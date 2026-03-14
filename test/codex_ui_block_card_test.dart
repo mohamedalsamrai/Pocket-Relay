@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/conversation_entry_card.dart';
@@ -7,16 +8,14 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/conversation
 void main() {
   testWidgets('renders reasoning blocks with markdown text', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexTextBlock(
-              id: 'reasoning_1',
-              kind: CodexUiBlockKind.reasoning,
-              createdAt: DateTime(2026, 3, 14, 12),
-              title: 'Reasoning',
-              body: 'Investigating the next step.',
-            ),
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'reasoning_1',
+            kind: CodexUiBlockKind.reasoning,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Reasoning',
+            body: 'Investigating the next step.',
           ),
         ),
       ),
@@ -30,19 +29,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData.light(),
-        darkTheme: ThemeData.dark(),
+      _buildTestApp(
         themeMode: ThemeMode.dark,
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexTextBlock(
-              id: 'reasoning_code_1',
-              kind: CodexUiBlockKind.reasoning,
-              createdAt: DateTime(2026, 3, 14, 12),
-              title: 'Reasoning',
-              body: '```dart\nfinal answer = 42;\n```',
-            ),
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'reasoning_code_1',
+            kind: CodexUiBlockKind.reasoning,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Reasoning',
+            body: '```dart\nfinal answer = 42;\n```',
           ),
         ),
       ),
@@ -53,29 +48,74 @@ void main() {
     final codeStyle = _findStyleForText(tester, 'final answer = 42;');
 
     expect(codeStyle, isNotNull);
-    expect(codeStyle?.color, const Color(0xFF1C1917));
+    expect(codeStyle?.color, const Color(0xFFE7F3F4));
+  });
+
+  testWidgets('uses dark surfaces for parsed codex cards in dark mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        themeMode: ThemeMode.dark,
+        child: Column(
+          children: [
+            ConversationEntryCard(
+              block: CodexTextBlock(
+                id: 'reasoning_dark_1',
+                kind: CodexUiBlockKind.reasoning,
+                createdAt: DateTime(2026, 3, 14, 12),
+                title: 'Reasoning',
+                body: 'Dark mode should use the themed surface.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            ConversationEntryCard(
+              block: CodexChangedFilesBlock(
+                id: 'files_dark_1',
+                createdAt: DateTime(2026, 3, 14, 12),
+                title: 'Changed files',
+                files: <CodexChangedFile>[
+                  const CodexChangedFile(
+                    path: 'lib/src/features/chat/presentation/widgets/foo.dart',
+                    additions: 2,
+                    deletions: 1,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    expect(
+      _findDecoratedContainerColorForText(tester, 'Reasoning'),
+      PocketPalette.dark.surface,
+    );
+    expect(
+      _findDecoratedContainerColorForText(tester, 'Changed files'),
+      PocketPalette.dark.surface,
+    );
   });
 
   testWidgets('renders approval request actions', (tester) async {
     String? approvedRequestId;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexApprovalRequestBlock(
-              id: 'request_1',
-              createdAt: DateTime(2026, 3, 14, 12),
-              requestId: 'request_1',
-              requestType: CodexCanonicalRequestType.fileChangeApproval,
-              title: 'File change approval',
-              body: 'Allow Codex to write files.',
-            ),
-            onApproveRequest: (requestId) async {
-              approvedRequestId = requestId;
-            },
-            onDenyRequest: (_) async {},
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexApprovalRequestBlock(
+            id: 'request_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            requestId: 'request_1',
+            requestType: CodexCanonicalRequestType.fileChangeApproval,
+            title: 'File change approval',
+            body: 'Allow Codex to write files.',
           ),
+          onApproveRequest: (requestId) async {
+            approvedRequestId = requestId;
+          },
+          onDenyRequest: (_) async {},
         ),
       ),
     );
@@ -94,29 +134,27 @@ void main() {
     Map<String, List<String>>? submittedAnswers;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexUserInputRequestBlock(
-              id: 'input_1',
-              createdAt: DateTime(2026, 3, 14, 12),
-              requestId: 'input_1',
-              requestType: CodexCanonicalRequestType.toolUserInput,
-              title: 'Input required',
-              body: 'Codex needs clarification.',
-              questions: const <CodexRuntimeUserInputQuestion>[
-                CodexRuntimeUserInputQuestion(
-                  id: 'q1',
-                  header: 'Project',
-                  question: 'Which project should I use?',
-                ),
-              ],
-            ),
-            onSubmitUserInput: (requestId, answers) async {
-              submittedRequestId = requestId;
-              submittedAnswers = answers;
-            },
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexUserInputRequestBlock(
+            id: 'input_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            requestId: 'input_1',
+            requestType: CodexCanonicalRequestType.toolUserInput,
+            title: 'Input required',
+            body: 'Codex needs clarification.',
+            questions: const <CodexRuntimeUserInputQuestion>[
+              CodexRuntimeUserInputQuestion(
+                id: 'q1',
+                header: 'Project',
+                question: 'Which project should I use?',
+              ),
+            ],
           ),
+          onSubmitUserInput: (requestId, answers) async {
+            submittedRequestId = requestId;
+            submittedAnswers = answers;
+          },
         ),
       ),
     );
@@ -144,16 +182,14 @@ void main() {
       ];
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: ConversationEntryCard(
-                block: CodexProposedPlanBlock(
-                  id: 'plan_1',
-                  createdAt: DateTime(2026, 3, 14, 12),
-                  title: 'Proposed plan',
-                  markdown: markdownLines.join('\n'),
-                ),
+        _buildTestApp(
+          child: SingleChildScrollView(
+            child: ConversationEntryCard(
+              block: CodexProposedPlanBlock(
+                id: 'plan_1',
+                createdAt: DateTime(2026, 3, 14, 12),
+                title: 'Proposed plan',
+                markdown: markdownLines.join('\n'),
               ),
             ),
           ),
@@ -175,30 +211,28 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexWorkLogGroupBlock(
-              id: 'worklog_1',
-              createdAt: DateTime(2026, 3, 14, 12),
-              entries: <CodexWorkLogEntry>[
-                CodexWorkLogEntry(
-                  id: 'entry_1',
-                  createdAt: DateTime(2026, 3, 14, 12),
-                  entryKind: CodexWorkLogEntryKind.commandExecution,
-                  title: 'Read docs completed',
-                  preview: 'Found the CLI docs',
-                  exitCode: 0,
-                ),
-                CodexWorkLogEntry(
-                  id: 'entry_2',
-                  createdAt: DateTime(2026, 3, 14, 12, 0, 1),
-                  entryKind: CodexWorkLogEntryKind.webSearch,
-                  title: 'Search the reference complete',
-                  isRunning: true,
-                ),
-              ],
-            ),
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexWorkLogGroupBlock(
+            id: 'worklog_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            entries: <CodexWorkLogEntry>[
+              CodexWorkLogEntry(
+                id: 'entry_1',
+                createdAt: DateTime(2026, 3, 14, 12),
+                entryKind: CodexWorkLogEntryKind.commandExecution,
+                title: 'Read docs completed',
+                preview: 'Found the CLI docs',
+                exitCode: 0,
+              ),
+              CodexWorkLogEntry(
+                id: 'entry_2',
+                createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+                entryKind: CodexWorkLogEntryKind.webSearch,
+                title: 'Search the reference complete',
+                isRunning: true,
+              ),
+            ],
           ),
         ),
       ),
@@ -212,34 +246,32 @@ void main() {
 
   testWidgets('renders changed files summary and diff toggle', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ConversationEntryCard(
-            block: CodexChangedFilesBlock(
-              id: 'diff_1',
-              createdAt: DateTime(2026, 3, 14, 12),
-              title: 'Changed files',
-              files: const <CodexChangedFile>[
-                CodexChangedFile(
-                  path: 'lib/src/features/chat/chat_screen.dart',
-                  additions: 3,
-                  deletions: 1,
-                ),
-                CodexChangedFile(
-                  path:
-                      'lib/src/features/chat/widgets/conversation_entry_card.dart',
-                  additions: 8,
-                  deletions: 2,
-                ),
-              ],
-              unifiedDiff:
-                  'diff --git a/lib/main.dart b/lib/main.dart\n'
-                  '--- a/lib/main.dart\n'
-                  '+++ b/lib/main.dart\n'
-                  '@@ -1 +1 @@\n'
-                  '-old\n'
-                  '+new\n',
-            ),
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(
+                path: 'lib/src/features/chat/chat_screen.dart',
+                additions: 3,
+                deletions: 1,
+              ),
+              CodexChangedFile(
+                path:
+                    'lib/src/features/chat/widgets/conversation_entry_card.dart',
+                additions: 8,
+                deletions: 2,
+              ),
+            ],
+            unifiedDiff:
+                'diff --git a/lib/main.dart b/lib/main.dart\n'
+                '--- a/lib/main.dart\n'
+                '+++ b/lib/main.dart\n'
+                '@@ -1 +1 @@\n'
+                '-old\n'
+                '+new\n',
           ),
         ),
       ),
@@ -255,6 +287,18 @@ void main() {
     expect(find.text('Hide diff'), findsOneWidget);
     expect(find.textContaining('diff --git a/lib/main.dart'), findsOneWidget);
   });
+}
+
+Widget _buildTestApp({
+  required Widget child,
+  ThemeMode themeMode = ThemeMode.light,
+}) {
+  return MaterialApp(
+    theme: buildPocketTheme(Brightness.light),
+    darkTheme: buildPocketTheme(Brightness.dark),
+    themeMode: themeMode,
+    home: Scaffold(body: child),
+  );
 }
 
 TextStyle? _findStyleForText(WidgetTester tester, String text) {
@@ -275,6 +319,19 @@ TextStyle? _findStyleForText(WidgetTester tester, String text) {
     final style = _styleForInlineText(widget.text, text);
     if (style != null) {
       return style;
+    }
+  }
+
+  return null;
+}
+
+Color? _findDecoratedContainerColorForText(WidgetTester tester, String text) {
+  for (final container in tester.widgetList<Container>(
+    find.ancestor(of: find.text(text), matching: find.byType(Container)),
+  )) {
+    final decoration = container.decoration;
+    if (decoration is BoxDecoration && decoration.color != null) {
+      return decoration.color;
     }
   }
 

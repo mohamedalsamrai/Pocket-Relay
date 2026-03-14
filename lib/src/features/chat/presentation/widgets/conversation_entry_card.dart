@@ -1,7 +1,8 @@
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 
 class ConversationEntryCard extends StatelessWidget {
   const ConversationEntryCard({
@@ -23,6 +24,7 @@ class ConversationEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
     return switch (block) {
       final CodexUserMessageBlock userBlock => _UserMessageCard(
         block: userBlock,
@@ -72,19 +74,19 @@ class ConversationEntryCard extends StatelessWidget {
       final CodexStatusBlock statusBlock => _MetaCard(
         title: statusBlock.title,
         body: statusBlock.body,
-        accent: const Color(0xFF0F766E),
+        accent: _tealAccent(brightness),
         icon: Icons.info_outline,
       ),
       final CodexErrorBlock errorBlock => _MetaCard(
         title: errorBlock.title,
         body: errorBlock.body,
-        accent: const Color(0xFFB91C1C),
+        accent: _redAccent(brightness),
         icon: Icons.warning_amber_rounded,
       ),
       final CodexUsageBlock usageBlock => _MetaCard(
         title: usageBlock.title,
         body: usageBlock.body,
-        accent: const Color(0xFF7C3AED),
+        accent: _violetAccent(brightness),
         icon: Icons.analytics_outlined,
       ),
     };
@@ -153,27 +155,32 @@ class _TextBlockCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final palette = _paletteFor(block.kind);
+    final cards = _ConversationCardPalette.of(context);
+    final palette = _paletteFor(block.kind, theme.brightness);
     final markdownStyle = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyLarge?.copyWith(
-        color: const Color(0xFF1C1917),
+        color: cards.textPrimary,
         height: 1.5,
       ),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xFFF0EBDE),
+        color: cards.codeSurface,
         borderRadius: BorderRadius.circular(16),
       ),
       blockquoteDecoration: BoxDecoration(
-        color: palette.accent.withValues(alpha: 0.08),
+        color: cards.tintedSurface(
+          palette.accent,
+          lightAlpha: 0.08,
+          darkAlpha: 0.18,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
-      h1: theme.textTheme.headlineSmall,
-      h2: theme.textTheme.titleLarge,
-      h3: theme.textTheme.titleMedium,
+      h1: theme.textTheme.headlineSmall?.copyWith(color: cards.textPrimary),
+      h2: theme.textTheme.titleLarge?.copyWith(color: cards.textPrimary),
+      h3: theme.textTheme.titleMedium?.copyWith(color: cards.textPrimary),
       code: theme.textTheme.bodyMedium?.copyWith(
-        color: const Color(0xFF1C1917),
+        color: cards.codeText,
         fontFamily: 'monospace',
-        backgroundColor: const Color(0xFFF0EBDE),
+        backgroundColor: cards.codeSurface,
       ),
     );
 
@@ -182,12 +189,12 @@ class _TextBlockCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cards.surface,
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: palette.border),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x12000000),
+              color: cards.shadow,
               blurRadius: 20,
               offset: Offset(0, 12),
             ),
@@ -245,17 +252,21 @@ class _PlanUpdateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final accent = _blueAccent(theme.brightness);
+
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 720),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cards.surface,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFBFDBFE)),
-          boxShadow: const [
+          border: Border.all(color: cards.accentBorder(accent)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x12000000),
+              color: cards.shadow,
               blurRadius: 20,
               offset: Offset(0, 12),
             ),
@@ -264,16 +275,16 @@ class _PlanUpdateCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.checklist_rtl, size: 18, color: Color(0xFF2563EB)),
-                SizedBox(width: 8),
+                Icon(Icons.checklist_rtl, size: 18, color: accent),
+                const SizedBox(width: 8),
                 Text(
                   'Plan',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF2563EB),
+                    color: accent,
                     letterSpacing: 0.4,
                   ),
                 ),
@@ -284,8 +295,8 @@ class _PlanUpdateCard extends StatelessWidget {
               const SizedBox(height: 12),
               SelectableText(
                 block.explanation!,
-                style: const TextStyle(
-                  color: Color(0xFF334155),
+                style: TextStyle(
+                  color: cards.textSecondary,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -294,7 +305,7 @@ class _PlanUpdateCard extends StatelessWidget {
             if (block.steps.isNotEmpty) ...[
               const SizedBox(height: 14),
               ...block.steps.map((step) {
-                final status = _planStepStatus(step.status);
+                final status = _planStepStatus(step.status, cards);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
@@ -311,8 +322,8 @@ class _PlanUpdateCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           step.step,
-                          style: const TextStyle(
-                            color: Color(0xFF0F172A),
+                          style: TextStyle(
+                            color: cards.textPrimary,
                             fontSize: 14,
                             height: 1.35,
                           ),
@@ -326,9 +337,9 @@ class _PlanUpdateCard extends StatelessWidget {
               }),
             ] else ...[
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Waiting for plan steps…',
-                style: TextStyle(color: Color(0xFF64748B)),
+                style: TextStyle(color: cards.textMuted),
               ),
             ],
           ],
@@ -353,23 +364,25 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final accent = _blueAccent(theme.brightness);
     final markdownStyle = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyLarge?.copyWith(
-        color: const Color(0xFF1C1917),
+        color: cards.textPrimary,
         height: 1.5,
       ),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xFFF0EBDE),
+        color: cards.codeSurface,
         borderRadius: BorderRadius.circular(16),
       ),
       blockquoteDecoration: BoxDecoration(
-        color: const Color(0xFFDBEAFE),
+        color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
         borderRadius: BorderRadius.circular(16),
       ),
       code: theme.textTheme.bodyMedium?.copyWith(
-        color: const Color(0xFF1C1917),
+        color: cards.codeText,
         fontFamily: 'monospace',
-        backgroundColor: const Color(0xFFF0EBDE),
+        backgroundColor: cards.codeSurface,
       ),
     );
     final title =
@@ -391,12 +404,12 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cards.surface,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: const Color(0xFFBFDBFE)),
-          boxShadow: const [
+          border: Border.all(color: cards.accentBorder(accent)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x12000000),
+              color: cards.shadow,
               blurRadius: 20,
               offset: Offset(0, 12),
             ),
@@ -407,19 +420,15 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.description_outlined,
-                  size: 18,
-                  color: Color(0xFF2563EB),
-                ),
+                Icon(Icons.description_outlined, size: 18, color: accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF2563EB),
+                      color: accent,
                       letterSpacing: 0.4,
                     ),
                   ),
@@ -446,13 +455,13 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
                     child: IgnorePointer(
                       child: Container(
                         height: 48,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: <Color>[
-                              Color(0x00FFFFFF),
-                              Color(0xFFFFFFFF),
+                              cards.surface.withValues(alpha: 0),
+                              cards.surface,
                             ],
                           ),
                         ),
@@ -489,6 +498,7 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cards = _ConversationCardPalette.of(context);
     final entries = widget.block.entries;
     final hasOverflow = entries.length > 4;
     final visibleEntries = hasOverflow && !_expanded
@@ -500,19 +510,19 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: cards.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFD7CDB8)),
+          border: Border.all(color: cards.neutralBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.construction_outlined,
                   size: 18,
-                  color: Color(0xFF78716C),
+                  color: cards.textMuted,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -522,18 +532,18 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
                       )
                       ? 'Work log'
                       : 'Activity',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF57534E),
+                    color: cards.textSecondary,
                     letterSpacing: 0.4,
                   ),
                 ),
                 const Spacer(),
                 Text(
                   '${entries.length}',
-                  style: const TextStyle(
-                    color: Color(0xFF78716C),
+                  style: TextStyle(
+                    color: cards.textMuted,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -566,8 +576,10 @@ class _WorkLogEntryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
     final icon = _workLogIcon(entry.entryKind);
-    final accent = _workLogAccent(entry.entryKind);
+    final accent = _workLogAccent(entry.entryKind, theme.brightness);
     final title = _normalizeCompactToolLabel(entry.title);
     final preview = _normalizedWorkLogPreview(entry.preview, title);
 
@@ -575,9 +587,9 @@ class _WorkLogEntryRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
+        color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withValues(alpha: 0.18)),
+        border: Border.all(color: cards.accentBorder(accent)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,8 +602,8 @@ class _WorkLogEntryRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF1C1917),
+                  style: TextStyle(
+                    color: cards.textPrimary,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -602,8 +614,8 @@ class _WorkLogEntryRow extends StatelessWidget {
                     preview,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF57534E),
+                    style: TextStyle(
+                      color: cards.textSecondary,
                       fontSize: 12,
                       height: 1.35,
                     ),
@@ -614,13 +626,13 @@ class _WorkLogEntryRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           if (entry.isRunning)
-            const _Badge(label: 'running', color: Color(0xFF0F766E))
+            _Badge(label: 'running', color: _tealAccent(theme.brightness))
           else if (entry.exitCode != null)
             _Badge(
               label: 'exit ${entry.exitCode}',
               color: entry.exitCode == 0
-                  ? const Color(0xFF2563EB)
-                  : const Color(0xFFDC2626),
+                  ? _blueAccent(theme.brightness)
+                  : _redAccent(theme.brightness),
             ),
         ],
       ),
@@ -642,6 +654,9 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final accent = _amberAccent(theme.brightness);
     final files = widget.block.files;
     final diff = widget.block.unifiedDiff?.trim();
     final canToggleDiff = diff != null && diff.isNotEmpty;
@@ -662,12 +677,12 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cards.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFFCD34D)),
-          boxShadow: const [
+          border: Border.all(color: cards.accentBorder(accent)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x14000000),
+              color: cards.shadow,
               blurRadius: 18,
               offset: Offset(0, 10),
             ),
@@ -678,19 +693,15 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
           children: [
             Row(
               children: [
-                const Icon(
-                  Icons.drive_file_rename_outline,
-                  size: 18,
-                  color: Color(0xFFB45309),
-                ),
+                Icon(Icons.drive_file_rename_outline, size: 18, color: accent),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     widget.block.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFB45309),
+                      color: accent,
                       letterSpacing: 0.4,
                     ),
                   ),
@@ -704,8 +715,8 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
               children: [
                 Text(
                   fileCountLabel,
-                  style: const TextStyle(
-                    color: Color(0xFF78716C),
+                  style: TextStyle(
+                    color: cards.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.2,
@@ -715,19 +726,16 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                   const SizedBox(width: 8),
                   Text(
                     '+$totalAdditions -$totalDeletions',
-                    style: const TextStyle(
-                      color: Color(0xFF57534E),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: cards.textSecondary, fontSize: 12),
                   ),
                 ],
               ],
             ),
             const SizedBox(height: 10),
             if (files.isEmpty)
-              const Text(
+              Text(
                 'Waiting for changed files…',
-                style: TextStyle(color: Color(0xFF78716C)),
+                style: TextStyle(color: cards.textMuted),
               )
             else
               Column(
@@ -741,21 +749,27 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBEB),
+                          color: cards.tintedSurface(
+                            accent,
+                            lightAlpha: 0.08,
+                            darkAlpha: 0.14,
+                          ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: const Color(
-                              0xFFFCD34D,
-                            ).withValues(alpha: 0.5),
+                            color: cards.accentBorder(
+                              accent,
+                              lightAlpha: 0.32,
+                              darkAlpha: 0.42,
+                            ),
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.insert_drive_file_outlined,
                               size: 14,
-                              color: Color(0xFFB45309),
+                              color: accent,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -763,10 +777,10 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                                 file.path,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontFamily: 'monospace',
-                                  color: Color(0xFF44403C),
+                                  color: cards.textSecondary,
                                   height: 1.35,
                                 ),
                               ),
@@ -775,9 +789,9 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                               const SizedBox(width: 8),
                               Text(
                                 '+${file.additions} -${file.deletions}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Color(0xFF78716C),
+                                  color: cards.textMuted,
                                 ),
                               ),
                             ],
@@ -800,13 +814,13 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
+                  color: cards.terminalBody,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: SelectableText(
                   diff,
-                  style: const TextStyle(
-                    color: Color(0xFFE5E7EB),
+                  style: TextStyle(
+                    color: cards.terminalText,
                     fontFamily: 'monospace',
                     fontSize: 12,
                     height: 1.35,
@@ -828,6 +842,9 @@ class _CommandCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final runningColor = _tealAccent(theme.brightness);
     final output = block.output.trim().isEmpty
         ? 'Waiting for output…'
         : block.output;
@@ -836,11 +853,11 @@ class _CommandCard extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 760),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1F2937),
+          color: cards.terminalShell,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x22000000),
+              color: cards.shadow,
               blurRadius: 20,
               offset: Offset(0, 10),
             ),
@@ -856,24 +873,28 @@ class _CommandCard extends StatelessWidget {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  const Icon(Icons.terminal, color: Colors.white70, size: 18),
+                  Icon(
+                    Icons.terminal,
+                    color: cards.terminalText.withValues(alpha: 0.72),
+                    size: 18,
+                  ),
                   Text(
                     block.command,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: cards.terminalText,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'monospace',
                     ),
                   ),
                   if (block.isRunning)
-                    const _StateChip(label: 'running', color: Color(0xFF0F766E))
+                    _StateChip(label: 'running', color: runningColor)
                   else if (block.exitCode != null)
                     _StateChip(
                       label: 'exit ${block.exitCode}',
                       color: block.exitCode == 0
-                          ? const Color(0xFF2563EB)
-                          : const Color(0xFFDC2626),
+                          ? _blueAccent(theme.brightness)
+                          : _redAccent(theme.brightness),
                     ),
                 ],
               ),
@@ -886,16 +907,16 @@ class _CommandCard extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-              decoration: const BoxDecoration(
-                color: Color(0xFF111827),
+              decoration: BoxDecoration(
+                color: cards.terminalBody,
                 borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(24),
                 ),
               ),
               child: SelectableText(
                 output,
-                style: const TextStyle(
-                  color: Color(0xFFE5E7EB),
+                style: TextStyle(
+                  color: cards.terminalText,
                   fontFamily: 'monospace',
                   fontSize: 13,
                   height: 1.45,
@@ -922,6 +943,9 @@ class _ApprovalRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final accent = _amberAccent(theme.brightness);
     final canRespond = !block.isResolved && onApprove != null && onDeny != null;
 
     return ConstrainedBox(
@@ -929,14 +953,12 @@ class _ApprovalRequestCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFBEB),
+          color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.14),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
-          ),
-          boxShadow: const [
+          border: Border.all(color: cards.accentBorder(accent)),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x10F59E0B),
+              color: cards.shadow,
               blurRadius: 18,
               offset: Offset(0, 10),
             ),
@@ -947,13 +969,13 @@ class _ApprovalRequestCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.gpp_maybe_outlined, color: Color(0xFFD97706)),
+                Icon(Icons.gpp_maybe_outlined, color: accent),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     block.title,
-                    style: const TextStyle(
-                      color: Color(0xFFB45309),
+                    style: TextStyle(
+                      color: accent,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
@@ -962,7 +984,7 @@ class _ApprovalRequestCard extends StatelessWidget {
                 if (block.isResolved)
                   _Badge(
                     label: block.resolutionLabel ?? 'resolved',
-                    color: const Color(0xFFB45309),
+                    color: accent,
                   ),
               ],
             ),
@@ -970,8 +992,8 @@ class _ApprovalRequestCard extends StatelessWidget {
               const SizedBox(height: 10),
               SelectableText(
                 block.body,
-                style: const TextStyle(
-                  color: Color(0xFF3F3F46),
+                style: TextStyle(
+                  color: cards.textSecondary,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -991,6 +1013,7 @@ class _ApprovalRequestCard extends StatelessWidget {
                       : null,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFB45309),
+                    foregroundColor: Colors.white,
                   ),
                   child: const Text('Approve'),
                 ),
@@ -1046,6 +1069,9 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cards = _ConversationCardPalette.of(context);
+    final accent = _blueAccent(theme.brightness);
     final canSubmit = !widget.block.isResolved && widget.onSubmit != null;
 
     return ConstrainedBox(
@@ -1053,39 +1079,37 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: cards.tintedSurface(accent, lightAlpha: 0.06, darkAlpha: 0.14),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFF2563EB).withValues(alpha: 0.2),
-          ),
+          border: Border.all(color: cards.accentBorder(accent)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.fact_check_outlined, color: Color(0xFF2563EB)),
+                Icon(Icons.fact_check_outlined, color: accent),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     widget.block.title,
-                    style: const TextStyle(
-                      color: Color(0xFF1D4ED8),
+                    style: TextStyle(
+                      color: accent,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 if (widget.block.isResolved)
-                  const _Badge(label: 'submitted', color: Color(0xFF2563EB)),
+                  _Badge(label: 'submitted', color: accent),
               ],
             ),
             if (widget.block.body.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
               SelectableText(
                 widget.block.body,
-                style: const TextStyle(
-                  color: Color(0xFF334155),
+                style: TextStyle(
+                  color: cards.textSecondary,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -1105,6 +1129,7 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
   }
 
   List<Widget> _buildFields() {
+    final cards = _ConversationCardPalette.of(context);
     if (widget.block.questions.isEmpty) {
       return <Widget>[
         TextField(
@@ -1128,16 +1153,16 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
           children: [
             Text(
               question.header,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
+                color: cards.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               question.question,
-              style: const TextStyle(
-                color: Color(0xFF475569),
+              style: TextStyle(
+                color: cards.textSecondary,
                 fontSize: 13,
                 height: 1.35,
               ),
@@ -1205,14 +1230,15 @@ class _MetaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cards = _ConversationCardPalette.of(context);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 680),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: cards.surface,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: accent.withValues(alpha: 0.24)),
+          border: Border.all(color: cards.accentBorder(accent)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1235,8 +1261,8 @@ class _MetaCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     SelectableText(
                       body,
-                      style: const TextStyle(
-                        color: Color(0xFF292524),
+                      style: TextStyle(
+                        color: cards.textPrimary,
                         fontSize: 14,
                         height: 1.4,
                       ),
@@ -1285,16 +1311,17 @@ class _InlinePulseChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = _tealAccent(Theme.of(context).brightness);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F766E).withValues(alpha: 0.12),
+        color: accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: Color(0xFF0F766E),
+        style: TextStyle(
+          color: accent,
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
@@ -1329,6 +1356,79 @@ class _StateChip extends StatelessWidget {
   }
 }
 
+class _ConversationCardPalette {
+  const _ConversationCardPalette({
+    required this.brightness,
+    required this.surface,
+    required this.neutralBorder,
+    required this.shadow,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textMuted,
+    required this.codeSurface,
+    required this.codeText,
+    required this.terminalShell,
+    required this.terminalBody,
+    required this.terminalText,
+  });
+
+  factory _ConversationCardPalette.of(BuildContext context) {
+    final theme = Theme.of(context);
+    final pocket = context.pocketPalette;
+    final brightness = theme.brightness;
+    final isDark = brightness == Brightness.dark;
+
+    return _ConversationCardPalette(
+      brightness: brightness,
+      surface: pocket.surface,
+      neutralBorder: pocket.surfaceBorder,
+      shadow: pocket.shadowColor,
+      textPrimary: isDark ? const Color(0xFFF4F2ED) : const Color(0xFF1C1917),
+      textSecondary: isDark ? const Color(0xFFD6D0C5) : const Color(0xFF57534E),
+      textMuted: isDark ? const Color(0xFFA8A29E) : const Color(0xFF78716C),
+      codeSurface: isDark ? const Color(0xFF0F191B) : const Color(0xFFF0EBDE),
+      codeText: isDark ? const Color(0xFFE7F3F4) : const Color(0xFF1C1917),
+      terminalShell: isDark ? const Color(0xFF111B1D) : const Color(0xFF1F2937),
+      terminalBody: isDark ? const Color(0xFF0A1112) : const Color(0xFF111827),
+      terminalText: isDark ? const Color(0xFFE5F0F1) : const Color(0xFFE5E7EB),
+    );
+  }
+
+  final Brightness brightness;
+  final Color surface;
+  final Color neutralBorder;
+  final Color shadow;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textMuted;
+  final Color codeSurface;
+  final Color codeText;
+  final Color terminalShell;
+  final Color terminalBody;
+  final Color terminalText;
+
+  bool get isDark => brightness == Brightness.dark;
+
+  Color tintedSurface(
+    Color accent, {
+    double lightAlpha = 0.06,
+    double darkAlpha = 0.14,
+  }) {
+    return Color.alphaBlend(
+      accent.withValues(alpha: isDark ? darkAlpha : lightAlpha),
+      surface,
+    );
+  }
+
+  Color accentBorder(
+    Color accent, {
+    double lightAlpha = 0.32,
+    double darkAlpha = 0.42,
+  }) {
+    return accent.withValues(alpha: isDark ? darkAlpha : lightAlpha);
+  }
+}
+
 class _BlockPalette {
   const _BlockPalette({
     required this.accent,
@@ -1341,28 +1441,35 @@ class _BlockPalette {
   final IconData icon;
 }
 
-_BlockPalette _paletteFor(CodexUiBlockKind kind) {
+_BlockPalette _paletteFor(CodexUiBlockKind kind, Brightness brightness) {
   return switch (kind) {
-    CodexUiBlockKind.reasoning => const _BlockPalette(
-      accent: Color(0xFF7C3AED),
-      border: Color(0xFFD8B4FE),
+    CodexUiBlockKind.reasoning => _BlockPalette(
+      accent: _violetAccent(brightness),
+      border: _violetAccent(
+        brightness,
+      ).withValues(alpha: brightness == Brightness.dark ? 0.4 : 0.3),
       icon: Icons.psychology_alt_outlined,
     ),
-    CodexUiBlockKind.plan ||
-    CodexUiBlockKind.proposedPlan => const _BlockPalette(
-      accent: Color(0xFF2563EB),
-      border: Color(0xFFBFDBFE),
+    CodexUiBlockKind.plan || CodexUiBlockKind.proposedPlan => _BlockPalette(
+      accent: _blueAccent(brightness),
+      border: _blueAccent(
+        brightness,
+      ).withValues(alpha: brightness == Brightness.dark ? 0.4 : 0.28),
       icon: Icons.checklist_rtl,
     ),
     CodexUiBlockKind.fileChange ||
-    CodexUiBlockKind.changedFiles => const _BlockPalette(
-      accent: Color(0xFFB45309),
-      border: Color(0xFFFCD34D),
+    CodexUiBlockKind.changedFiles => _BlockPalette(
+      accent: _amberAccent(brightness),
+      border: _amberAccent(
+        brightness,
+      ).withValues(alpha: brightness == Brightness.dark ? 0.42 : 0.3),
       icon: Icons.drive_file_rename_outline,
     ),
-    _ => const _BlockPalette(
-      accent: Color(0xFF0F766E),
-      border: Color(0xFFD5CCB8),
+    _ => _BlockPalette(
+      accent: _tealAccent(brightness),
+      border: _tealAccent(
+        brightness,
+      ).withValues(alpha: brightness == Brightness.dark ? 0.38 : 0.24),
       icon: Icons.auto_awesome,
     ),
   };
@@ -1384,27 +1491,54 @@ class _PlanStepStatusPresentation {
   final IconData icon;
 }
 
-_PlanStepStatusPresentation _planStepStatus(CodexRuntimePlanStepStatus status) {
+_PlanStepStatusPresentation _planStepStatus(
+  CodexRuntimePlanStepStatus status,
+  _ConversationCardPalette cards,
+) {
   return switch (status) {
-    CodexRuntimePlanStepStatus.completed => const _PlanStepStatusPresentation(
+    CodexRuntimePlanStepStatus.completed => _PlanStepStatusPresentation(
       label: 'done',
-      accent: Color(0xFF0F766E),
-      border: Color(0xFFA7F3D0),
-      background: Color(0xFFF0FDFA),
+      accent: _tealAccent(cards.brightness),
+      border: cards.accentBorder(
+        _tealAccent(cards.brightness),
+        lightAlpha: 0.24,
+        darkAlpha: 0.34,
+      ),
+      background: cards.tintedSurface(
+        _tealAccent(cards.brightness),
+        lightAlpha: 0.08,
+        darkAlpha: 0.18,
+      ),
       icon: Icons.check_circle_outline,
     ),
-    CodexRuntimePlanStepStatus.inProgress => const _PlanStepStatusPresentation(
+    CodexRuntimePlanStepStatus.inProgress => _PlanStepStatusPresentation(
       label: 'active',
-      accent: Color(0xFF2563EB),
-      border: Color(0xFFBFDBFE),
-      background: Color(0xFFEFF6FF),
+      accent: _blueAccent(cards.brightness),
+      border: cards.accentBorder(
+        _blueAccent(cards.brightness),
+        lightAlpha: 0.24,
+        darkAlpha: 0.34,
+      ),
+      background: cards.tintedSurface(
+        _blueAccent(cards.brightness),
+        lightAlpha: 0.08,
+        darkAlpha: 0.18,
+      ),
       icon: Icons.timelapse_outlined,
     ),
-    CodexRuntimePlanStepStatus.pending => const _PlanStepStatusPresentation(
+    CodexRuntimePlanStepStatus.pending => _PlanStepStatusPresentation(
       label: 'pending',
-      accent: Color(0xFF78716C),
-      border: Color(0xFFE7E5E4),
-      background: Color(0xFFFAFAF9),
+      accent: _neutralAccent(cards.brightness),
+      border: cards.accentBorder(
+        _neutralAccent(cards.brightness),
+        lightAlpha: 0.18,
+        darkAlpha: 0.26,
+      ),
+      background: cards.tintedSurface(
+        _neutralAccent(cards.brightness),
+        lightAlpha: 0.04,
+        darkAlpha: 0.1,
+      ),
       icon: Icons.radio_button_unchecked,
     ),
   };
@@ -1423,17 +1557,59 @@ IconData _workLogIcon(CodexWorkLogEntryKind kind) {
   };
 }
 
-Color _workLogAccent(CodexWorkLogEntryKind kind) {
+Color _workLogAccent(CodexWorkLogEntryKind kind, Brightness brightness) {
   return switch (kind) {
-    CodexWorkLogEntryKind.commandExecution => const Color(0xFF2563EB),
-    CodexWorkLogEntryKind.webSearch => const Color(0xFF0F766E),
-    CodexWorkLogEntryKind.imageView => const Color(0xFF7C3AED),
-    CodexWorkLogEntryKind.mcpToolCall => const Color(0xFFB45309),
-    CodexWorkLogEntryKind.dynamicToolCall => const Color(0xFFDC2626),
-    CodexWorkLogEntryKind.collabAgentToolCall => const Color(0xFF9333EA),
-    CodexWorkLogEntryKind.fileChange => const Color(0xFFB45309),
-    CodexWorkLogEntryKind.unknown => const Color(0xFF0F766E),
+    CodexWorkLogEntryKind.commandExecution => _blueAccent(brightness),
+    CodexWorkLogEntryKind.webSearch => _tealAccent(brightness),
+    CodexWorkLogEntryKind.imageView => _violetAccent(brightness),
+    CodexWorkLogEntryKind.mcpToolCall => _amberAccent(brightness),
+    CodexWorkLogEntryKind.dynamicToolCall => _redAccent(brightness),
+    CodexWorkLogEntryKind.collabAgentToolCall => _purpleAccent(brightness),
+    CodexWorkLogEntryKind.fileChange => _amberAccent(brightness),
+    CodexWorkLogEntryKind.unknown => _tealAccent(brightness),
   };
+}
+
+Color _tealAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFF2DD4BF)
+      : const Color(0xFF0F766E);
+}
+
+Color _blueAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFF60A5FA)
+      : const Color(0xFF2563EB);
+}
+
+Color _violetAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFC4B5FD)
+      : const Color(0xFF7C3AED);
+}
+
+Color _purpleAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFD8B4FE)
+      : const Color(0xFF9333EA);
+}
+
+Color _amberAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFFBBF24)
+      : const Color(0xFFB45309);
+}
+
+Color _redAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFF87171)
+      : const Color(0xFFDC2626);
+}
+
+Color _neutralAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFC4BBB0)
+      : const Color(0xFF78716C);
 }
 
 String _normalizeCompactToolLabel(String value) {
