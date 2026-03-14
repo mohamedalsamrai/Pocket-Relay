@@ -30,6 +30,27 @@ class CodexSessionState {
 
   bool get isBusy => connectionStatus == CodexRuntimeSessionState.running;
 
+  List<CodexUiBlock> get transcriptBlocks =>
+      blocks.where(_shouldAppearInTranscript).toList(growable: false);
+
+  CodexApprovalRequestBlock? get primaryPendingApprovalBlock =>
+      _firstPendingBlock<CodexApprovalRequestBlock>(
+        blocks.whereType<CodexApprovalRequestBlock>().where(
+          (block) =>
+              !block.isResolved &&
+              pendingApprovalRequests.containsKey(block.requestId),
+        ),
+      );
+
+  CodexUserInputRequestBlock? get primaryPendingUserInputBlock =>
+      _firstPendingBlock<CodexUserInputRequestBlock>(
+        blocks.whereType<CodexUserInputRequestBlock>().where(
+          (block) =>
+              !block.isResolved &&
+              pendingUserInputRequests.containsKey(block.requestId),
+        ),
+      );
+
   CodexSessionState copyWith({
     CodexRuntimeSessionState? connectionStatus,
     String? threadId,
@@ -58,6 +79,20 @@ class CodexSessionState {
           : (latestUsageSummary ?? this.latestUsageSummary),
     );
   }
+}
+
+bool _shouldAppearInTranscript(CodexUiBlock block) {
+  return switch (block) {
+    CodexApprovalRequestBlock(:final isResolved) => isResolved,
+    CodexUserInputRequestBlock(:final isResolved) => isResolved,
+    _ => true,
+  };
+}
+
+T? _firstPendingBlock<T extends CodexUiBlock>(Iterable<T> blocks) {
+  final sorted = blocks.toList(growable: false)
+    ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
+  return sorted.isEmpty ? null : sorted.first;
 }
 
 class CodexSessionPendingRequest {

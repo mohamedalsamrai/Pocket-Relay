@@ -57,8 +57,8 @@ class EmptyState extends StatelessWidget {
                       const SizedBox(height: 10),
                       Text(
                         isConfigured
-                            ? 'Send a prompt below. The app will SSH into your box, run `codex exec --json`, and render messages, commands, and status as cards.'
-                            : 'Start by configuring an SSH target. After that, every prompt runs Codex remotely and keeps the output readable on mobile.',
+                            ? 'Send a prompt below. The app will SSH into your box, keep `codex app-server` running, and turn the live stream into phone-sized cards.'
+                            : 'Start by configuring an SSH target. After that, the app keeps a remote Codex session open and makes the interaction readable on mobile.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.black.withValues(alpha: 0.68),
@@ -72,7 +72,8 @@ class EmptyState extends StatelessWidget {
                         runSpacing: 10,
                         children: const [
                           _ChecklistPill('SSH into the dev box'),
-                          _ChecklistPill('Run Codex in JSON mode'),
+                          _ChecklistPill('Keep Codex app-server live'),
+                          _ChecklistPill('Handle approvals and user input'),
                           _ChecklistPill('Show commands and answers as cards'),
                         ],
                       ),

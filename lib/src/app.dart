@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen.dart';
+import 'package:pocket_relay/src/features/chat/services/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/services/ssh_codex_service.dart';
 
 class PocketRelayApp extends StatelessWidget {
-  const PocketRelayApp({super.key, this.profileStore, this.remoteService});
+  const PocketRelayApp({
+    super.key,
+    this.profileStore,
+    this.remoteService,
+    this.appServerClient,
+  });
 
   final CodexProfileStore? profileStore;
   final SshCodexService? remoteService;
+  final CodexAppServerClient? appServerClient;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +62,7 @@ class PocketRelayApp extends StatelessWidget {
       home: ChatScreen(
         profileStore: profileStore ?? SecureCodexProfileStore(),
         remoteService: remoteService ?? SshCodexService(),
+        appServerClient: appServerClient ?? CodexAppServerClient(),
       ),
     );
   }
