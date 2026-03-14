@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:codex_pocket/src/features/chat/models/codex_remote_event.dart';
-import 'package:codex_pocket/src/features/chat/models/conversation_entry.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_remote_event.dart';
+import 'package:pocket_relay/src/features/chat/models/conversation_entry.dart';
 
 class ParsedCodexLine {
   const ParsedCodexLine({this.events = const [], this.usage});

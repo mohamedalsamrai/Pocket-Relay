@@ -1,4 +1,4 @@
-import 'package:codex_pocket/src/features/chat/models/conversation_entry.dart';
+import 'package:pocket_relay/src/features/chat/models/conversation_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 

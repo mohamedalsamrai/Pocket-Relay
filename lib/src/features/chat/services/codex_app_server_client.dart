@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/core/utils/shell_utils.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:dartssh2/dartssh2.dart';
 
 sealed class CodexAppServerEvent {
@@ -114,7 +114,7 @@ typedef CodexAppServerProcessLauncher =
 class CodexAppServerClient {
   CodexAppServerClient({
     CodexAppServerProcessLauncher? processLauncher,
-    this.clientName = 'codex_pocket',
+    this.clientName = 'pocket_relay',
     this.clientVersion = '1.0.0',
   }) : _processLauncher = processLauncher ?? _openSshProcess;
 
@@ -194,7 +194,7 @@ class CodexAppServerClient {
         <String, Object?>{
           'clientInfo': <String, String>{
             'name': clientName,
-            'title': 'Codex Pocket',
+            'title': 'Pocket Relay',
             'version': clientVersion,
           },
           'capabilities': const <String, bool>{'experimentalApi': true},

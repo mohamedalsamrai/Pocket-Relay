@@ -2,7 +2,7 @@
 
 ## Goal
 
-Migrate Codex Pocket from `codex exec --json` to `codex app-server` so the app can:
+Migrate Pocket Relay from `codex exec --json` to `codex app-server` so the app can:
 
 - render richer Codex output as mobile widgets
 - handle mid-turn approvals and user-input requests

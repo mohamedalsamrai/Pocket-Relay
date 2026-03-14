@@ -1,13 +1,13 @@
-import 'package:codex_pocket/src/app.dart';
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/core/storage/codex_profile_store.dart';
-import 'package:codex_pocket/src/features/chat/services/ssh_codex_service.dart';
+import 'package:pocket_relay/src/app.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/features/chat/services/ssh_codex_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shows the Codex Pocket shell', (tester) async {
+  testWidgets('shows the Pocket Relay shell', (tester) async {
     await tester.pumpWidget(
-      CodexPocketApp(
+      PocketRelayApp(
         profileStore: MemoryCodexProfileStore(
           initialValue: SavedProfile(
             profile: ConnectionProfile.defaults(),
@@ -20,7 +20,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Codex Pocket'), findsOneWidget);
+    expect(find.text('Pocket Relay'), findsOneWidget);
     expect(find.text('Configure remote'), findsWidgets);
   });
 }

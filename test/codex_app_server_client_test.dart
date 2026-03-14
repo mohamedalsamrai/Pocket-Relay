@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/features/chat/services/codex_app_server_client.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/features/chat/services/codex_app_server_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

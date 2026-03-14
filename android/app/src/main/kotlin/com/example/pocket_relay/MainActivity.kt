@@ -1,4 +1,4 @@
-package com.example.codex_pocket
+package com.example.pocket_relay
 
 import io.flutter.embedding.android.FlutterActivity
 

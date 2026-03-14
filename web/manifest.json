@@ -1,11 +1,11 @@
 {
-    "name": "codex_pocket",
-    "short_name": "codex_pocket",
+    "name": "Pocket Relay",
+    "short_name": "Pocket Relay",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Pocket Relay is a mobile-friendly remote client for coding sessions on your dev box.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,4 +1,4 @@
-import 'package:codex_pocket/src/features/chat/models/conversation_entry.dart';
+import 'package:pocket_relay/src/features/chat/models/conversation_entry.dart';
 
 sealed class CodexRemoteEvent {
   const CodexRemoteEvent();

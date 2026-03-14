@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:codex_pocket/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,10 +11,15 @@ abstract class CodexProfileStore {
 }
 
 class SecureCodexProfileStore implements CodexProfileStore {
-  static const _profileKey = 'codex_pocket.profile';
-  static const _passwordKey = 'codex_pocket.secret.password';
-  static const _privateKeyKey = 'codex_pocket.secret.private_key';
+  static const _profileKey = 'pocket_relay.profile';
+  static const _legacyProfileKey = 'codex_pocket.profile';
+  static const _passwordKey = 'pocket_relay.secret.password';
+  static const _legacyPasswordKey = 'codex_pocket.secret.password';
+  static const _privateKeyKey = 'pocket_relay.secret.private_key';
+  static const _legacyPrivateKeyKey = 'codex_pocket.secret.private_key';
   static const _privateKeyPassphraseKey =
+      'pocket_relay.secret.private_key_passphrase';
+  static const _legacyPrivateKeyPassphraseKey =
       'codex_pocket.secret.private_key_passphrase';
 
   final FlutterSecureStorage _secureStorage;
@@ -25,17 +30,23 @@ class SecureCodexProfileStore implements CodexProfileStore {
   @override
   Future<SavedProfile> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final rawProfile = prefs.getString(_profileKey);
+    final rawProfile =
+        prefs.getString(_profileKey) ?? prefs.getString(_legacyProfileKey);
     final profile = rawProfile == null
         ? ConnectionProfile.defaults()
         : ConnectionProfile.fromJson(
             jsonDecode(rawProfile) as Map<String, dynamic>,
           );
 
-    final password = await _secureStorage.read(key: _passwordKey) ?? '';
-    final privateKeyPem = await _secureStorage.read(key: _privateKeyKey) ?? '';
-    final privateKeyPassphrase =
-        await _secureStorage.read(key: _privateKeyPassphraseKey) ?? '';
+    final password = await _readSecret(_passwordKey, _legacyPasswordKey);
+    final privateKeyPem = await _readSecret(
+      _privateKeyKey,
+      _legacyPrivateKeyKey,
+    );
+    final privateKeyPassphrase = await _readSecret(
+      _privateKeyPassphraseKey,
+      _legacyPrivateKeyPassphraseKey,
+    );
 
     return SavedProfile(
       profile: profile,
@@ -67,6 +78,12 @@ class SecureCodexProfileStore implements CodexProfileStore {
     }
 
     await _secureStorage.write(key: key, value: value);
+  }
+
+  Future<String> _readSecret(String key, String legacyKey) async {
+    return await _secureStorage.read(key: key) ??
+        await _secureStorage.read(key: legacyKey) ??
+        '';
   }
 }
 

@@ -1,4 +1,4 @@
-import 'package:codex_pocket/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:flutter/material.dart';
 
 class ConnectionSheetResult {

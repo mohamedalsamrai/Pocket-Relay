@@ -1,4 +1,4 @@
-name: codex_pocket
+name: pocket_relay
 description: "A mobile-friendly Flutter client for running Codex remotely over SSH."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.

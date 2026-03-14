@@ -1,6 +1,6 @@
-import 'package:codex_pocket/src/features/chat/models/codex_remote_event.dart';
-import 'package:codex_pocket/src/features/chat/models/conversation_entry.dart';
-import 'package:codex_pocket/src/features/chat/services/codex_event_parser.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_remote_event.dart';
+import 'package:pocket_relay/src/features/chat/models/conversation_entry.dart';
+import 'package:pocket_relay/src/features/chat/services/codex_event_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,16 +1,16 @@
 import 'dart:async';
 
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/core/storage/codex_profile_store.dart';
-import 'package:codex_pocket/src/core/utils/thread_utils.dart';
-import 'package:codex_pocket/src/features/chat/models/codex_remote_event.dart';
-import 'package:codex_pocket/src/features/chat/models/conversation_entry.dart';
-import 'package:codex_pocket/src/features/chat/presentation/widgets/chat_composer.dart';
-import 'package:codex_pocket/src/features/chat/presentation/widgets/connection_banner.dart';
-import 'package:codex_pocket/src/features/chat/presentation/widgets/conversation_entry_card.dart';
-import 'package:codex_pocket/src/features/chat/presentation/widgets/empty_state.dart';
-import 'package:codex_pocket/src/features/chat/services/ssh_codex_service.dart';
-import 'package:codex_pocket/src/features/settings/presentation/connection_sheet.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/core/utils/thread_utils.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_remote_event.dart';
+import 'package:pocket_relay/src/features/chat/models/conversation_entry.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/connection_banner.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
+import 'package:pocket_relay/src/features/chat/services/ssh_codex_service.dart';
+import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 import 'package:flutter/material.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -77,7 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Codex Pocket',
+              'Pocket Relay',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             Text(

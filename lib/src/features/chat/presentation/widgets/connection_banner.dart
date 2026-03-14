@@ -1,5 +1,5 @@
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/core/utils/thread_utils.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/utils/thread_utils.dart';
 import 'package:flutter/material.dart';
 
 class ConnectionBanner extends StatelessWidget {

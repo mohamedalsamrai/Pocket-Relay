@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'package:codex_pocket/src/core/storage/codex_profile_store.dart';
-import 'package:codex_pocket/src/features/chat/presentation/chat_screen.dart';
-import 'package:codex_pocket/src/features/chat/services/ssh_codex_service.dart';
+import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen.dart';
+import 'package:pocket_relay/src/features/chat/services/ssh_codex_service.dart';
 
-class CodexPocketApp extends StatelessWidget {
-  const CodexPocketApp({super.key, this.profileStore, this.remoteService});
+class PocketRelayApp extends StatelessWidget {
+  const PocketRelayApp({super.key, this.profileStore, this.remoteService});
 
   final CodexProfileStore? profileStore;
   final SshCodexService? remoteService;
@@ -18,7 +18,7 @@ class CodexPocketApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Codex Pocket',
+      title: 'Pocket Relay',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

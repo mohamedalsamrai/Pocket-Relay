@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:codex_pocket/src/core/models/connection_models.dart';
-import 'package:codex_pocket/src/core/utils/shell_utils.dart';
-import 'package:codex_pocket/src/features/chat/models/codex_remote_event.dart';
-import 'package:codex_pocket/src/features/chat/services/codex_event_parser.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/utils/shell_utils.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_remote_event.dart';
+import 'package:pocket_relay/src/features/chat/services/codex_event_parser.dart';
 import 'package:dartssh2/dartssh2.dart';
 
 class SshCodexService {

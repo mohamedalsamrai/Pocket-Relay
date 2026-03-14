@@ -1,6 +1,6 @@
-# Codex Pocket
+# Pocket Relay
 
-Codex Pocket is a Flutter app that SSHes into a developer box, runs the Codex CLI remotely in `--json` mode, and renders the stream as mobile-friendly cards instead of a raw terminal.
+Pocket Relay is a Flutter app that SSHes into a developer box, runs the Codex CLI remotely in `--json` mode, and renders the stream as mobile-friendly cards instead of a raw terminal.
 
 ## Source Tree
 
