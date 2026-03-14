@@ -5,8 +5,12 @@ enum CodexUiBlockKind {
   assistantMessage,
   reasoning,
   plan,
+  proposedPlan,
   commandExecution,
+  workLogEntry,
+  workLogGroup,
   fileChange,
+  changedFiles,
   approvalRequest,
   userInputRequest,
   status,
@@ -24,6 +28,49 @@ sealed class CodexUiBlock {
   final String id;
   final CodexUiBlockKind kind;
   final DateTime createdAt;
+}
+
+class CodexChangedFile {
+  const CodexChangedFile({
+    required this.path,
+    this.additions = 0,
+    this.deletions = 0,
+  });
+
+  final String path;
+  final int additions;
+  final int deletions;
+}
+
+enum CodexWorkLogEntryKind {
+  commandExecution,
+  webSearch,
+  imageView,
+  mcpToolCall,
+  dynamicToolCall,
+  collabAgentToolCall,
+  fileChange,
+  unknown,
+}
+
+class CodexWorkLogEntry {
+  const CodexWorkLogEntry({
+    required this.id,
+    required this.createdAt,
+    required this.entryKind,
+    required this.title,
+    this.preview,
+    this.isRunning = false,
+    this.exitCode,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final CodexWorkLogEntryKind entryKind;
+  final String title;
+  final String? preview;
+  final bool isRunning;
+  final int? exitCode;
 }
 
 final class CodexUserMessageBlock extends CodexUiBlock {
@@ -62,6 +109,58 @@ final class CodexTextBlock extends CodexUiBlock {
   }
 }
 
+final class CodexPlanUpdateBlock extends CodexUiBlock {
+  const CodexPlanUpdateBlock({
+    required super.id,
+    required super.createdAt,
+    this.explanation,
+    this.steps = const <CodexRuntimePlanStep>[],
+  }) : super(kind: CodexUiBlockKind.plan);
+
+  final String? explanation;
+  final List<CodexRuntimePlanStep> steps;
+
+  CodexPlanUpdateBlock copyWith({
+    String? explanation,
+    List<CodexRuntimePlanStep>? steps,
+  }) {
+    return CodexPlanUpdateBlock(
+      id: id,
+      createdAt: createdAt,
+      explanation: explanation ?? this.explanation,
+      steps: steps ?? this.steps,
+    );
+  }
+}
+
+final class CodexProposedPlanBlock extends CodexUiBlock {
+  const CodexProposedPlanBlock({
+    required super.id,
+    required super.createdAt,
+    required this.title,
+    required this.markdown,
+    this.isStreaming = false,
+  }) : super(kind: CodexUiBlockKind.proposedPlan);
+
+  final String title;
+  final String markdown;
+  final bool isStreaming;
+
+  CodexProposedPlanBlock copyWith({
+    String? title,
+    String? markdown,
+    bool? isStreaming,
+  }) {
+    return CodexProposedPlanBlock(
+      id: id,
+      createdAt: createdAt,
+      title: title ?? this.title,
+      markdown: markdown ?? this.markdown,
+      isStreaming: isStreaming ?? this.isStreaming,
+    );
+  }
+}
+
 final class CodexCommandExecutionBlock extends CodexUiBlock {
   const CodexCommandExecutionBlock({
     required super.id,
@@ -90,6 +189,84 @@ final class CodexCommandExecutionBlock extends CodexUiBlock {
       output: output ?? this.output,
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
+    );
+  }
+}
+
+final class CodexWorkLogEntryBlock extends CodexUiBlock {
+  const CodexWorkLogEntryBlock({
+    required super.id,
+    required super.createdAt,
+    required this.entryKind,
+    required this.title,
+    this.preview,
+    this.isRunning = false,
+    this.exitCode,
+  }) : super(kind: CodexUiBlockKind.workLogEntry);
+
+  final CodexWorkLogEntryKind entryKind;
+  final String title;
+  final String? preview;
+  final bool isRunning;
+  final int? exitCode;
+
+  CodexWorkLogEntryBlock copyWith({
+    CodexWorkLogEntryKind? entryKind,
+    String? title,
+    String? preview,
+    bool? isRunning,
+    int? exitCode,
+  }) {
+    return CodexWorkLogEntryBlock(
+      id: id,
+      createdAt: createdAt,
+      entryKind: entryKind ?? this.entryKind,
+      title: title ?? this.title,
+      preview: preview ?? this.preview,
+      isRunning: isRunning ?? this.isRunning,
+      exitCode: exitCode ?? this.exitCode,
+    );
+  }
+}
+
+final class CodexWorkLogGroupBlock extends CodexUiBlock {
+  const CodexWorkLogGroupBlock({
+    required super.id,
+    required super.createdAt,
+    required this.entries,
+  }) : super(kind: CodexUiBlockKind.workLogGroup);
+
+  final List<CodexWorkLogEntry> entries;
+}
+
+final class CodexChangedFilesBlock extends CodexUiBlock {
+  const CodexChangedFilesBlock({
+    required super.id,
+    required super.createdAt,
+    required this.title,
+    this.files = const <CodexChangedFile>[],
+    this.unifiedDiff,
+    this.isRunning = false,
+  }) : super(kind: CodexUiBlockKind.changedFiles);
+
+  final String title;
+  final List<CodexChangedFile> files;
+  final String? unifiedDiff;
+  final bool isRunning;
+
+  CodexChangedFilesBlock copyWith({
+    String? title,
+    List<CodexChangedFile>? files,
+    String? unifiedDiff,
+    bool? isRunning,
+  }) {
+    return CodexChangedFilesBlock(
+      id: id,
+      createdAt: createdAt,
+      title: title ?? this.title,
+      files: files ?? this.files,
+      unifiedDiff: unifiedDiff ?? this.unifiedDiff,
+      isRunning: isRunning ?? this.isRunning,
     );
   }
 }

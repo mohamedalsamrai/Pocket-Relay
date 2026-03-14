@@ -244,6 +244,56 @@ void main() {
     expect(unknown, isEmpty);
   });
 
+  test('maps turn plan and diff notifications into runtime events', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final planUpdated = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'turn/plan/updated',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'explanation': 'Implement the migration in phases.',
+          'plan': <Object>[
+            <String, Object?>{
+              'step': 'Wire the transport',
+              'status': 'completed',
+            },
+            <String, Object?>{
+              'step': 'Render proposed plans',
+              'status': 'inProgress',
+            },
+          ],
+        },
+      ),
+    );
+    final diffUpdated = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'turn/diff/updated',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'unifiedDiff':
+              'diff --git a/lib/app.dart b/lib/app.dart\n'
+              '--- a/lib/app.dart\n'
+              '+++ b/lib/app.dart\n'
+              '@@ -1 +1 @@\n'
+              '-old\n'
+              '+new\n',
+        },
+      ),
+    );
+
+    final planEvent = planUpdated.single as CodexRuntimeTurnPlanUpdatedEvent;
+    final diffEvent = diffUpdated.single as CodexRuntimeTurnDiffUpdatedEvent;
+
+    expect(planEvent.explanation, 'Implement the migration in phases.');
+    expect(planEvent.steps, hasLength(2));
+    expect(planEvent.steps.first.status, CodexRuntimePlanStepStatus.completed);
+    expect(planEvent.steps.last.status, CodexRuntimePlanStepStatus.inProgress);
+    expect(diffEvent.unifiedDiff, contains('diff --git'));
+  });
+
   test(
     'maps partial item update notifications without embedded item snapshots',
     () {

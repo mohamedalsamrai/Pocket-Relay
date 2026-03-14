@@ -18,6 +18,8 @@ enum CodexRuntimeThreadState {
 
 enum CodexRuntimeTurnState { completed, failed, interrupted, cancelled }
 
+enum CodexRuntimePlanStepStatus { pending, inProgress, completed }
+
 enum CodexRuntimeItemStatus { inProgress, completed, failed, declined }
 
 enum CodexRuntimeContentStreamKind {
@@ -85,6 +87,13 @@ class CodexRuntimeTurnUsage {
   final int? cachedInputTokens;
   final int? outputTokens;
   final Map<String, dynamic>? raw;
+}
+
+class CodexRuntimePlanStep {
+  const CodexRuntimePlanStep({required this.step, required this.status});
+
+  final String step;
+  final CodexRuntimePlanStepStatus status;
 }
 
 class CodexRuntimeUserInputOption {
@@ -254,6 +263,34 @@ final class CodexRuntimeTurnAbortedEvent extends CodexRuntimeEvent {
   });
 
   final String? reason;
+}
+
+final class CodexRuntimeTurnPlanUpdatedEvent extends CodexRuntimeEvent {
+  const CodexRuntimeTurnPlanUpdatedEvent({
+    required super.createdAt,
+    required this.steps,
+    super.threadId,
+    super.turnId,
+    super.rawMethod,
+    super.rawPayload,
+    this.explanation,
+  });
+
+  final String? explanation;
+  final List<CodexRuntimePlanStep> steps;
+}
+
+final class CodexRuntimeTurnDiffUpdatedEvent extends CodexRuntimeEvent {
+  const CodexRuntimeTurnDiffUpdatedEvent({
+    required super.createdAt,
+    required this.unifiedDiff,
+    super.threadId,
+    super.turnId,
+    super.rawMethod,
+    super.rawPayload,
+  });
+
+  final String unifiedDiff;
 }
 
 sealed class CodexRuntimeItemLifecycleEvent extends CodexRuntimeEvent {

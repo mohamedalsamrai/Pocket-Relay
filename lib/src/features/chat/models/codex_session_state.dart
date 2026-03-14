@@ -31,7 +31,7 @@ class CodexSessionState {
   bool get isBusy => connectionStatus == CodexRuntimeSessionState.running;
 
   List<CodexUiBlock> get transcriptBlocks =>
-      blocks.where(_shouldAppearInTranscript).toList(growable: false);
+      _buildTranscriptBlocks(blocks.where(_shouldAppearInTranscript));
 
   CodexApprovalRequestBlock? get primaryPendingApprovalBlock =>
       _firstPendingBlock<CodexApprovalRequestBlock>(
@@ -87,6 +87,53 @@ bool _shouldAppearInTranscript(CodexUiBlock block) {
     CodexUserInputRequestBlock(:final isResolved) => isResolved,
     _ => true,
   };
+}
+
+List<CodexUiBlock> _buildTranscriptBlocks(Iterable<CodexUiBlock> blocks) {
+  final transcript = <CodexUiBlock>[];
+  final pendingWorkEntries = <CodexWorkLogEntryBlock>[];
+
+  void flushWorkEntries() {
+    if (pendingWorkEntries.isEmpty) {
+      return;
+    }
+
+    final first = pendingWorkEntries.first;
+    final last = pendingWorkEntries.last;
+    transcript.add(
+      CodexWorkLogGroupBlock(
+        id: 'worklog_${first.id}_${last.id}',
+        createdAt: first.createdAt,
+        entries: pendingWorkEntries
+            .map(
+              (entry) => CodexWorkLogEntry(
+                id: entry.id,
+                createdAt: entry.createdAt,
+                entryKind: entry.entryKind,
+                title: entry.title,
+                preview: entry.preview,
+                isRunning: entry.isRunning,
+                exitCode: entry.exitCode,
+              ),
+            )
+            .toList(growable: false),
+      ),
+    );
+    pendingWorkEntries.clear();
+  }
+
+  for (final block in blocks) {
+    if (block is CodexWorkLogEntryBlock) {
+      pendingWorkEntries.add(block);
+      continue;
+    }
+
+    flushWorkEntries();
+    transcript.add(block);
+  }
+
+  flushWorkEntries();
+  return transcript;
 }
 
 T? _firstPendingBlock<T extends CodexUiBlock>(Iterable<T> blocks) {
@@ -154,6 +201,7 @@ class CodexSessionActiveItem {
     this.body = '',
     this.isRunning = false,
     this.exitCode,
+    this.snapshot,
   });
 
   final String itemId;
@@ -167,12 +215,14 @@ class CodexSessionActiveItem {
   final String body;
   final bool isRunning;
   final int? exitCode;
+  final Map<String, dynamic>? snapshot;
 
   CodexSessionActiveItem copyWith({
     String? title,
     String? body,
     bool? isRunning,
     int? exitCode,
+    Map<String, dynamic>? snapshot,
   }) {
     return CodexSessionActiveItem(
       itemId: itemId,
@@ -186,6 +236,7 @@ class CodexSessionActiveItem {
       body: body ?? this.body,
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
+      snapshot: snapshot ?? this.snapshot,
     );
   }
 }

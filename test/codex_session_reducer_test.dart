@@ -225,4 +225,95 @@ void main() {
     expect(state.blocks.first, isA<CodexStatusBlock>());
     expect(state.blocks.last, isA<CodexErrorBlock>());
   });
+
+  test('groups consecutive work-log entries in transcript blocks', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemStartedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.commandExecution,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_command',
+        status: CodexRuntimeItemStatus.inProgress,
+        detail: 'git status',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.commandExecution,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_command',
+        status: CodexRuntimeItemStatus.completed,
+        snapshot: const <String, Object?>{
+          'result': <String, Object?>{'output': 'On branch main'},
+          'exitCode': 0,
+        },
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemStartedEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        itemType: CodexCanonicalItemType.webSearch,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_search',
+        status: CodexRuntimeItemStatus.completed,
+        detail: 'Search docs',
+      ),
+    );
+
+    expect(state.blocks.whereType<CodexWorkLogEntryBlock>(), hasLength(2));
+    expect(state.transcriptBlocks, hasLength(1));
+    final group = state.transcriptBlocks.single as CodexWorkLogGroupBlock;
+    expect(group.entries, hasLength(2));
+    expect(group.entries.first.title, 'git status');
+    expect(group.entries.last.entryKind, CodexWorkLogEntryKind.webSearch);
+  });
+
+  test('renders proposed plan and changed files as dedicated blocks', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeContentDeltaEvent(
+        createdAt: now,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'plan_1',
+        streamKind: CodexRuntimeContentStreamKind.planText,
+        delta: '# Ship it\n\n- add widgets',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeTurnDiffUpdatedEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        unifiedDiff:
+            'diff --git a/lib/main.dart b/lib/main.dart\n'
+            '--- a/lib/main.dart\n'
+            '+++ b/lib/main.dart\n'
+            '@@ -1 +1 @@\n'
+            '-old\n'
+            '+new\n',
+      ),
+    );
+
+    expect(state.blocks.first, isA<CodexProposedPlanBlock>());
+    final changedFiles = state.blocks.last as CodexChangedFilesBlock;
+    expect(changedFiles.files.single.path, 'lib/main.dart');
+    expect(changedFiles.unifiedDiff, contains('diff --git'));
+  });
 }

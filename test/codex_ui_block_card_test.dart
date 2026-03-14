@@ -100,4 +100,129 @@ void main() {
       'q1': <String>['Pocket Relay'],
     });
   });
+
+  testWidgets(
+    'renders proposed plans with extracted title and collapse control',
+    (tester) async {
+      final markdownLines = <String>[
+        '# Ship mobile widgets',
+        '',
+        '## Summary',
+        '',
+        for (var index = 0; index < 24; index += 1)
+          '- Step ${index + 1} for the rollout',
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ConversationEntryCard(
+                block: CodexProposedPlanBlock(
+                  id: 'plan_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Proposed plan',
+                  markdown: markdownLines.join('\n'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Ship mobile widgets'), findsOneWidget);
+      expect(find.text('Summary'), findsNothing);
+      expect(find.text('Expand plan'), findsOneWidget);
+
+      await tester.tap(find.text('Expand plan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Collapse plan'), findsOneWidget);
+    },
+  );
+
+  testWidgets('renders compact work-log groups with normalized labels', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ConversationEntryCard(
+            block: CodexWorkLogGroupBlock(
+              id: 'worklog_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              entries: <CodexWorkLogEntry>[
+                CodexWorkLogEntry(
+                  id: 'entry_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'Read docs completed',
+                  preview: 'Found the CLI docs',
+                  exitCode: 0,
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_2',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+                  entryKind: CodexWorkLogEntryKind.webSearch,
+                  title: 'Search the reference complete',
+                  isRunning: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Work log'), findsOneWidget);
+    expect(find.text('Read docs'), findsOneWidget);
+    expect(find.text('Read docs completed'), findsNothing);
+    expect(find.text('running'), findsOneWidget);
+  });
+
+  testWidgets('renders changed files summary and diff toggle', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ConversationEntryCard(
+            block: CodexChangedFilesBlock(
+              id: 'diff_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Changed files',
+              files: const <CodexChangedFile>[
+                CodexChangedFile(
+                  path: 'lib/src/features/chat/chat_screen.dart',
+                  additions: 3,
+                  deletions: 1,
+                ),
+                CodexChangedFile(
+                  path:
+                      'lib/src/features/chat/widgets/conversation_entry_card.dart',
+                  additions: 8,
+                  deletions: 2,
+                ),
+              ],
+              unifiedDiff:
+                  'diff --git a/lib/main.dart b/lib/main.dart\n'
+                  '--- a/lib/main.dart\n'
+                  '+++ b/lib/main.dart\n'
+                  '@@ -1 +1 @@\n'
+                  '-old\n'
+                  '+new\n',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('2 files'), findsOneWidget);
+    expect(find.text('+11 -3'), findsOneWidget);
+    expect(find.text('Show diff'), findsOneWidget);
+
+    await tester.tap(find.text('Show diff'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hide diff'), findsOneWidget);
+    expect(find.textContaining('diff --git a/lib/main.dart'), findsOneWidget);
+  });
 }

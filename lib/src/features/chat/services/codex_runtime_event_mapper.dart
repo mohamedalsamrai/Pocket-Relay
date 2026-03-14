@@ -254,6 +254,37 @@ class CodexRuntimeEventMapper {
             reason: _eventReason(payload) ?? 'Turn aborted.',
           ),
         ];
+      case 'turn/plan/updated':
+        return <CodexRuntimeEvent>[
+          CodexRuntimeTurnPlanUpdatedEvent(
+            createdAt: now,
+            threadId: _asString(payload?['threadId']),
+            turnId: _asString(payload?['turnId']),
+            rawMethod: event.method,
+            rawPayload: event.params,
+            explanation: _asString(payload?['explanation']),
+            steps: _toPlanSteps(_asList(payload?['plan'])),
+          ),
+        ];
+      case 'turn/diff/updated':
+        final unifiedDiff = _stringFromCandidates(<Object?>[
+          payload?['unifiedDiff'],
+          payload?['diff'],
+          payload?['patch'],
+        ]);
+        if (unifiedDiff == null || unifiedDiff.isEmpty) {
+          return const <CodexRuntimeEvent>[];
+        }
+        return <CodexRuntimeEvent>[
+          CodexRuntimeTurnDiffUpdatedEvent(
+            createdAt: now,
+            threadId: _asString(payload?['threadId']),
+            turnId: _asString(payload?['turnId']),
+            rawMethod: event.method,
+            rawPayload: event.params,
+            unifiedDiff: unifiedDiff,
+          ),
+        ];
       case 'item/started':
         final itemEvent = _mapItemLifecycle(
           payload,
@@ -869,6 +900,32 @@ class CodexRuntimeEventMapper {
           );
         })
         .whereType<CodexRuntimeUserInputQuestion>()
+        .toList();
+  }
+
+  static List<CodexRuntimePlanStep> _toPlanSteps(List<dynamic>? rawPlan) {
+    if (rawPlan == null) {
+      return const <CodexRuntimePlanStep>[];
+    }
+
+    return rawPlan
+        .map(_asObject)
+        .whereType<Map<String, dynamic>>()
+        .map((step) {
+          final title = _asString(step['step'])?.trim();
+          if (title == null || title.isEmpty) {
+            return null;
+          }
+
+          final status = switch (_asString(step['status'])) {
+            'completed' => CodexRuntimePlanStepStatus.completed,
+            'inProgress' => CodexRuntimePlanStepStatus.inProgress,
+            _ => CodexRuntimePlanStepStatus.pending,
+          };
+
+          return CodexRuntimePlanStep(step: title, status: status);
+        })
+        .whereType<CodexRuntimePlanStep>()
         .toList();
   }
 
