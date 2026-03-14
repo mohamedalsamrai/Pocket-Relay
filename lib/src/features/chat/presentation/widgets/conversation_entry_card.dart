@@ -103,18 +103,18 @@ class _UserMessageCard extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: 540),
         child: Container(
-          margin: const EdgeInsets.only(left: 56),
-          padding: const EdgeInsets.all(18),
+          margin: const EdgeInsets.only(left: 48),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
           decoration: BoxDecoration(
             color: const Color(0xFF0F766E),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x220F766E),
-                blurRadius: 24,
-                offset: Offset(0, 12),
+                blurRadius: 16,
+                offset: Offset(0, 8),
               ),
             ],
           ),
@@ -125,18 +125,18 @@ class _UserMessageCard extends StatelessWidget {
                 'You',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.6,
+                  letterSpacing: 0.3,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               SelectableText(
                 block.text,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
-                  height: 1.45,
+                  fontSize: 15,
+                  height: 1.35,
                 ),
               ),
             ],
@@ -157,14 +157,29 @@ class _TextBlockCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cards = _ConversationCardPalette.of(context);
     final palette = _paletteFor(block.kind, theme.brightness);
+    final isAssistant = block.kind == CodexUiBlockKind.assistantMessage;
+    final cardRadius = isAssistant ? 22.0 : 20.0;
+    final cardPadding = EdgeInsets.fromLTRB(
+      isAssistant ? 16 : 14,
+      isAssistant ? 15 : 12,
+      isAssistant ? 16 : 14,
+      isAssistant ? 16 : 13,
+    );
+    final blockSurface = isAssistant
+        ? cards.tintedSurface(palette.accent, lightAlpha: 0.1, darkAlpha: 0.18)
+        : cards.surface;
+    final cardBorder = isAssistant
+        ? cards.accentBorder(palette.accent, lightAlpha: 0.42, darkAlpha: 0.56)
+        : palette.border;
     final markdownStyle = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyLarge?.copyWith(
         color: cards.textPrimary,
-        height: 1.5,
+        fontSize: isAssistant ? 16 : 14,
+        height: isAssistant ? 1.45 : 1.38,
       ),
       codeblockDecoration: BoxDecoration(
         color: cards.codeSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       blockquoteDecoration: BoxDecoration(
         color: cards.tintedSurface(
@@ -172,65 +187,98 @@ class _TextBlockCard extends StatelessWidget {
           lightAlpha: 0.08,
           darkAlpha: 0.18,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
-      h1: theme.textTheme.headlineSmall?.copyWith(color: cards.textPrimary),
-      h2: theme.textTheme.titleLarge?.copyWith(color: cards.textPrimary),
-      h3: theme.textTheme.titleMedium?.copyWith(color: cards.textPrimary),
+      h1: theme.textTheme.headlineSmall?.copyWith(
+        color: cards.textPrimary,
+        fontSize: isAssistant ? 21 : 19,
+      ),
+      h2: theme.textTheme.titleLarge?.copyWith(
+        color: cards.textPrimary,
+        fontSize: isAssistant ? 18 : 16,
+      ),
+      h3: theme.textTheme.titleMedium?.copyWith(
+        color: cards.textPrimary,
+        fontSize: isAssistant ? 16 : 15,
+      ),
       code: theme.textTheme.bodyMedium?.copyWith(
         color: cards.codeText,
         fontFamily: 'monospace',
         backgroundColor: cards.codeSurface,
+        fontSize: isAssistant ? 14 : 13,
       ),
     );
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 700),
+      constraints: BoxConstraints(maxWidth: isAssistant ? 780 : 660),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: cardPadding,
         decoration: BoxDecoration(
-          color: cards.surface,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: palette.border),
-          boxShadow: [
-            BoxShadow(
-              color: cards.shadow,
-              blurRadius: 20,
-              offset: Offset(0, 12),
-            ),
-          ],
+          color: blockSurface,
+          borderRadius: BorderRadius.circular(cardRadius),
+          border: Border.all(color: cardBorder),
+          boxShadow: isAssistant
+              ? [
+                  BoxShadow(
+                    color: palette.accent.withValues(
+                      alpha: cards.isDark ? 0.16 : 0.1,
+                    ),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                  BoxShadow(
+                    color: cards.shadow.withValues(
+                      alpha: cards.isDark ? 0.26 : 0.08,
+                    ),
+                    blurRadius: 14,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: cards.shadow.withValues(
+                      alpha: cards.isDark ? 0.2 : 0.06,
+                    ),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(palette.icon, size: 18, color: palette.accent),
-                const SizedBox(width: 8),
+                Icon(
+                  palette.icon,
+                  size: isAssistant ? 18 : 16,
+                  color: palette.accent,
+                ),
+                const SizedBox(width: 7),
                 Text(
                   block.title,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: isAssistant ? 13 : 12,
                     fontWeight: FontWeight.w700,
                     color: palette.accent,
-                    letterSpacing: 0.4,
+                    letterSpacing: isAssistant ? 0.3 : 0.2,
                   ),
                 ),
                 if (block.isRunning) ...[
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   const _InlinePulseChip(label: 'running'),
                 ],
               ],
             ),
             if (block.isRunning) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               LinearProgressIndicator(
                 minHeight: 2,
                 color: palette.accent,
                 backgroundColor: palette.accent.withValues(alpha: 0.08),
               ),
             ],
-            const SizedBox(height: 12),
+            SizedBox(height: isAssistant ? 10 : 8),
             MarkdownBody(
               data: block.body.trim().isEmpty
                   ? '_Waiting for content…_'
@@ -257,18 +305,18 @@ class _PlanUpdateCard extends StatelessWidget {
     final accent = _blueAccent(theme.brightness);
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 720),
+      constraints: const BoxConstraints(maxWidth: 700),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
         decoration: BoxDecoration(
           color: cards.surface,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: cards.accentBorder(accent)),
           boxShadow: [
             BoxShadow(
-              color: cards.shadow,
-              blurRadius: 20,
-              offset: Offset(0, 12),
+              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -277,66 +325,69 @@ class _PlanUpdateCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.checklist_rtl, size: 18, color: accent),
-                const SizedBox(width: 8),
+                Icon(Icons.checklist_rtl, size: 16, color: accent),
+                const SizedBox(width: 7),
                 Text(
                   'Plan',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: accent,
-                    letterSpacing: 0.4,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ],
             ),
             if (block.explanation != null &&
                 block.explanation!.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               SelectableText(
                 block.explanation!,
                 style: TextStyle(
                   color: cards.textSecondary,
-                  fontSize: 14,
-                  height: 1.4,
+                  fontSize: 13,
+                  height: 1.32,
                 ),
               ),
             ],
             if (block.steps.isNotEmpty) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               ...block.steps.map((step) {
                 final status = _planStepStatus(step.status, cards);
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
                   decoration: BoxDecoration(
                     color: status.background,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: status.border),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(status.icon, size: 18, color: status.accent),
-                      const SizedBox(width: 10),
+                      Icon(status.icon, size: 16, color: status.accent),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           step.step,
                           style: TextStyle(
                             color: cards.textPrimary,
-                            fontSize: 14,
-                            height: 1.35,
+                            fontSize: 13,
+                            height: 1.28,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       _Badge(label: status.label, color: status.accent),
                     ],
                   ),
                 );
               }),
             ] else ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
                 'Waiting for plan steps…',
                 style: TextStyle(color: cards.textMuted),
@@ -369,20 +420,22 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
     final markdownStyle = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyLarge?.copyWith(
         color: cards.textPrimary,
-        height: 1.5,
+        fontSize: 14,
+        height: 1.38,
       ),
       codeblockDecoration: BoxDecoration(
         color: cards.codeSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       blockquoteDecoration: BoxDecoration(
         color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       code: theme.textTheme.bodyMedium?.copyWith(
         color: cards.codeText,
         fontFamily: 'monospace',
         backgroundColor: cards.codeSurface,
+        fontSize: 13,
       ),
     );
     final title =
@@ -394,24 +447,21 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
     final canCollapse = displayedMarkdown.length > 900 || lineCount > 20;
     final displayedText = _expanded || !canCollapse
         ? displayedMarkdown
-        : _buildCollapsedPlanPreview(
-            widget.block.markdown,
-            maxVisibleLines: 10,
-          );
+        : _buildCollapsedPlanPreview(widget.block.markdown, maxVisibleLines: 8);
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 720),
+      constraints: const BoxConstraints(maxWidth: 700),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
         decoration: BoxDecoration(
           color: cards.surface,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: cards.accentBorder(accent)),
           boxShadow: [
             BoxShadow(
-              color: cards.shadow,
-              blurRadius: 20,
-              offset: Offset(0, 12),
+              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -420,16 +470,16 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.description_outlined, size: 18, color: accent),
-                const SizedBox(width: 8),
+                Icon(Icons.description_outlined, size: 16, color: accent),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: accent,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -437,7 +487,7 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
                   const _InlinePulseChip(label: 'drafting'),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Stack(
               children: [
                 MarkdownBody(
@@ -454,7 +504,7 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
                     bottom: 0,
                     child: IgnorePointer(
                       child: Container(
-                        height: 48,
+                        height: 36,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
@@ -471,7 +521,7 @@ class _ProposedPlanCardState extends State<_ProposedPlanCard> {
               ],
             ),
             if (canCollapse) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               OutlinedButton(
                 onPressed: () => setState(() => _expanded = !_expanded),
                 child: Text(_expanded ? 'Collapse plan' : 'Expand plan'),
@@ -500,18 +550,18 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
   Widget build(BuildContext context) {
     final cards = _ConversationCardPalette.of(context);
     final entries = widget.block.entries;
-    final hasOverflow = entries.length > 4;
+    final hasOverflow = entries.length > 3;
     final visibleEntries = hasOverflow && !_expanded
-        ? entries.skip(entries.length - 4).toList(growable: false)
+        ? entries.skip(entries.length - 3).toList(growable: false)
         : entries;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
+      constraints: const BoxConstraints(maxWidth: 700),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
         decoration: BoxDecoration(
           color: cards.surface,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: cards.neutralBorder),
         ),
         child: Column(
@@ -521,10 +571,10 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
               children: [
                 Icon(
                   Icons.construction_outlined,
-                  size: 18,
+                  size: 16,
                   color: cards.textMuted,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 7),
                 Text(
                   entries.every(
                         (entry) =>
@@ -533,10 +583,10 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
                       ? 'Work log'
                       : 'Activity',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: cards.textSecondary,
-                    letterSpacing: 0.4,
+                    letterSpacing: 0.2,
                   ),
                 ),
                 const Spacer(),
@@ -549,10 +599,10 @@ class _WorkLogGroupCardState extends State<_WorkLogGroupCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ...visibleEntries.map((entry) => _WorkLogEntryRow(entry: entry)),
             if (hasOverflow) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               TextButton(
                 onPressed: () => setState(() => _expanded = !_expanded),
                 child: Text(
@@ -584,18 +634,18 @@ class _WorkLogEntryRow extends StatelessWidget {
     final preview = _normalizedWorkLogPreview(entry.preview, title);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: cards.accentBorder(accent)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: accent),
-          const SizedBox(width: 10),
+          Icon(icon, size: 15, color: accent),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,26 +655,26 @@ class _WorkLogEntryRow extends StatelessWidget {
                   style: TextStyle(
                     color: cards.textPrimary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
                 if (preview != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     preview,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: cards.textSecondary,
-                      fontSize: 12,
-                      height: 1.35,
+                      fontSize: 11.5,
+                      height: 1.25,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           if (entry.isRunning)
             _Badge(label: 'running', color: _tealAccent(theme.brightness))
           else if (entry.exitCode != null)
@@ -673,18 +723,18 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
     final hasStats = totalAdditions > 0 || totalDeletions > 0;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
+      constraints: const BoxConstraints(maxWidth: 700),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
         decoration: BoxDecoration(
           color: cards.surface,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: cards.accentBorder(accent)),
           boxShadow: [
             BoxShadow(
-              color: cards.shadow,
-              blurRadius: 18,
-              offset: Offset(0, 10),
+              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -693,16 +743,16 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.drive_file_rename_outline, size: 18, color: accent),
-                const SizedBox(width: 8),
+                Icon(Icons.drive_file_rename_outline, size: 16, color: accent),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     widget.block.title,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: accent,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -710,7 +760,7 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                   const _InlinePulseChip(label: 'updating'),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Text(
@@ -731,7 +781,7 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                 ],
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             if (files.isEmpty)
               Text(
                 'Waiting for changed files…',
@@ -743,10 +793,10 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                     .map(
                       (file) => Container(
                         width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
+                          horizontal: 10,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: cards.tintedSurface(
@@ -754,7 +804,7 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                             lightAlpha: 0.08,
                             darkAlpha: 0.14,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: cards.accentBorder(
                               accent,
@@ -768,20 +818,20 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                           children: [
                             Icon(
                               Icons.insert_drive_file_outlined,
-                              size: 14,
+                              size: 13,
                               color: accent,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
                                 file.path,
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   fontFamily: 'monospace',
                                   color: cards.textSecondary,
-                                  height: 1.35,
+                                  height: 1.2,
                                 ),
                               ),
                             ),
@@ -802,28 +852,28 @@ class _ChangedFilesCardState extends State<_ChangedFilesCard> {
                     .toList(growable: false),
               ),
             if (canToggleDiff) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               OutlinedButton(
                 onPressed: () => setState(() => _showDiff = !_showDiff),
                 child: Text(_showDiff ? 'Hide diff' : 'Show diff'),
               ),
             ],
             if (_showDiff && diff != null && diff.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: cards.terminalBody,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: SelectableText(
                   diff,
                   style: TextStyle(
                     color: cards.terminalText,
                     fontFamily: 'monospace',
-                    fontSize: 12,
-                    height: 1.35,
+                    fontSize: 11.5,
+                    height: 1.28,
                   ),
                 ),
               ),
@@ -850,16 +900,16 @@ class _CommandCard extends StatelessWidget {
         : block.output;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760),
+      constraints: const BoxConstraints(maxWidth: 720),
       child: Container(
         decoration: BoxDecoration(
           color: cards.terminalShell,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: cards.shadow,
-              blurRadius: 20,
-              offset: Offset(0, 10),
+              color: cards.shadow.withValues(alpha: cards.isDark ? 0.2 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -867,22 +917,22 @@ class _CommandCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
               child: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   Icon(
                     Icons.terminal,
                     color: cards.terminalText.withValues(alpha: 0.72),
-                    size: 18,
+                    size: 16,
                   ),
                   Text(
                     block.command,
                     style: TextStyle(
                       color: cards.terminalText,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'monospace',
                     ),
@@ -906,11 +956,11 @@ class _CommandCard extends StatelessWidget {
               ),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               decoration: BoxDecoration(
                 color: cards.terminalBody,
                 borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(24),
+                  bottom: Radius.circular(18),
                 ),
               ),
               child: SelectableText(
@@ -918,8 +968,8 @@ class _CommandCard extends StatelessWidget {
                 style: TextStyle(
                   color: cards.terminalText,
                   fontFamily: 'monospace',
-                  fontSize: 13,
-                  height: 1.45,
+                  fontSize: 12.5,
+                  height: 1.32,
                 ),
               ),
             ),
@@ -949,18 +999,18 @@ class _ApprovalRequestCard extends StatelessWidget {
     final canRespond = !block.isResolved && onApprove != null && onDeny != null;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 720),
+      constraints: const BoxConstraints(maxWidth: 680),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
         decoration: BoxDecoration(
           color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.14),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: cards.accentBorder(accent)),
           boxShadow: [
             BoxShadow(
-              color: cards.shadow,
-              blurRadius: 18,
-              offset: Offset(0, 10),
+              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -969,14 +1019,14 @@ class _ApprovalRequestCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.gpp_maybe_outlined, color: accent),
-                const SizedBox(width: 10),
+                Icon(Icons.gpp_maybe_outlined, size: 16, color: accent),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     block.title,
                     style: TextStyle(
                       color: accent,
-                      fontSize: 14,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -989,17 +1039,17 @@ class _ApprovalRequestCard extends StatelessWidget {
               ],
             ),
             if (block.body.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               SelectableText(
                 block.body,
                 style: TextStyle(
                   color: cards.textSecondary,
-                  fontSize: 14,
-                  height: 1.4,
+                  fontSize: 13,
+                  height: 1.32,
                 ),
               ),
             ],
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 OutlinedButton(
@@ -1075,12 +1125,12 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
     final canSubmit = !widget.block.isResolved && widget.onSubmit != null;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 720),
+      constraints: const BoxConstraints(maxWidth: 680),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
         decoration: BoxDecoration(
           color: cards.tintedSurface(accent, lightAlpha: 0.06, darkAlpha: 0.14),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: cards.accentBorder(accent)),
         ),
         child: Column(
@@ -1088,14 +1138,14 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.fact_check_outlined, color: accent),
-                const SizedBox(width: 10),
+                Icon(Icons.fact_check_outlined, size: 16, color: accent),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     widget.block.title,
                     style: TextStyle(
                       color: accent,
-                      fontSize: 14,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1105,19 +1155,19 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
               ],
             ),
             if (widget.block.body.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               SelectableText(
                 widget.block.body,
                 style: TextStyle(
                   color: cards.textSecondary,
-                  fontSize: 14,
-                  height: 1.4,
+                  fontSize: 13,
+                  height: 1.32,
                 ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             ..._buildFields(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             FilledButton(
               onPressed: canSubmit ? _submit : null,
               child: const Text('Submit response'),
@@ -1135,7 +1185,7 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
         TextField(
           controller: _controllers['response'],
           minLines: 2,
-          maxLines: 4,
+          maxLines: 3,
           decoration: const InputDecoration(
             labelText: 'Response',
             border: OutlineInputBorder(),
@@ -1147,7 +1197,7 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
     return widget.block.questions.map((question) {
       final controller = _controllers[question.id]!;
       return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(bottom: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1156,19 +1206,20 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: cards.textPrimary,
+                fontSize: 12.5,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               question.question,
               style: TextStyle(
                 color: cards.textSecondary,
-                fontSize: 13,
-                height: 1.35,
+                fontSize: 12,
+                height: 1.25,
               ),
             ),
             if (question.options.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1184,7 +1235,7 @@ class _UserInputRequestCardState extends State<_UserInputRequestCard> {
                     .toList(),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             TextField(
               controller: controller,
               obscureText: question.isSecret,
@@ -1232,43 +1283,46 @@ class _MetaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = _ConversationCardPalette.of(context);
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 680),
+      constraints: const BoxConstraints(maxWidth: 700),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
         decoration: BoxDecoration(
           color: cards.surface,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: cards.accentBorder(accent)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: accent, size: 18),
-            const SizedBox(width: 10),
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(icon, color: accent, size: 15),
+            ),
+            const SizedBox(width: 8),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (body.trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      body,
+              child: SelectableText.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: title,
                       style: TextStyle(
-                        color: cards.textPrimary,
-                        fontSize: 14,
-                        height: 1.4,
+                        color: accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (body.trim().isNotEmpty)
+                      TextSpan(
+                        text: '  ${body.trim()}',
+                        style: TextStyle(
+                          color: cards.textSecondary,
+                          fontSize: 12.5,
+                          height: 1.3,
+                        ),
+                      ),
                   ],
-                ],
+                ),
+                style: TextStyle(color: cards.textSecondary),
               ),
             ),
           ],
@@ -1287,7 +1341,7 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
@@ -1296,7 +1350,7 @@ class _Badge extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1313,7 +1367,7 @@ class _InlinePulseChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _tealAccent(Theme.of(context).brightness);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
@@ -1322,7 +1376,7 @@ class _InlinePulseChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: accent,
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1339,7 +1393,7 @@ class _StateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
@@ -1348,7 +1402,7 @@ class _StateChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.92),
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
       ),

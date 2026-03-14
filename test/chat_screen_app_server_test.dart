@@ -96,7 +96,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hi from Codex'), findsOneWidget);
-    expect(find.text('Turn complete'), findsOneWidget);
+    expect(find.textContaining('Turn complete'), findsOneWidget);
   });
 
   testWidgets('approval actions are routed to the app-server client', (
@@ -338,6 +338,9 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   }
 
   void emit(CodexAppServerEvent event) {
+    if (_eventsController.isClosed) {
+      return;
+    }
     _eventsController.add(event);
   }
 

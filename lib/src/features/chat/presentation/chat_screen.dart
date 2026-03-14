@@ -187,7 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : ListView.separated(
                             controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+                            padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
                             itemBuilder: (context, index) {
                               return ConversationEntryCard(
                                 block: transcriptBlocks[index],
@@ -197,14 +197,14 @@ class _ChatScreenState extends State<ChatScreen> {
                               );
                             },
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 8),
                             itemCount: transcriptBlocks.length,
                           ),
                   ),
                   if (pendingApprovalBlock != null ||
                       pendingUserInputBlock != null)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 220),
                         child: SingleChildScrollView(
@@ -219,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               if (pendingApprovalBlock != null &&
                                   pendingUserInputBlock != null)
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 8),
                               if (pendingUserInputBlock != null)
                                 ConversationEntryCard(
                                   block: pendingUserInputBlock,
@@ -235,7 +235,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                       child: ChatComposer(
                         controller: _composerController,
                         enabled: _profile.isReady && !_isLoading,
