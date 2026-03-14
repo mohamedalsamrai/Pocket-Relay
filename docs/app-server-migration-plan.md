@@ -52,6 +52,9 @@ Rules for every phase:
 
 ```text
 lib/src/features/chat/
+  application/
+    transcript_policy.dart
+    transcript_reducer.dart
   models/
     codex_runtime_event.dart
     codex_session_state.dart
@@ -69,7 +72,6 @@ lib/src/features/chat/
     codex_app_server_client.dart
     codex_json_rpc_codec.dart
     codex_runtime_event_mapper.dart
-    codex_session_reducer.dart
 ```
 
 ## Proposed Target Tree
@@ -197,32 +199,22 @@ Result:
 - card-specific rendering code no longer lives in one file
 - the dispatcher owns block selection and callback wiring only
 
-### Phase 2: Split Transcript State Logic
+### Phase 2: Completed Transcript State Split
 
-Primary target:
+Done:
 
-- break up `codex_session_reducer.dart`
+- replace `services/codex_session_reducer.dart` with:
+  - `application/transcript_reducer.dart`
+  - `application/transcript_policy.dart`
+- move reducer orchestration into the thin reducer file
+- move transcript behavior and block construction into the policy file
+- rewire the screen and tests onto the new application layer
 
-Files to create:
+Result:
 
-- `application/transcript_reducer.dart`
-- `application/transcript_policy.dart`
-
-Responsibilities:
-
-- `transcript_reducer.dart`: event-to-state orchestration
-- `transcript_policy.dart`: dedupe, suppression, grouping, ordering, block-id rules
-
-Rules:
-
-- transcript ordering and suppression must not live in widgets
-- block construction must stay close to the reducer unless a real seam appears
-- keep all stream and request regressions covered while cutting
-
-Exit criteria:
-
+- the reducer is now a small event dispatch/orchestration layer
 - transcript behavior can be tested without pumping `ChatScreen`
-- dedupe, grouping, and token-usage behavior are isolated from widget code
+- the next state seam is now between transcript policy and runtime mapping
 
 ### Phase 3: Split Runtime Mapping
 

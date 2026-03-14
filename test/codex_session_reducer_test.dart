@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
-import 'package:pocket_relay/src/features/chat/services/codex_session_reducer.dart';
 
 void main() {
   test(
     'creates and updates assistant entries from lifecycle and delta events',
     () {
-      final reducer = CodexSessionReducer();
+      final reducer = TranscriptReducer();
       var state = CodexSessionState.initial();
       final now = DateTime(2026, 3, 14, 12);
 
@@ -67,7 +67,7 @@ void main() {
   );
 
   test('renders official user-message items as user transcript blocks', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -90,7 +90,7 @@ void main() {
   });
 
   test('dedupes app-server user-message echoes against the local prompt', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     final now = DateTime(2026, 3, 14, 12);
     var state = reducer.addUserMessage(
       CodexSessionState.initial(),
@@ -117,7 +117,7 @@ void main() {
   });
 
   test('preserves spaces while assistant text is still streaming', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -172,7 +172,7 @@ void main() {
   });
 
   test('renders review and compaction items as status blocks', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -214,7 +214,7 @@ void main() {
   });
 
   test('suppresses empty reasoning lifecycle blocks until text arrives', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     final now = DateTime(2026, 3, 14, 12);
     var state = CodexSessionState.initial();
 
@@ -251,7 +251,7 @@ void main() {
   });
 
   test('opens and resolves approval requests', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -291,7 +291,7 @@ void main() {
   });
 
   test('opens and resolves user-input requests', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -339,7 +339,7 @@ void main() {
   });
 
   test('tracks thread and turn ids and captures usage summaries', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -382,7 +382,7 @@ void main() {
   });
 
   test('keeps warnings and errors non-fatal to the UI state', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = const CodexSessionState(
       connectionStatus: CodexRuntimeSessionState.ready,
     );
@@ -412,7 +412,7 @@ void main() {
   });
 
   test('hides non-signal status events but keeps thread token usage', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -474,7 +474,7 @@ void main() {
   });
 
   test('groups consecutive work-log entries in transcript blocks', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 
@@ -527,7 +527,7 @@ void main() {
   });
 
   test('renders proposed plan and changed files as dedicated blocks', () {
-    final reducer = CodexSessionReducer();
+    final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
 

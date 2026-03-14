@@ -2,8 +2,8 @@ import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 
-class CodexSessionReducer {
-  const CodexSessionReducer();
+class TranscriptPolicy {
+  const TranscriptPolicy();
 
   CodexSessionState addUserMessage(
     CodexSessionState state, {
@@ -69,179 +69,221 @@ class CodexSessionReducer {
     return state.copyWith(clearThreadId: true, clearTurnId: true);
   }
 
-  CodexSessionState reduceRuntimeEvent(
+  CodexSessionState applySessionExited(
     CodexSessionState state,
-    CodexRuntimeEvent event,
+    CodexRuntimeSessionExitedEvent event,
   ) {
-    switch (event) {
-      case CodexRuntimeSessionStartedEvent():
-        return state;
-      case CodexRuntimeSessionStateChangedEvent():
-        return state.copyWith(connectionStatus: event.state);
-      case CodexRuntimeSessionExitedEvent():
-        final nextState = state.copyWith(
-          connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
-              ? CodexRuntimeSessionState.error
-              : CodexRuntimeSessionState.stopped,
-          clearThreadId: true,
-          clearTurnId: true,
-          activeItems: const <String, CodexSessionActiveItem>{},
-          pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
-          pendingUserInputRequests:
-              const <String, CodexSessionPendingUserInputRequest>{},
-        );
-        if (event.exitKind != CodexRuntimeSessionExitKind.error) {
-          return nextState;
-        }
-        return _upsertBlock(
-          nextState,
-          CodexErrorBlock(
-            id: _eventEntryId('session-exit', event.createdAt),
-            createdAt: event.createdAt,
-            title: 'Session exited',
-            body: event.reason ?? 'The Codex session ended.',
-          ),
-        );
-      case CodexRuntimeThreadStartedEvent():
-        return state.copyWith(threadId: event.providerThreadId);
-      case CodexRuntimeThreadStateChangedEvent():
-        final isClosed = event.state == CodexRuntimeThreadState.closed;
-        return state.copyWith(
-          clearThreadId: isClosed,
-          clearTurnId: isClosed,
-          activeItems: isClosed
-              ? const <String, CodexSessionActiveItem>{}
-              : state.activeItems,
-        );
-      case CodexRuntimeTurnStartedEvent():
-        return state.copyWith(
-          connectionStatus: CodexRuntimeSessionState.running,
-          threadId: event.threadId ?? state.threadId,
-          turnId: event.turnId,
-        );
-      case CodexRuntimeTurnCompletedEvent():
-        final nextState = state.copyWith(
-          connectionStatus: CodexRuntimeSessionState.ready,
-          clearTurnId: true,
-          latestUsageSummary: _buildRuntimeUsageSummary(event),
-        );
-        final usageSummary = nextState.latestUsageSummary;
-        if (usageSummary == null || usageSummary.isEmpty) {
-          return nextState;
-        }
-        return _upsertBlock(
-          nextState,
-          CodexUsageBlock(
-            id: _eventEntryId('usage', event.createdAt),
-            createdAt: event.createdAt,
-            title: 'Turn complete',
-            body: usageSummary,
-          ),
-        );
-      case CodexRuntimeTurnAbortedEvent():
-        return _upsertBlock(
-          state.copyWith(
-            connectionStatus: CodexRuntimeSessionState.ready,
-            clearTurnId: true,
-          ),
-          CodexStatusBlock(
-            id: _eventEntryId('status', event.createdAt),
-            createdAt: event.createdAt,
-            title: 'Turn aborted',
-            body: event.reason ?? 'The active turn was aborted.',
-            isTranscriptSignal: true,
-          ),
-        );
-      case CodexRuntimeTurnPlanUpdatedEvent():
-        return _upsertBlock(
-          state,
-          CodexPlanUpdateBlock(
-            id: 'turn_plan_${event.turnId ?? event.createdAt.toIso8601String()}',
-            createdAt: event.createdAt,
-            explanation: event.explanation,
-            steps: event.steps,
-          ),
-        );
-      case CodexRuntimeTurnDiffUpdatedEvent():
-        return _upsertBlock(
-          state,
-          CodexChangedFilesBlock(
-            id: 'turn_diff_${event.turnId ?? event.createdAt.toIso8601String()}',
-            createdAt: event.createdAt,
-            title: 'Changed files',
-            files: _changedFilesFromSources(
-              snapshot: null,
-              body: event.unifiedDiff,
-              rawPayload: event.rawPayload,
-            ),
-            unifiedDiff: event.unifiedDiff,
-          ),
-        );
-      case CodexRuntimeItemStartedEvent():
-        return _applyItemLifecycle(state, event, removeAfterUpsert: false);
-      case CodexRuntimeItemUpdatedEvent():
-        return _applyItemLifecycle(state, event, removeAfterUpsert: false);
-      case CodexRuntimeItemCompletedEvent():
-        return _applyItemLifecycle(state, event, removeAfterUpsert: true);
-      case CodexRuntimeContentDeltaEvent():
-        return _applyContentDelta(state, event);
-      case CodexRuntimeRequestOpenedEvent():
-        return _applyRequestOpened(state, event);
-      case CodexRuntimeRequestResolvedEvent():
-        return _applyRequestResolved(state, event);
-      case CodexRuntimeUserInputRequestedEvent():
-        return _applyUserInputRequested(state, event);
-      case CodexRuntimeUserInputResolvedEvent():
-        return _applyUserInputResolved(state, event);
-      case CodexRuntimeWarningEvent():
-        return _upsertBlock(
-          state,
-          _statusEntry(
-            prefix: 'warning',
-            title: 'Warning',
-            body: event.details == null || event.details!.trim().isEmpty
-                ? event.summary
-                : '${event.summary}\n\n${event.details}',
-            createdAt: event.createdAt,
-            isTranscriptSignal: true,
-          ),
-        );
-      case CodexRuntimeStatusEvent():
-        if (event.rawMethod == 'thread/tokenUsage/updated') {
-          return _upsertBlock(
-            state,
-            CodexUsageBlock(
-              id: _eventEntryId('usage', event.createdAt),
-              createdAt: event.createdAt,
-              title: event.title,
-              body: event.message,
-            ),
-          );
-        }
-        if (!_isTranscriptStatusSignal(event)) {
-          return state;
-        }
-        return _upsertBlock(
-          state,
-          CodexStatusBlock(
-            id: _eventEntryId('status', event.createdAt),
-            createdAt: event.createdAt,
-            title: event.title,
-            body: event.message,
-            isTranscriptSignal: true,
-          ),
-        );
-      case CodexRuntimeErrorEvent():
-        return _upsertBlock(
-          state,
-          CodexErrorBlock(
-            id: _eventEntryId('error', event.createdAt),
-            createdAt: event.createdAt,
-            title: 'Runtime error',
-            body: event.message,
-          ),
-        );
+    final nextState = state.copyWith(
+      connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
+          ? CodexRuntimeSessionState.error
+          : CodexRuntimeSessionState.stopped,
+      clearThreadId: true,
+      clearTurnId: true,
+      activeItems: const <String, CodexSessionActiveItem>{},
+      pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
+      pendingUserInputRequests:
+          const <String, CodexSessionPendingUserInputRequest>{},
+    );
+    if (event.exitKind != CodexRuntimeSessionExitKind.error) {
+      return nextState;
     }
+    return _upsertBlock(
+      nextState,
+      CodexErrorBlock(
+        id: _eventEntryId('session-exit', event.createdAt),
+        createdAt: event.createdAt,
+        title: 'Session exited',
+        body: event.reason ?? 'The Codex session ended.',
+      ),
+    );
+  }
+
+  CodexSessionState applyTurnCompleted(
+    CodexSessionState state,
+    CodexRuntimeTurnCompletedEvent event,
+  ) {
+    final nextState = state.copyWith(
+      connectionStatus: CodexRuntimeSessionState.ready,
+      clearTurnId: true,
+      latestUsageSummary: _buildRuntimeUsageSummary(event),
+    );
+    final usageSummary = nextState.latestUsageSummary;
+    if (usageSummary == null || usageSummary.isEmpty) {
+      return nextState;
+    }
+    return _upsertBlock(
+      nextState,
+      CodexUsageBlock(
+        id: _eventEntryId('usage', event.createdAt),
+        createdAt: event.createdAt,
+        title: 'Turn complete',
+        body: usageSummary,
+      ),
+    );
+  }
+
+  CodexSessionState applyTurnAborted(
+    CodexSessionState state,
+    CodexRuntimeTurnAbortedEvent event,
+  ) {
+    return _upsertBlock(
+      state.copyWith(
+        connectionStatus: CodexRuntimeSessionState.ready,
+        clearTurnId: true,
+      ),
+      CodexStatusBlock(
+        id: _eventEntryId('status', event.createdAt),
+        createdAt: event.createdAt,
+        title: 'Turn aborted',
+        body: event.reason ?? 'The active turn was aborted.',
+        isTranscriptSignal: true,
+      ),
+    );
+  }
+
+  CodexSessionState applyTurnPlanUpdated(
+    CodexSessionState state,
+    CodexRuntimeTurnPlanUpdatedEvent event,
+  ) {
+    return _upsertBlock(
+      state,
+      CodexPlanUpdateBlock(
+        id: 'turn_plan_${event.turnId ?? event.createdAt.toIso8601String()}',
+        createdAt: event.createdAt,
+        explanation: event.explanation,
+        steps: event.steps,
+      ),
+    );
+  }
+
+  CodexSessionState applyTurnDiffUpdated(
+    CodexSessionState state,
+    CodexRuntimeTurnDiffUpdatedEvent event,
+  ) {
+    return _upsertBlock(
+      state,
+      CodexChangedFilesBlock(
+        id: 'turn_diff_${event.turnId ?? event.createdAt.toIso8601String()}',
+        createdAt: event.createdAt,
+        title: 'Changed files',
+        files: _changedFilesFromSources(
+          snapshot: null,
+          body: event.unifiedDiff,
+          rawPayload: event.rawPayload,
+        ),
+        unifiedDiff: event.unifiedDiff,
+      ),
+    );
+  }
+
+  CodexSessionState applyItemLifecycle(
+    CodexSessionState state,
+    CodexRuntimeItemLifecycleEvent event, {
+    required bool removeAfterUpsert,
+  }) {
+    return _applyItemLifecycle(
+      state,
+      event,
+      removeAfterUpsert: removeAfterUpsert,
+    );
+  }
+
+  CodexSessionState applyContentDelta(
+    CodexSessionState state,
+    CodexRuntimeContentDeltaEvent event,
+  ) {
+    return _applyContentDelta(state, event);
+  }
+
+  CodexSessionState applyRequestOpened(
+    CodexSessionState state,
+    CodexRuntimeRequestOpenedEvent event,
+  ) {
+    return _applyRequestOpened(state, event);
+  }
+
+  CodexSessionState applyRequestResolved(
+    CodexSessionState state,
+    CodexRuntimeRequestResolvedEvent event,
+  ) {
+    return _applyRequestResolved(state, event);
+  }
+
+  CodexSessionState applyUserInputRequested(
+    CodexSessionState state,
+    CodexRuntimeUserInputRequestedEvent event,
+  ) {
+    return _applyUserInputRequested(state, event);
+  }
+
+  CodexSessionState applyUserInputResolved(
+    CodexSessionState state,
+    CodexRuntimeUserInputResolvedEvent event,
+  ) {
+    return _applyUserInputResolved(state, event);
+  }
+
+  CodexSessionState applyWarning(
+    CodexSessionState state,
+    CodexRuntimeWarningEvent event,
+  ) {
+    return _upsertBlock(
+      state,
+      _statusEntry(
+        prefix: 'warning',
+        title: 'Warning',
+        body: event.details == null || event.details!.trim().isEmpty
+            ? event.summary
+            : '${event.summary}\n\n${event.details}',
+        createdAt: event.createdAt,
+        isTranscriptSignal: true,
+      ),
+    );
+  }
+
+  CodexSessionState applyStatus(
+    CodexSessionState state,
+    CodexRuntimeStatusEvent event,
+  ) {
+    if (event.rawMethod == 'thread/tokenUsage/updated') {
+      return _upsertBlock(
+        state,
+        CodexUsageBlock(
+          id: _eventEntryId('usage', event.createdAt),
+          createdAt: event.createdAt,
+          title: event.title,
+          body: event.message,
+        ),
+      );
+    }
+    if (!_isTranscriptStatusSignal(event)) {
+      return state;
+    }
+    return _upsertBlock(
+      state,
+      CodexStatusBlock(
+        id: _eventEntryId('status', event.createdAt),
+        createdAt: event.createdAt,
+        title: event.title,
+        body: event.message,
+        isTranscriptSignal: true,
+      ),
+    );
+  }
+
+  CodexSessionState applyRuntimeError(
+    CodexSessionState state,
+    CodexRuntimeErrorEvent event,
+  ) {
+    return _upsertBlock(
+      state,
+      CodexErrorBlock(
+        id: _eventEntryId('error', event.createdAt),
+        createdAt: event.createdAt,
+        title: 'Runtime error',
+        body: event.message,
+      ),
+    );
   }
 
   CodexSessionState _applyItemLifecycle(

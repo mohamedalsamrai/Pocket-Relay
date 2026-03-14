@@ -6,12 +6,12 @@ import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 import 'package:pocket_relay/src/features/chat/services/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/services/codex_runtime_event_mapper.dart';
-import 'package:pocket_relay/src/features/chat/services/codex_session_reducer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 import 'package:flutter/material.dart';
 
@@ -40,7 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final _composerController = TextEditingController();
   final _scrollController = ScrollController();
-  final _sessionReducer = const CodexSessionReducer();
+  final _sessionReducer = const TranscriptReducer();
   final _runtimeEventMapper = CodexRuntimeEventMapper();
 
   ConnectionProfile _profile = ConnectionProfile.defaults();
