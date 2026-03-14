@@ -89,6 +89,61 @@ void main() {
     expect(block.text, 'Ship the fix');
   });
 
+  test('preserves spaces while assistant text is still streaming', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemStartedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.assistantMessage,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_streaming',
+        status: CodexRuntimeItemStatus.inProgress,
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeContentDeltaEvent(
+        createdAt: now,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_streaming',
+        streamKind: CodexRuntimeContentStreamKind.assistantText,
+        delta: 'The',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeContentDeltaEvent(
+        createdAt: now.add(const Duration(milliseconds: 1)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_streaming',
+        streamKind: CodexRuntimeContentStreamKind.assistantText,
+        delta: ' shell',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeContentDeltaEvent(
+        createdAt: now.add(const Duration(milliseconds: 2)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_streaming',
+        streamKind: CodexRuntimeContentStreamKind.assistantText,
+        delta: ' session',
+      ),
+    );
+
+    final block = state.blocks.single as CodexTextBlock;
+    expect(block.body, 'The shell session');
+    expect(block.isRunning, isTrue);
+  });
+
   test('renders review and compaction items as status blocks', () {
     final reducer = CodexSessionReducer();
     var state = CodexSessionState.initial();
@@ -258,6 +313,7 @@ void main() {
     expect(state.threadId, 'thread_123');
     expect(state.turnId, isNull);
     expect(state.latestUsageSummary, 'input 12 · cached 3 · output 7');
+    expect(state.blocks, hasLength(1));
     expect(state.blocks.last, isA<CodexUsageBlock>());
   });
 
@@ -289,6 +345,42 @@ void main() {
     expect(state.blocks, hasLength(2));
     expect(state.blocks.first, isA<CodexStatusBlock>());
     expect(state.blocks.last, isA<CodexErrorBlock>());
+  });
+
+  test('hides non-signal status events but keeps thread token usage', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeStatusEvent(
+        createdAt: now,
+        rawMethod: 'unknown/method',
+        title: 'Unknown Method',
+        message: 'Received unknown method.',
+      ),
+    );
+
+    expect(state.blocks, isEmpty);
+    expect(state.transcriptBlocks, isEmpty);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeStatusEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        threadId: 'thread_123',
+        rawMethod: 'thread/tokenUsage/updated',
+        title: 'Thread token usage',
+        message: 'Last: input 10 | Total: input 20\nContext window: 200000',
+      ),
+    );
+
+    expect(state.blocks.single, isA<CodexUsageBlock>());
+    final block = state.blocks.single as CodexUsageBlock;
+    expect(block.title, 'Thread token usage');
+    expect(block.body, contains('Context window: 200000'));
+    expect(state.transcriptBlocks.single, isA<CodexUsageBlock>());
   });
 
   test('groups consecutive work-log entries in transcript blocks', () {

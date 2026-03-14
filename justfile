@@ -1,3 +1,5 @@
+android_avd := "Pixel_9_API_36"
+
 default:
     @just --list
 
@@ -5,16 +7,67 @@ doctor:
     flutter doctor -v
 
 emulator:
-    emulator @Pixel_9_API_36 -gpu swiftshader_indirect -no-audio -no-snapshot -no-boot-anim -no-metrics
+    emulator @{{android_avd}} -gpu swiftshader_indirect -no-audio -no-snapshot -no-boot-anim -no-metrics
 
 emulator-host-experimental:
-    env __GLX_VENDOR_LIBRARY_NAME=mesa QT_QPA_PLATFORM=xcb emulator @Pixel_9_API_36 -gpu host -no-audio -no-snapshot -no-boot-anim -no-metrics
+    env __GLX_VENDOR_LIBRARY_NAME=mesa QT_QPA_PLATFORM=xcb emulator @{{android_avd}} -gpu host -no-audio -no-snapshot -no-boot-anim -no-metrics
 
 run-android:
     flutter run -d android
 
 run-ios:
     flutter run -d ios
+
+[no-exit-message]
+[script]
+run-android-emulator:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    device="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }')"
+    if [ -z "$device" ]; then
+      echo "No running Android emulator found. Start one with 'just emulator' or 'just android-dev'." >&2
+      exit 1
+    fi
+
+    exec flutter run -d "$device"
+
+[no-exit-message]
+[script]
+attach-android-emulator:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    device="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }')"
+    if [ -z "$device" ]; then
+      echo "No running Android emulator found." >&2
+      exit 1
+    fi
+
+    exec flutter attach -d "$device"
+
+[no-exit-message]
+[script]
+android-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    avd="{{android_avd}}"
+    device="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }')"
+
+    if [ -z "$device" ]; then
+      flutter emulators --launch "$avd"
+
+      until device="$(adb devices | awk '$1 ~ /^emulator-/ && $2 == "device" { print $1; exit }')"; [ -n "$device" ]; do
+        sleep 2
+      done
+
+      until [ "$(adb -s "$device" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do
+        sleep 2
+      done
+    fi
+
+    exec flutter run -d "$device"
 
 [no-exit-message]
 [script]

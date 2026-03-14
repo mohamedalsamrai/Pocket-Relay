@@ -540,18 +540,7 @@ class CodexRuntimeEventMapper {
           ),
         ];
       default:
-        return <CodexRuntimeEvent>[
-          CodexRuntimeStatusEvent(
-            createdAt: now,
-            threadId: _asString(payload?['threadId']),
-            turnId: _asString(payload?['turnId']),
-            itemId: _asString(payload?['itemId']),
-            rawMethod: event.method,
-            rawPayload: event.params,
-            title: _notificationTitle(event.method),
-            message: _notificationMessage(event.method, payload),
-          ),
-        ];
+        return const <CodexRuntimeEvent>[];
     }
   }
 
@@ -665,6 +654,18 @@ class CodexRuntimeEventMapper {
     return null;
   }
 
+  static String? _stringFromCandidatesPreservingWhitespace(
+    List<Object?> candidates,
+  ) {
+    for (final candidate in candidates) {
+      final value = _asString(candidate);
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
+  }
+
   static String? _eventReason(Map<String, dynamic>? payload) {
     return _stringFromCandidates(<Object?>[
       payload?['reason'],
@@ -674,7 +675,7 @@ class CodexRuntimeEventMapper {
   }
 
   static String? _contentDelta(Map<String, dynamic>? payload) {
-    return _stringFromCandidates(<Object?>[
+    return _stringFromCandidatesPreservingWhitespace(<Object?>[
       payload?['delta'],
       payload?['text'],
       _asObject(payload?['content'])?['text'],
@@ -689,7 +690,7 @@ class CodexRuntimeEventMapper {
     final textParts = <String>[];
     for (final item in contentItems) {
       final object = _asObject(item);
-      final text = _stringFromCandidates(<Object?>[
+      final text = _stringFromCandidatesPreservingWhitespace(<Object?>[
         object?['text'],
         _asObject(object?['content'])?['text'],
       ]);
@@ -702,110 +703,6 @@ class CodexRuntimeEventMapper {
       return null;
     }
     return textParts.join('\n');
-  }
-
-  static String _notificationTitle(String method) {
-    return switch (method) {
-      'account/login/completed' => 'Login',
-      'account/rateLimits/updated' => 'Rate limits',
-      'account/updated' => 'Account',
-      'app/list/updated' => 'Apps',
-      'command/exec/outputDelta' => 'Command output',
-      'fuzzyFileSearch/sessionCompleted' => 'File search',
-      'fuzzyFileSearch/sessionUpdated' => 'File search',
-      'hook/completed' => 'Hook',
-      'hook/started' => 'Hook',
-      'item/autoApprovalReview/completed' => 'Approval review',
-      'item/autoApprovalReview/started' => 'Approval review',
-      'mcpServer/oauthLogin/completed' => 'MCP login',
-      'model/rerouted' => 'Model',
-      'skills/changed' => 'Skills',
-      'thread/name/updated' => 'Thread',
-      'thread/realtime/closed' => 'Realtime',
-      'thread/realtime/error' => 'Realtime',
-      'thread/realtime/itemAdded' => 'Realtime',
-      'thread/realtime/outputAudio/delta' => 'Realtime audio',
-      'thread/realtime/started' => 'Realtime',
-      'windows/worldWritableWarning' => 'Windows warning',
-      'windowsSandbox/setupCompleted' => 'Windows sandbox',
-      _ => _titleCase(_normalizeType(method)),
-    };
-  }
-
-  static String _notificationMessage(
-    String method,
-    Map<String, dynamic>? payload,
-  ) {
-    return switch (method) {
-      'account/login/completed' =>
-        (payload?['success'] == true)
-            ? 'Account login completed successfully.'
-            : _stringFromCandidates(<Object?>[payload?['error']]) ??
-                  'Account login did not complete successfully.',
-      'account/updated' => _accountUpdatedMessage(payload),
-      'thread/name/updated' =>
-        'Thread renamed to "${_asString(payload?['name']) ?? 'Untitled'}".',
-      'thread/realtime/started' =>
-        'Realtime streaming started for this thread.',
-      'thread/realtime/closed' => 'Realtime streaming closed for this thread.',
-      'thread/realtime/error' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['error'],
-            ]) ??
-            'Realtime streaming reported an error.',
-      'thread/realtime/itemAdded' =>
-        'A realtime item was added to the active thread.',
-      'thread/realtime/outputAudio/delta' => 'Realtime audio output received.',
-      'item/autoApprovalReview/started' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['reviewer'],
-            ]) ??
-            'Automatic approval review started.',
-      'item/autoApprovalReview/completed' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['decision'],
-            ]) ??
-            'Automatic approval review completed.',
-      'mcpServer/oauthLogin/completed' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['serverName'],
-            ]) ??
-            'MCP OAuth login completed.',
-      'model/rerouted' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['model'],
-            ]) ??
-            'Codex rerouted the requested model.',
-      'skills/changed' => 'The available skills changed for this session.',
-      'windowsSandbox/setupCompleted' =>
-        _stringFromCandidates(<Object?>[payload?['message']]) ??
-            'Windows sandbox setup completed.',
-      'windows/worldWritableWarning' =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['path'],
-            ]) ??
-            'Codex detected a world-writable path.',
-      _ =>
-        _stringFromCandidates(<Object?>[
-              payload?['message'],
-              payload?['summary'],
-              payload?['details'],
-              payload?['reason'],
-              payload?['path'],
-              payload?['name'],
-              payload?['tool'],
-              payload?['query'],
-              payload?['serverName'],
-              payload?['authMode'],
-            ]) ??
-            'Received ${_normalizeType(method)}.',
-    };
   }
 
   static String _threadTokenUsageMessage(Map<String, dynamic>? payload) {
@@ -838,23 +735,6 @@ class CodexRuntimeEventMapper {
     return 'Last: ${formatBreakdown(last)}\n'
         'Total: ${formatBreakdown(total)}'
         '${contextWindow == null ? '' : '\nContext window: $contextWindow'}';
-  }
-
-  static String _accountUpdatedMessage(Map<String, dynamic>? payload) {
-    final authMode = _asString(payload?['authMode']) ?? 'none';
-    final planType = _asString(payload?['planType']);
-    final suffix = planType == null || planType.isEmpty
-        ? ''
-        : ' · plan: $planType';
-    return 'Auth mode: $authMode$suffix.';
-  }
-
-  static String _titleCase(String value) {
-    return value
-        .split(' ')
-        .where((segment) => segment.isNotEmpty)
-        .map((segment) => '${segment[0].toUpperCase()}${segment.substring(1)}')
-        .join(' ');
   }
 
   static CodexCanonicalItemType _canonicalItemType(Object? raw) {

@@ -49,6 +49,7 @@ class CodexSessionReducer {
       createdAt: eventTime,
       title: 'Run stopped',
       body: message,
+      isTranscriptSignal: true,
     );
 
     return _upsertBlock(
@@ -85,6 +86,7 @@ class CodexSessionReducer {
         createdAt: eventTime,
         title: 'New thread',
         body: message,
+        isTranscriptSignal: true,
       ),
     );
   }
@@ -117,38 +119,21 @@ class CodexSessionReducer {
           return state;
         }
 
-        final nextState = state.copyWith(threadId: threadId);
-        if (state.threadId == threadId) {
-          return nextState;
-        }
-
-        return _upsertBlock(
-          nextState,
-          CodexStatusBlock(
-            id: 'thread_$threadId',
-            createdAt: DateTime.now(),
-            title: 'Thread ready',
-            body: 'Remote session ${_shortenId(threadId)} is active.',
-          ),
-        );
+        return state.copyWith(threadId: threadId);
       case EntryUpsertedEvent(:final entry):
         return _upsertBlock(state, _blockFromLegacyEntry(entry));
       case InformationalEvent(:final message, :final isError):
+        if (!isError) {
+          return state;
+        }
         return _upsertBlock(
           state,
-          isError
-              ? CodexErrorBlock(
-                  id: _eventEntryId('error', DateTime.now()),
-                  createdAt: DateTime.now(),
-                  title: 'Remote issue',
-                  body: message,
-                )
-              : CodexStatusBlock(
-                  id: _eventEntryId('status', DateTime.now()),
-                  createdAt: DateTime.now(),
-                  title: 'Status',
-                  body: message,
-                ),
+          CodexErrorBlock(
+            id: _eventEntryId('error', DateTime.now()),
+            createdAt: DateTime.now(),
+            title: 'Remote issue',
+            body: message,
+          ),
         );
       case TurnFinishedEvent():
         final nextState = state.copyWith(
@@ -177,32 +162,9 @@ class CodexSessionReducer {
   ) {
     switch (event) {
       case CodexRuntimeSessionStartedEvent():
-        if (event.message == null || event.message!.trim().isEmpty) {
-          return state;
-        }
-        return _upsertBlock(
-          state,
-          _statusEntry(
-            prefix: 'status',
-            title: 'Session',
-            body: event.message!,
-            createdAt: event.createdAt,
-          ),
-        );
+        return state;
       case CodexRuntimeSessionStateChangedEvent():
-        final nextState = state.copyWith(connectionStatus: event.state);
-        if (event.reason == null || event.reason!.trim().isEmpty) {
-          return nextState;
-        }
-        return _upsertBlock(
-          nextState,
-          _statusEntry(
-            prefix: 'status',
-            title: 'Session',
-            body: event.reason!,
-            createdAt: event.createdAt,
-          ),
-        );
+        return state.copyWith(connectionStatus: event.state);
       case CodexRuntimeSessionExitedEvent():
         final nextState = state.copyWith(
           connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
@@ -215,51 +177,28 @@ class CodexSessionReducer {
           pendingUserInputRequests:
               const <String, CodexSessionPendingUserInputRequest>{},
         );
+        if (event.exitKind != CodexRuntimeSessionExitKind.error) {
+          return nextState;
+        }
         return _upsertBlock(
           nextState,
-          event.exitKind == CodexRuntimeSessionExitKind.error
-              ? CodexErrorBlock(
-                  id: _eventEntryId('session-exit', event.createdAt),
-                  createdAt: event.createdAt,
-                  title: 'Session exited',
-                  body: event.reason ?? 'The Codex session ended.',
-                )
-              : CodexStatusBlock(
-                  id: _eventEntryId('session-exit', event.createdAt),
-                  createdAt: event.createdAt,
-                  title: 'Session exited',
-                  body: event.reason ?? 'The Codex session ended.',
-                ),
-        );
-      case CodexRuntimeThreadStartedEvent():
-        final nextState = state.copyWith(threadId: event.providerThreadId);
-        return _upsertBlock(
-          nextState,
-          CodexStatusBlock(
-            id: 'thread_${event.providerThreadId}',
+          CodexErrorBlock(
+            id: _eventEntryId('session-exit', event.createdAt),
             createdAt: event.createdAt,
-            title: 'Thread ready',
-            body:
-                'Remote session ${_shortenId(event.providerThreadId)} is active.',
+            title: 'Session exited',
+            body: event.reason ?? 'The Codex session ended.',
           ),
         );
+      case CodexRuntimeThreadStartedEvent():
+        return state.copyWith(threadId: event.providerThreadId);
       case CodexRuntimeThreadStateChangedEvent():
         final isClosed = event.state == CodexRuntimeThreadState.closed;
-        final nextState = state.copyWith(
+        return state.copyWith(
           clearThreadId: isClosed,
           clearTurnId: isClosed,
           activeItems: isClosed
               ? const <String, CodexSessionActiveItem>{}
               : state.activeItems,
-        );
-        return _upsertBlock(
-          nextState,
-          _statusEntry(
-            prefix: 'thread-state',
-            title: 'Thread ${_threadStateLabel(event.state)}',
-            body: _threadStateMessage(event),
-            createdAt: event.createdAt,
-          ),
         );
       case CodexRuntimeTurnStartedEvent():
         return state.copyWith(
@@ -297,6 +236,7 @@ class CodexSessionReducer {
             createdAt: event.createdAt,
             title: 'Turn aborted',
             body: event.reason ?? 'The active turn was aborted.',
+            isTranscriptSignal: true,
           ),
         );
       case CodexRuntimeTurnPlanUpdatedEvent():
@@ -350,9 +290,24 @@ class CodexSessionReducer {
                 ? event.summary
                 : '${event.summary}\n\n${event.details}',
             createdAt: event.createdAt,
+            isTranscriptSignal: true,
           ),
         );
       case CodexRuntimeStatusEvent():
+        if (event.rawMethod == 'thread/tokenUsage/updated') {
+          return _upsertBlock(
+            state,
+            CodexUsageBlock(
+              id: _threadTokenUsageBlockId(event.threadId),
+              createdAt: event.createdAt,
+              title: event.title,
+              body: event.message,
+            ),
+          );
+        }
+        if (!_isTranscriptStatusSignal(event)) {
+          return state;
+        }
         return _upsertBlock(
           state,
           CodexStatusBlock(
@@ -360,6 +315,7 @@ class CodexSessionReducer {
             createdAt: event.createdAt,
             title: event.title,
             body: event.message,
+            isTranscriptSignal: true,
           ),
         );
       case CodexRuntimeErrorEvent():
@@ -818,13 +774,29 @@ class CodexSessionReducer {
     required String title,
     required String body,
     required DateTime createdAt,
+    bool isTranscriptSignal = false,
   }) {
     return CodexStatusBlock(
       id: _eventEntryId(prefix, createdAt),
       createdAt: createdAt,
       title: title,
       body: body,
+      isTranscriptSignal: isTranscriptSignal,
     );
+  }
+
+  static bool _isTranscriptStatusSignal(CodexRuntimeStatusEvent event) {
+    return switch (event.rawMethod) {
+      'account/chatgptAuthTokens/refresh' ||
+      'item/tool/call' ||
+      'item/fileRead/requestApproval' =>
+        true,
+      _ => false,
+    };
+  }
+
+  static String _threadTokenUsageBlockId(String? threadId) {
+    return 'thread_token_usage_${threadId ?? 'current'}';
   }
 
   String _itemTitle(
@@ -1223,28 +1195,6 @@ class CodexSessionReducer {
     };
   }
 
-  static String _threadStateLabel(CodexRuntimeThreadState state) {
-    return switch (state) {
-      CodexRuntimeThreadState.active => 'active',
-      CodexRuntimeThreadState.idle => 'idle',
-      CodexRuntimeThreadState.archived => 'archived',
-      CodexRuntimeThreadState.closed => 'closed',
-      CodexRuntimeThreadState.compacted => 'compacted',
-      CodexRuntimeThreadState.error => 'error',
-    };
-  }
-
-  static String _threadStateMessage(CodexRuntimeThreadStateChangedEvent event) {
-    return switch (event.state) {
-      CodexRuntimeThreadState.closed => 'The current thread was closed.',
-      CodexRuntimeThreadState.archived => 'The current thread was archived.',
-      CodexRuntimeThreadState.compacted =>
-        'Codex compacted the current thread context.',
-      CodexRuntimeThreadState.error => 'The current thread reported an error.',
-      _ => 'The thread state changed to ${_threadStateLabel(event.state)}.',
-    };
-  }
-
   static String _questionsSummary(
     List<CodexRuntimeUserInputQuestion> questions,
   ) {
@@ -1321,13 +1271,6 @@ class CodexSessionReducer {
 
   static String _eventEntryId(String prefix, DateTime createdAt) {
     return '$prefix-${createdAt.microsecondsSinceEpoch}';
-  }
-
-  static String _shortenId(String value) {
-    if (value.length <= 12) {
-      return value;
-    }
-    return '${value.substring(0, 6)}…${value.substring(value.length - 4)}';
   }
 
   static String? _stringFromCandidates(List<Object?> candidates) {

@@ -358,10 +358,12 @@ final class CodexStatusBlock extends CodexUiBlock {
     required super.createdAt,
     required this.title,
     required this.body,
+    this.isTranscriptSignal = false,
   }) : super(kind: CodexUiBlockKind.status);
 
   final String title;
   final String body;
+  final bool isTranscriptSignal;
 }
 
 final class CodexErrorBlock extends CodexUiBlock {

@@ -85,6 +85,7 @@ bool _shouldAppearInTranscript(CodexUiBlock block) {
   return switch (block) {
     CodexApprovalRequestBlock(:final isResolved) => isResolved,
     CodexUserInputRequestBlock(:final isResolved) => isResolved,
+    CodexStatusBlock(:final isTranscriptSignal) => isTranscriptSignal,
     _ => true,
   };
 }

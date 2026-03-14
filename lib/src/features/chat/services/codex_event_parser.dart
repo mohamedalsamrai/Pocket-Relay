@@ -26,14 +26,6 @@ class CodexEventParser {
           events.add(ThreadStartedEvent(threadId));
         }
         break;
-      case 'turn.started':
-        events.add(
-          const InformationalEvent(
-            message: 'Codex turn started.',
-            isError: false,
-          ),
-        );
-        break;
       case 'item.started':
       case 'item.completed':
         final item = event['item'];
@@ -58,14 +50,6 @@ class CodexEventParser {
           InformationalEvent(
             message: event['message'] as String? ?? 'Remote Codex error.',
             isError: true,
-          ),
-        );
-        break;
-      default:
-        events.add(
-          InformationalEvent(
-            message: 'Unhandled Codex event: $type',
-            isError: false,
           ),
         );
         break;
@@ -112,14 +96,7 @@ class CodexEventParser {
           exitCode: (item['exit_code'] as num?)?.toInt(),
         );
       default:
-        final payload = const JsonEncoder.withIndent('  ').convert(item);
-        return ConversationEntry(
-          id: id,
-          kind: ConversationEntryKind.status,
-          title: itemType.replaceAll('_', ' '),
-          body: payload,
-          createdAt: now,
-        );
+        return null;
     }
   }
 }

@@ -95,6 +95,39 @@ void main() {
     expect(deltaEvent.delta, 'Hello');
   });
 
+  test('preserves whitespace in streaming content deltas', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final leadingSpace = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/agentMessage/delta',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'itemId': 'item_123',
+          'delta': ' shell',
+        },
+      ),
+    );
+    final spaceOnly = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/agentMessage/delta',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'itemId': 'item_123',
+          'delta': ' ',
+        },
+      ),
+    );
+
+    expect(
+      (leadingSpace.single as CodexRuntimeContentDeltaEvent).delta,
+      ' shell',
+    );
+    expect((spaceOnly.single as CodexRuntimeContentDeltaEvent).delta, ' ');
+  });
+
   test('maps official user, review, and image item types correctly', () {
     final mapper = CodexRuntimeEventMapper();
 
@@ -330,7 +363,7 @@ void main() {
     expect(usageEvent.message, contains('Context window: 200000'));
   });
 
-  test('maps warnings and keeps unknown notifications visible', () {
+  test('maps warnings and drops unknown notifications', () {
     final mapper = CodexRuntimeEventMapper();
 
     final warning = mapper.mapEvent(
@@ -354,9 +387,7 @@ void main() {
       (warning.single as CodexRuntimeWarningEvent).summary,
       'Config warning',
     );
-    final status = unknown.single as CodexRuntimeStatusEvent;
-    expect(status.title, 'Unknown Method');
-    expect(status.message, 'Received unknown method.');
+    expect(unknown, isEmpty);
   });
 
   test('maps turn plan and diff notifications into runtime events', () {

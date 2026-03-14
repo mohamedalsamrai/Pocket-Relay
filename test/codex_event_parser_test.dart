@@ -38,4 +38,14 @@ void main() {
     expect(parsed.usage?.cachedInputTokens, 45);
     expect(parsed.usage?.outputTokens, 67);
   });
+
+  test('ignores legacy protocol events that are not transcript signals', () {
+    final unknownEvent = parser.parseLine('{"type":"turn.started"}');
+    final unknownItem = parser.parseLine(
+      '{"type":"item.completed","item":{"id":"plan_1","type":"plan","text":"Do the work"}}',
+    );
+
+    expect(unknownEvent.events, isEmpty);
+    expect(unknownItem.events, isEmpty);
+  });
 }
