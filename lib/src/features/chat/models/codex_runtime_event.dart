@@ -67,6 +67,7 @@ enum CodexCanonicalRequestType {
   execCommandApproval,
   permissionsRequestApproval,
   toolUserInput,
+  mcpServerElicitation,
   dynamicToolCall,
   authTokensRefresh,
   unknown,

@@ -12,6 +12,7 @@ class CodexRuntimeEventMapper {
 
     switch (event) {
       case CodexAppServerConnectedEvent(:final userAgent):
+        _pendingRequests.clear();
         return <CodexRuntimeEvent>[
           CodexRuntimeSessionStartedEvent(
             createdAt: now,
@@ -28,6 +29,7 @@ class CodexRuntimeEventMapper {
           ),
         ];
       case CodexAppServerDisconnectedEvent(:final exitCode):
+        _pendingRequests.clear();
         return <CodexRuntimeEvent>[
           CodexRuntimeSessionExitedEvent(
             createdAt: now,
@@ -160,6 +162,7 @@ class CodexRuntimeEventMapper {
         ];
       case 'session/exited':
       case 'session/closed':
+        _pendingRequests.clear();
         return <CodexRuntimeEvent>[
           CodexRuntimeSessionExitedEvent(
             createdAt: now,
@@ -327,39 +330,46 @@ class CodexRuntimeEventMapper {
             : <CodexRuntimeEvent>[itemEvent];
       case 'item/reasoning/summaryPartAdded':
       case 'item/commandExecution/terminalInteraction':
-        final itemEvent = _mapItemLifecycle(
-          payload,
-          now,
-          rawMethod: event.method,
-          rawPayload: event.params,
-          fallbackStatus: CodexRuntimeItemStatus.inProgress,
-          builder:
-              ({
-                required createdAt,
-                required itemType,
-                required threadId,
-                required turnId,
-                required itemId,
-                required status,
-                required rawMethod,
-                required rawPayload,
-                required title,
-                required detail,
-                required snapshot,
-              }) => CodexRuntimeItemUpdatedEvent(
-                createdAt: createdAt,
-                itemType: itemType,
-                threadId: threadId,
-                turnId: turnId,
-                itemId: itemId,
-                status: status,
-                rawMethod: rawMethod,
-                rawPayload: rawPayload,
-                title: title,
-                detail: detail,
-                snapshot: snapshot,
-              ),
-        );
+        final itemEvent =
+            _mapItemLifecycle(
+              payload,
+              now,
+              rawMethod: event.method,
+              rawPayload: event.params,
+              fallbackStatus: CodexRuntimeItemStatus.inProgress,
+              builder:
+                  ({
+                    required createdAt,
+                    required itemType,
+                    required threadId,
+                    required turnId,
+                    required itemId,
+                    required status,
+                    required rawMethod,
+                    required rawPayload,
+                    required title,
+                    required detail,
+                    required snapshot,
+                  }) => CodexRuntimeItemUpdatedEvent(
+                    createdAt: createdAt,
+                    itemType: itemType,
+                    threadId: threadId,
+                    turnId: turnId,
+                    itemId: itemId,
+                    status: status,
+                    rawMethod: rawMethod,
+                    rawPayload: rawPayload,
+                    title: title,
+                    detail: detail,
+                    snapshot: snapshot,
+                  ),
+            ) ??
+            _mapPartialItemUpdate(
+              payload,
+              now,
+              rawMethod: event.method,
+              rawPayload: event.params,
+            );
         return itemEvent == null
             ? const <CodexRuntimeEvent>[]
             : <CodexRuntimeEvent>[itemEvent];
@@ -503,7 +513,7 @@ class CodexRuntimeEventMapper {
     })
     builder,
   }) {
-    final item = _asObject(payload?['item']) ?? payload;
+    final item = _asObject(payload?['item']);
     final threadId = _asString(payload?['threadId']);
     final turnId = _asString(payload?['turnId']);
     final itemId = _asString(item?['id']) ?? _asString(payload?['itemId']);
@@ -695,6 +705,8 @@ class CodexRuntimeEventMapper {
       'item/permissions/requestApproval' =>
         CodexCanonicalRequestType.permissionsRequestApproval,
       'item/tool/requestUserInput' => CodexCanonicalRequestType.toolUserInput,
+      'mcpServer/elicitation/request' =>
+        CodexCanonicalRequestType.mcpServerElicitation,
       'item/tool/call' => CodexCanonicalRequestType.dynamicToolCall,
       'account/chatgptAuthTokens/refresh' =>
         CodexCanonicalRequestType.authTokensRefresh,
@@ -716,6 +728,8 @@ class CodexRuntimeEventMapper {
 
   static String? _requestDetail(Map<String, dynamic>? payload) {
     return _stringFromCandidates(<Object?>[
+      payload?['message'],
+      payload?['serverName'],
       payload?['command'],
       payload?['reason'],
       payload?['prompt'],
@@ -896,6 +910,49 @@ class CodexRuntimeEventMapper {
     } on FormatException {
       return null;
     }
+  }
+
+  static CodexRuntimeItemUpdatedEvent? _mapPartialItemUpdate(
+    Map<String, dynamic>? payload,
+    DateTime now, {
+    required String rawMethod,
+    required Object? rawPayload,
+  }) {
+    final threadId = _asString(payload?['threadId']);
+    final turnId = _asString(payload?['turnId']);
+    final itemId = _asString(payload?['itemId']);
+    if (threadId == null || turnId == null || itemId == null) {
+      return null;
+    }
+
+    final itemType = switch (rawMethod) {
+      'item/reasoning/summaryPartAdded' => CodexCanonicalItemType.reasoning,
+      'item/commandExecution/terminalInteraction' =>
+        CodexCanonicalItemType.commandExecution,
+      _ => CodexCanonicalItemType.unknown,
+    };
+
+    final detail = switch (rawMethod) {
+      'item/reasoning/summaryPartAdded' =>
+        'Summary part ${_asInt(payload?['summaryIndex']) ?? '?'} added.',
+      'item/commandExecution/terminalInteraction' =>
+        _asString(payload?['stdin']) ?? _asString(payload?['processId']),
+      _ => null,
+    };
+
+    return CodexRuntimeItemUpdatedEvent(
+      createdAt: now,
+      itemType: itemType,
+      threadId: threadId,
+      turnId: turnId,
+      itemId: itemId,
+      status: CodexRuntimeItemStatus.inProgress,
+      rawMethod: rawMethod,
+      rawPayload: rawPayload,
+      title: _itemTitle(itemType),
+      detail: detail,
+      snapshot: payload,
+    );
   }
 }
 

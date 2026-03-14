@@ -137,6 +137,31 @@ void main() {
     },
   );
 
+  test('maps mcp elicitation requests into canonical request events', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final requestOpened = mapper.mapEvent(
+      const CodexAppServerRequestEvent(
+        requestId: 's:elicitation-1',
+        method: 'mcpServer/elicitation/request',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'serverName': 'filesystem',
+          'message': 'Choose a directory',
+          'mode': 'form',
+        },
+      ),
+    );
+
+    final openedEvent = requestOpened.single as CodexRuntimeRequestOpenedEvent;
+    expect(
+      openedEvent.requestType,
+      CodexCanonicalRequestType.mcpServerElicitation,
+    );
+    expect(openedEvent.detail, 'Choose a directory');
+  });
+
   test('maps user input requests and answered notifications', () {
     final mapper = CodexRuntimeEventMapper();
 
@@ -217,5 +242,76 @@ void main() {
       'Config warning',
     );
     expect(unknown, isEmpty);
+  });
+
+  test(
+    'maps partial item update notifications without embedded item snapshots',
+    () {
+      final mapper = CodexRuntimeEventMapper();
+
+      final reasoningUpdate = mapper.mapEvent(
+        const CodexAppServerNotificationEvent(
+          method: 'item/reasoning/summaryPartAdded',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_123',
+            'itemId': 'item_123',
+            'summaryIndex': 2,
+          },
+        ),
+      );
+      final terminalInteraction = mapper.mapEvent(
+        const CodexAppServerNotificationEvent(
+          method: 'item/commandExecution/terminalInteraction',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_123',
+            'itemId': 'item_456',
+            'processId': 'proc_1',
+            'stdin': 'y\n',
+          },
+        ),
+      );
+
+      final reasoningEvent =
+          reasoningUpdate.single as CodexRuntimeItemUpdatedEvent;
+      final terminalEvent =
+          terminalInteraction.single as CodexRuntimeItemUpdatedEvent;
+
+      expect(reasoningEvent.itemType, CodexCanonicalItemType.reasoning);
+      expect(reasoningEvent.itemId, 'item_123');
+      expect(reasoningEvent.detail, 'Summary part 2 added.');
+      expect(terminalEvent.itemType, CodexCanonicalItemType.commandExecution);
+      expect(terminalEvent.itemId, 'item_456');
+      expect(terminalEvent.detail, 'y\n');
+    },
+  );
+
+  test('clears stale pending requests after disconnect', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    mapper.mapEvent(
+      const CodexAppServerRequestEvent(
+        requestId: 'i:99',
+        method: 'item/fileChange/requestApproval',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'itemId': 'item_123',
+          'reason': 'Write files',
+        },
+      ),
+    );
+    mapper.mapEvent(const CodexAppServerDisconnectedEvent(exitCode: 1));
+
+    final resolved = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'serverRequest/resolved',
+        params: <String, Object?>{'threadId': 'thread_123', 'requestId': 99},
+      ),
+    );
+
+    final resolvedEvent = resolved.single as CodexRuntimeRequestResolvedEvent;
+    expect(resolvedEvent.requestType, CodexCanonicalRequestType.unknown);
   });
 }

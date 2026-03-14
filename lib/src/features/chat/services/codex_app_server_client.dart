@@ -80,6 +80,8 @@ class CodexAppServerTurn {
   final String turnId;
 }
 
+enum CodexAppServerElicitationAction { accept, decline, cancel }
+
 class CodexAppServerException implements Exception {
   const CodexAppServerException(this.message, {this.code, this.data});
 
@@ -233,32 +235,61 @@ class CodexAppServerClient {
     final effectiveCwd = (cwd ?? profile.workspaceDir).trim().isEmpty
         ? profile.workspaceDir.trim()
         : (cwd ?? profile.workspaceDir).trim();
-    final method = resumeThreadId != null && resumeThreadId.trim().isNotEmpty
-        ? 'thread/resume'
-        : 'thread/start';
-    final params = <String, Object?>{
+    final normalizedResumeThreadId = resumeThreadId?.trim();
+    final effectiveResumeThreadId =
+        profile.ephemeralSession ||
+            normalizedResumeThreadId == null ||
+            normalizedResumeThreadId.isEmpty
+        ? null
+        : normalizedResumeThreadId;
+    final baseParams = <String, Object?>{
       'cwd': effectiveCwd,
       'approvalPolicy': _approvalPolicyFor(profile),
       'sandbox': _sandboxFor(profile),
-      'ephemeral': profile.ephemeralSession,
       if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
-      if (resumeThreadId != null && resumeThreadId.trim().isNotEmpty)
-        'threadId': resumeThreadId.trim(),
+    };
+    var method = effectiveResumeThreadId != null
+        ? 'thread/resume'
+        : 'thread/start';
+    final resumeThreadParam = effectiveResumeThreadId == null
+        ? null
+        : <String, Object?>{'threadId': effectiveResumeThreadId};
+    var params = <String, Object?>{
+      ...baseParams,
+      if (method == 'thread/start') 'ephemeral': profile.ephemeralSession,
+      ...?resumeThreadParam,
     };
 
-    final response = await _sendRequest(method, params);
+    Object? response;
+    try {
+      response = await _sendRequest(method, params);
+    } on CodexAppServerException catch (error) {
+      if (effectiveResumeThreadId == null ||
+          !_isRecoverableThreadResumeError(error)) {
+        rethrow;
+      }
+
+      method = 'thread/start';
+      params = <String, Object?>{
+        ...baseParams,
+        'ephemeral': profile.ephemeralSession,
+      };
+      response = await _sendRequest(method, params);
+    }
+
     final payload = _requireObject(response, '$method response');
     final thread = _requireObject(payload['thread'], '$method thread');
     final threadId =
         _asString(thread['id']) ?? _asString(payload['threadId']) ?? '';
 
     if (threadId.isEmpty) {
-      throw const CodexAppServerException(
-        'thread/start response did not include a thread id.',
+      throw CodexAppServerException(
+        '$method response did not include a thread id.',
       );
     }
 
     _threadId = threadId;
+    _activeTurnId = null;
 
     return CodexAppServerSession(
       threadId: threadId,
@@ -277,13 +308,17 @@ class CodexAppServerClient {
   }) async {
     _requireConnected();
 
+    final effectiveThreadId = threadId.trim();
     final trimmedText = text.trim();
+    if (effectiveThreadId.isEmpty) {
+      throw const CodexAppServerException('Thread id cannot be empty.');
+    }
     if (trimmedText.isEmpty) {
       throw const CodexAppServerException('Turn input cannot be empty.');
     }
 
     final params = <String, Object?>{
-      'threadId': threadId,
+      'threadId': effectiveThreadId,
       'input': <Object>[
         <String, Object?>{
           'type': 'text',
@@ -305,10 +340,10 @@ class CodexAppServerClient {
       );
     }
 
-    _threadId = threadId;
+    _threadId = effectiveThreadId;
     _activeTurnId = turnId;
 
-    return CodexAppServerTurn(threadId: threadId, turnId: turnId);
+    return CodexAppServerTurn(threadId: effectiveThreadId, turnId: turnId);
   }
 
   Future<void> answerUserInput({
@@ -339,6 +374,11 @@ class CodexAppServerClient {
     required bool approved,
   }) async {
     final pending = _requirePendingServerRequest(requestId);
+    if (pending.method == 'item/permissions/requestApproval') {
+      await resolvePermissionsRequest(requestId: requestId, approved: approved);
+      return;
+    }
+
     final decision = switch (pending.method) {
       'item/commandExecution/requestApproval' =>
         approved ? 'accept' : 'decline',
@@ -354,6 +394,65 @@ class CodexAppServerClient {
       requestId: requestId,
       result: <String, Object?>{'decision': decision},
     );
+  }
+
+  Future<void> resolvePermissionsRequest({
+    required String requestId,
+    required bool approved,
+    String scope = 'turn',
+  }) async {
+    if (scope != 'turn' && scope != 'session') {
+      throw CodexAppServerException('Unsupported permission scope: $scope');
+    }
+
+    final pending = _requirePendingServerRequest(requestId);
+    if (pending.method != 'item/permissions/requestApproval') {
+      throw CodexAppServerException(
+        'Request $requestId is ${pending.method}, not item/permissions/requestApproval.',
+      );
+    }
+
+    final payload = _asObject(pending.params);
+    final requestedPermissions = _asObject(payload?['permissions']);
+    await sendServerResult(
+      requestId: requestId,
+      result: <String, Object?>{
+        'permissions': approved
+            ? _grantedPermissionsFromRequest(requestedPermissions)
+            : const <String, Object?>{},
+        'scope': scope,
+      },
+    );
+  }
+
+  Future<void> respondToElicitation({
+    required String requestId,
+    required CodexAppServerElicitationAction action,
+    Object? content,
+    Object? metadata,
+  }) async {
+    final pending = _requirePendingServerRequest(requestId);
+    if (pending.method != 'mcpServer/elicitation/request') {
+      throw CodexAppServerException(
+        'Request $requestId is ${pending.method}, not mcpServer/elicitation/request.',
+      );
+    }
+
+    if (action != CodexAppServerElicitationAction.accept && content != null) {
+      throw const CodexAppServerException(
+        'Only accepted elicitation responses may include content.',
+      );
+    }
+
+    final result = <String, Object?>{'action': action.name};
+    if (content != null) {
+      result['content'] = content;
+    }
+    if (metadata != null) {
+      result['_meta'] = metadata;
+    }
+
+    await sendServerResult(requestId: requestId, result: result);
   }
 
   Future<void> sendServerResult({
@@ -490,17 +589,35 @@ class CodexAppServerClient {
   void _updateRuntimePointers(String method, Object? params) {
     final payload = _asObject(params);
     switch (method) {
+      case 'session/exited':
+      case 'session/closed':
+        _threadId = null;
+        _activeTurnId = null;
+        break;
       case 'thread/started':
         final thread = _asObject(payload?['thread']);
         _threadId = _asString(thread?['id']) ?? _asString(payload?['threadId']);
+        _activeTurnId = null;
+        break;
+      case 'thread/closed':
+        final threadId = _asString(payload?['threadId']);
+        if (threadId == null || threadId == _threadId) {
+          _threadId = null;
+          _activeTurnId = null;
+        }
         break;
       case 'turn/started':
+        _threadId = _asString(payload?['threadId']) ?? _threadId;
         final turn = _asObject(payload?['turn']);
         _activeTurnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
         break;
       case 'turn/completed':
       case 'turn/aborted':
-        _activeTurnId = null;
+        final turn = _asObject(payload?['turn']);
+        final turnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
+        if (turnId == null || turnId == _activeTurnId) {
+          _activeTurnId = null;
+        }
         break;
     }
   }
@@ -581,13 +698,43 @@ class CodexAppServerClient {
   }
 
   static String _approvalPolicyFor(ConnectionProfile profile) {
-    return profile.dangerouslyBypassSandbox ? 'never' : 'on-request';
+    return profile.dangerouslyBypassSandbox ? 'never' : 'onRequest';
   }
 
   static String _sandboxFor(ConnectionProfile profile) {
     return profile.dangerouslyBypassSandbox
-        ? 'danger-full-access'
-        : 'workspace-write';
+        ? 'dangerFullAccess'
+        : 'workspaceWrite';
+  }
+
+  static Map<String, Object?> _grantedPermissionsFromRequest(
+    Map<String, dynamic>? requested,
+  ) {
+    if (requested == null) {
+      return const <String, Object?>{};
+    }
+
+    return <String, Object?>{
+      if (requested['network'] != null) 'network': requested['network'],
+      if (requested['fileSystem'] != null)
+        'fileSystem': requested['fileSystem'],
+      if (requested['macos'] != null) 'macos': requested['macos'],
+    };
+  }
+
+  static bool _isRecoverableThreadResumeError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (!message.contains('thread/resume')) {
+      return false;
+    }
+
+    return const <String>[
+      'not found',
+      'missing thread',
+      'no such thread',
+      'unknown thread',
+      'does not exist',
+    ].any(message.contains);
   }
 }
 

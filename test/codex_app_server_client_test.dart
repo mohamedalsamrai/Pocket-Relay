@@ -68,8 +68,8 @@ void main() {
                 'cwd': '/workspace',
                 'model': 'gpt-5.3-codex',
                 'modelProvider': 'openai',
-                'approvalPolicy': 'on-request',
-                'sandbox': <String, Object?>{'type': 'workspace-write'},
+                'approvalPolicy': 'onRequest',
+                'sandbox': <String, Object?>{'type': 'workspaceWrite'},
               },
             });
           case 'turn/start':
@@ -115,8 +115,8 @@ void main() {
 
     expect(threadStartRequest['params'], <String, Object?>{
       'cwd': '/workspace',
-      'approvalPolicy': 'on-request',
-      'sandbox': 'workspace-write',
+      'approvalPolicy': 'onRequest',
+      'sandbox': 'workspaceWrite',
       'ephemeral': false,
     });
     expect(turnStartRequest['params'], <String, Object?>{
@@ -128,6 +128,184 @@ void main() {
           'text_elements': <Object>[],
         },
       ],
+    });
+
+    await client.disconnect();
+  });
+
+  test(
+    'startSession uses thread/resume params without ephemeral field',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          switch (message['method']) {
+            case 'initialize':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'userAgent': 'codex-app-server-test',
+                },
+              });
+            case 'thread/resume':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'thread': <String, Object?>{'id': 'thread_resumed'},
+                  'cwd': '/workspace',
+                  'model': 'gpt-5.3-codex',
+                  'modelProvider': 'openai',
+                  'approvalPolicy': 'onRequest',
+                  'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+                },
+              });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      await client.startSession(resumeThreadId: 'thread_old');
+
+      final resumeRequest = process.writtenMessages.firstWhere(
+        (message) => message['method'] == 'thread/resume',
+      );
+      expect(resumeRequest['params'], <String, Object?>{
+        'cwd': '/workspace',
+        'approvalPolicy': 'onRequest',
+        'sandbox': 'workspaceWrite',
+        'threadId': 'thread_old',
+      });
+
+      await client.disconnect();
+    },
+  );
+
+  test(
+    'startSession falls back to thread/start when thread/resume cannot find the thread',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          switch (message['method']) {
+            case 'initialize':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'userAgent': 'codex-app-server-test',
+                },
+              });
+            case 'thread/resume':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'error': <String, Object?>{
+                  'code': -32000,
+                  'message': 'thread/resume failed: thread not found',
+                },
+              });
+            case 'thread/start':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'thread': <String, Object?>{'id': 'thread_fresh'},
+                  'cwd': '/workspace',
+                  'model': 'gpt-5.3-codex',
+                  'modelProvider': 'openai',
+                  'approvalPolicy': 'onRequest',
+                  'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+                },
+              });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      final session = await client.startSession(resumeThreadId: 'thread_old');
+
+      expect(session.threadId, 'thread_fresh');
+      expect(
+        process.writtenMessages
+            .where((message) => message['method'] == 'thread/resume')
+            .length,
+        1,
+      );
+      expect(
+        process.writtenMessages
+            .where((message) => message['method'] == 'thread/start')
+            .length,
+        1,
+      );
+
+      await client.disconnect();
+    },
+  );
+
+  test('ephemeral sessions ignore resume thread ids and start fresh', () async {
+    late _FakeCodexAppServerProcess process;
+    process = _FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        switch (message['method']) {
+          case 'initialize':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          case 'thread/start':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'thread': <String, Object?>{'id': 'thread_new'},
+                'cwd': '/workspace',
+                'model': 'gpt-5.3-codex',
+                'modelProvider': 'openai',
+                'approvalPolicy': 'onRequest',
+                'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+              },
+            });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: _profile(ephemeralSession: true),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    await client.startSession(resumeThreadId: 'thread_old');
+
+    final startRequest = process.writtenMessages.firstWhere(
+      (message) => message['method'] == 'thread/start',
+    );
+    expect(startRequest['params'], <String, Object?>{
+      'cwd': '/workspace',
+      'approvalPolicy': 'onRequest',
+      'sandbox': 'workspaceWrite',
+      'ephemeral': true,
     });
 
     await client.disconnect();
@@ -208,10 +386,350 @@ void main() {
     await subscription.cancel();
     await client.disconnect();
   });
+
+  test(
+    'permissions approval requests can be resolved through the client API',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          if (message['method'] == 'initialize') {
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      process.sendStdout(<String, Object?>{
+        'id': 'perm-1',
+        'method': 'item/permissions/requestApproval',
+        'params': <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'itemId': 'item_123',
+          'permissions': <String, Object?>{
+            'network': <String, Object?>{'enabled': true},
+            'fileSystem': <String, Object?>{
+              'write': <String>['/tmp/project'],
+            },
+            'macos': null,
+          },
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      await client.resolveApproval(requestId: 's:perm-1', approved: true);
+
+      expect(process.writtenMessages.last, <String, Object?>{
+        'id': 'perm-1',
+        'result': <String, Object?>{
+          'permissions': <String, Object?>{
+            'network': <String, Object?>{'enabled': true},
+            'fileSystem': <String, Object?>{
+              'write': <String>['/tmp/project'],
+            },
+          },
+          'scope': 'turn',
+        },
+      });
+
+      await client.disconnect();
+    },
+  );
+
+  test(
+    'session exit notifications clear tracked thread and turn ids',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          switch (message['method']) {
+            case 'initialize':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'userAgent': 'codex-app-server-test',
+                },
+              });
+            case 'thread/start':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'thread': <String, Object?>{'id': 'thread_123'},
+                  'cwd': '/workspace',
+                  'model': 'gpt-5.3-codex',
+                  'modelProvider': 'openai',
+                  'approvalPolicy': 'onRequest',
+                  'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+                },
+              });
+            case 'turn/start':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'turn': <String, Object?>{'id': 'turn_123'},
+                },
+              });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      final session = await client.startSession();
+      await client.sendUserMessage(
+        threadId: session.threadId,
+        text: 'hello from phone',
+      );
+
+      expect(client.threadId, 'thread_123');
+      expect(client.activeTurnId, 'turn_123');
+
+      process.sendStdout(<String, Object?>{
+        'method': 'session/exited',
+        'params': <String, Object?>{'exitCode': 0},
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(client.threadId, isNull);
+      expect(client.activeTurnId, isNull);
+
+      await client.disconnect();
+    },
+  );
+
+  test('starting a new session clears the active turn pointer', () async {
+    late _FakeCodexAppServerProcess process;
+    process = _FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        switch (message['method']) {
+          case 'initialize':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          case 'thread/start':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'thread': <String, Object?>{'id': 'thread_123'},
+                'cwd': '/workspace',
+                'model': 'gpt-5.3-codex',
+                'modelProvider': 'openai',
+                'approvalPolicy': 'onRequest',
+                'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+              },
+            });
+          case 'thread/resume':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'thread': <String, Object?>{'id': 'thread_456'},
+                'cwd': '/workspace',
+                'model': 'gpt-5.3-codex',
+                'modelProvider': 'openai',
+                'approvalPolicy': 'onRequest',
+                'sandbox': <String, Object?>{'type': 'workspaceWrite'},
+              },
+            });
+          case 'turn/start':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'turn': <String, Object?>{'id': 'turn_123'},
+              },
+            });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    final session = await client.startSession();
+    await client.sendUserMessage(threadId: session.threadId, text: 'hello');
+    expect(client.activeTurnId, 'turn_123');
+
+    final resumed = await client.startSession(resumeThreadId: 'thread_456');
+
+    expect(resumed.threadId, 'thread_456');
+    expect(client.threadId, 'thread_456');
+    expect(client.activeTurnId, isNull);
+
+    await client.disconnect();
+  });
+
+  test(
+    'notification pointer updates ignore stale turn completions and clear closed threads',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          if (message['method'] == 'initialize') {
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      process.sendStdout(<String, Object?>{
+        'method': 'thread/started',
+        'params': <String, Object?>{
+          'thread': <String, Object?>{'id': 'thread_123'},
+        },
+      });
+      process.sendStdout(<String, Object?>{
+        'method': 'turn/started',
+        'params': <String, Object?>{
+          'threadId': 'thread_123',
+          'turn': <String, Object?>{'id': 'turn_old'},
+        },
+      });
+      process.sendStdout(<String, Object?>{
+        'method': 'turn/started',
+        'params': <String, Object?>{
+          'threadId': 'thread_123',
+          'turn': <String, Object?>{'id': 'turn_new'},
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(client.threadId, 'thread_123');
+      expect(client.activeTurnId, 'turn_new');
+
+      process.sendStdout(<String, Object?>{
+        'method': 'turn/completed',
+        'params': <String, Object?>{
+          'threadId': 'thread_123',
+          'turn': <String, Object?>{'id': 'turn_old'},
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(client.activeTurnId, 'turn_new');
+
+      process.sendStdout(<String, Object?>{
+        'method': 'thread/closed',
+        'params': <String, Object?>{'threadId': 'thread_123'},
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      expect(client.threadId, isNull);
+      expect(client.activeTurnId, isNull);
+
+      await client.disconnect();
+    },
+  );
+
+  test(
+    'mcp elicitation requests can be resolved through the client API',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          if (message['method'] == 'initialize') {
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      process.sendStdout(<String, Object?>{
+        'id': 'elicitation-1',
+        'method': 'mcpServer/elicitation/request',
+        'params': <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'serverName': 'filesystem',
+          'message': 'Choose a directory',
+          'mode': 'form',
+          'requestedSchema': <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{'type': 'string'},
+            },
+          },
+        },
+      });
+      await Future<void>.delayed(Duration.zero);
+
+      await client.respondToElicitation(
+        requestId: 's:elicitation-1',
+        action: CodexAppServerElicitationAction.accept,
+        content: <String, Object?>{'path': '/workspace'},
+      );
+
+      expect(process.writtenMessages.last, <String, Object?>{
+        'id': 'elicitation-1',
+        'result': <String, Object?>{
+          'action': 'accept',
+          'content': <String, Object?>{'path': '/workspace'},
+        },
+      });
+
+      await client.disconnect();
+    },
+  );
 }
 
-ConnectionProfile _profile() {
-  return const ConnectionProfile(
+ConnectionProfile _profile({bool ephemeralSession = false}) {
+  return ConnectionProfile(
     label: 'Developer Box',
     host: 'example.com',
     port: 22,
@@ -222,7 +740,7 @@ ConnectionProfile _profile() {
     hostFingerprint: '',
     skipGitRepoCheck: true,
     dangerouslyBypassSandbox: false,
-    ephemeralSession: false,
+    ephemeralSession: ephemeralSession,
   );
 }
 
