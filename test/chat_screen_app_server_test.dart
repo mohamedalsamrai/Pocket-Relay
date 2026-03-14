@@ -220,6 +220,56 @@ void main() {
       );
     },
   );
+
+  testWidgets('unsupported host requests are rejected with a status entry', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        remoteService: SshCodexService(),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    appServerClient.emit(
+      const CodexAppServerRequestEvent(
+        requestId: 's:auth-1',
+        method: 'account/chatgptAuthTokens/refresh',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'reason': 'unauthorized',
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Auth refresh unsupported'), findsOneWidget);
+    expect(
+      find.textContaining('does not manage external ChatGPT tokens'),
+      findsOneWidget,
+    );
+    expect(appServerClient.rejectedRequests, <
+      ({String requestId, String message})
+    >[
+      (
+        requestId: 's:auth-1',
+        message:
+            'Pocket Relay does not manage external ChatGPT tokens, so this app-server auth refresh request was rejected.',
+      ),
+    ]);
+  });
 }
 
 ConnectionProfile _configuredProfile() {
@@ -250,6 +300,19 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   final List<({String requestId, Map<String, List<String>> answers})>
   userInputResponses =
       <({String requestId, Map<String, List<String>> answers})>[];
+  final List<({String requestId, String message})> rejectedRequests =
+      <({String requestId, String message})>[];
+  final List<
+    ({String requestId, bool success, List<Map<String, Object?>> contentItems})
+  >
+  dynamicToolResponses =
+      <
+        ({
+          String requestId,
+          bool success,
+          List<Map<String, Object?>> contentItems,
+        })
+      >[];
 
   bool _isConnected = false;
   String? _threadId;
@@ -319,6 +382,29 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     required Map<String, List<String>> answers,
   }) async {
     userInputResponses.add((requestId: requestId, answers: answers));
+  }
+
+  @override
+  Future<void> respondDynamicToolCall({
+    required String requestId,
+    required bool success,
+    List<Map<String, Object?>> contentItems = const <Map<String, Object?>>[],
+  }) async {
+    dynamicToolResponses.add((
+      requestId: requestId,
+      success: success,
+      contentItems: contentItems,
+    ));
+  }
+
+  @override
+  Future<void> rejectServerRequest({
+    required String requestId,
+    required String message,
+    int code = -32000,
+    Object? data,
+  }) async {
+    rejectedRequests.add((requestId: requestId, message: message));
   }
 
   @override

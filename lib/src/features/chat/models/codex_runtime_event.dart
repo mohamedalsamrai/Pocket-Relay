@@ -54,6 +54,7 @@ enum CodexCanonicalItemType {
   collabAgentToolCall,
   webSearch,
   imageView,
+  imageGeneration,
   reviewEntered,
   reviewExited,
   contextCompaction,
@@ -467,6 +468,23 @@ final class CodexRuntimeWarningEvent extends CodexRuntimeEvent {
 
   final String summary;
   final String? details;
+}
+
+final class CodexRuntimeStatusEvent extends CodexRuntimeEvent {
+  const CodexRuntimeStatusEvent({
+    required super.createdAt,
+    required this.title,
+    required this.message,
+    super.threadId,
+    super.turnId,
+    super.itemId,
+    super.requestId,
+    super.rawMethod,
+    super.rawPayload,
+  });
+
+  final String title;
+  final String message;
 }
 
 final class CodexRuntimeErrorEvent extends CodexRuntimeEvent {

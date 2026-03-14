@@ -352,6 +352,16 @@ class CodexSessionReducer {
             createdAt: event.createdAt,
           ),
         );
+      case CodexRuntimeStatusEvent():
+        return _upsertBlock(
+          state,
+          CodexStatusBlock(
+            id: _eventEntryId('status', event.createdAt),
+            createdAt: event.createdAt,
+            title: event.title,
+            body: event.message,
+          ),
+        );
       case CodexRuntimeErrorEvent():
         return _upsertBlock(
           state,
@@ -678,6 +688,11 @@ class CodexSessionReducer {
   CodexUiBlock _blockFromActiveItem(CodexSessionActiveItem item) {
     final title = item.title ?? _defaultItemTitle(item.itemType);
     return switch (item.blockKind) {
+      CodexUiBlockKind.userMessage => CodexUserMessageBlock(
+        id: item.entryId,
+        createdAt: item.createdAt,
+        text: item.body,
+      ),
       CodexUiBlockKind.commandExecution => CodexCommandExecutionBlock(
         id: item.entryId,
         createdAt: item.createdAt,
@@ -842,7 +857,16 @@ class CodexSessionReducer {
     if (body != null && body.isNotEmpty) {
       return body;
     }
-    return currentBody;
+    if (currentBody.isNotEmpty) {
+      return currentBody;
+    }
+    return switch (event.itemType) {
+      CodexCanonicalItemType.reviewEntered => 'Codex entered review mode.',
+      CodexCanonicalItemType.reviewExited => 'Codex exited review mode.',
+      CodexCanonicalItemType.contextCompaction =>
+        'Codex compacted the current thread context.',
+      _ => currentBody,
+    };
   }
 
   static String? _extractTextFromSnapshot(Map<String, dynamic>? snapshot) {
@@ -857,9 +881,13 @@ class CodexSessionReducer {
       snapshot['aggregated_output'],
       snapshot['text'],
       snapshot['summary'],
+      snapshot['review'],
+      snapshot['revisedPrompt'],
       snapshot['patch'],
+      snapshot['result'],
       nestedResult?['output'],
       nestedResult?['text'],
+      nestedResult?['path'],
     ]);
   }
 
@@ -872,9 +900,11 @@ class CodexSessionReducer {
     CodexCanonicalItemType itemType,
   ) {
     return switch (itemType) {
+      CodexCanonicalItemType.userMessage => CodexUiBlockKind.userMessage,
       CodexCanonicalItemType.commandExecution ||
       CodexCanonicalItemType.webSearch ||
       CodexCanonicalItemType.imageView ||
+      CodexCanonicalItemType.imageGeneration ||
       CodexCanonicalItemType.mcpToolCall ||
       CodexCanonicalItemType.dynamicToolCall ||
       CodexCanonicalItemType.collabAgentToolCall =>
@@ -882,8 +912,11 @@ class CodexSessionReducer {
       CodexCanonicalItemType.reasoning => CodexUiBlockKind.reasoning,
       CodexCanonicalItemType.plan => CodexUiBlockKind.proposedPlan,
       CodexCanonicalItemType.fileChange => CodexUiBlockKind.changedFiles,
-      CodexCanonicalItemType.error => CodexUiBlockKind.error,
+      CodexCanonicalItemType.reviewEntered ||
+      CodexCanonicalItemType.reviewExited ||
+      CodexCanonicalItemType.contextCompaction ||
       CodexCanonicalItemType.unknown => CodexUiBlockKind.status,
+      CodexCanonicalItemType.error => CodexUiBlockKind.error,
       _ => CodexUiBlockKind.assistantMessage,
     };
   }
@@ -908,6 +941,7 @@ class CodexSessionReducer {
 
   static String _defaultItemTitle(CodexCanonicalItemType itemType) {
     return switch (itemType) {
+      CodexCanonicalItemType.userMessage => 'You',
       CodexCanonicalItemType.assistantMessage => 'Codex',
       CodexCanonicalItemType.reasoning => 'Reasoning',
       CodexCanonicalItemType.plan => 'Proposed plan',
@@ -915,9 +949,13 @@ class CodexSessionReducer {
       CodexCanonicalItemType.fileChange => 'Changed files',
       CodexCanonicalItemType.webSearch => 'Web search',
       CodexCanonicalItemType.imageView => 'Image view',
+      CodexCanonicalItemType.imageGeneration => 'Image generation',
       CodexCanonicalItemType.mcpToolCall => 'MCP tool call',
       CodexCanonicalItemType.dynamicToolCall => 'Tool call',
       CodexCanonicalItemType.collabAgentToolCall => 'Agent tool call',
+      CodexCanonicalItemType.reviewEntered => 'Review started',
+      CodexCanonicalItemType.reviewExited => 'Review finished',
+      CodexCanonicalItemType.contextCompaction => 'Context compacted',
       CodexCanonicalItemType.error => 'Error',
       _ => 'Codex',
     };
@@ -931,6 +969,8 @@ class CodexSessionReducer {
         CodexWorkLogEntryKind.commandExecution,
       CodexCanonicalItemType.webSearch => CodexWorkLogEntryKind.webSearch,
       CodexCanonicalItemType.imageView => CodexWorkLogEntryKind.imageView,
+      CodexCanonicalItemType.imageGeneration =>
+        CodexWorkLogEntryKind.imageGeneration,
       CodexCanonicalItemType.mcpToolCall => CodexWorkLogEntryKind.mcpToolCall,
       CodexCanonicalItemType.dynamicToolCall =>
         CodexWorkLogEntryKind.dynamicToolCall,

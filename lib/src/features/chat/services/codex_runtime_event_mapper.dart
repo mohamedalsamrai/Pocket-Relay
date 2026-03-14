@@ -88,7 +88,8 @@ class CodexRuntimeEventMapper {
       itemId: itemId,
     );
 
-    if (event.method == 'item/tool/requestUserInput') {
+    if (event.method == 'item/tool/requestUserInput' ||
+        event.method == 'tool/requestUserInput') {
       final questions = _toUserInputQuestions(payload);
       if (questions.isEmpty) {
         return const <CodexRuntimeEvent>[];
@@ -361,46 +362,53 @@ class CodexRuntimeEventMapper {
             : <CodexRuntimeEvent>[itemEvent];
       case 'item/reasoning/summaryPartAdded':
       case 'item/commandExecution/terminalInteraction':
-        final itemEvent =
-            _mapItemLifecycle(
-              payload,
-              now,
-              rawMethod: event.method,
-              rawPayload: event.params,
-              fallbackStatus: CodexRuntimeItemStatus.inProgress,
-              builder:
-                  ({
-                    required createdAt,
-                    required itemType,
-                    required threadId,
-                    required turnId,
-                    required itemId,
-                    required status,
-                    required rawMethod,
-                    required rawPayload,
-                    required title,
-                    required detail,
-                    required snapshot,
-                  }) => CodexRuntimeItemUpdatedEvent(
-                    createdAt: createdAt,
-                    itemType: itemType,
-                    threadId: threadId,
-                    turnId: turnId,
-                    itemId: itemId,
-                    status: status,
-                    rawMethod: rawMethod,
-                    rawPayload: rawPayload,
-                    title: title,
-                    detail: detail,
-                    snapshot: snapshot,
-                  ),
-            ) ??
-            _mapPartialItemUpdate(
-              payload,
-              now,
-              rawMethod: event.method,
-              rawPayload: event.params,
-            );
+      case 'item/mcpToolCall/progress':
+        final itemEvent = event.method == 'item/mcpToolCall/progress'
+            ? _mapMcpToolProgress(
+                payload,
+                now,
+                rawMethod: event.method,
+                rawPayload: event.params,
+              )
+            : _mapItemLifecycle(
+                    payload,
+                    now,
+                    rawMethod: event.method,
+                    rawPayload: event.params,
+                    fallbackStatus: CodexRuntimeItemStatus.inProgress,
+                    builder:
+                        ({
+                          required createdAt,
+                          required itemType,
+                          required threadId,
+                          required turnId,
+                          required itemId,
+                          required status,
+                          required rawMethod,
+                          required rawPayload,
+                          required title,
+                          required detail,
+                          required snapshot,
+                        }) => CodexRuntimeItemUpdatedEvent(
+                          createdAt: createdAt,
+                          itemType: itemType,
+                          threadId: threadId,
+                          turnId: turnId,
+                          itemId: itemId,
+                          status: status,
+                          rawMethod: rawMethod,
+                          rawPayload: rawPayload,
+                          title: title,
+                          detail: detail,
+                          snapshot: snapshot,
+                        ),
+                  ) ??
+                  _mapPartialItemUpdate(
+                    payload,
+                    now,
+                    rawMethod: event.method,
+                    rawPayload: event.params,
+                  );
         return itemEvent == null
             ? const <CodexRuntimeEvent>[]
             : <CodexRuntimeEvent>[itemEvent];
@@ -458,7 +466,20 @@ class CodexRuntimeEventMapper {
             resolution: payload?['resolution'] ?? event.params,
           ),
         ];
+      case 'thread/tokenUsage/updated':
+        return <CodexRuntimeEvent>[
+          CodexRuntimeStatusEvent(
+            createdAt: now,
+            threadId: _asString(payload?['threadId']),
+            turnId: _asString(payload?['turnId']),
+            rawMethod: event.method,
+            rawPayload: event.params,
+            title: 'Thread token usage',
+            message: _threadTokenUsageMessage(payload),
+          ),
+        ];
       case 'item/tool/requestUserInput/answered':
+      case 'tool/requestUserInput/answered':
         final requestId = _requestTokenFromRaw(payload?['requestId']);
         if (requestId != null) {
           _pendingRequests.remove(requestId);
@@ -519,8 +540,51 @@ class CodexRuntimeEventMapper {
           ),
         ];
       default:
-        return const <CodexRuntimeEvent>[];
+        return <CodexRuntimeEvent>[
+          CodexRuntimeStatusEvent(
+            createdAt: now,
+            threadId: _asString(payload?['threadId']),
+            turnId: _asString(payload?['turnId']),
+            itemId: _asString(payload?['itemId']),
+            rawMethod: event.method,
+            rawPayload: event.params,
+            title: _notificationTitle(event.method),
+            message: _notificationMessage(event.method, payload),
+          ),
+        ];
     }
+  }
+
+  CodexRuntimeItemUpdatedEvent? _mapMcpToolProgress(
+    Map<String, dynamic>? payload,
+    DateTime now, {
+    required String rawMethod,
+    required Object? rawPayload,
+  }) {
+    final threadId = _asString(payload?['threadId']);
+    final turnId = _asString(payload?['turnId']);
+    final itemId = _asString(payload?['itemId']);
+    final message = _asString(payload?['message'])?.trim();
+    if (threadId == null ||
+        turnId == null ||
+        itemId == null ||
+        message == null ||
+        message.isEmpty) {
+      return null;
+    }
+
+    return CodexRuntimeItemUpdatedEvent(
+      createdAt: now,
+      itemType: CodexCanonicalItemType.mcpToolCall,
+      threadId: threadId,
+      turnId: turnId,
+      itemId: itemId,
+      status: CodexRuntimeItemStatus.inProgress,
+      rawMethod: rawMethod,
+      rawPayload: rawPayload,
+      title: _itemTitle(CodexCanonicalItemType.mcpToolCall),
+      detail: message,
+    );
   }
 
   CodexRuntimeItemLifecycleEvent? _mapItemLifecycle(
@@ -617,6 +681,182 @@ class CodexRuntimeEventMapper {
     ]);
   }
 
+  static String? _contentItemsText(List<dynamic>? contentItems) {
+    if (contentItems == null) {
+      return null;
+    }
+
+    final textParts = <String>[];
+    for (final item in contentItems) {
+      final object = _asObject(item);
+      final text = _stringFromCandidates(<Object?>[
+        object?['text'],
+        _asObject(object?['content'])?['text'],
+      ]);
+      if (text != null && text.isNotEmpty) {
+        textParts.add(text);
+      }
+    }
+
+    if (textParts.isEmpty) {
+      return null;
+    }
+    return textParts.join('\n');
+  }
+
+  static String _notificationTitle(String method) {
+    return switch (method) {
+      'account/login/completed' => 'Login',
+      'account/rateLimits/updated' => 'Rate limits',
+      'account/updated' => 'Account',
+      'app/list/updated' => 'Apps',
+      'command/exec/outputDelta' => 'Command output',
+      'fuzzyFileSearch/sessionCompleted' => 'File search',
+      'fuzzyFileSearch/sessionUpdated' => 'File search',
+      'hook/completed' => 'Hook',
+      'hook/started' => 'Hook',
+      'item/autoApprovalReview/completed' => 'Approval review',
+      'item/autoApprovalReview/started' => 'Approval review',
+      'mcpServer/oauthLogin/completed' => 'MCP login',
+      'model/rerouted' => 'Model',
+      'skills/changed' => 'Skills',
+      'thread/name/updated' => 'Thread',
+      'thread/realtime/closed' => 'Realtime',
+      'thread/realtime/error' => 'Realtime',
+      'thread/realtime/itemAdded' => 'Realtime',
+      'thread/realtime/outputAudio/delta' => 'Realtime audio',
+      'thread/realtime/started' => 'Realtime',
+      'windows/worldWritableWarning' => 'Windows warning',
+      'windowsSandbox/setupCompleted' => 'Windows sandbox',
+      _ => _titleCase(_normalizeType(method)),
+    };
+  }
+
+  static String _notificationMessage(
+    String method,
+    Map<String, dynamic>? payload,
+  ) {
+    return switch (method) {
+      'account/login/completed' =>
+        (payload?['success'] == true)
+            ? 'Account login completed successfully.'
+            : _stringFromCandidates(<Object?>[payload?['error']]) ??
+                  'Account login did not complete successfully.',
+      'account/updated' => _accountUpdatedMessage(payload),
+      'thread/name/updated' =>
+        'Thread renamed to "${_asString(payload?['name']) ?? 'Untitled'}".',
+      'thread/realtime/started' =>
+        'Realtime streaming started for this thread.',
+      'thread/realtime/closed' => 'Realtime streaming closed for this thread.',
+      'thread/realtime/error' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['error'],
+            ]) ??
+            'Realtime streaming reported an error.',
+      'thread/realtime/itemAdded' =>
+        'A realtime item was added to the active thread.',
+      'thread/realtime/outputAudio/delta' => 'Realtime audio output received.',
+      'item/autoApprovalReview/started' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['reviewer'],
+            ]) ??
+            'Automatic approval review started.',
+      'item/autoApprovalReview/completed' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['decision'],
+            ]) ??
+            'Automatic approval review completed.',
+      'mcpServer/oauthLogin/completed' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['serverName'],
+            ]) ??
+            'MCP OAuth login completed.',
+      'model/rerouted' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['model'],
+            ]) ??
+            'Codex rerouted the requested model.',
+      'skills/changed' => 'The available skills changed for this session.',
+      'windowsSandbox/setupCompleted' =>
+        _stringFromCandidates(<Object?>[payload?['message']]) ??
+            'Windows sandbox setup completed.',
+      'windows/worldWritableWarning' =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['path'],
+            ]) ??
+            'Codex detected a world-writable path.',
+      _ =>
+        _stringFromCandidates(<Object?>[
+              payload?['message'],
+              payload?['summary'],
+              payload?['details'],
+              payload?['reason'],
+              payload?['path'],
+              payload?['name'],
+              payload?['tool'],
+              payload?['query'],
+              payload?['serverName'],
+              payload?['authMode'],
+            ]) ??
+            'Received ${_normalizeType(method)}.',
+    };
+  }
+
+  static String _threadTokenUsageMessage(Map<String, dynamic>? payload) {
+    final tokenUsage = _asObject(payload?['tokenUsage']);
+    final last = _asObject(tokenUsage?['last']);
+    final total = _asObject(tokenUsage?['total']);
+    final contextWindow = _asInt(tokenUsage?['modelContextWindow']);
+
+    String formatBreakdown(Map<String, dynamic>? usage) {
+      if (usage == null) {
+        return 'unavailable';
+      }
+
+      final parts = <String>[
+        'input ${_asInt(usage['inputTokens']) ?? 0}',
+        'cached ${_asInt(usage['cachedInputTokens']) ?? 0}',
+        'output ${_asInt(usage['outputTokens']) ?? 0}',
+      ];
+      final reasoning = _asInt(usage['reasoningOutputTokens']);
+      if (reasoning != null && reasoning > 0) {
+        parts.add('reasoning $reasoning');
+      }
+      final totalTokens = _asInt(usage['totalTokens']);
+      if (totalTokens != null) {
+        parts.add('total $totalTokens');
+      }
+      return parts.join(' · ');
+    }
+
+    return 'Last: ${formatBreakdown(last)}\n'
+        'Total: ${formatBreakdown(total)}'
+        '${contextWindow == null ? '' : '\nContext window: $contextWindow'}';
+  }
+
+  static String _accountUpdatedMessage(Map<String, dynamic>? payload) {
+    final authMode = _asString(payload?['authMode']) ?? 'none';
+    final planType = _asString(payload?['planType']);
+    final suffix = planType == null || planType.isEmpty
+        ? ''
+        : ' · plan: $planType';
+    return 'Auth mode: $authMode$suffix.';
+  }
+
+  static String _titleCase(String value) {
+    return value
+        .split(' ')
+        .where((segment) => segment.isNotEmpty)
+        .map((segment) => '${segment[0].toUpperCase()}${segment.substring(1)}')
+        .join(' ');
+  }
+
   static CodexCanonicalItemType _canonicalItemType(Object? raw) {
     final normalized = _normalizeType(raw);
     if (normalized.contains('user')) {
@@ -652,13 +892,18 @@ class CodexRuntimeEventMapper {
     if (normalized.contains('web search')) {
       return CodexCanonicalItemType.webSearch;
     }
+    if (normalized.contains('image generation')) {
+      return CodexCanonicalItemType.imageGeneration;
+    }
     if (normalized.contains('image')) {
       return CodexCanonicalItemType.imageView;
     }
-    if (normalized.contains('review entered')) {
+    if (normalized.contains('entered review mode') ||
+        normalized.contains('review entered')) {
       return CodexCanonicalItemType.reviewEntered;
     }
-    if (normalized.contains('review exited')) {
+    if (normalized.contains('exited review mode') ||
+        normalized.contains('review exited')) {
       return CodexCanonicalItemType.reviewExited;
     }
     if (normalized.contains('compact')) {
@@ -699,6 +944,10 @@ class CodexRuntimeEventMapper {
       CodexCanonicalItemType.dynamicToolCall => 'Tool call',
       CodexCanonicalItemType.webSearch => 'Web search',
       CodexCanonicalItemType.imageView => 'Image view',
+      CodexCanonicalItemType.imageGeneration => 'Image generation',
+      CodexCanonicalItemType.reviewEntered => 'Review started',
+      CodexCanonicalItemType.reviewExited => 'Review finished',
+      CodexCanonicalItemType.contextCompaction => 'Context compacted',
       CodexCanonicalItemType.error => 'Error',
       _ => null,
     };
@@ -710,16 +959,26 @@ class CodexRuntimeEventMapper {
   ) {
     final nestedResult = _asObject(item['result']);
     return _stringFromCandidates(<Object?>[
+      _contentItemsText(_asList(item['content'])),
       item['command'],
       item['title'],
       item['summary'],
       item['text'],
+      item['review'],
       item['path'],
       item['prompt'],
+      item['query'],
+      item['tool'],
+      item['revisedPrompt'],
+      item['result'],
       nestedResult?['command'],
+      nestedResult?['path'],
+      nestedResult?['text'],
       payload?['command'],
       payload?['message'],
       payload?['prompt'],
+      payload?['path'],
+      payload?['tool'],
     ]);
   }
 
@@ -735,6 +994,7 @@ class CodexRuntimeEventMapper {
       'execCommandApproval' => CodexCanonicalRequestType.execCommandApproval,
       'item/permissions/requestApproval' =>
         CodexCanonicalRequestType.permissionsRequestApproval,
+      'tool/requestUserInput' => CodexCanonicalRequestType.toolUserInput,
       'item/tool/requestUserInput' => CodexCanonicalRequestType.toolUserInput,
       'mcpServer/elicitation/request' =>
         CodexCanonicalRequestType.mcpServerElicitation,
@@ -764,6 +1024,8 @@ class CodexRuntimeEventMapper {
       payload?['command'],
       payload?['reason'],
       payload?['prompt'],
+      payload?['tool'],
+      payload?['previousAccountId'],
     ]);
   }
 

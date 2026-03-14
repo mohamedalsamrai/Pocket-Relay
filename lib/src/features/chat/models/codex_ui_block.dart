@@ -46,6 +46,7 @@ enum CodexWorkLogEntryKind {
   commandExecution,
   webSearch,
   imageView,
+  imageGeneration,
   mcpToolCall,
   dynamicToolCall,
   collabAgentToolCall,

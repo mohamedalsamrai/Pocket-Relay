@@ -450,6 +450,144 @@ void main() {
     },
   );
 
+  test('dynamic tool requests can be answered with tool output', () async {
+    late _FakeCodexAppServerProcess process;
+    process = _FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        if (message['method'] == 'initialize') {
+          process.sendStdout(<String, Object?>{
+            'id': message['id'],
+            'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+          });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    process.sendStdout(<String, Object?>{
+      'id': 'tool-1',
+      'method': 'item/tool/call',
+      'params': <String, Object?>{
+        'threadId': 'thread_123',
+        'turnId': 'turn_123',
+        'callId': 'call_123',
+        'tool': 'preview-image',
+        'arguments': <String, Object?>{'path': '/tmp/image.png'},
+      },
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    await client.respondDynamicToolCall(
+      requestId: 's:tool-1',
+      success: false,
+      contentItems: const <Map<String, Object?>>[
+        <String, Object?>{
+          'type': 'inputText',
+          'text': 'Dynamic tool calls are not supported.',
+        },
+      ],
+    );
+
+    expect(process.writtenMessages.last, <String, Object?>{
+      'id': 'tool-1',
+      'result': <String, Object?>{
+        'contentItems': <Object>[
+          <String, Object?>{
+            'type': 'inputText',
+            'text': 'Dynamic tool calls are not supported.',
+          },
+        ],
+        'success': false,
+      },
+    });
+
+    await client.disconnect();
+  });
+
+  test('auth token refresh requests can be answered or rejected', () async {
+    late _FakeCodexAppServerProcess process;
+    process = _FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        if (message['method'] == 'initialize') {
+          process.sendStdout(<String, Object?>{
+            'id': message['id'],
+            'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+          });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    process.sendStdout(<String, Object?>{
+      'id': 'auth-1',
+      'method': 'account/chatgptAuthTokens/refresh',
+      'params': <String, Object?>{
+        'reason': 'unauthorized',
+        'previousAccountId': 'org-123',
+      },
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    await client.respondAuthTokensRefresh(
+      requestId: 's:auth-1',
+      accessToken: 'access-token',
+      chatgptAccountId: 'org-456',
+      chatgptPlanType: 'plus',
+    );
+
+    expect(process.writtenMessages.last, <String, Object?>{
+      'id': 'auth-1',
+      'result': <String, Object?>{
+        'accessToken': 'access-token',
+        'chatgptAccountId': 'org-456',
+        'chatgptPlanType': 'plus',
+      },
+    });
+
+    process.sendStdout(<String, Object?>{
+      'id': 'legacy-read-1',
+      'method': 'item/fileRead/requestApproval',
+      'params': <String, Object?>{'reason': 'Read file'},
+    });
+    await Future<void>.delayed(Duration.zero);
+
+    await client.rejectServerRequest(
+      requestId: 's:legacy-read-1',
+      message: 'Unsupported request.',
+      code: -32601,
+    );
+
+    expect(process.writtenMessages.last, <String, Object?>{
+      'id': 'legacy-read-1',
+      'error': <String, Object?>{
+        'code': -32601,
+        'message': 'Unsupported request.',
+      },
+    });
+
+    await client.disconnect();
+  });
+
   test(
     'session exit notifications clear tracked thread and turn ids',
     () async {

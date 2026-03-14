@@ -1603,6 +1603,7 @@ IconData _workLogIcon(CodexWorkLogEntryKind kind) {
     CodexWorkLogEntryKind.commandExecution => Icons.terminal,
     CodexWorkLogEntryKind.webSearch => Icons.travel_explore,
     CodexWorkLogEntryKind.imageView => Icons.image_outlined,
+    CodexWorkLogEntryKind.imageGeneration => Icons.auto_awesome_outlined,
     CodexWorkLogEntryKind.mcpToolCall => Icons.extension_outlined,
     CodexWorkLogEntryKind.dynamicToolCall => Icons.build_outlined,
     CodexWorkLogEntryKind.collabAgentToolCall => Icons.groups_2_outlined,
@@ -1616,6 +1617,7 @@ Color _workLogAccent(CodexWorkLogEntryKind kind, Brightness brightness) {
     CodexWorkLogEntryKind.commandExecution => _blueAccent(brightness),
     CodexWorkLogEntryKind.webSearch => _tealAccent(brightness),
     CodexWorkLogEntryKind.imageView => _violetAccent(brightness),
+    CodexWorkLogEntryKind.imageGeneration => _pinkAccent(brightness),
     CodexWorkLogEntryKind.mcpToolCall => _amberAccent(brightness),
     CodexWorkLogEntryKind.dynamicToolCall => _redAccent(brightness),
     CodexWorkLogEntryKind.collabAgentToolCall => _purpleAccent(brightness),
@@ -1640,6 +1642,12 @@ Color _violetAccent(Brightness brightness) {
   return brightness == Brightness.dark
       ? const Color(0xFFC4B5FD)
       : const Color(0xFF7C3AED);
+}
+
+Color _pinkAccent(Brightness brightness) {
+  return brightness == Brightness.dark
+      ? const Color(0xFFF9A8D4)
+      : const Color(0xFFDB2777);
 }
 
 Color _purpleAccent(Brightness brightness) {

@@ -66,6 +66,71 @@ void main() {
     },
   );
 
+  test('renders official user-message items as user transcript blocks', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.userMessage,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_user',
+        status: CodexRuntimeItemStatus.completed,
+        snapshot: const <String, Object?>{'text': 'Ship the fix'},
+      ),
+    );
+
+    expect(state.blocks.single, isA<CodexUserMessageBlock>());
+    final block = state.blocks.single as CodexUserMessageBlock;
+    expect(block.text, 'Ship the fix');
+  });
+
+  test('renders review and compaction items as status blocks', () {
+    final reducer = CodexSessionReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.reviewEntered,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_review',
+        status: CodexRuntimeItemStatus.completed,
+        detail: 'Checking the patch set',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        itemType: CodexCanonicalItemType.contextCompaction,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_compaction',
+        status: CodexRuntimeItemStatus.completed,
+      ),
+    );
+
+    expect(state.blocks, hasLength(2));
+    expect(state.blocks.first, isA<CodexStatusBlock>());
+    expect(state.blocks.last, isA<CodexStatusBlock>());
+    expect(
+      (state.blocks.first as CodexStatusBlock).body,
+      'Checking the patch set',
+    );
+    expect(
+      (state.blocks.last as CodexStatusBlock).body,
+      'Codex compacted the current thread context.',
+    );
+  });
+
   test('opens and resolves approval requests', () {
     final reducer = CodexSessionReducer();
     var state = CodexSessionState.initial();

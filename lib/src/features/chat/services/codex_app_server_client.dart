@@ -351,9 +351,10 @@ class CodexAppServerClient {
     required Map<String, List<String>> answers,
   }) async {
     final pending = _requirePendingServerRequest(requestId);
-    if (pending.method != 'item/tool/requestUserInput') {
+    if (pending.method != 'item/tool/requestUserInput' &&
+        pending.method != 'tool/requestUserInput') {
       throw CodexAppServerException(
-        'Request $requestId is ${pending.method}, not item/tool/requestUserInput.',
+        'Request $requestId is ${pending.method}, not tool/requestUserInput.',
       );
     }
 
@@ -365,6 +366,50 @@ class CodexAppServerClient {
             'answers': value,
           }),
         ),
+      },
+    );
+  }
+
+  Future<void> respondDynamicToolCall({
+    required String requestId,
+    required bool success,
+    List<Map<String, Object?>> contentItems = const <Map<String, Object?>>[],
+  }) async {
+    final pending = _requirePendingServerRequest(requestId);
+    if (pending.method != 'item/tool/call') {
+      throw CodexAppServerException(
+        'Request $requestId is ${pending.method}, not item/tool/call.',
+      );
+    }
+
+    await sendServerResult(
+      requestId: requestId,
+      result: <String, Object?>{
+        'contentItems': contentItems,
+        'success': success,
+      },
+    );
+  }
+
+  Future<void> respondAuthTokensRefresh({
+    required String requestId,
+    required String accessToken,
+    required String chatgptAccountId,
+    String? chatgptPlanType,
+  }) async {
+    final pending = _requirePendingServerRequest(requestId);
+    if (pending.method != 'account/chatgptAuthTokens/refresh') {
+      throw CodexAppServerException(
+        'Request $requestId is ${pending.method}, not account/chatgptAuthTokens/refresh.',
+      );
+    }
+
+    await sendServerResult(
+      requestId: requestId,
+      result: <String, Object?>{
+        'accessToken': accessToken,
+        'chatgptAccountId': chatgptAccountId,
+        'chatgptPlanType': chatgptPlanType,
       },
     );
   }
@@ -382,6 +427,7 @@ class CodexAppServerClient {
     final decision = switch (pending.method) {
       'item/commandExecution/requestApproval' =>
         approved ? 'accept' : 'decline',
+      'item/fileRead/requestApproval' => approved ? 'accept' : 'decline',
       'item/fileChange/requestApproval' => approved ? 'accept' : 'decline',
       'applyPatchApproval' => approved ? 'approved' : 'denied',
       'execCommandApproval' => approved ? 'approved' : 'denied',
@@ -393,6 +439,27 @@ class CodexAppServerClient {
     await sendServerResult(
       requestId: requestId,
       result: <String, Object?>{'decision': decision},
+    );
+  }
+
+  Future<void> rejectServerRequest({
+    required String requestId,
+    required String message,
+    int code = -32000,
+    Object? data,
+  }) async {
+    final pending = _inboundRequestStore.take(requestId);
+    if (pending == null) {
+      throw CodexAppServerException(
+        'Unknown pending server request: $requestId',
+      );
+    }
+
+    _writeMessage(
+      CodexJsonRpcResponse.failure(
+        id: pending.id,
+        error: CodexJsonRpcError(message: message, code: code, data: data),
+      ),
     );
   }
 

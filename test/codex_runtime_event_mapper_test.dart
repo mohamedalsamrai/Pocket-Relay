@@ -95,6 +95,69 @@ void main() {
     expect(deltaEvent.delta, 'Hello');
   });
 
+  test('maps official user, review, and image item types correctly', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final userItem = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'item': <String, Object?>{
+            'id': 'item_user',
+            'type': 'userMessage',
+            'status': 'completed',
+            'content': <Object>[
+              <String, Object?>{'type': 'text', 'text': 'Ship the fix'},
+            ],
+          },
+        },
+      ),
+    );
+    final reviewItem = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'item': <String, Object?>{
+            'id': 'item_review',
+            'type': 'enteredReviewMode',
+            'status': 'completed',
+            'review': 'Checking the patch set',
+          },
+        },
+      ),
+    );
+    final imageItem = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'item': <String, Object?>{
+            'id': 'item_image',
+            'type': 'imageGeneration',
+            'status': 'completed',
+            'revisedPrompt': 'Diagram of the new architecture',
+          },
+        },
+      ),
+    );
+
+    final userEvent = userItem.single as CodexRuntimeItemCompletedEvent;
+    final reviewEvent = reviewItem.single as CodexRuntimeItemCompletedEvent;
+    final imageEvent = imageItem.single as CodexRuntimeItemCompletedEvent;
+
+    expect(userEvent.itemType, CodexCanonicalItemType.userMessage);
+    expect(userEvent.detail, 'Ship the fix');
+    expect(reviewEvent.itemType, CodexCanonicalItemType.reviewEntered);
+    expect(reviewEvent.detail, 'Checking the patch set');
+    expect(imageEvent.itemType, CodexCanonicalItemType.imageGeneration);
+    expect(imageEvent.detail, 'Diagram of the new architecture');
+  });
+
   test(
     'maps request approval and serverRequest/resolved into canonical request events',
     () {
@@ -217,7 +280,57 @@ void main() {
     expect(answeredEvent.answers['q1'], <String>['Vince']);
   });
 
-  test('maps warnings and drops unknown methods', () {
+  test('maps progress and token-usage notifications', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final progress = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'item/mcpToolCall/progress',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'itemId': 'item_mcp',
+          'message': 'Fetching repository metadata',
+        },
+      ),
+    );
+    final tokenUsage = mapper.mapEvent(
+      const CodexAppServerNotificationEvent(
+        method: 'thread/tokenUsage/updated',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_123',
+          'tokenUsage': <String, Object?>{
+            'last': <String, Object?>{
+              'inputTokens': 10,
+              'cachedInputTokens': 2,
+              'outputTokens': 4,
+              'reasoningOutputTokens': 1,
+              'totalTokens': 17,
+            },
+            'total': <String, Object?>{
+              'inputTokens': 20,
+              'cachedInputTokens': 3,
+              'outputTokens': 8,
+              'reasoningOutputTokens': 1,
+              'totalTokens': 32,
+            },
+            'modelContextWindow': 200000,
+          },
+        },
+      ),
+    );
+
+    final progressEvent = progress.single as CodexRuntimeItemUpdatedEvent;
+    final usageEvent = tokenUsage.single as CodexRuntimeStatusEvent;
+
+    expect(progressEvent.itemType, CodexCanonicalItemType.mcpToolCall);
+    expect(progressEvent.detail, 'Fetching repository metadata');
+    expect(usageEvent.title, 'Thread token usage');
+    expect(usageEvent.message, contains('Context window: 200000'));
+  });
+
+  test('maps warnings and keeps unknown notifications visible', () {
     final mapper = CodexRuntimeEventMapper();
 
     final warning = mapper.mapEvent(
@@ -241,7 +354,9 @@ void main() {
       (warning.single as CodexRuntimeWarningEvent).summary,
       'Config warning',
     );
-    expect(unknown, isEmpty);
+    final status = unknown.single as CodexRuntimeStatusEvent;
+    expect(status.title, 'Unknown Method');
+    expect(status.message, 'Received unknown method.');
   });
 
   test('maps turn plan and diff notifications into runtime events', () {

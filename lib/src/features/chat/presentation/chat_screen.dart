@@ -52,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   CodexAppServerClient? _appServerClient;
   StreamSubscription<CodexRemoteEvent>? _turnSubscription;
-  StreamSubscription<CodexRuntimeEvent>? _runtimeSubscription;
+  StreamSubscription<CodexAppServerEvent>? _appServerEventSubscription;
 
   bool get _usesAppServer => _appServerClient != null;
 
@@ -61,9 +61,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _appServerClient = widget.appServerClient;
     if (_usesAppServer) {
-      _runtimeSubscription = _runtimeEventMapper
-          .bind(_appServerClient!.events)
-          .listen(_handleRuntimeEvent);
+      _appServerEventSubscription = _appServerClient!.events.listen(
+        _handleAppServerEvent,
+      );
     }
     final initialSavedProfile = widget.initialSavedProfile;
     if (initialSavedProfile == null) {
@@ -79,7 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _turnSubscription?.cancel();
-    _runtimeSubscription?.cancel();
+    _appServerEventSubscription?.cancel();
     if (_usesAppServer) {
       unawaited(_appServerClient!.disconnect());
     } else {
@@ -432,6 +432,92 @@ class _ChatScreenState extends State<ChatScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _handleAppServerEvent(CodexAppServerEvent event) {
+    if (event is CodexAppServerRequestEvent &&
+        _isUnsupportedHostRequest(event.method)) {
+      unawaited(_handleUnsupportedHostRequest(event));
+      return;
+    }
+
+    for (final runtimeEvent in _runtimeEventMapper.mapEvent(event)) {
+      _handleRuntimeEvent(runtimeEvent);
+    }
+  }
+
+  bool _isUnsupportedHostRequest(String method) {
+    return method == 'account/chatgptAuthTokens/refresh' ||
+        method == 'item/tool/call' ||
+        method == 'item/fileRead/requestApproval';
+  }
+
+  Future<void> _handleUnsupportedHostRequest(
+    CodexAppServerRequestEvent event,
+  ) async {
+    final payload = _asObject(event.params);
+    final threadId = _asString(payload?['threadId']);
+    final turnId = _asString(payload?['turnId']);
+    final itemId = _asString(payload?['itemId']);
+    final toolName = _asString(payload?['tool']) ?? 'dynamic tool';
+
+    final (title, message) = switch (event.method) {
+      'account/chatgptAuthTokens/refresh' => (
+        'Auth refresh unsupported',
+        'Pocket Relay does not manage external ChatGPT tokens, so this app-server auth refresh request was rejected.',
+      ),
+      'item/tool/call' => (
+        'Dynamic tool unsupported',
+        'Pocket Relay does not implement the experimental host-side tool "$toolName", so the request was rejected.',
+      ),
+      'item/fileRead/requestApproval' => (
+        'File read approval unsupported',
+        'Pocket Relay received a legacy file-read approval request that this client does not implement, so the request was rejected.',
+      ),
+      _ => (
+        'Request unsupported',
+        'Pocket Relay rejected an unsupported app-server request.',
+      ),
+    };
+
+    _applyRuntimeEvent(
+      CodexRuntimeStatusEvent(
+        createdAt: DateTime.now(),
+        threadId: threadId,
+        turnId: turnId,
+        itemId: itemId,
+        requestId: event.requestId,
+        rawMethod: event.method,
+        rawPayload: event.params,
+        title: title,
+        message: message,
+      ),
+      scrollToEnd: true,
+    );
+
+    try {
+      if (event.method == 'item/tool/call') {
+        await _appServerClient!.respondDynamicToolCall(
+          requestId: event.requestId,
+          success: false,
+          contentItems: <Map<String, Object?>>[
+            <String, Object?>{'type': 'inputText', 'text': message},
+          ],
+        );
+        return;
+      }
+
+      await _appServerClient!.rejectServerRequest(
+        requestId: event.requestId,
+        message: message,
+      );
+    } catch (error) {
+      _reportAppServerFailure(
+        title: 'Request handling failed',
+        message: 'Could not reject an unsupported app-server request.',
+        error: error,
+      );
+    }
+  }
+
   void _handleRuntimeEvent(CodexRuntimeEvent event) {
     _applyRuntimeEvent(event, scrollToEnd: true);
   }
@@ -652,6 +738,17 @@ class _ChatScreenState extends State<ChatScreen> {
       scrollToEnd: true,
     );
     _showSnackBar(message);
+  }
+
+  static Map<String, dynamic>? _asObject(Object? value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return null;
+  }
+
+  static String? _asString(Object? value) {
+    return value is String ? value : null;
   }
 }
 
