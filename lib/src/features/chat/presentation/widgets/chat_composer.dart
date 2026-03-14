@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 
 class ChatComposer extends StatelessWidget {
   const ChatComposer({
@@ -18,16 +19,18 @@ class ChatComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.pocketPalette;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: palette.surface,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x19000000),
+            color: palette.shadowColor,
             blurRadius: 28,
-            offset: Offset(0, 14),
+            offset: const Offset(0, 14),
           ),
         ],
       ),

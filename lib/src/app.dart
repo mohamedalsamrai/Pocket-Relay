@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:pocket_relay/src/core/models/app_preferences.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen.dart';
 import 'package:pocket_relay/src/features/chat/services/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/services/ssh_codex_service.dart';
 
-class PocketRelayApp extends StatelessWidget {
+class PocketRelayApp extends StatefulWidget {
   const PocketRelayApp({
     super.key,
     this.profileStore,
@@ -18,52 +21,66 @@ class PocketRelayApp extends StatelessWidget {
   final CodexAppServerClient? appServerClient;
 
   @override
+  State<PocketRelayApp> createState() => _PocketRelayAppState();
+}
+
+class _PocketRelayAppState extends State<PocketRelayApp> {
+  late final CodexProfileStore _profileStore;
+  SavedProfile? _savedProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileStore = widget.profileStore ?? SecureCodexProfileStore();
+    _loadSavedProfile();
+  }
+
+  Future<void> _loadSavedProfile() async {
+    final savedProfile = await _profileStore.load();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _savedProfile = savedProfile;
+    });
+  }
+
+  void _updatePreferences(AppPreferences preferences) {
+    setState(() {
+      _savedProfile =
+          (_savedProfile ??
+                  SavedProfile(
+                    profile: ConnectionProfile.defaults(),
+                    secrets: const ConnectionSecrets(),
+                  ))
+              .copyWith(preferences: preferences);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0F766E),
-      brightness: Brightness.light,
-    );
+    final savedProfile = _savedProfile;
+    final themeMode = savedProfile?.preferences.isDarkMode ?? false
+        ? ThemeMode.dark
+        : ThemeMode.light;
 
     return MaterialApp(
       title: 'Pocket Relay',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: scheme,
-        scaffoldBackgroundColor: const Color(0xFFF4EFE5),
-        textTheme: ThemeData.light(useMaterial3: true).textTheme.apply(
-          bodyColor: const Color(0xFF1C1917),
-          displayColor: const Color(0xFF1C1917),
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: const Color(0xFFF4EFE5),
-          foregroundColor: const Color(0xFF1C1917),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(color: scheme.outlineVariant),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(color: scheme.outlineVariant),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide(color: scheme.primary, width: 1.5),
-          ),
-        ),
-      ),
-      home: ChatScreen(
-        profileStore: profileStore ?? SecureCodexProfileStore(),
-        remoteService: remoteService ?? SshCodexService(),
-        appServerClient: appServerClient ?? CodexAppServerClient(),
-      ),
+      theme: buildPocketTheme(Brightness.light),
+      darkTheme: buildPocketTheme(Brightness.dark),
+      themeMode: themeMode,
+      home: savedProfile == null
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : ChatScreen(
+              profileStore: _profileStore,
+              remoteService: widget.remoteService ?? SshCodexService(),
+              appServerClient: widget.appServerClient ?? CodexAppServerClient(),
+              initialSavedProfile: savedProfile,
+              preferences: savedProfile.preferences,
+              onPreferencesChanged: _updatePreferences,
+            ),
     );
   }
 }

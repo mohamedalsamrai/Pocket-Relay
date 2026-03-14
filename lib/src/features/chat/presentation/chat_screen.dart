@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:pocket_relay/src/core/models/app_preferences.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_remote_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/connection_banner.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/conversation_entry_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/services/codex_app_server_client.dart';
@@ -22,11 +23,17 @@ class ChatScreen extends StatefulWidget {
     required this.profileStore,
     required this.remoteService,
     this.appServerClient,
+    this.initialSavedProfile,
+    required this.preferences,
+    required this.onPreferencesChanged,
   });
 
   final CodexProfileStore profileStore;
   final SshCodexService remoteService;
   final CodexAppServerClient? appServerClient;
+  final SavedProfile? initialSavedProfile;
+  final AppPreferences preferences;
+  final ValueChanged<AppPreferences> onPreferencesChanged;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -58,7 +65,15 @@ class _ChatScreenState extends State<ChatScreen> {
           .bind(_appServerClient!.events)
           .listen(_handleRuntimeEvent);
     }
-    _loadProfile();
+    final initialSavedProfile = widget.initialSavedProfile;
+    if (initialSavedProfile == null) {
+      _loadProfile();
+      return;
+    }
+
+    _profile = initialSavedProfile.profile;
+    _secrets = initialSavedProfile.secrets;
+    _isLoading = false;
   }
 
   @override
@@ -90,6 +105,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.pocketPalette;
     final transcriptBlocks = _sessionState.transcriptBlocks;
     final pendingApprovalBlock = _sessionState.primaryPendingApprovalBlock;
     final pendingUserInputBlock = _sessionState.primaryPendingUserInputBlock;
@@ -114,7 +131,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   : 'Configure a remote box',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.black.withValues(alpha: 0.64),
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -151,26 +168,17 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFF4EFE5), Color(0xFFECE4D4)],
+            colors: <Color>[palette.backgroundTop, palette.backgroundBottom],
           ),
         ),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                    child: ConnectionBanner(
-                      profile: _profile,
-                      threadId: _sessionState.threadId,
-                      isBusy: _sessionState.isBusy,
-                      onConfigure: _openSettingsSheet,
-                    ),
-                  ),
                   Expanded(
                     child: !hasVisibleConversation
                         ? EmptyState(
@@ -179,7 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           )
                         : ListView.separated(
                             controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                            padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
                             itemBuilder: (context, index) {
                               return ConversationEntryCard(
                                 block: transcriptBlocks[index],
@@ -193,7 +201,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             itemCount: transcriptBlocks.length,
                           ),
                   ),
-                  if (pendingApprovalBlock != null || pendingUserInputBlock != null)
+                  if (pendingApprovalBlock != null ||
+                      pendingUserInputBlock != null)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
                       child: ConstrainedBox(
@@ -252,11 +261,25 @@ class _ChatScreenState extends State<ChatScreen> {
         return ConnectionSheet(
           initialProfile: _profile,
           initialSecrets: _secrets,
+          initialPreferences: widget.preferences,
         );
       },
     );
 
     if (result == null) {
+      return;
+    }
+
+    final connectionChanged =
+        result.profile != _profile || result.secrets != _secrets;
+    final preferencesChanged = result.preferences != widget.preferences;
+
+    if (preferencesChanged) {
+      await widget.profileStore.savePreferences(result.preferences);
+      widget.onPreferencesChanged(result.preferences);
+    }
+
+    if (!connectionChanged) {
       return;
     }
 

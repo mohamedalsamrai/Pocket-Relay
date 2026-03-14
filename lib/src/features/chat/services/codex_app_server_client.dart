@@ -703,8 +703,8 @@ class CodexAppServerClient {
 
   static String _sandboxFor(ConnectionProfile profile) {
     return profile.dangerouslyBypassSandbox
-        ? 'dangerFullAccess'
-        : 'workspaceWrite';
+        ? 'danger-full-access'
+        : 'workspace-write';
   }
 
   static Map<String, Object?> _grantedPermissionsFromRequest(

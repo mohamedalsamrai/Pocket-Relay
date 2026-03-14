@@ -87,10 +87,7 @@ void main() {
           'turn': <String, Object?>{
             'id': 'turn_1',
             'status': 'completed',
-            'usage': <String, Object?>{
-              'inputTokens': 12,
-              'outputTokens': 34,
-            },
+            'usage': <String, Object?>{'inputTokens': 12, 'outputTokens': 34},
           },
         },
       ),
@@ -152,71 +149,77 @@ void main() {
     );
   });
 
-  testWidgets('user-input requests are submitted through the app-server client', (
-    tester,
-  ) async {
-    final appServerClient = FakeCodexAppServerClient();
-    addTearDown(appServerClient.close);
+  testWidgets(
+    'user-input requests are submitted through the app-server client',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
           ),
+          remoteService: SshCodexService(),
+          appServerClient: appServerClient,
         ),
-        remoteService: SshCodexService(),
-        appServerClient: appServerClient,
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    appServerClient.emit(
-      const CodexAppServerRequestEvent(
-        requestId: 's:user-input-1',
-        method: 'item/tool/requestUserInput',
-        params: <String, Object?>{
-          'threadId': 'thread_123',
-          'turnId': 'turn_1',
-          'itemId': 'item_1',
-          'questions': <Object>[
-            <String, Object?>{
-              'id': 'q1',
-              'header': 'Name',
-              'question': 'What is your name?',
-              'options': <Object>[
-                <String, Object?>{
-                  'label': 'Vince',
-                  'description': 'Use the saved profile name.',
-                },
-              ],
-            },
-          ],
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:user-input-1',
+          method: 'item/tool/requestUserInput',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'questions': <Object>[
+              <String, Object?>{
+                'id': 'q1',
+                'header': 'Name',
+                'question': 'What is your name?',
+                'options': <Object>[
+                  <String, Object?>{
+                    'label': 'Vince',
+                    'description': 'Use the saved profile name.',
+                  },
+                ],
+              },
+            ],
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input required'), findsOneWidget);
+      expect(find.text('What is your name?'), findsOneWidget);
+
+      await tester.tap(find.text('Vince').first);
+      await tester.pump();
+      await tester.ensureVisible(find.text('Submit response'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Submit response'));
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.userInputResponses, hasLength(1));
+      expect(
+        appServerClient.userInputResponses.single.requestId,
+        's:user-input-1',
+      );
+      expect(
+        appServerClient.userInputResponses.single.answers,
+        <String, List<String>>{
+          'q1': <String>['Vince'],
         },
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    expect(find.text('Input required'), findsOneWidget);
-    expect(find.text('What is your name?'), findsOneWidget);
-
-    await tester.tap(find.text('Vince').first);
-    await tester.pump();
-    await tester.ensureVisible(find.text('Submit response'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Submit response'));
-    await tester.pumpAndSettle();
-
-    expect(appServerClient.userInputResponses, hasLength(1));
-    expect(appServerClient.userInputResponses.single.requestId, 's:user-input-1');
-    expect(
-      appServerClient.userInputResponses.single.answers,
-      <String, List<String>>{'q1': <String>['Vince']},
-    );
-  });
+      );
+    },
+  );
 }
 
 ConnectionProfile _configuredProfile() {
@@ -231,7 +234,9 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     : super(
         processLauncher:
             ({required profile, required secrets, required emitEvent}) async {
-              throw UnimplementedError('The fake app-server client never launches a process.');
+              throw UnimplementedError(
+                'The fake app-server client never launches a process.',
+              );
             },
       );
 

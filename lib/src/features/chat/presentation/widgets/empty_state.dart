@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -12,6 +13,9 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.pocketPalette;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -24,9 +28,9 @@ class EmptyState extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.86),
+                    color: palette.surface,
                     borderRadius: BorderRadius.circular(32),
-                    border: Border.all(color: const Color(0xFFD7CDB8)),
+                    border: Border.all(color: palette.surfaceBorder),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -35,13 +39,13 @@ class EmptyState extends StatelessWidget {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE3F4F1),
+                          color: palette.subtleSurface,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.phone_android,
                           size: 30,
-                          color: Color(0xFF0F766E),
+                          color: theme.colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -61,7 +65,7 @@ class EmptyState extends StatelessWidget {
                             : 'Start by configuring an SSH target. After that, the app keeps a remote Codex session open and makes the interaction readable on mobile.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.black.withValues(alpha: 0.68),
+                          color: theme.colorScheme.onSurfaceVariant,
                           height: 1.5,
                         ),
                       ),
@@ -104,10 +108,12 @@ class _ChecklistPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.pocketPalette;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFE7D8),
+        color: palette.subtleSurface,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label),

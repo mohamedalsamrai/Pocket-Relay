@@ -1,3 +1,5 @@
+import 'package:pocket_relay/src/core/models/app_preferences.dart';
+
 enum AuthMode { password, privateKey }
 
 class ConnectionProfile {
@@ -115,6 +117,37 @@ class ConnectionProfile {
       'ephemeralSession': ephemeralSession,
     };
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ConnectionProfile &&
+        other.label == label &&
+        other.host == host &&
+        other.port == port &&
+        other.username == username &&
+        other.workspaceDir == workspaceDir &&
+        other.codexPath == codexPath &&
+        other.authMode == authMode &&
+        other.hostFingerprint == hostFingerprint &&
+        other.skipGitRepoCheck == skipGitRepoCheck &&
+        other.dangerouslyBypassSandbox == dangerouslyBypassSandbox &&
+        other.ephemeralSession == ephemeralSession;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    label,
+    host,
+    port,
+    username,
+    workspaceDir,
+    codexPath,
+    authMode,
+    hostFingerprint,
+    skipGitRepoCheck,
+    dangerouslyBypassSandbox,
+    ephemeralSession,
+  );
 }
 
 class ConnectionSecrets {
@@ -142,13 +175,42 @@ class ConnectionSecrets {
       privateKeyPassphrase: privateKeyPassphrase ?? this.privateKeyPassphrase,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ConnectionSecrets &&
+        other.password == password &&
+        other.privateKeyPem == privateKeyPem &&
+        other.privateKeyPassphrase == privateKeyPassphrase;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(password, privateKeyPem, privateKeyPassphrase);
 }
 
 class SavedProfile {
-  const SavedProfile({required this.profile, required this.secrets});
+  const SavedProfile({
+    required this.profile,
+    required this.secrets,
+    this.preferences = const AppPreferences(),
+  });
 
   final ConnectionProfile profile;
   final ConnectionSecrets secrets;
+  final AppPreferences preferences;
+
+  SavedProfile copyWith({
+    ConnectionProfile? profile,
+    ConnectionSecrets? secrets,
+    AppPreferences? preferences,
+  }) {
+    return SavedProfile(
+      profile: profile ?? this.profile,
+      secrets: secrets ?? this.secrets,
+      preferences: preferences ?? this.preferences,
+    );
+  }
 }
 
 AuthMode _authModeFromName(String? value, {required AuthMode fallback}) {
