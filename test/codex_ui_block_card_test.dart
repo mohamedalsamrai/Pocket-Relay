@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 
 void main() {
   testWidgets('renders reasoning blocks with markdown text', (tester) async {
@@ -310,7 +310,7 @@ void main() {
               ),
               CodexChangedFile(
                 path:
-                    'lib/src/features/chat/widgets/conversation_entry_card.dart',
+                    'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
                 additions: 8,
                 deletions: 2,
               ),

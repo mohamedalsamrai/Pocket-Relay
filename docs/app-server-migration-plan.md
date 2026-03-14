@@ -56,21 +56,21 @@ lib/src/features/chat/
     codex_runtime_event.dart
     codex_session_state.dart
     codex_ui_block.dart
-    conversation_entry.dart
   presentation/
     chat_screen.dart
     widgets/
       chat_composer.dart
-      conversation_entry_card.dart
       empty_state.dart
+      transcript/
+        conversation_entry_card.dart
+        cards/
+        support/
   services/
     codex_app_server_client.dart
     codex_json_rpc_codec.dart
     codex_runtime_event_mapper.dart
     codex_session_reducer.dart
 ```
-
-`conversation_entry.dart` is dead weight from the old architecture and should be deleted during the early cleanup phase.
 
 ## Proposed Target Tree
 
@@ -107,6 +107,8 @@ lib/src/features/chat/
           assistant_message_card.dart
           user_message_card.dart
           reasoning_card.dart
+          plan_update_card.dart
+          proposed_plan_card.dart
           command_card.dart
           work_log_group_card.dart
           changed_files_card.dart
@@ -118,6 +120,8 @@ lib/src/features/chat/
         support/
           conversation_card_palette.dart
           markdown_style_factory.dart
+          meta_card.dart
+          transcript_chips.dart
 ```
 
 ## Explicitly Not In The First-Wave Tree
@@ -176,44 +180,22 @@ Already done:
 - delete `ssh_codex_service.dart`
 - remove legacy branches from the app shell and chat screen
 - make the app compile and test on the app-server path only
-
-Follow-up cleanup still needed:
-
 - delete `conversation_entry.dart`
 
-### Phase 1: Split Transcript Rendering
+### Phase 1: Completed Transcript Rendering Split
 
-Primary target:
+Done:
 
-- break up `conversation_entry_card.dart`
+- move transcript rendering under `presentation/widgets/transcript/`
+- replace the old 2109 LOC renderer with an 89 LOC dispatcher
+- extract card-family widgets into `presentation/widgets/transcript/cards/`
+- extract shared palette, markdown, chip, and meta-card helpers into `presentation/widgets/transcript/support/`
+- delete `conversation_entry.dart`
 
-Files to create first:
-
-- `presentation/widgets/transcript/conversation_entry_card.dart`
-- `presentation/widgets/transcript/cards/assistant_message_card.dart`
-- `presentation/widgets/transcript/cards/user_message_card.dart`
-- `presentation/widgets/transcript/cards/reasoning_card.dart`
-- `presentation/widgets/transcript/cards/command_card.dart`
-- `presentation/widgets/transcript/cards/work_log_group_card.dart`
-- `presentation/widgets/transcript/cards/changed_files_card.dart`
-- `presentation/widgets/transcript/cards/approval_request_card.dart`
-- `presentation/widgets/transcript/cards/user_input_request_card.dart`
-- `presentation/widgets/transcript/cards/status_card.dart`
-- `presentation/widgets/transcript/cards/error_card.dart`
-- `presentation/widgets/transcript/cards/usage_card.dart`
-- `presentation/widgets/transcript/support/conversation_card_palette.dart`
-- `presentation/widgets/transcript/support/markdown_style_factory.dart`
-
-Rules:
-
-- no reducer behavior changes in this phase
-- `conversation_entry_card.dart` becomes a shallow switch only
-- delete `conversation_entry.dart` if no callsites remain
-
-Exit criteria:
+Result:
 
 - card-specific rendering code no longer lives in one file
-- the shallow dispatcher owns only block selection and callback wiring
+- the dispatcher owns block selection and callback wiring only
 
 ### Phase 2: Split Transcript State Logic
 
