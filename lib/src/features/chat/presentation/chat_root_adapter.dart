@@ -7,6 +7,8 @@ import 'package:pocket_relay/src/features/chat/application/chat_session_controll
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
@@ -14,9 +16,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presente
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
@@ -24,11 +23,15 @@ class ChatRootAdapter extends StatefulWidget {
     required this.profileStore,
     required this.appServerClient,
     this.initialSavedProfile,
+    this.regionPolicy = const ChatRootRegionPolicy.allFlutter(),
+    this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
   });
 
   final CodexProfileStore profileStore;
   final CodexAppServerClient appServerClient;
   final SavedProfile? initialSavedProfile;
+  final ChatRootRegionPolicy regionPolicy;
+  final ChatRootOverlayDelegate overlayDelegate;
 
   @override
   State<ChatRootAdapter> createState() => _ChatRootAdapterState();
@@ -87,23 +90,51 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
         final screen = _buildScreenContract();
         return FlutterChatScreenRenderer(
           screen: screen,
-          surfaceChangeToken: _sessionController.sessionState,
-          onScreenAction: (action) => _handleScreenAction(action, screen),
-          onAutoFollowEligibilityChanged: (isNearBottom) {
-            _transcriptFollowHost.updateAutoFollowEligibility(
-              isNearBottom: isNearBottom,
-            );
-          },
-          onComposerDraftChanged: _composerDraftHost.updateText,
-          onSendPrompt: _sendPrompt,
-          onStopActiveTurn: _stopActiveTurn,
-          onApproveRequest: _sessionController.approveRequest,
-          onDenyRequest: _sessionController.denyRequest,
-          onOpenChangedFileDiff: _requestChangedFileDiff,
-          onSubmitUserInput: _sessionController.submitUserInput,
+          appChrome: _buildAppChrome(screen),
+          transcriptRegion: _buildTranscriptRegion(screen),
+          composerRegion: _buildComposerRegion(screen),
         );
       },
     );
+  }
+
+  PreferredSizeWidget _buildAppChrome(ChatScreenContract screen) {
+    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.appChrome)) {
+      ChatRootRegionRenderer.flutter => FlutterChatAppChrome(
+        screen: screen,
+        onScreenAction: (action) => _handleScreenAction(action, screen),
+      ),
+    };
+  }
+
+  Widget _buildTranscriptRegion(ChatScreenContract screen) {
+    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.transcript)) {
+      ChatRootRegionRenderer.flutter => FlutterChatTranscriptRegion(
+        screen: screen,
+        surfaceChangeToken: _sessionController.sessionState,
+        onScreenAction: (action) => _handleScreenAction(action, screen),
+        onAutoFollowEligibilityChanged: (isNearBottom) {
+          _transcriptFollowHost.updateAutoFollowEligibility(
+            isNearBottom: isNearBottom,
+          );
+        },
+        onApproveRequest: _sessionController.approveRequest,
+        onDenyRequest: _sessionController.denyRequest,
+        onOpenChangedFileDiff: _requestChangedFileDiff,
+        onSubmitUserInput: _sessionController.submitUserInput,
+      ),
+    };
+  }
+
+  Widget _buildComposerRegion(ChatScreenContract screen) {
+    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.composer)) {
+      ChatRootRegionRenderer.flutter => FlutterChatComposerRegion(
+        composer: screen.composer,
+        onComposerDraftChanged: _composerDraftHost.updateText,
+        onSendPrompt: _sendPrompt,
+        onStopActiveTurn: _stopActiveTurn,
+      ),
+    };
   }
 
   ChatSessionController _buildSessionController() {
@@ -131,21 +162,22 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  Future<void> _openSettingsSheet(
+  Future<void> _openConnectionSettings(
     ChatConnectionSettingsLaunchContract connectionSettings,
   ) async {
-    final result = await showModalBottomSheet<ConnectionSettingsSubmitPayload>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return ConnectionSheet(
-          initialProfile: connectionSettings.initialProfile,
-          initialSecrets: connectionSettings.initialSecrets,
-        );
-      },
-    );
+    if (!mounted) {
+      return;
+    }
+
+    final result = switch (widget.regionPolicy.rendererFor(
+      ChatRootRegion.settingsOverlay,
+    )) {
+      ChatRootRegionRenderer.flutter =>
+        await widget.overlayDelegate.openConnectionSettings(
+          context: context,
+          connectionSettings: connectionSettings,
+        ),
+    };
 
     if (result == null) {
       return;
@@ -165,17 +197,14 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  Future<void> _openChangedFileDiffSheet(
-    ChatChangedFileDiffContract diff,
-  ) async {
-    await showModalBottomSheet<void>(
+  Future<void> _openChangedFileDiff(ChatChangedFileDiffContract diff) async {
+    if (!mounted) {
+      return;
+    }
+
+    await widget.overlayDelegate.openChangedFileDiff(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return ChangedFileDiffSheet(diff: diff);
-      },
+      diff: diff,
     );
   }
 
@@ -238,9 +267,9 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       case ChatShowSnackBarEffect(:final message):
         _showSnackBar(message);
       case ChatOpenConnectionSettingsEffect(:final payload):
-        unawaited(_openSettingsSheet(payload));
+        unawaited(_openConnectionSettings(payload));
       case ChatOpenChangedFileDiffEffect(:final payload):
-        unawaited(_openChangedFileDiffSheet(payload));
+        unawaited(_openChangedFileDiff(payload));
     }
   }
 
@@ -248,8 +277,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+
+    widget.overlayDelegate.showSnackBar(context: context, message: message);
   }
 }

@@ -68,35 +68,35 @@ renderer can consume the same ownership model.
   and forwards callbacks back to the screen host.
 - `PocketRelayApp` now routes through a root `ChatRootAdapter` host instead of
   jumping directly to `ChatScreen`.
+- Top-level settings, changed-file diff, and snackbar execution now route
+  through an adapter-owned `ChatRootOverlayDelegate`.
+- Renderer ownership is now explicit for app chrome, transcript, composer, and
+  settings overlay through `ChatRootRegionPolicy`, with all-Flutter as the
+  current default path.
 
 These are the parts we should build on, not reopen.
 
 ## What Is Still Not Ready For Native Ownership
 
-- Top-level overlay execution is still hardwired to Flutter scaffold APIs in
-  `ChatRootAdapter`.
-- Region delegation is still implicit because the adapter always renders the
-  full Flutter screen renderer path.
+- Adapter parity hardening is still incomplete.
+- The adapter still does not prove an injected or non-default renderer path.
 
 ## Next Active Work
 
 Phase 5 is complete.
 
-The next thing to do is Slice 4 of Phase 6:
+The next thing to do is Slice 5 of Phase 6:
 
-- move overlay and region delegation behind the adapter seam
+- harden adapter parity and injected-renderer ownership
 
 Reason:
 
 - the transcript surface boundary is now explicit and test-covered enough to
   support adapter work
-- Slice 3 introduced `ChatRootAdapter`, so the missing seam is no longer app
-  entry ownership
-- top-level sheet/snackbar execution still lives directly inside the adapter
-- the adapter still selects one whole Flutter screen instead of explicit
-  renderer regions
-- the next blocker is moving overlays and region selection behind adapter-owned
-  delegates before native work starts
+- Slice 4 moved overlay execution behind `ChatRootOverlayDelegate`
+- Slice 4 made region ownership explicit for the first adapter-managed regions
+- the next blocker is proving the adapter owns selection and parity rather than
+  only encoding the default all-Flutter path
 
 ## Target Architecture
 
@@ -1258,7 +1258,7 @@ Current file:
 That means the first app-level ownership seam now exists, but region selection
 still begins one level down inside the adapter.
 
-#### 2. `ChatRootAdapter` now combines application host and effect executor
+#### 2. `ChatRootAdapter` now combines application host plus adapter delegates
 
 Current file:
 
@@ -1270,12 +1270,13 @@ Current file:
 - `ChatTranscriptFollowHost` lifecycle
 - screen effect subscription from controller snackbar messages
 - action dispatch between contract actions and controller methods
-- top-level overlay execution through `showModalBottomSheet(...)`
-- snackbar execution through `ScaffoldMessenger`
-- host wiring into the extracted Flutter renderer
+- top-level overlay delegation through `ChatRootOverlayDelegate`
+- region selection through `ChatRootRegionPolicy`
+- host wiring into the extracted Flutter renderer regions
 
-That means the adapter seam now exists, but renderer-region selection is still
-not explicit and overlay execution still lives inside the adapter itself.
+That means the adapter seam now owns the right categories of work, but the
+remaining Phase 6 task is proving parity and selection through stronger tests
+and injected renderer paths.
 
 #### 3. Composer state is now ready for adapter ownership
 
@@ -1300,9 +1301,9 @@ screen-contract field, while leaving only local controller syncing inside the
 Flutter composer renderer.
 
 That blocker is now removed. Slice 2 extracted the pure Flutter screen
-renderer away from controller and overlay hosting, and Slice 3 moved the host
-ownership into the adapter. The next remaining Phase 6 blocker is explicit
-overlay and region delegation.
+renderer away from controller and overlay hosting, Slice 3 moved the host
+ownership into the adapter, and Slice 4 added explicit overlay and region
+delegation. The next remaining Phase 6 blocker is parity hardening.
 
 #### 4. Overlay payloads are ready, but overlay execution is still Flutter-hardwired
 
@@ -1318,8 +1319,8 @@ The presentation layer already models:
 - changed-file diff launch payloads
 - snackbar effects
 
-But execution still happens directly through Flutter APIs inside
-`ChatRootAdapter`.
+The default execution still uses Flutter implementations, but it now happens
+behind `ChatRootOverlayDelegate`.
 
 That is a good Phase 6 target because the product semantics are already mapped;
 only adapter ownership is missing.
@@ -1343,25 +1344,29 @@ The transcript feed should still remain Flutter-owned for now, but the adapter
 should make it possible to keep transcript rendering in Flutter while later
 swapping app chrome, composer, and settings surfaces.
 
-#### 6. Current tests now cover the first adapter seam, but not delegation yet
+#### 6. Current tests now cover delegation, but not injected selection yet
 
 Current files:
 
 - `test/widget_test.dart`
 - `test/chat_screen_app_server_test.dart`
 - `test/chat_screen_renderer_test.dart`
+- `test/chat_root_adapter_test.dart`
 
 Current tests now prove:
 
 - that `PocketRelayApp` routes through `ChatRootAdapter`
 - that the extracted Flutter renderer still forwards host callbacks correctly
 - that the all-Flutter adapter path preserves current behavior
+- that settings, changed-file diff, and snackbar execution route through the
+  adapter overlay delegate
 
 But they do not yet prove:
 
-- that top-level effects are delegated behind adapter-owned abstractions
 - that a renderer can be replaced or injected without changing controller or
   contract logic
+- that adapter region selection changes behavior independently of the renderer
+  internals
 
 So the next Phase 6 slices need delegation-oriented and selection-oriented
 tests, not just another round of Flutter parity checks.
@@ -1458,16 +1463,22 @@ This is the slice where the root architectural adapter becomes real.
 
 ### Slice 4: Overlay and region delegation
 
-Slice 4 should cover:
+This slice is complete on this branch.
+
+Slice 4 delivered:
 
 - moving settings-sheet, changed-file-diff, and snackbar execution behind
-  adapter-owned delegates
-- making renderer-region ownership explicit for at least:
+  `ChatRootOverlayDelegate`
+- making renderer-region ownership explicit for:
   - app chrome
   - composer
   - settings overlay
   - transcript
-- preserving transcript as Flutter-owned in the default adapter policy
+  through `ChatRootRegionPolicy`
+- preserving transcript as Flutter-owned in the default all-Flutter adapter
+  policy
+- adding adapter tests that prove settings, snackbar, and changed-file diff
+  paths route through the overlay delegate
 
 This slice is where the adapter starts selecting or embedding renderer
 ownership for major regions instead of simply wrapping one full-screen widget.
@@ -1538,7 +1549,7 @@ Unless broader behavior is explicitly requested, Phase 6 should preserve:
 
 The next active Phase 6 slice is:
 
-- overlay and region delegation
+- adapter parity hardening
 
 Reason:
 
@@ -1546,8 +1557,10 @@ Reason:
   adapter boundary
 - Slice 2 extracted the pure Flutter renderer object the adapter can host
 - Slice 3 introduced the adapter host itself
-- the next structural cut is moving overlay execution and region ownership
-  behind explicit adapter delegates
+- Slice 4 moved overlay execution and region ownership behind explicit adapter
+  delegates
+- the next structural cut is proving parity and adapter-owned selection with
+  stronger ownership tests and injected renderer paths
 
 ### Phase 7
 

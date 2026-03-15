@@ -27,6 +27,9 @@ void main() {
     expect(find.byType(ChatRootAdapter), findsOneWidget);
     expect(find.byType(ChatScreen), findsNothing);
     expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
+    expect(find.byType(FlutterChatAppChrome), findsOneWidget);
+    expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
+    expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
   });
 
   testWidgets('uses system theme mode', (tester) async {
