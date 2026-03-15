@@ -26,37 +26,46 @@ class CupertinoChatScreenRenderer extends StatelessWidget {
       data: MaterialBasedCupertinoThemeData(materialTheme: Theme.of(context)),
       child: CupertinoPageScaffold(
         backgroundColor: palette.backgroundTop,
-        child: Material(
-          type: MaterialType.transparency,
-          child: Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: appChrome,
-            body: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: <Color>[
-                    palette.backgroundTop,
-                    palette.backgroundBottom,
-                  ],
-                ),
-              ),
-              child: screen.isLoading
-                  ? const Center(child: CupertinoActivityIndicator())
-                  : Column(
-                      children: [
-                        Expanded(child: transcriptRegion),
-                        if (screen.turnIndicator case final turnIndicator?)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                            child: TurnElapsedFooter(
-                              turnTimer: turnIndicator.timer,
-                            ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[palette.backgroundTop, palette.backgroundBottom],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                appChrome,
+                Expanded(
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: screen.isLoading
+                        ? const Center(child: CupertinoActivityIndicator())
+                        : Column(
+                            children: [
+                              Expanded(child: transcriptRegion),
+                              if (screen.turnIndicator
+                                  case final turnIndicator?)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    0,
+                                    14,
+                                    0,
+                                  ),
+                                  child: TurnElapsedFooter(
+                                    turnTimer: turnIndicator.timer,
+                                  ),
+                                ),
+                              composerRegion,
+                            ],
                           ),
-                        composerRegion,
-                      ],
-                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -86,8 +86,8 @@ These are the parts we should build on, not reopen.
   `FlutterChatScreenRenderer` shell.
 - The settings form host still lives inside the Material `ConnectionSheet`
   widget, so a second renderer would currently duplicate form-state plumbing.
-- Top-level settings presentation and feedback still route through Material
-  bottom sheets and `SnackBar`.
+- Top-level feedback still routes through `SnackBar`, and the composer remains
+  the main shell-level Material control surface on iPhone.
 - The transcript feed is still intentionally Flutter-owned while the first
   native surfaces are cut.
 
@@ -97,18 +97,18 @@ Phase 6 is complete.
 
 Phase 7 is now in progress on this branch.
 
-The next thing to do is Phase 7 Slice 3:
+The next thing to do is Phase 7 Slice 4:
 
-- Cupertino app chrome and shell actions
+- Cupertino composer surface
 
 Reason:
 
-- Slice 2 extracted the shared settings host and added a real Cupertino
-  settings renderer from the same contract and state path
-- the iOS settings overlay path is now policy-driven instead of hardwired to
-  the Material bottom sheet
-- the most visible remaining Material cues on iPhone are now the top app
-  chrome and screen action presentation
+- Slice 3 already moved the iOS shell onto Cupertino app chrome and
+  Cupertino-style action presentation
+- the most visible remaining Material control surface on iPhone is now the
+  composer
+- composer draft ownership is already above the renderer, so the next slice
+  can stay focused on renderer work instead of state work
 
 ## Phase 7 Start Checklist
 
@@ -1905,6 +1905,22 @@ This is the first place where Phase 7 should add a new real Cupertino surface.
 
 ### Slice 3: Cupertino app chrome and shell actions
 
+This slice is complete on this branch.
+
+Slice 3 delivered:
+
+- adding `CupertinoChatAppChrome` as the iOS top app chrome implementation
+- routing iOS shell menu actions through `CupertinoActionSheet` presentation
+  instead of the Material popup menu path
+- removing the iOS shell's dependence on `Scaffold.appBar` by hosting the
+  Cupertino chrome directly in `CupertinoChatScreenRenderer`
+- preserving the same `ChatScreenContract` action ids and callback routing
+- tests proving:
+  - toolbar actions still route through adapter-owned callbacks
+  - menu actions are presented and selected through the Cupertino action sheet
+  - the iOS foundation renderer path now uses `CupertinoChatAppChrome` while
+    transcript and composer remain on the Flutter region path
+
 This slice should cover:
 
 - a Cupertino top app chrome implementation
@@ -2006,14 +2022,13 @@ Unless broader behavior is explicitly requested, Phase 7 should preserve:
 
 The next active Phase 7 slice is:
 
-- Cupertino app chrome and shell actions
+- Cupertino composer surface
 
 Reason:
 
-- Slice 2 already removed the settings-host blocker and added the first real
-  Cupertino surface
-- the remaining high-visibility Material cues are now concentrated in app
-  chrome and screen action presentation
+- Slice 3 already removed the highest-visibility Material shell cues in the
+  iOS app chrome path
+- the remaining high-visibility Material control surface is now the composer
 - the mixed iOS profile has to be modeled explicitly before app chrome,
   settings, and composer work can land cleanly
 

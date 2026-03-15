@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
@@ -76,10 +77,14 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     required ValueChanged<ChatScreenActionId> onScreenAction,
   }) {
     return switch (renderer) {
-      // Slice 1 adds explicit Cupertino policy vocabulary before distinct
-      // Cupertino region widgets land in later Phase 7 slices.
-      ChatRootRegionRenderer.cupertino || ChatRootRegionRenderer.flutter =>
-        FlutterChatAppChrome(screen: screen, onScreenAction: onScreenAction),
+      ChatRootRegionRenderer.cupertino => CupertinoChatAppChrome(
+        screen: screen,
+        onScreenAction: onScreenAction,
+      ),
+      ChatRootRegionRenderer.flutter => FlutterChatAppChrome(
+        screen: screen,
+        onScreenAction: onScreenAction,
+      ),
     };
   }
 

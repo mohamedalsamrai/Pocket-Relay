@@ -12,6 +12,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_de
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
@@ -263,7 +264,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
+      expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
       expect(find.byType(FlutterChatScreenRenderer), findsNothing);
+      expect(find.byType(FlutterChatAppChrome), findsNothing);
       expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
       expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
     },
