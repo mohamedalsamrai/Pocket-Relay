@@ -775,6 +775,73 @@ void main() {
     },
   );
 
+  testWidgets('invalid prompt submission does not force transcript follow', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 24; index += 1) {
+      appServerClient.emit(
+        CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_$index',
+            'item': <String, Object?>{
+              'id': 'item_$index',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'Assistant message $index',
+            },
+          },
+        ),
+      );
+    }
+
+    await tester.pumpAndSettle();
+
+    final scrollableState = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollableState.position.maxScrollExtent, greaterThan(0));
+
+    await tester.drag(find.byType(ListView), const Offset(0, 320));
+    await tester.pumpAndSettle();
+
+    final pixelsBeforeSubmit = scrollableState.position.pixels;
+    expect(
+      pixelsBeforeSubmit,
+      lessThan(scrollableState.position.maxScrollExtent),
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Needs credentials');
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This profile needs an SSH password.'), findsOneWidget);
+    expect(appServerClient.sentMessages, isEmpty);
+    expect(scrollableState.position.pixels, closeTo(pixelsBeforeSubmit, 1));
+    expect(
+      scrollableState.position.pixels,
+      lessThan(scrollableState.position.maxScrollExtent - 40),
+    );
+  });
+
   testWidgets('thread token usage is shown once when the turn completes', (
     tester,
   ) async {

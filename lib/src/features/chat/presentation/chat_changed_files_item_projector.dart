@@ -153,13 +153,16 @@ _DiffStats _resolveHeaderStats({
   required List<CodexChangedFile> files,
   required List<_ParsedDiffPatch> patches,
 }) {
-  final fileStats = files.fold<_DiffStats>(
-    const _DiffStats(),
-    (sum, file) => _DiffStats(
-      additions: sum.additions + file.additions,
-      deletions: sum.deletions + file.deletions,
-    ),
-  );
+  final fileStats = files.fold<_DiffStats>(const _DiffStats(), (sum, file) {
+    final stats = _resolveFileStats(
+      file: file,
+      patch: _patchForFile(file, patches, totalFiles: files.length),
+    );
+    return _DiffStats(
+      additions: sum.additions + stats.additions,
+      deletions: sum.deletions + stats.deletions,
+    );
+  });
   if (fileStats.additions > 0 || fileStats.deletions > 0) {
     return fileStats;
   }
@@ -177,11 +180,14 @@ _DiffStats _resolveFileStats({
   required CodexChangedFile file,
   required _ParsedDiffPatch? patch,
 }) {
-  if (file.additions > 0 || file.deletions > 0 || patch == null) {
+  if (patch == null) {
     return _DiffStats(additions: file.additions, deletions: file.deletions);
   }
 
-  return _DiffStats(additions: patch.additions, deletions: patch.deletions);
+  return _DiffStats(
+    additions: file.additions > 0 ? file.additions : patch.additions,
+    deletions: file.deletions > 0 ? file.deletions : patch.deletions,
+  );
 }
 
 List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {

@@ -301,11 +301,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendPrompt() async {
-    _transcriptFollowHost.requestFollow(
-      source: ChatTranscriptFollowRequestSource.sendPrompt,
-    );
     final sent = await _sessionController.sendPrompt(_composerController.text);
     if (sent) {
+      _transcriptFollowHost.requestFollow(
+        source: ChatTranscriptFollowRequestSource.sendPrompt,
+      );
       _composerController.clear();
     }
   }

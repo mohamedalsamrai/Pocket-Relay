@@ -231,13 +231,50 @@ void main() {
         expect(changedFilesItem.title, block.title);
         expect(changedFilesItem.fileCount, 1);
         expect(changedFilesItem.headerStats.additions, 1);
-        expect(changedFilesItem.headerStats.deletions, 0);
+        expect(changedFilesItem.headerStats.deletions, 1);
         expect(changedFilesItem.rows.single.displayPathLabel, 'lib/app.dart');
+        expect(changedFilesItem.rows.single.stats.deletions, 1);
         expect(changedFilesItem.rows.single.diff, isNotNull);
         expect(
           changedFilesItem.rows.single.diff?.lines.first.text,
           'diff --git a/lib/app.dart b/lib/app.dart',
         );
+      },
+    );
+
+    test(
+      'derives changed-files header totals from resolved row stats when file payloads are partial',
+      () {
+        final block = CodexChangedFilesBlock(
+          id: 'changed_files_mixed_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          title: 'Changed files',
+          files: const <CodexChangedFile>[
+            CodexChangedFile(path: 'README.md', additions: 1),
+            CodexChangedFile(path: 'lib/app.dart'),
+          ],
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              '--- a/README.md\n'
+              '+++ b/README.md\n'
+              '@@ -1 +1 @@\n'
+              '-old readme\n'
+              '+new readme\n'
+              'diff --git a/lib/app.dart b/lib/app.dart\n'
+              '--- a/lib/app.dart\n'
+              '+++ b/lib/app.dart\n'
+              '@@ -1 +1,2 @@\n'
+              '-old app\n'
+              '+new app\n'
+              '+second line\n',
+        );
+
+        final item = projector.project(block) as ChatChangedFilesItemContract;
+
+        expect(item.headerStats.additions, 3);
+        expect(item.headerStats.deletions, 2);
+        expect(item.rows[1].stats.additions, 2);
+        expect(item.rows[1].stats.deletions, 1);
       },
     );
   });
