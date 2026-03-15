@@ -54,6 +54,18 @@ class TranscriptReducer {
         return state.copyWith(
           clearThreadId: isClosed,
           clearTurnId: isClosed,
+          turnTimers: isClosed && state.turnId != null
+              ? <String, CodexSessionTurnTimer>{
+                  ...state.turnTimers,
+                  state.turnId!:
+                      (state.turnTimers[state.turnId!] ??
+                              CodexSessionTurnTimer(
+                                turnId: state.turnId!,
+                                startedAt: event.createdAt,
+                              ))
+                          .copyWith(completedAt: event.createdAt),
+                }
+              : state.turnTimers,
           clearPendingThreadTokenUsageBlock: isClosed,
           activeItems: isClosed
               ? const <String, CodexSessionActiveItem>{}
@@ -64,6 +76,15 @@ class TranscriptReducer {
           connectionStatus: CodexRuntimeSessionState.running,
           threadId: event.threadId ?? state.threadId,
           turnId: event.turnId,
+          turnTimers: event.turnId == null
+              ? state.turnTimers
+              : <String, CodexSessionTurnTimer>{
+                  ...state.turnTimers,
+                  event.turnId!: CodexSessionTurnTimer(
+                    turnId: event.turnId!,
+                    startedAt: event.createdAt,
+                  ),
+                },
           clearPendingThreadTokenUsageBlock: true,
         );
       case CodexRuntimeTurnCompletedEvent():

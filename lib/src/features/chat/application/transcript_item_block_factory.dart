@@ -24,6 +24,7 @@ class TranscriptItemBlockFactory {
         createdAt: item.createdAt,
         command: title,
         output: item.body,
+        turnId: item.turnId,
         isRunning: item.isRunning,
         exitCode: item.exitCode,
       ),
@@ -32,6 +33,7 @@ class TranscriptItemBlockFactory {
         createdAt: item.createdAt,
         title: title,
         entryKind: _workLogEntryKindFor(item.itemType),
+        turnId: item.turnId,
         preview: _workLogPreview(item),
         isRunning: item.isRunning,
         exitCode: item.exitCode,
@@ -48,6 +50,7 @@ class TranscriptItemBlockFactory {
           snapshot: item.snapshot,
           body: item.body,
         ),
+        turnId: item.turnId,
         isRunning: item.isRunning,
       ),
       CodexUiBlockKind.reasoning => CodexTextBlock(
@@ -56,6 +59,7 @@ class TranscriptItemBlockFactory {
         createdAt: item.createdAt,
         title: title,
         body: item.body,
+        turnId: item.turnId,
         isRunning: item.isRunning,
       ),
       CodexUiBlockKind.proposedPlan => CodexProposedPlanBlock(
@@ -63,6 +67,7 @@ class TranscriptItemBlockFactory {
         createdAt: item.createdAt,
         title: title,
         markdown: item.body,
+        turnId: item.turnId,
         isStreaming: item.isRunning,
       ),
       CodexUiBlockKind.plan => CodexPlanUpdateBlock(
@@ -87,6 +92,7 @@ class TranscriptItemBlockFactory {
         createdAt: item.createdAt,
         title: title,
         body: item.body,
+        turnId: item.turnId,
         isRunning: item.isRunning,
       ),
     };

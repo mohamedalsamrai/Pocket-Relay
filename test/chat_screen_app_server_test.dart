@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hi from Codex'), findsOneWidget);
-    expect(find.text('end'), findsOneWidget);
+    expect(find.textContaining('end'), findsOneWidget);
   });
 
   testWidgets('approval actions are routed to the app-server client', (
@@ -467,7 +467,7 @@ void main() {
 
     expect(find.text('Thread usage'), findsOneWidget);
     expect(find.text('ctx 200k'), findsOneWidget);
-    expect(find.text('end'), findsOneWidget);
+    expect(find.textContaining('end'), findsOneWidget);
   });
 }
 

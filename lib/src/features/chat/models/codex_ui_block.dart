@@ -61,6 +61,7 @@ class CodexWorkLogEntry {
     required this.createdAt,
     required this.entryKind,
     required this.title,
+    this.turnId,
     this.preview,
     this.isRunning = false,
     this.exitCode,
@@ -70,6 +71,7 @@ class CodexWorkLogEntry {
   final DateTime createdAt;
   final CodexWorkLogEntryKind entryKind;
   final String title;
+  final String? turnId;
   final String? preview;
   final bool isRunning;
   final int? exitCode;
@@ -92,20 +94,28 @@ final class CodexTextBlock extends CodexUiBlock {
     required super.createdAt,
     required this.title,
     required this.body,
+    this.turnId,
     this.isRunning = false,
   });
 
   final String title;
   final String body;
+  final String? turnId;
   final bool isRunning;
 
-  CodexTextBlock copyWith({String? title, String? body, bool? isRunning}) {
+  CodexTextBlock copyWith({
+    String? title,
+    String? body,
+    String? turnId,
+    bool? isRunning,
+  }) {
     return CodexTextBlock(
       id: id,
       kind: kind,
       createdAt: createdAt,
       title: title ?? this.title,
       body: body ?? this.body,
+      turnId: turnId ?? this.turnId,
       isRunning: isRunning ?? this.isRunning,
     );
   }
@@ -141,16 +151,19 @@ final class CodexProposedPlanBlock extends CodexUiBlock {
     required super.createdAt,
     required this.title,
     required this.markdown,
+    this.turnId,
     this.isStreaming = false,
   }) : super(kind: CodexUiBlockKind.proposedPlan);
 
   final String title;
   final String markdown;
+  final String? turnId;
   final bool isStreaming;
 
   CodexProposedPlanBlock copyWith({
     String? title,
     String? markdown,
+    String? turnId,
     bool? isStreaming,
   }) {
     return CodexProposedPlanBlock(
@@ -158,6 +171,7 @@ final class CodexProposedPlanBlock extends CodexUiBlock {
       createdAt: createdAt,
       title: title ?? this.title,
       markdown: markdown ?? this.markdown,
+      turnId: turnId ?? this.turnId,
       isStreaming: isStreaming ?? this.isStreaming,
     );
   }
@@ -169,18 +183,21 @@ final class CodexCommandExecutionBlock extends CodexUiBlock {
     required super.createdAt,
     required this.command,
     required this.output,
+    this.turnId,
     this.isRunning = false,
     this.exitCode,
   }) : super(kind: CodexUiBlockKind.commandExecution);
 
   final String command;
   final String output;
+  final String? turnId;
   final bool isRunning;
   final int? exitCode;
 
   CodexCommandExecutionBlock copyWith({
     String? command,
     String? output,
+    String? turnId,
     bool? isRunning,
     int? exitCode,
   }) {
@@ -189,6 +206,7 @@ final class CodexCommandExecutionBlock extends CodexUiBlock {
       createdAt: createdAt,
       command: command ?? this.command,
       output: output ?? this.output,
+      turnId: turnId ?? this.turnId,
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
     );
@@ -201,6 +219,7 @@ final class CodexWorkLogEntryBlock extends CodexUiBlock {
     required super.createdAt,
     required this.entryKind,
     required this.title,
+    this.turnId,
     this.preview,
     this.isRunning = false,
     this.exitCode,
@@ -208,6 +227,7 @@ final class CodexWorkLogEntryBlock extends CodexUiBlock {
 
   final CodexWorkLogEntryKind entryKind;
   final String title;
+  final String? turnId;
   final String? preview;
   final bool isRunning;
   final int? exitCode;
@@ -215,6 +235,7 @@ final class CodexWorkLogEntryBlock extends CodexUiBlock {
   CodexWorkLogEntryBlock copyWith({
     CodexWorkLogEntryKind? entryKind,
     String? title,
+    String? turnId,
     String? preview,
     bool? isRunning,
     int? exitCode,
@@ -224,6 +245,7 @@ final class CodexWorkLogEntryBlock extends CodexUiBlock {
       createdAt: createdAt,
       entryKind: entryKind ?? this.entryKind,
       title: title ?? this.title,
+      turnId: turnId ?? this.turnId,
       preview: preview ?? this.preview,
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
@@ -248,18 +270,21 @@ final class CodexChangedFilesBlock extends CodexUiBlock {
     required this.title,
     this.files = const <CodexChangedFile>[],
     this.unifiedDiff,
+    this.turnId,
     this.isRunning = false,
   }) : super(kind: CodexUiBlockKind.changedFiles);
 
   final String title;
   final List<CodexChangedFile> files;
   final String? unifiedDiff;
+  final String? turnId;
   final bool isRunning;
 
   CodexChangedFilesBlock copyWith({
     String? title,
     List<CodexChangedFile>? files,
     String? unifiedDiff,
+    String? turnId,
     bool? isRunning,
   }) {
     return CodexChangedFilesBlock(
@@ -268,6 +293,7 @@ final class CodexChangedFilesBlock extends CodexUiBlock {
       title: title ?? this.title,
       files: files ?? this.files,
       unifiedDiff: unifiedDiff ?? this.unifiedDiff,
+      turnId: turnId ?? this.turnId,
       isRunning: isRunning ?? this.isRunning,
     );
   }
@@ -396,7 +422,9 @@ final class CodexTurnBoundaryBlock extends CodexUiBlock {
     required super.id,
     required super.createdAt,
     this.label = 'end',
+    this.elapsed,
   }) : super(kind: CodexUiBlockKind.turnBoundary);
 
   final String label;
+  final Duration? elapsed;
 }

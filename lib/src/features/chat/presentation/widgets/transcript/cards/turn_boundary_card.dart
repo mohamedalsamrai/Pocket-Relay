@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/utils/duration_utils.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
@@ -10,6 +11,9 @@ class TurnBoundaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = ConversationCardPalette.of(context);
+    final label = block.elapsed == null
+        ? block.label
+        : '${block.label} · ${formatElapsedDuration(block.elapsed!)}';
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 700),
       child: Padding(
@@ -25,7 +29,7 @@ class TurnBoundaryCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
-                block.label,
+                label,
                 style: TextStyle(
                   color: cards.textMuted,
                   fontSize: 10.5,

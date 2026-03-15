@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/assistant_message_card.dart';
@@ -19,12 +20,14 @@ class ConversationEntryCard extends StatelessWidget {
   const ConversationEntryCard({
     super.key,
     required this.block,
+    this.turnTimer,
     this.onApproveRequest,
     this.onDenyRequest,
     this.onSubmitUserInput,
   });
 
   final CodexUiBlock block;
+  final CodexSessionTurnTimer? turnTimer;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
   final Future<void> Function(
@@ -41,16 +44,21 @@ class ConversationEntryCard extends StatelessWidget {
       ),
       final CodexTextBlock textBlock
           when textBlock.kind == CodexUiBlockKind.reasoning =>
-        ReasoningCard(block: textBlock),
-      final CodexTextBlock textBlock => AssistantMessageCard(block: textBlock),
+        ReasoningCard(block: textBlock, turnTimer: turnTimer),
+      final CodexTextBlock textBlock => AssistantMessageCard(
+        block: textBlock,
+        turnTimer: turnTimer,
+      ),
       final CodexPlanUpdateBlock planUpdateBlock => PlanUpdateCard(
         block: planUpdateBlock,
       ),
       final CodexProposedPlanBlock proposedPlanBlock => ProposedPlanCard(
         block: proposedPlanBlock,
+        turnTimer: turnTimer,
       ),
       final CodexCommandExecutionBlock commandBlock => CommandCard(
         block: commandBlock,
+        turnTimer: turnTimer,
       ),
       final CodexWorkLogEntryBlock workLogEntryBlock => WorkLogGroupCard(
         block: CodexWorkLogGroupBlock(
@@ -62,18 +70,22 @@ class ConversationEntryCard extends StatelessWidget {
               createdAt: workLogEntryBlock.createdAt,
               entryKind: workLogEntryBlock.entryKind,
               title: workLogEntryBlock.title,
+              turnId: workLogEntryBlock.turnId,
               preview: workLogEntryBlock.preview,
               isRunning: workLogEntryBlock.isRunning,
               exitCode: workLogEntryBlock.exitCode,
             ),
           ],
         ),
+        turnTimer: turnTimer,
       ),
       final CodexWorkLogGroupBlock workLogGroupBlock => WorkLogGroupCard(
         block: workLogGroupBlock,
+        turnTimer: turnTimer,
       ),
       final CodexChangedFilesBlock changedFilesBlock => ChangedFilesCard(
         block: changedFilesBlock,
+        turnTimer: turnTimer,
       ),
       final CodexApprovalRequestBlock approvalBlock => ApprovalRequestCard(
         block: approvalBlock,

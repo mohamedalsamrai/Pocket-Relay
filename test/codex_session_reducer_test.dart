@@ -342,6 +342,7 @@ void main() {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
+    final completedAt = now.add(const Duration(seconds: 5));
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -362,7 +363,7 @@ void main() {
     state = reducer.reduceRuntimeEvent(
       state,
       CodexRuntimeTurnCompletedEvent(
-        createdAt: now,
+        createdAt: completedAt,
         threadId: 'thread_123',
         turnId: 'turn_123',
         state: CodexRuntimeTurnState.completed,
@@ -377,8 +378,45 @@ void main() {
     expect(state.threadId, 'thread_123');
     expect(state.turnId, isNull);
     expect(state.latestUsageSummary, 'input 12 · cached 3 · output 7');
+    expect(state.turnTimers['turn_123']?.startedAt, now);
+    expect(
+      state.turnTimers['turn_123']?.elapsedAt(completedAt),
+      const Duration(seconds: 5),
+    );
     expect(state.blocks, hasLength(1));
-    expect(state.blocks.last, isA<CodexTurnBoundaryBlock>());
+    final boundary = state.blocks.last as CodexTurnBoundaryBlock;
+    expect(boundary.elapsed, const Duration(seconds: 5));
+  });
+
+  test('finalizes the active turn timer when the session exits', () {
+    final reducer = TranscriptReducer();
+    final startedAt = DateTime(2026, 3, 14, 12);
+    final exitedAt = startedAt.add(const Duration(seconds: 9));
+    var state = CodexSessionState.initial();
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeTurnStartedEvent(
+        createdAt: startedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeSessionExitedEvent(
+        createdAt: exitedAt,
+        exitKind: CodexRuntimeSessionExitKind.error,
+        reason: 'Socket closed',
+      ),
+    );
+
+    expect(state.turnId, isNull);
+    expect(
+      state.turnTimers['turn_123']?.elapsedAt(exitedAt),
+      const Duration(seconds: 9),
+    );
   });
 
   test('keeps warnings and errors non-fatal to the UI state', () {

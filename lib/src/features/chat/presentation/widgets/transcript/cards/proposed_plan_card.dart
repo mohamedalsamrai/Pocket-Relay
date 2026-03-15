@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/markdown_style_factory.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class ProposedPlanCard extends StatefulWidget {
-  const ProposedPlanCard({super.key, required this.block});
+  const ProposedPlanCard({super.key, required this.block, this.turnTimer});
 
   final CodexProposedPlanBlock block;
+  final CodexSessionTurnTimer? turnTimer;
 
   @override
   State<ProposedPlanCard> createState() => _ProposedPlanCardState();
@@ -27,8 +30,11 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
       cards: cards,
       accent: accent,
     );
-    final title = _proposedPlanTitle(widget.block.markdown) ?? widget.block.title;
-    final displayedMarkdown = _stripDisplayedPlanMarkdown(widget.block.markdown);
+    final title =
+        _proposedPlanTitle(widget.block.markdown) ?? widget.block.title;
+    final displayedMarkdown = _stripDisplayedPlanMarkdown(
+      widget.block.markdown,
+    );
     final lineCount = '\n'.allMatches(displayedMarkdown).length + 1;
     final canCollapse = displayedMarkdown.length > 900 || lineCount > 20;
     final displayedText = _expanded || !canCollapse
@@ -113,6 +119,8 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
                 child: Text(_expanded ? 'Collapse plan' : 'Expand plan'),
               ),
             ],
+            if (widget.turnTimer != null)
+              TurnElapsedFooter(turnTimer: widget.turnTimer!, accent: accent),
           ],
         ),
       ),

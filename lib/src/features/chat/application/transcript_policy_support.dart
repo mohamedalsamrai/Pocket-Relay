@@ -5,6 +5,30 @@ import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 class TranscriptPolicySupport {
   const TranscriptPolicySupport();
 
+  Map<String, CodexSessionTurnTimer> completeTurnTimer(
+    Map<String, CodexSessionTurnTimer> turnTimers,
+    String? turnId,
+    DateTime completedAt,
+  ) {
+    if (turnId == null || turnId.isEmpty) {
+      return turnTimers;
+    }
+
+    final existing = turnTimers[turnId];
+    return <String, CodexSessionTurnTimer>{
+      ...turnTimers,
+      turnId:
+          existing?.copyWith(
+            completedAt: existing.completedAt ?? completedAt,
+          ) ??
+          CodexSessionTurnTimer(
+            turnId: turnId,
+            startedAt: completedAt,
+            completedAt: completedAt,
+          ),
+    };
+  }
+
   CodexSessionState upsertBlock(CodexSessionState state, CodexUiBlock block) {
     final nextBlocks = List<CodexUiBlock>.from(state.blocks);
     final index = nextBlocks.indexWhere((existing) => existing.id == block.id);

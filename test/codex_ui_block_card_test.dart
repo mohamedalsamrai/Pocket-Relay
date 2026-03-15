@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
 
 void main() {
   testWidgets('renders reasoning blocks with markdown text', (tester) async {
@@ -96,6 +98,121 @@ void main() {
       _findDecoratedContainerColorForText(tester, 'Changed files'),
       PocketPalette.dark.surface,
     );
+  });
+
+  testWidgets('renders assistant messages without a decorated card shell', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'assistant_1',
+            kind: CodexUiBlockKind.assistantMessage,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Codex',
+            body: 'Plain assistant transcript.',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Codex'), findsOneWidget);
+    expect(find.text('Plain assistant transcript.'), findsOneWidget);
+    expect(_findDecoratedContainerColorForText(tester, 'Codex'), isNull);
+  });
+
+  testWidgets('renders a live elapsed footer for a running assistant turn', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'assistant_live_1',
+            kind: CodexUiBlockKind.assistantMessage,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Codex',
+            body: 'Streaming response.',
+            turnId: 'turn_live',
+            isRunning: true,
+          ),
+          turnTimer: CodexSessionTurnTimer(
+            turnId: 'turn_live',
+            startedAt: DateTime.now().subtract(const Duration(seconds: 5)),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Elapsed'), findsOneWidget);
+  });
+
+  testWidgets('renders a completed elapsed footer with the final duration', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'assistant_done_1',
+            kind: CodexUiBlockKind.assistantMessage,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Codex',
+            body: 'Final response.',
+            turnId: 'turn_done',
+          ),
+          turnTimer: CodexSessionTurnTimer(
+            turnId: 'turn_done',
+            startedAt: DateTime(2026, 3, 14, 12),
+            completedAt: DateTime(2026, 3, 14, 12, 1, 8),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Completed in 1:08'), findsOneWidget);
+  });
+
+  testWidgets('shows the elapsed footer only on the last eligible block', (
+    tester,
+  ) async {
+    final timer = CodexSessionTurnTimer(
+      turnId: 'turn_1',
+      startedAt: DateTime(2026, 3, 14, 12),
+      completedAt: DateTime(2026, 3, 14, 12, 0, 9),
+    );
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: TranscriptList(
+          controller: TranscriptListController(),
+          isConfigured: true,
+          transcriptBlocks: <CodexUiBlock>[
+            CodexTextBlock(
+              id: 'reasoning_1',
+              kind: CodexUiBlockKind.reasoning,
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Reasoning',
+              body: 'Planning the patch.',
+              turnId: 'turn_1',
+            ),
+            CodexTextBlock(
+              id: 'assistant_1',
+              kind: CodexUiBlockKind.assistantMessage,
+              createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+              title: 'Codex',
+              body: 'Patch applied.',
+              turnId: 'turn_1',
+            ),
+          ],
+          turnTimers: <String, CodexSessionTurnTimer>{'turn_1': timer},
+          onConfigure: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('Completed in 0:09'), findsOneWidget);
   });
 
   testWidgets('renders approval request actions', (tester) async {
@@ -320,7 +437,55 @@ void main() {
     expect(find.text('end'), findsOneWidget);
   });
 
-  testWidgets('renders changed files summary and diff toggle', (tester) async {
+  testWidgets('renders elapsed time in the turn completion separator', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTurnBoundaryBlock(
+            id: 'turn_end_2',
+            createdAt: DateTime(2026, 3, 14, 12),
+            elapsed: const Duration(minutes: 1, seconds: 5),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('end · 1:05'), findsOneWidget);
+  });
+
+  testWidgets('renders a live elapsed footer on the active streaming card', (
+    tester,
+  ) async {
+    final startedAt = DateTime.now().subtract(const Duration(seconds: 5));
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexTextBlock(
+            id: 'assistant_live_1',
+            kind: CodexUiBlockKind.assistantMessage,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Codex',
+            body: 'Streaming response',
+            turnId: 'turn_123',
+            isRunning: true,
+          ),
+          turnTimer: CodexSessionTurnTimer(
+            turnId: 'turn_123',
+            startedAt: startedAt,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Elapsed 0:05'), findsOneWidget);
+  });
+
+  testWidgets('renders changed files summary and opens a per-file diff sheet', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _buildTestApp(
         child: ConversationEntryCard(
@@ -342,9 +507,74 @@ void main() {
               ),
             ],
             unifiedDiff:
-                'diff --git a/lib/main.dart b/lib/main.dart\n'
-                '--- a/lib/main.dart\n'
-                '+++ b/lib/main.dart\n'
+                'diff --git a/lib/src/features/chat/chat_screen.dart b/lib/src/features/chat/chat_screen.dart\n'
+                '--- a/lib/src/features/chat/chat_screen.dart\n'
+                '+++ b/lib/src/features/chat/chat_screen.dart\n'
+                '@@ -1 +1 @@\n'
+                '-old screen\n'
+                '+new screen\n'
+                'diff --git a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart b/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                '--- a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                '+++ b/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                '@@ -2 +2 @@\n'
+                '-old card\n'
+                '+new card\n',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('2 files'), findsOneWidget);
+    expect(find.text('+11 -3'), findsOneWidget);
+    expect(find.text('View diff'), findsNWidgets(2));
+    expect(find.text('Show diff'), findsNothing);
+
+    await tester.tap(
+      find.text(
+        'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.textContaining(
+        'diff --git a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('+8 additions'), findsOneWidget);
+    expect(find.text('-2 deletions'), findsOneWidget);
+    expect(find.text('+new card'), findsOneWidget);
+  });
+
+  testWidgets('does not attach a single patch to unrelated file rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_unmatched_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(path: 'README.md'),
+              CodexChangedFile(
+                path: 'lib/app.dart',
+                additions: 1,
+                deletions: 1,
+              ),
+            ],
+            unifiedDiff:
+                'diff --git a/lib/app.dart b/lib/app.dart\n'
+                '--- a/lib/app.dart\n'
+                '+++ b/lib/app.dart\n'
                 '@@ -1 +1 @@\n'
                 '-old\n'
                 '+new\n',
@@ -353,15 +583,129 @@ void main() {
       ),
     );
 
-    expect(find.text('2 files'), findsOneWidget);
-    expect(find.text('+11 -3'), findsOneWidget);
-    expect(find.text('Show diff'), findsOneWidget);
+    expect(find.text('View diff'), findsOneWidget);
+    expect(find.text('No patch'), findsOneWidget);
+    expect(find.text('README.md'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('Show diff'));
+  testWidgets('matches renamed files by old-path aliases', (tester) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_rename_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(path: 'lib/old_name.dart'),
+            ],
+            unifiedDiff:
+                'diff --git a/lib/old_name.dart b/lib/new_name.dart\n'
+                'similarity index 88%\n'
+                'rename from lib/old_name.dart\n'
+                'rename to lib/new_name.dart\n'
+                '--- a/lib/old_name.dart\n'
+                '+++ b/lib/new_name.dart\n'
+                '@@ -1 +1 @@\n'
+                '-oldName();\n'
+                '+newName();\n',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('View diff'), findsOneWidget);
+    expect(find.text('No patch'), findsNothing);
+
+    await tester.tap(find.text('lib/old_name.dart'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Hide diff'), findsOneWidget);
-    expect(find.textContaining('diff --git a/lib/main.dart'), findsOneWidget);
+    expect(find.text('renamed'), findsOneWidget);
+    expect(find.text('+1 additions'), findsOneWidget);
+    expect(find.text('-1 deletions'), findsOneWidget);
+    expect(find.text('+newName();'), findsOneWidget);
+  });
+
+  testWidgets('derives file rows from diff-only payloads without git headers', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_only_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            unifiedDiff:
+                '--- a/lib/first.dart\n'
+                '+++ b/lib/first.dart\n'
+                '@@ -1 +1 @@\n'
+                '-old first\n'
+                '+new first\n'
+                '--- a/lib/second.dart\n'
+                '+++ b/lib/second.dart\n'
+                '@@ -2 +2 @@\n'
+                '-old second\n'
+                '+new second\n',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('2 files'), findsOneWidget);
+    expect(find.text('+2 -2'), findsOneWidget);
+    expect(find.text('lib/first.dart'), findsOneWidget);
+    expect(find.text('lib/second.dart'), findsOneWidget);
+    expect(find.text('View diff'), findsNWidgets(2));
+
+    await tester.tap(find.text('lib/second.dart'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('+new second'), findsOneWidget);
+    expect(find.text('-old second'), findsOneWidget);
+  });
+
+  testWidgets('shows a bounded preview for very large diffs', (tester) async {
+    final diffLines = <String>[
+      'diff --git a/lib/large.dart b/lib/large.dart',
+      '--- a/lib/large.dart',
+      '+++ b/lib/large.dart',
+      '@@ -1,0 +1,360 @@',
+      for (var index = 0; index < 360; index += 1) '+line $index',
+    ];
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: ConversationEntryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_large_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(path: 'lib/large.dart', additions: 360),
+            ],
+            unifiedDiff: diffLines.join('\n'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('lib/large.dart'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Load full diff'), findsOneWidget);
+    expect(
+      find.text('Showing the first 320 lines to keep the sheet responsive.'),
+      findsOneWidget,
+    );
+    expect(find.text('+line 315'), findsOneWidget);
+    expect(find.text('+line 359'), findsNothing);
+
+    await tester.tap(find.text('Load full diff'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show preview'), findsOneWidget);
+    expect(find.text('+line 359'), findsOneWidget);
   });
 }
 

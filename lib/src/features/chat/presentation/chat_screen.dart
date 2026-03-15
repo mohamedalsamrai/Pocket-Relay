@@ -137,6 +137,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           controller: _transcriptListController,
                           isConfigured: profile.isReady,
                           transcriptBlocks: _sessionController.transcriptBlocks,
+                          turnTimers:
+                              _sessionController.sessionState.turnTimers,
                           pendingApprovalBlock:
                               _sessionController.pendingApprovalBlock,
                           pendingUserInputBlock:

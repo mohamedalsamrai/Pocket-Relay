@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
@@ -15,6 +16,7 @@ class TranscriptList extends StatefulWidget {
     required this.controller,
     required this.isConfigured,
     required this.transcriptBlocks,
+    required this.turnTimers,
     required this.onConfigure,
     this.pendingApprovalBlock,
     this.pendingUserInputBlock,
@@ -26,6 +28,7 @@ class TranscriptList extends StatefulWidget {
   final TranscriptListController controller;
   final bool isConfigured;
   final List<CodexUiBlock> transcriptBlocks;
+  final Map<String, CodexSessionTurnTimer> turnTimers;
   final VoidCallback onConfigure;
   final CodexApprovalRequestBlock? pendingApprovalBlock;
   final CodexUserInputRequestBlock? pendingUserInputBlock;
@@ -96,8 +99,10 @@ class _TranscriptListState extends State<TranscriptList> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
               itemBuilder: (context, index) {
+                final block = widget.transcriptBlocks[index];
                 return ConversationEntryCard(
-                  block: widget.transcriptBlocks[index],
+                  block: block,
+                  turnTimer: _turnTimerForBlock(block),
                   onApproveRequest: widget.onApproveRequest,
                   onDenyRequest: widget.onDenyRequest,
                   onSubmitUserInput: widget.onSubmitUserInput,
@@ -193,4 +198,52 @@ class _TranscriptListState extends State<TranscriptList> {
     return activeMetrics.maxScrollExtent - activeMetrics.pixels <=
         _autoScrollResumeDistance;
   }
+
+  CodexSessionTurnTimer? _turnTimerForBlock(CodexUiBlock block) {
+    final turnId = _turnIdFor(block);
+    if (turnId == null) {
+      return null;
+    }
+    final turnTimer = widget.turnTimers[turnId];
+    if (turnTimer == null) {
+      return null;
+    }
+    final latestBlockId = _latestTimerFooterBlockIdForTurn(turnId);
+    return latestBlockId == block.id ? turnTimer : null;
+  }
+
+  String? _latestTimerFooterBlockIdForTurn(String turnId) {
+    String? latestBlockId;
+    for (final block in widget.transcriptBlocks) {
+      if (_turnIdFor(block) == turnId && _supportsTurnTimerFooter(block)) {
+        latestBlockId = block.id;
+      }
+    }
+    return latestBlockId;
+  }
+}
+
+bool _supportsTurnTimerFooter(CodexUiBlock block) {
+  return switch (block) {
+    CodexTextBlock() ||
+    CodexProposedPlanBlock() ||
+    CodexChangedFilesBlock() ||
+    CodexCommandExecutionBlock() ||
+    CodexWorkLogEntryBlock() ||
+    CodexWorkLogGroupBlock() => true,
+    _ => false,
+  };
+}
+
+String? _turnIdFor(CodexUiBlock block) {
+  return switch (block) {
+    CodexTextBlock(:final turnId) => turnId,
+    CodexProposedPlanBlock(:final turnId) => turnId,
+    CodexChangedFilesBlock(:final turnId) => turnId,
+    CodexCommandExecutionBlock(:final turnId) => turnId,
+    CodexWorkLogEntryBlock(:final turnId) => turnId,
+    CodexWorkLogGroupBlock(:final entries) =>
+      entries.isEmpty ? null : entries.last.turnId,
+    _ => null,
+  };
 }

@@ -1,11 +1,42 @@
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 
+class CodexSessionTurnTimer {
+  const CodexSessionTurnTimer({
+    required this.turnId,
+    required this.startedAt,
+    this.completedAt,
+  });
+
+  final String turnId;
+  final DateTime startedAt;
+  final DateTime? completedAt;
+
+  bool get isRunning => completedAt == null;
+
+  Duration elapsedAt(DateTime now) {
+    final end = completedAt ?? now;
+    if (end.isBefore(startedAt)) {
+      return Duration.zero;
+    }
+    return end.difference(startedAt);
+  }
+
+  CodexSessionTurnTimer copyWith({DateTime? completedAt}) {
+    return CodexSessionTurnTimer(
+      turnId: turnId,
+      startedAt: startedAt,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
+}
+
 class CodexSessionState {
   const CodexSessionState({
     this.connectionStatus = CodexRuntimeSessionState.stopped,
     this.threadId,
     this.turnId,
+    this.turnTimers = const <String, CodexSessionTurnTimer>{},
     this.pendingApprovalRequests = const <String, CodexSessionPendingRequest>{},
     this.pendingUserInputRequests =
         const <String, CodexSessionPendingUserInputRequest>{},
@@ -22,6 +53,7 @@ class CodexSessionState {
   final CodexRuntimeSessionState connectionStatus;
   final String? threadId;
   final String? turnId;
+  final Map<String, CodexSessionTurnTimer> turnTimers;
   final Map<String, CodexSessionPendingRequest> pendingApprovalRequests;
   final Map<String, CodexSessionPendingUserInputRequest>
   pendingUserInputRequests;
@@ -59,6 +91,7 @@ class CodexSessionState {
     bool clearThreadId = false,
     String? turnId,
     bool clearTurnId = false,
+    Map<String, CodexSessionTurnTimer>? turnTimers,
     Map<String, CodexSessionPendingRequest>? pendingApprovalRequests,
     Map<String, CodexSessionPendingUserInputRequest>? pendingUserInputRequests,
     Map<String, CodexSessionActiveItem>? activeItems,
@@ -72,6 +105,7 @@ class CodexSessionState {
       connectionStatus: connectionStatus ?? this.connectionStatus,
       threadId: clearThreadId ? null : (threadId ?? this.threadId),
       turnId: clearTurnId ? null : (turnId ?? this.turnId),
+      turnTimers: turnTimers ?? this.turnTimers,
       pendingApprovalRequests:
           pendingApprovalRequests ?? this.pendingApprovalRequests,
       pendingUserInputRequests:
@@ -119,6 +153,7 @@ List<CodexUiBlock> _buildTranscriptBlocks(Iterable<CodexUiBlock> blocks) {
                 createdAt: entry.createdAt,
                 entryKind: entry.entryKind,
                 title: entry.title,
+                turnId: entry.turnId,
                 preview: entry.preview,
                 isRunning: entry.isRunning,
                 exitCode: entry.exitCode,

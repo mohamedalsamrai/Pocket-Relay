@@ -2,6 +2,7 @@ import 'package:pocket_relay/src/features/chat/application/transcript_changed_fi
 import 'package:pocket_relay/src/features/chat/application/transcript_item_policy.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_request_policy.dart';
+import 'package:pocket_relay/src/core/utils/duration_utils.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -48,6 +49,7 @@ class TranscriptPolicy {
     final cleared = state.copyWith(
       clearThreadId: true,
       clearTurnId: true,
+      turnTimers: const <String, CodexSessionTurnTimer>{},
       activeItems: const <String, CodexSessionActiveItem>{},
       pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
       pendingUserInputRequests:
@@ -75,6 +77,7 @@ class TranscriptPolicy {
     return state.copyWith(
       clearThreadId: true,
       clearTurnId: true,
+      turnTimers: const <String, CodexSessionTurnTimer>{},
       blocks: const <CodexUiBlock>[],
       activeItems: const <String, CodexSessionActiveItem>{},
       pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
@@ -89,6 +92,7 @@ class TranscriptPolicy {
     return state.copyWith(
       clearThreadId: true,
       clearTurnId: true,
+      turnTimers: const <String, CodexSessionTurnTimer>{},
       clearPendingThreadTokenUsageBlock: true,
     );
   }
@@ -97,12 +101,18 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSessionExitedEvent event,
   ) {
+    final completedTurnTimers = _support.completeTurnTimer(
+      state.turnTimers,
+      state.turnId,
+      event.createdAt,
+    );
     final nextState = state.copyWith(
       connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
           ? CodexRuntimeSessionState.error
           : CodexRuntimeSessionState.stopped,
       clearThreadId: true,
       clearTurnId: true,
+      turnTimers: completedTurnTimers,
       activeItems: const <String, CodexSessionActiveItem>{},
       pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
       pendingUserInputRequests:
@@ -127,9 +137,16 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnCompletedEvent event,
   ) {
+    final completedTurnTimers = _support.completeTurnTimer(
+      state.turnTimers,
+      event.turnId ?? state.turnId,
+      event.createdAt,
+    );
+    final completedTimer = completedTurnTimers[event.turnId ?? state.turnId];
     var nextState = state.copyWith(
       connectionStatus: CodexRuntimeSessionState.ready,
       clearTurnId: true,
+      turnTimers: completedTurnTimers,
       latestUsageSummary: _support.buildRuntimeUsageSummary(event),
       clearPendingThreadTokenUsageBlock: true,
     );
@@ -142,6 +159,7 @@ class TranscriptPolicy {
       CodexTurnBoundaryBlock(
         id: _support.eventEntryId('turn-end', event.createdAt),
         createdAt: event.createdAt,
+        elapsed: completedTimer?.elapsedAt(event.createdAt),
       ),
     );
   }
@@ -150,17 +168,27 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnAbortedEvent event,
   ) {
+    final completedTurnTimers = _support.completeTurnTimer(
+      state.turnTimers,
+      event.turnId ?? state.turnId,
+      event.createdAt,
+    );
+    final completedTimer = completedTurnTimers[event.turnId ?? state.turnId];
+    final elapsed = completedTimer?.elapsedAt(event.createdAt);
     return _support.upsertBlock(
       state.copyWith(
         connectionStatus: CodexRuntimeSessionState.ready,
         clearTurnId: true,
+        turnTimers: completedTurnTimers,
         clearPendingThreadTokenUsageBlock: true,
       ),
       CodexStatusBlock(
         id: _support.eventEntryId('status', event.createdAt),
         createdAt: event.createdAt,
         title: 'Turn aborted',
-        body: event.reason ?? 'The active turn was aborted.',
+        body: elapsed == null
+            ? (event.reason ?? 'The active turn was aborted.')
+            : '${event.reason ?? 'The active turn was aborted.'}\n\nElapsed ${formatElapsedDuration(elapsed)}.',
         isTranscriptSignal: true,
       ),
     );
@@ -197,6 +225,7 @@ class TranscriptPolicy {
           rawPayload: event.rawPayload,
         ),
         unifiedDiff: event.unifiedDiff,
+        turnId: event.turnId,
       ),
     );
   }
