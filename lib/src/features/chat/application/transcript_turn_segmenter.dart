@@ -23,6 +23,9 @@ class TranscriptTurnArtifactBuilder {
     if (_isWorkBlockKind(item.blockKind)) {
       return _upsertWorkArtifact(turn, item);
     }
+    if (item.blockKind == CodexUiBlockKind.changedFiles) {
+      return _upsertChangedFilesArtifact(turn, item);
+    }
     return _upsertSingleArtifact(turn, item);
   }
 
@@ -123,6 +126,83 @@ class TranscriptTurnArtifactBuilder {
     );
   }
 
+  CodexActiveTurnState _upsertChangedFilesArtifact(
+    CodexActiveTurnState turn,
+    CodexSessionActiveItem item,
+  ) {
+    final entry = _changedFilesEntryFromItem(item);
+    var nextArtifacts = List<CodexTurnArtifact>.from(turn.artifacts);
+    String artifactId;
+
+    if (nextArtifacts.lastOrNull case final CodexTurnChangedFilesArtifact last) {
+      nextArtifacts[nextArtifacts.length - 1] = _changedFilesArtifactWithEntry(
+        last,
+        entry,
+      );
+      artifactId = last.id;
+    } else {
+      final nextArtifact = CodexTurnChangedFilesArtifact(
+        id: 'changed_files_group_${item.entryId}',
+        createdAt: item.createdAt,
+        title: item.title ?? _blockFactory.defaultItemTitle(item.itemType),
+        entries: <CodexChangedFilesEntry>[entry],
+      );
+      nextArtifacts = appendCodexTurnArtifact(nextArtifacts, nextArtifact);
+      artifactId = nextArtifact.id;
+    }
+
+    return turn.copyWith(
+      artifacts: nextArtifacts,
+      itemArtifactIds: <String, String>{
+        ...turn.itemArtifactIds,
+        item.itemId: artifactId,
+      },
+      hasWork: turn.hasWork || _isWorkItem(item.itemType),
+      hasReasoning:
+          turn.hasReasoning ||
+          item.itemType == CodexCanonicalItemType.reasoning,
+    );
+  }
+
+  CodexChangedFilesEntry _changedFilesEntryFromItem(
+    CodexSessionActiveItem item,
+  ) {
+    return CodexChangedFilesEntry(
+      id: item.entryId,
+      itemId: item.itemId,
+      createdAt: item.createdAt,
+      files: _changedFilesParser.changedFilesFromSources(
+        snapshot: item.snapshot,
+        body: item.body,
+      ),
+      unifiedDiff: _changedFilesParser.unifiedDiffFromSources(
+        snapshot: item.snapshot,
+        body: item.body,
+      ),
+      isRunning: item.isRunning,
+    );
+  }
+
+  CodexTurnChangedFilesArtifact _changedFilesArtifactWithEntry(
+    CodexTurnChangedFilesArtifact artifact,
+    CodexChangedFilesEntry entry,
+  ) {
+    final nextEntries = List<CodexChangedFilesEntry>.from(artifact.entries);
+    final index = nextEntries.indexWhere((existing) => existing.id == entry.id);
+    if (index == -1) {
+      nextEntries.add(entry);
+    } else {
+      nextEntries[index] = entry;
+    }
+
+    return CodexTurnChangedFilesArtifact(
+      id: artifact.id,
+      createdAt: artifact.createdAt,
+      title: artifact.title,
+      entries: nextEntries,
+    );
+  }
+
   CodexTurnArtifact? _artifactFromItem(CodexSessionActiveItem item) {
     final title = item.title ?? _blockFactory.defaultItemTitle(item.itemType);
     final artifactId = item.entryId;
@@ -179,21 +259,6 @@ class TranscriptTurnArtifactBuilder {
         title: title,
         markdown: item.body,
         itemId: item.itemId,
-        isStreaming: item.isRunning,
-      ),
-      CodexUiBlockKind.changedFiles => CodexTurnChangedFilesArtifact(
-        id: artifactId,
-        createdAt: item.createdAt,
-        title: title,
-        itemId: item.itemId,
-        files: _changedFilesParser.changedFilesFromSources(
-          snapshot: item.snapshot,
-          body: item.body,
-        ),
-        unifiedDiff: _changedFilesParser.unifiedDiffFromSources(
-          snapshot: item.snapshot,
-          body: item.body,
-        ),
         isStreaming: item.isRunning,
       ),
       _ => null,

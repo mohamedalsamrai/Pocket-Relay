@@ -342,10 +342,9 @@ CodexTurnArtifact freezeCodexTurnArtifact(CodexTurnArtifact artifact) {
         id: artifact.id,
         createdAt: artifact.createdAt,
         title: artifact.title,
-        itemId: artifact.itemId,
-        files: artifact.files,
-        unifiedDiff: artifact.unifiedDiff,
-        isStreaming: false,
+        entries: artifact.entries
+            .map((entry) => entry.copyWith(isRunning: false))
+            .toList(growable: false),
       ),
     CodexTurnBlockArtifact(:final block) => CodexTurnBlockArtifact(
       block: _freezeCodexUiBlock(block),
@@ -570,6 +569,11 @@ Iterable<String> codexTurnArtifactIds(
         yield entry.id;
       }
     }
+    if (artifact case CodexTurnChangedFilesArtifact(:final entries)) {
+      for (final entry in entries) {
+        yield entry.id;
+      }
+    }
   }
 }
 
@@ -624,22 +628,67 @@ final class CodexTurnPlanArtifact extends CodexTurnArtifact {
   final bool isStreaming;
 }
 
+final class CodexChangedFilesEntry {
+  const CodexChangedFilesEntry({
+    required this.id,
+    required this.itemId,
+    required this.createdAt,
+    this.files = const <CodexChangedFile>[],
+    this.unifiedDiff,
+    this.isRunning = false,
+  });
+
+  final String id;
+  final String itemId;
+  final DateTime createdAt;
+  final List<CodexChangedFile> files;
+  final String? unifiedDiff;
+  final bool isRunning;
+
+  CodexChangedFilesEntry copyWith({
+    List<CodexChangedFile>? files,
+    String? unifiedDiff,
+    bool? isRunning,
+  }) {
+    return CodexChangedFilesEntry(
+      id: id,
+      itemId: itemId,
+      createdAt: createdAt,
+      files: files ?? this.files,
+      unifiedDiff: unifiedDiff ?? this.unifiedDiff,
+      isRunning: isRunning ?? this.isRunning,
+    );
+  }
+}
+
 final class CodexTurnChangedFilesArtifact extends CodexTurnArtifact {
   const CodexTurnChangedFilesArtifact({
     required super.id,
     required super.createdAt,
     required this.title,
-    this.itemId,
-    this.files = const <CodexChangedFile>[],
-    this.unifiedDiff,
-    this.isStreaming = false,
+    this.entries = const <CodexChangedFilesEntry>[],
   });
 
   final String title;
-  final String? itemId;
-  final List<CodexChangedFile> files;
-  final String? unifiedDiff;
-  final bool isStreaming;
+  final List<CodexChangedFilesEntry> entries;
+
+  List<CodexChangedFile> get files => entries
+      .expand((entry) => entry.files)
+      .toList(growable: false);
+
+  String? get unifiedDiff {
+    final parts = entries
+        .map((entry) => entry.unifiedDiff?.trim())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) {
+      return null;
+    }
+    return parts.join('\n');
+  }
+
+  bool get isStreaming => entries.any((entry) => entry.isRunning);
 }
 
 final class CodexTurnBlockArtifact extends CodexTurnArtifact {

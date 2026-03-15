@@ -1866,7 +1866,7 @@ void main() {
   );
 
   test(
-    'appends distinct file-change items as separate changed-files artifacts',
+    'consolidates consecutive distinct file-change items into one changed-files artifact',
     () {
       final reducer = TranscriptReducer();
       final now = DateTime(2026, 3, 14, 12);
@@ -1920,10 +1920,10 @@ void main() {
       final changedFilesBlocks = state.transcriptBlocks
           .whereType<CodexChangedFilesBlock>()
           .toList(growable: false);
-      expect(changedFilesBlocks, hasLength(2));
-      expect(changedFilesBlocks.first.id, isNot(changedFilesBlocks.last.id));
-      expect(changedFilesBlocks.first.files.single.path, 'README.md');
-      expect(changedFilesBlocks.last.files.single.path, 'lib/app.dart');
+      expect(changedFilesBlocks, hasLength(1));
+      expect(changedFilesBlocks.single.files, hasLength(2));
+      expect(changedFilesBlocks.single.files.first.path, 'README.md');
+      expect(changedFilesBlocks.single.files.last.path, 'lib/app.dart');
     },
   );
 
