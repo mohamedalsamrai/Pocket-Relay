@@ -263,35 +263,61 @@ void main() {
       ),
     );
 
-    expect(find.text('Thread token usage'), findsOneWidget);
-    expect(find.text('ctx 258400'), findsOneWidget);
-    expect(find.text('last'), findsOneWidget);
+    expect(find.text('Thread usage'), findsOneWidget);
+    expect(find.text('ctx 258.4k'), findsOneWidget);
+    expect(find.text('current'), findsOneWidget);
     expect(find.text('total'), findsOneWidget);
-    expect(find.text('input 10946'), findsOneWidget);
-    expect(find.text('output 910'), findsOneWidget);
+    expect(find.text('in'), findsOneWidget);
+    expect(find.text('cache'), findsOneWidget);
+    expect(find.text('out'), findsOneWidget);
+    expect(find.text('rsn'), findsOneWidget);
+    expect(find.text('all'), findsOneWidget);
+    expect(find.text('10.9k'), findsOneWidget);
+    expect(find.text('910'), findsOneWidget);
   });
 
-  testWidgets('collapses duplicate thread token usage sections', (tester) async {
+  testWidgets(
+    'renders duplicate thread token usage as current and total rows',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: ConversationEntryCard(
+            block: CodexUsageBlock(
+              id: 'usage_2',
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Thread token usage',
+              body:
+                  'Last: input 12 · cached 3 · output 7\n'
+                  'Total: input 12 · cached 3 · output 7',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('current'), findsOneWidget);
+      expect(find.text('total'), findsOneWidget);
+      expect(find.text('in'), findsOneWidget);
+      expect(find.text('cache'), findsOneWidget);
+      expect(find.text('out'), findsOneWidget);
+      expect(find.text('12'), findsNWidgets(2));
+      expect(find.text('3'), findsNWidgets(2));
+      expect(find.text('7'), findsNWidgets(2));
+    },
+  );
+
+  testWidgets('renders turn completion as a compact separator', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(
         child: ConversationEntryCard(
-          block: CodexUsageBlock(
-            id: 'usage_2',
+          block: CodexTurnBoundaryBlock(
+            id: 'turn_end_1',
             createdAt: DateTime(2026, 3, 14, 12),
-            title: 'Thread token usage',
-            body:
-                'Last: input 12 · cached 3 · output 7\n'
-                'Total: input 12 · cached 3 · output 7',
           ),
         ),
       ),
     );
 
-    expect(find.text('last'), findsNothing);
-    expect(find.text('total'), findsNothing);
-    expect(find.text('input 12'), findsOneWidget);
-    expect(find.text('cached 3'), findsOneWidget);
-    expect(find.text('output 7'), findsOneWidget);
+    expect(find.text('end'), findsOneWidget);
   });
 
   testWidgets('renders changed files summary and diff toggle', (tester) async {

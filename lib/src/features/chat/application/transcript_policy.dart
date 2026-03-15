@@ -52,6 +52,7 @@ class TranscriptPolicy {
       pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
       pendingUserInputRequests:
           const <String, CodexSessionPendingUserInputRequest>{},
+      clearPendingThreadTokenUsageBlock: true,
     );
     if (message == null || message.trim().isEmpty) {
       return cleared;
@@ -80,11 +81,16 @@ class TranscriptPolicy {
       pendingUserInputRequests:
           const <String, CodexSessionPendingUserInputRequest>{},
       clearLatestUsageSummary: true,
+      clearPendingThreadTokenUsageBlock: true,
     );
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
-    return state.copyWith(clearThreadId: true, clearTurnId: true);
+    return state.copyWith(
+      clearThreadId: true,
+      clearTurnId: true,
+      clearPendingThreadTokenUsageBlock: true,
+    );
   }
 
   CodexSessionState applySessionExited(
@@ -101,6 +107,7 @@ class TranscriptPolicy {
       pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
       pendingUserInputRequests:
           const <String, CodexSessionPendingUserInputRequest>{},
+      clearPendingThreadTokenUsageBlock: true,
     );
     if (event.exitKind != CodexRuntimeSessionExitKind.error) {
       return nextState;
@@ -120,22 +127,21 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnCompletedEvent event,
   ) {
-    final nextState = state.copyWith(
+    var nextState = state.copyWith(
       connectionStatus: CodexRuntimeSessionState.ready,
       clearTurnId: true,
       latestUsageSummary: _support.buildRuntimeUsageSummary(event),
+      clearPendingThreadTokenUsageBlock: true,
     );
-    final usageSummary = nextState.latestUsageSummary;
-    if (usageSummary == null || usageSummary.isEmpty) {
-      return nextState;
+    final pendingThreadTokenUsageBlock = state.pendingThreadTokenUsageBlock;
+    if (pendingThreadTokenUsageBlock != null) {
+      nextState = _support.upsertBlock(nextState, pendingThreadTokenUsageBlock);
     }
     return _support.upsertBlock(
       nextState,
-      CodexUsageBlock(
-        id: _support.eventEntryId('usage', event.createdAt),
+      CodexTurnBoundaryBlock(
+        id: _support.eventEntryId('turn-end', event.createdAt),
         createdAt: event.createdAt,
-        title: 'Turn complete',
-        body: usageSummary,
       ),
     );
   }
@@ -148,6 +154,7 @@ class TranscriptPolicy {
       state.copyWith(
         connectionStatus: CodexRuntimeSessionState.ready,
         clearTurnId: true,
+        clearPendingThreadTokenUsageBlock: true,
       ),
       CodexStatusBlock(
         id: _support.eventEntryId('status', event.createdAt),
@@ -264,10 +271,9 @@ class TranscriptPolicy {
     CodexRuntimeStatusEvent event,
   ) {
     if (event.rawMethod == 'thread/tokenUsage/updated') {
-      return _support.upsertBlock(
-        state,
-        CodexUsageBlock(
-          id: _support.eventEntryId('usage', event.createdAt),
+      return state.copyWith(
+        pendingThreadTokenUsageBlock: CodexUsageBlock(
+          id: _support.eventEntryId('thread-usage', event.createdAt),
           createdAt: event.createdAt,
           title: event.title,
           body: event.message,

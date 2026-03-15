@@ -54,6 +54,7 @@ class TranscriptReducer {
         return state.copyWith(
           clearThreadId: isClosed,
           clearTurnId: isClosed,
+          clearPendingThreadTokenUsageBlock: isClosed,
           activeItems: isClosed
               ? const <String, CodexSessionActiveItem>{}
               : state.activeItems,
@@ -63,6 +64,7 @@ class TranscriptReducer {
           connectionStatus: CodexRuntimeSessionState.running,
           threadId: event.threadId ?? state.threadId,
           turnId: event.turnId,
+          clearPendingThreadTokenUsageBlock: true,
         );
       case CodexRuntimeTurnCompletedEvent():
         return _policy.applyTurnCompleted(state, event);

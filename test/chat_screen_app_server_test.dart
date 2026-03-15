@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hi from Codex'), findsOneWidget);
-    expect(find.textContaining('Turn complete'), findsOneWidget);
+    expect(find.text('end'), findsOneWidget);
   });
 
   testWidgets('approval actions are routed to the app-server client', (
@@ -357,7 +357,7 @@ void main() {
     },
   );
 
-  testWidgets('thread token usage is rendered like a normal transcript card', (
+  testWidgets('thread token usage is shown once when the turn completes', (
     tester,
   ) async {
     final appServerClient = FakeCodexAppServerClient();
@@ -436,15 +436,38 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(find.text('Thread usage'), findsNothing);
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'turn/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turn': <String, Object?>{
+            'id': 'turn_live',
+            'status': 'completed',
+            'usage': <String, Object?>{
+              'inputTokens': 12,
+              'cachedInputTokens': 3,
+              'outputTokens': 7,
+            },
+          },
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(
-      find.text('Thread token usage'),
+      find.text('Thread usage'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Thread token usage'), findsOneWidget);
-    expect(find.text('ctx 200000'), findsOneWidget);
+    expect(find.text('Thread usage'), findsOneWidget);
+    expect(find.text('ctx 200k'), findsOneWidget);
+    expect(find.text('end'), findsOneWidget);
   });
 }
 

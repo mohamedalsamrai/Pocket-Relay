@@ -12,6 +12,9 @@ This document is the active refactor plan for the post-migration codebase.
 
 Detailed Phase 5 preflight planning and the rationale behind the infra cut live in `docs/pre-phase-5-infrastructure-plan.md`.
 
+Follow-on cleanup planning for the remaining application-layer hotspots lives in
+`docs/post-phase-6-application-plan.md`.
+
 ## Refactor Goals
 
 This refactor is meant to stop chat-layer bug whack-a-mole.

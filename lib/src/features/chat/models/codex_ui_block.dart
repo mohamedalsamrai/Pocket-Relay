@@ -16,6 +16,7 @@ enum CodexUiBlockKind {
   status,
   error,
   usage,
+  turnBoundary,
 }
 
 sealed class CodexUiBlock {
@@ -388,4 +389,14 @@ final class CodexUsageBlock extends CodexUiBlock {
 
   final String title;
   final String body;
+}
+
+final class CodexTurnBoundaryBlock extends CodexUiBlock {
+  const CodexTurnBoundaryBlock({
+    required super.id,
+    required super.createdAt,
+    this.label = 'end',
+  }) : super(kind: CodexUiBlockKind.turnBoundary);
+
+  final String label;
 }

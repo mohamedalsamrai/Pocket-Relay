@@ -9,6 +9,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_message_card.dart';
@@ -35,7 +36,9 @@ class ConversationEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (block) {
-      final CodexUserMessageBlock userBlock => UserMessageCard(block: userBlock),
+      final CodexUserMessageBlock userBlock => UserMessageCard(
+        block: userBlock,
+      ),
       final CodexTextBlock textBlock
           when textBlock.kind == CodexUiBlockKind.reasoning =>
         ReasoningCard(block: textBlock),
@@ -84,6 +87,9 @@ class ConversationEntryCard extends StatelessWidget {
       final CodexStatusBlock statusBlock => StatusCard(block: statusBlock),
       final CodexErrorBlock errorBlock => ErrorCard(block: errorBlock),
       final CodexUsageBlock usageBlock => UsageCard(block: usageBlock),
+      final CodexTurnBoundaryBlock boundaryBlock => TurnBoundaryCard(
+        block: boundaryBlock,
+      ),
     };
   }
 }

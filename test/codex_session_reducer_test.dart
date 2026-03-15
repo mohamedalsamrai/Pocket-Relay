@@ -378,7 +378,7 @@ void main() {
     expect(state.turnId, isNull);
     expect(state.latestUsageSummary, 'input 12 · cached 3 · output 7');
     expect(state.blocks, hasLength(1));
-    expect(state.blocks.last, isA<CodexUsageBlock>());
+    expect(state.blocks.last, isA<CodexTurnBoundaryBlock>());
   });
 
   test('keeps warnings and errors non-fatal to the UI state', () {
@@ -411,7 +411,7 @@ void main() {
     expect(state.blocks.last, isA<CodexErrorBlock>());
   });
 
-  test('hides non-signal status events but keeps thread token usage', () {
+  test('hides non-signal status events and defers thread token usage', () {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
     final now = DateTime(2026, 3, 14, 12);
@@ -449,11 +449,9 @@ void main() {
       ),
     );
 
-    expect(state.blocks.single, isA<CodexUsageBlock>());
-    final block = state.blocks.single as CodexUsageBlock;
-    expect(block.title, 'Thread token usage');
-    expect(block.body, contains('Context window: 200000'));
-    expect(state.transcriptBlocks.single, isA<CodexUsageBlock>());
+    expect(state.blocks, isEmpty);
+    expect(state.transcriptBlocks, isEmpty);
+    expect(state.pendingThreadTokenUsageBlock, isNotNull);
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -466,11 +464,29 @@ void main() {
       ),
     );
 
-    expect(state.blocks.whereType<CodexUsageBlock>(), hasLength(2));
-    expect(
-      (state.blocks.last as CodexUsageBlock).body,
-      contains('input 24'),
+    expect(state.blocks, isEmpty);
+    expect(state.pendingThreadTokenUsageBlock, isNotNull);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeTurnCompletedEvent(
+        createdAt: now.add(const Duration(seconds: 3)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        state: CodexRuntimeTurnState.completed,
+        usage: const CodexRuntimeTurnUsage(
+          inputTokens: 12,
+          cachedInputTokens: 3,
+          outputTokens: 7,
+        ),
+      ),
     );
+
+    expect(state.pendingThreadTokenUsageBlock, isNull);
+    expect(state.blocks.whereType<CodexUsageBlock>(), hasLength(1));
+    expect((state.blocks.first as CodexUsageBlock).title, 'Thread token usage');
+    expect((state.blocks.first as CodexUsageBlock).body, contains('input 24'));
+    expect(state.blocks.last, isA<CodexTurnBoundaryBlock>());
   });
 
   test('groups consecutive work-log entries in transcript blocks', () {

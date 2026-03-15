@@ -6,6 +6,9 @@ The active chat refactor plan lives in `docs/app-server-migration-plan.md`.
 
 Phase 5 preflight planning lives in `docs/pre-phase-5-infrastructure-plan.md`.
 
+The follow-on plan for the remaining application-layer hotspots lives in
+`docs/post-phase-6-application-plan.md`.
+
 Counts below are from the current app-server-only workspace snapshot and will drift over time.
 
 ## Primary Bug Hotspots

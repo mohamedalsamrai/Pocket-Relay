@@ -12,6 +12,7 @@ class CodexSessionState {
     this.activeItems = const <String, CodexSessionActiveItem>{},
     this.blocks = const <CodexUiBlock>[],
     this.latestUsageSummary,
+    this.pendingThreadTokenUsageBlock,
   });
 
   factory CodexSessionState.initial() {
@@ -27,6 +28,7 @@ class CodexSessionState {
   final Map<String, CodexSessionActiveItem> activeItems;
   final List<CodexUiBlock> blocks;
   final String? latestUsageSummary;
+  final CodexUsageBlock? pendingThreadTokenUsageBlock;
 
   bool get isBusy => connectionStatus == CodexRuntimeSessionState.running;
 
@@ -63,6 +65,8 @@ class CodexSessionState {
     List<CodexUiBlock>? blocks,
     String? latestUsageSummary,
     bool clearLatestUsageSummary = false,
+    CodexUsageBlock? pendingThreadTokenUsageBlock,
+    bool clearPendingThreadTokenUsageBlock = false,
   }) {
     return CodexSessionState(
       connectionStatus: connectionStatus ?? this.connectionStatus,
@@ -77,6 +81,9 @@ class CodexSessionState {
       latestUsageSummary: clearLatestUsageSummary
           ? null
           : (latestUsageSummary ?? this.latestUsageSummary),
+      pendingThreadTokenUsageBlock: clearPendingThreadTokenUsageBlock
+          ? null
+          : (pendingThreadTokenUsageBlock ?? this.pendingThreadTokenUsageBlock),
     );
   }
 }
