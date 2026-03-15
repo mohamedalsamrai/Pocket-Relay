@@ -201,6 +201,100 @@ void main() {
     },
   );
 
+  testWidgets(
+    'renders SSH host key mismatch as a dedicated settings-oriented card',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerSshHostKeyMismatchEvent(
+          host: 'example.com',
+          port: 22,
+          keyType: 'ssh-ed25519',
+          expectedFingerprint: 'aa:bb:cc:dd',
+          actualFingerprint: '11:22:33:44',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SSH host key mismatch'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('expected_host_fingerprint_value')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('observed_host_fingerprint_value')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('save_host_fingerprint')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('open_connection_settings')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'reuses the current SSH failure card when the same connect failure repeats',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerSshConnectFailedEvent(
+          host: 'example.com',
+          port: 22,
+          message: 'Connection refused',
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerSshConnectFailedEvent(
+          host: 'example.com',
+          port: 22,
+          message: 'Timed out',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SSH connection failed'), findsOneWidget);
+      expect(find.text('Connection refused'), findsNothing);
+      expect(find.text('Timed out'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('ssh_connect_failed_card')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('appends plan update cards instead of replacing them', (
     tester,
   ) async {

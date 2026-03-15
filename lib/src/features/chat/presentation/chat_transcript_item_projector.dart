@@ -43,8 +43,9 @@ class ChatTranscriptItemProjector {
         ChatUserInputRequestItemContract(
           request: _requestProjector.projectUserInputBlock(userInputBlock),
         ),
-      final CodexUnpinnedHostKeyBlock hostKeyBlock =>
-        ChatUnpinnedHostKeyItemContract(block: hostKeyBlock),
+      final CodexSshTranscriptBlock sshBlock => ChatSshItemContract(
+        block: sshBlock,
+      ),
       final CodexStatusBlock statusBlock => ChatStatusItemContract(
         block: statusBlock,
       ),

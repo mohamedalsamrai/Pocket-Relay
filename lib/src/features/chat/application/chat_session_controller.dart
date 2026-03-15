@@ -251,9 +251,9 @@ class ChatSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  CodexUnpinnedHostKeyBlock? _findUnpinnedHostKeyBlock(String blockId) {
+  CodexSshUnpinnedHostKeyBlock? _findUnpinnedHostKeyBlock(String blockId) {
     for (final block in _sessionState.blocks) {
-      if (block is CodexUnpinnedHostKeyBlock && block.id == blockId) {
+      if (block is CodexSshUnpinnedHostKeyBlock && block.id == blockId) {
         return block;
       }
     }

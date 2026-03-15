@@ -5,11 +5,11 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/assistant_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/error_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/host_fingerprint_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/pending_user_input_request_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/plan_update_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_card_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
@@ -74,8 +74,8 @@ class ConversationEntryCard extends StatelessWidget {
           request: userInputItem.request,
           onSubmit: onSubmitUserInput,
         ),
-      final ChatUnpinnedHostKeyItemContract hostKeyItem => HostFingerprintCard(
-        block: hostKeyItem.block,
+      final ChatSshItemContract sshItem => SshCardHost(
+        block: sshItem.block,
         onSaveFingerprint: onSaveHostFingerprint,
         onOpenConnectionSettings: onConfigure,
       ),

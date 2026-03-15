@@ -518,39 +518,36 @@ void main() {
   group('ChatTranscriptItemProjector', () {
     const projector = ChatTranscriptItemProjector();
 
-    test(
-      'projects work-log groups into work-log group item contracts',
-      () {
-        final groupBlock = CodexWorkLogGroupBlock(
-          id: 'worklog_1',
-          createdAt: DateTime(2026, 3, 15, 12),
-          entries: <CodexWorkLogEntry>[
-            CodexWorkLogEntry(
-              id: 'entry_1',
-              createdAt: DateTime(2026, 3, 15, 12),
-              entryKind: CodexWorkLogEntryKind.commandExecution,
-              title: 'Read docs',
-              turnId: 'turn_1',
-              preview: 'Found the CLI docs',
-              isRunning: true,
-              exitCode: 0,
-            ),
-          ],
-        );
+    test('projects work-log groups into work-log group item contracts', () {
+      final groupBlock = CodexWorkLogGroupBlock(
+        id: 'worklog_1',
+        createdAt: DateTime(2026, 3, 15, 12),
+        entries: <CodexWorkLogEntry>[
+          CodexWorkLogEntry(
+            id: 'entry_1',
+            createdAt: DateTime(2026, 3, 15, 12),
+            entryKind: CodexWorkLogEntryKind.commandExecution,
+            title: 'Read docs',
+            turnId: 'turn_1',
+            preview: 'Found the CLI docs',
+            isRunning: true,
+            exitCode: 0,
+          ),
+        ],
+      );
 
-        final item = projector.project(groupBlock);
+      final item = projector.project(groupBlock);
 
-        expect(item, isA<ChatWorkLogGroupItemContract>());
-        final groupItem = item as ChatWorkLogGroupItemContract;
-        expect(groupItem.block, same(groupBlock));
-        expect(groupItem.block.entries, hasLength(1));
-        expect(groupItem.block.entries.single.title, 'Read docs');
-        expect(groupItem.block.entries.single.turnId, 'turn_1');
-        expect(groupItem.block.entries.single.preview, 'Found the CLI docs');
-        expect(groupItem.block.entries.single.isRunning, isTrue);
-        expect(groupItem.block.entries.single.exitCode, 0);
-      },
-    );
+      expect(item, isA<ChatWorkLogGroupItemContract>());
+      final groupItem = item as ChatWorkLogGroupItemContract;
+      expect(groupItem.block, same(groupBlock));
+      expect(groupItem.block.entries, hasLength(1));
+      expect(groupItem.block.entries.single.title, 'Read docs');
+      expect(groupItem.block.entries.single.turnId, 'turn_1');
+      expect(groupItem.block.entries.single.preview, 'Found the CLI docs');
+      expect(groupItem.block.entries.single.isRunning, isTrue);
+      expect(groupItem.block.entries.single.exitCode, 0);
+    });
 
     test(
       'projects changed-files blocks into structured changed-files item contracts',
@@ -589,6 +586,22 @@ void main() {
         );
       },
     );
+
+    test('projects SSH transcript blocks into SSH item contracts', () {
+      final block = CodexSshConnectFailedBlock(
+        id: 'ssh_connect_failed_1',
+        createdAt: DateTime(2026, 3, 15, 12),
+        host: 'example.com',
+        port: 22,
+        message: 'Connection refused',
+      );
+
+      final item = projector.project(block);
+
+      expect(item, isA<ChatSshItemContract>());
+      final sshItem = item as ChatSshItemContract;
+      expect(sshItem.block, same(block));
+    });
 
     test(
       'derives changed-files header totals from resolved row stats when file payloads are partial',

@@ -1,4 +1,3 @@
-import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_item_policy.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_request_policy.dart';
@@ -361,23 +360,10 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeUnpinnedHostKeyEvent event,
   ) {
-    final alreadyVisible = state.blocks.any(
-      (block) =>
-          block is CodexUnpinnedHostKeyBlock &&
-          !block.isSaved &&
-          block.host == event.host &&
-          block.port == event.port &&
-          block.keyType == event.keyType &&
-          block.fingerprint == event.fingerprint,
-    );
-    if (alreadyVisible) {
-      return state;
-    }
-
-    return _support.appendBlock(
+    return _upsertTopLevelTranscriptBlock(
       state,
-      CodexUnpinnedHostKeyBlock(
-        id: _support.eventEntryId('host-key', event.createdAt),
+      CodexSshUnpinnedHostKeyBlock(
+        id: _sshUnpinnedHostKeyBlockId(host: event.host, port: event.port),
         createdAt: event.createdAt,
         host: event.host,
         port: event.port,
@@ -391,16 +377,14 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshConnectFailedEvent event,
   ) {
-    return _appendSshErrorBlock(
+    return _upsertTopLevelTranscriptBlock(
       state,
-      prefix: 'ssh-connect-failed',
-      createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
-      title: 'SSH connection failed',
-      body: _joinErrorBody(
-        'Could not connect to ${event.host}:${event.port}.',
-        event.message,
+      CodexSshConnectFailedBlock(
+        id: _sshConnectFailedBlockId(host: event.host, port: event.port),
+        createdAt: event.createdAt,
+        host: event.host,
+        port: event.port,
+        message: event.message,
       ),
     );
   }
@@ -409,19 +393,17 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshHostKeyMismatchEvent event,
   ) {
-    return _appendSshErrorBlock(
+    return _upsertTopLevelTranscriptBlock(
       state,
-      prefix: 'ssh-hostkey-mismatch',
-      createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
-      title: 'SSH host key mismatch',
-      body:
-          'Host key verification failed for ${event.host}:${event.port}.\n\n'
-          'Expected fingerprint: ${event.expectedFingerprint}\n'
-          'Observed fingerprint: ${event.actualFingerprint}\n'
-          'Key type: ${event.keyType}\n\n'
-          'Review the connection settings before trusting this host.',
+      CodexSshHostKeyMismatchBlock(
+        id: _sshHostKeyMismatchBlockId(host: event.host, port: event.port),
+        createdAt: event.createdAt,
+        host: event.host,
+        port: event.port,
+        keyType: event.keyType,
+        expectedFingerprint: event.expectedFingerprint,
+        actualFingerprint: event.actualFingerprint,
+      ),
     );
   }
 
@@ -429,18 +411,20 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshAuthenticationFailedEvent event,
   ) {
-    return _appendSshErrorBlock(
+    return _upsertTopLevelTranscriptBlock(
       state,
-      prefix: 'ssh-auth-failed',
-      createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
-      title: 'SSH authentication failed',
-      body: _joinErrorBody(
-        'SSH authentication failed for '
-        '${event.username}@${event.host}:${event.port} using '
-        '${_authModeLabel(event.authMode)}.',
-        event.message,
+      CodexSshAuthenticationFailedBlock(
+        id: _sshAuthenticationFailedBlockId(
+          host: event.host,
+          port: event.port,
+          username: event.username,
+        ),
+        createdAt: event.createdAt,
+        host: event.host,
+        port: event.port,
+        username: event.username,
+        authMode: event.authMode,
+        message: event.message,
       ),
     );
   }
@@ -449,16 +433,21 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshRemoteLaunchFailedEvent event,
   ) {
-    return _appendSshErrorBlock(
+    return _upsertTopLevelTranscriptBlock(
       state,
-      prefix: 'ssh-remote-launch-failed',
-      createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
-      title: 'SSH remote launch failed',
-      body:
-          '${_joinErrorBody('SSH connected to ${event.username}@${event.host}:${event.port}, '
-          'but the remote Codex app-server command could not start.', event.message)}\n\nCommand: ${event.command}',
+      CodexSshRemoteLaunchFailedBlock(
+        id: _sshRemoteLaunchFailedBlockId(
+          host: event.host,
+          port: event.port,
+          username: event.username,
+        ),
+        createdAt: event.createdAt,
+        host: event.host,
+        port: event.port,
+        username: event.username,
+        command: event.command,
+        message: event.message,
+      ),
     );
   }
 
@@ -467,13 +456,13 @@ class TranscriptPolicy {
     required String blockId,
   }) {
     final blockIndex = state.blocks.indexWhere(
-      (block) => block is CodexUnpinnedHostKeyBlock && block.id == blockId,
+      (block) => block is CodexSshUnpinnedHostKeyBlock && block.id == blockId,
     );
     if (blockIndex == -1) {
       return state;
     }
 
-    final block = state.blocks[blockIndex] as CodexUnpinnedHostKeyBlock;
+    final block = state.blocks[blockIndex] as CodexSshUnpinnedHostKeyBlock;
     if (block.isSaved) {
       return state;
     }
@@ -538,43 +527,6 @@ class TranscriptPolicy {
       turnId: event.turnId,
       threadId: event.threadId,
     );
-  }
-
-  CodexSessionState _appendSshErrorBlock(
-    CodexSessionState state, {
-    required String prefix,
-    required DateTime createdAt,
-    required String title,
-    required String body,
-    String? threadId,
-    String? turnId,
-  }) {
-    return _stateWithTranscriptBlock(
-      state,
-      CodexErrorBlock(
-        id: _support.eventEntryId(prefix, createdAt),
-        createdAt: createdAt,
-        title: title,
-        body: body,
-      ),
-      turnId: turnId,
-      threadId: threadId,
-    );
-  }
-
-  String _joinErrorBody(String summary, String details) {
-    final trimmedDetails = details.trim();
-    if (trimmedDetails.isEmpty) {
-      return summary;
-    }
-    return '$summary\n\n$trimmedDetails';
-  }
-
-  String _authModeLabel(AuthMode authMode) {
-    return switch (authMode) {
-      AuthMode.password => 'a password',
-      AuthMode.privateKey => 'a private key',
-    };
   }
 
   CodexSessionState _commitActiveTurn(
@@ -652,7 +604,7 @@ class TranscriptPolicy {
       createdAt: block.createdAt,
     );
     if (activeTurn == null) {
-      return _support.appendBlock(state, block);
+      return _upsertTopLevelTranscriptBlock(state, block);
     }
 
     return state.copyWith(activeTurn: _upsertTurnBlock(activeTurn, block));
@@ -705,6 +657,50 @@ class TranscriptPolicy {
         CodexTurnBlockArtifact(block: block),
       ),
     );
+  }
+
+  CodexSessionState _upsertTopLevelTranscriptBlock(
+    CodexSessionState state,
+    CodexUiBlock block,
+  ) {
+    final existingIndex = state.blocks.indexWhere(
+      (existing) => existing.id == block.id,
+    );
+    if (existingIndex == -1) {
+      return _support.appendBlock(state, block);
+    }
+
+    final nextBlocks = List<CodexUiBlock>.from(state.blocks);
+    nextBlocks[existingIndex] = block;
+    return state.copyWith(blocks: nextBlocks);
+  }
+
+  String _sshUnpinnedHostKeyBlockId({required String host, required int port}) {
+    return 'ssh-unpinned-$host-$port';
+  }
+
+  String _sshConnectFailedBlockId({required String host, required int port}) {
+    return 'ssh-connect-failed-$host-$port';
+  }
+
+  String _sshHostKeyMismatchBlockId({required String host, required int port}) {
+    return 'ssh-hostkey-mismatch-$host-$port';
+  }
+
+  String _sshAuthenticationFailedBlockId({
+    required String host,
+    required int port,
+    required String username,
+  }) {
+    return 'ssh-auth-failed-$username@$host-$port';
+  }
+
+  String _sshRemoteLaunchFailedBlockId({
+    required String host,
+    required int port,
+    required String username,
+  }) {
+    return 'ssh-remote-launch-failed-$username@$host-$port';
   }
 
   String _nextTranscriptEventBlockId(

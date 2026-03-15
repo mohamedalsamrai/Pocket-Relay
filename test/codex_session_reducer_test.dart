@@ -1459,10 +1459,10 @@ void main() {
 
     expect(state.connectionStatus, CodexRuntimeSessionState.ready);
     expect(state.blocks, hasLength(1));
-    expect(state.blocks.single, isA<CodexUnpinnedHostKeyBlock>());
+    expect(state.blocks.single, isA<CodexSshUnpinnedHostKeyBlock>());
   });
 
-  test('projects typed SSH failures into transcript error blocks', () {
+  test('projects typed SSH failures into dedicated transcript SSH blocks', () {
     final reducer = TranscriptReducer();
     var state = const CodexSessionState(
       connectionStatus: CodexRuntimeSessionState.ready,
@@ -1512,21 +1512,60 @@ void main() {
       ),
     );
 
-    final errors = state.blocks.whereType<CodexErrorBlock>().toList();
-    expect(errors, hasLength(4));
-    expect(errors[0].title, 'SSH connection failed');
+    expect(state.blocks, hasLength(4));
+    expect(state.blocks[0], isA<CodexSshConnectFailedBlock>());
     expect(
-      errors[0].body,
-      contains('Could not connect to 192.168.178.164:22.'),
+      (state.blocks[0] as CodexSshConnectFailedBlock).message,
+      'Connection refused',
     );
-    expect(errors[1].title, 'SSH host key mismatch');
-    expect(errors[1].body, contains('Expected fingerprint: aa:bb:cc'));
-    expect(errors[2].title, 'SSH authentication failed');
-    expect(errors[2].body, contains('using a private key'));
-    expect(errors[3].title, 'SSH remote launch failed');
+    expect(state.blocks[1], isA<CodexSshHostKeyMismatchBlock>());
     expect(
-      errors[3].body,
-      contains('Command: bash -lc codex app-server --listen stdio://'),
+      (state.blocks[1] as CodexSshHostKeyMismatchBlock).expectedFingerprint,
+      'aa:bb:cc',
+    );
+    expect(state.blocks[2], isA<CodexSshAuthenticationFailedBlock>());
+    expect(
+      (state.blocks[2] as CodexSshAuthenticationFailedBlock).authMode,
+      AuthMode.privateKey,
+    );
+    expect(state.blocks[3], isA<CodexSshRemoteLaunchFailedBlock>());
+    expect(
+      (state.blocks[3] as CodexSshRemoteLaunchFailedBlock).command,
+      'bash -lc codex app-server --listen stdio://',
+    );
+  });
+
+  test('upserts repeated identical SSH failures instead of appending them', () {
+    final reducer = TranscriptReducer();
+    var state = const CodexSessionState(
+      connectionStatus: CodexRuntimeSessionState.ready,
+    );
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeSshConnectFailedEvent(
+        createdAt: now,
+        host: '192.168.178.164',
+        port: 22,
+        message: 'Connection refused',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeSshConnectFailedEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        host: '192.168.178.164',
+        port: 22,
+        message: 'Timed out',
+      ),
+    );
+
+    expect(state.blocks, hasLength(1));
+    expect(state.blocks.single, isA<CodexSshConnectFailedBlock>());
+    expect(
+      (state.blocks.single as CodexSshConnectFailedBlock).message,
+      'Timed out',
     );
   });
 

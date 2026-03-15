@@ -103,10 +103,10 @@ final class ChatUserInputRequestItemContract
   String get id => request.id;
 }
 
-final class ChatUnpinnedHostKeyItemContract extends ChatTranscriptItemContract {
-  const ChatUnpinnedHostKeyItemContract({required this.block});
+final class ChatSshItemContract extends ChatTranscriptItemContract {
+  const ChatSshItemContract({required this.block});
 
-  final CodexUnpinnedHostKeyBlock block;
+  final CodexSshTranscriptBlock block;
 
   @override
   String get id => block.id;

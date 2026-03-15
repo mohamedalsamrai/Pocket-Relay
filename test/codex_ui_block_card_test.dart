@@ -283,6 +283,122 @@ void main() {
     expect(approvedRequestId, 'request_1');
   });
 
+  testWidgets(
+    'renders the unpinned host key SSH card with save and settings actions',
+    (tester) async {
+      String? savedBlockId;
+      var openedSettings = 0;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexSshUnpinnedHostKeyBlock(
+              id: 'ssh_unpinned_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              host: 'example.com',
+              port: 22,
+              keyType: 'ssh-ed25519',
+              fingerprint: 'aa:bb:cc:dd',
+            ),
+            onSaveHostFingerprint: (blockId) async {
+              savedBlockId = blockId;
+            },
+            onConfigure: () {
+              openedSettings += 1;
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Host key not pinned'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('save_host_fingerprint')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('host_fingerprint_value')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('open_connection_settings')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('save_host_fingerprint')));
+      await tester.pump();
+
+      expect(openedSettings, 1);
+      expect(savedBlockId, 'ssh_unpinned_1');
+    },
+  );
+
+  testWidgets(
+    'renders the host key mismatch SSH card without save affordances',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexSshHostKeyMismatchBlock(
+              id: 'ssh_mismatch_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              host: 'example.com',
+              port: 22,
+              keyType: 'ssh-ed25519',
+              expectedFingerprint: 'aa:bb:cc:dd',
+              actualFingerprint: '11:22:33:44',
+            ),
+            onConfigure: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('SSH host key mismatch'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('expected_host_fingerprint_value')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('observed_host_fingerprint_value')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('save_host_fingerprint')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('open_connection_settings')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('renders the remote launch SSH card with the command details', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexSshRemoteLaunchFailedBlock(
+            id: 'ssh_launch_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            host: 'example.com',
+            port: 22,
+            username: 'vince',
+            command: 'bash -lc codex app-server --listen stdio://',
+            message: 'exec request denied',
+          ),
+          onConfigure: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('SSH remote launch failed'), findsOneWidget);
+    expect(find.text('Command'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ssh_remote_command_value')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('open_connection_settings')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('renders user-input fields and submits answers', (tester) async {
     String? submittedRequestId;
     Map<String, List<String>>? submittedAnswers;
@@ -1309,6 +1425,8 @@ Widget _entryCard({
   void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff,
   Future<void> Function(String requestId, Map<String, List<String>> answers)?
   onSubmitUserInput,
+  Future<void> Function(String blockId)? onSaveHostFingerprint,
+  VoidCallback? onConfigure,
 }) {
   return Builder(
     builder: (context) {
@@ -1329,6 +1447,8 @@ Widget _entryCard({
               );
             },
         onSubmitUserInput: onSubmitUserInput,
+        onSaveHostFingerprint: onSaveHostFingerprint,
+        onConfigure: onConfigure,
       );
     },
   );

@@ -558,6 +558,311 @@ Controller:
 - keep snackbar expectations explicit when duplicate transcript injection is
   suppressed
 
+## Phase 3 Investigation Findings
+
+Phase 2 fixed runtime ownership for SSH failures, but Phase 3 is still blocked
+by one remaining split: transcript and UI ownership are half first-class and
+half generic.
+
+### 1. SSH transcript ownership is still split between a dedicated trust card and generic error blocks
+
+Current state:
+
+- [codex_ui_block.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/models/codex_ui_block.dart)
+  has a dedicated `CodexUnpinnedHostKeyBlock`, but all other SSH failures still
+  become generic `CodexErrorBlock`
+- [transcript_policy.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/transcript_policy.dart)
+  maps connect failure, mismatch, auth failure, and remote launch failure
+  through `_appendSshErrorBlock()`
+- [chat_transcript_item_projector.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/chat_transcript_item_projector.dart)
+  only has a dedicated SSH branch for the unpinned-host-key block
+- [conversation_entry_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart)
+  renders unpinned trust through
+  [host_fingerprint_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/host_fingerprint_card.dart)
+  but everything else through
+  [error_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/error_card.dart)
+
+Consequence:
+
+- SSH transcript surfaces still have two owners
+- adding dedicated mismatch/auth/launch cards on top of the current model would
+  create more one-off forks instead of a coherent SSH surface boundary
+
+### 2. The presentation layer does not have a single SSH family seam yet
+
+Current state:
+
+- [chat_transcript_item_contract.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/chat_transcript_item_contract.dart)
+  has one dedicated SSH item contract, `ChatUnpinnedHostKeyItemContract`
+- every other SSH path still projects to `ChatErrorItemContract`
+
+Consequence:
+
+- Phase 3 should not add three more unrelated item-contract branches that each
+  bypass the others
+- the clean cut is one transcript item family for SSH surfaces, backed by a
+  sealed SSH block family in the domain model
+
+### 3. Phase 3 does not need more runtime or controller event work
+
+Current state:
+
+- [runtime_event_mapper_transport_mapper.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/runtime_event_mapper_transport_mapper.dart)
+  already emits distinct runtime events for connect failure, host-key mismatch,
+  auth failure, authenticated, remote launch failure, and remote process
+  started
+- [chat_session_controller.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/chat_session_controller.dart)
+  already suppresses duplicate generic bootstrap failures and already has the
+  narrow `saveObservedHostFingerprint()` action for the unpinned-host-key flow
+
+Consequence:
+
+- Phase 3 should keep runtime/controller work minimal
+- the next ownership move belongs in transcript models, reducer policy, and
+  presentation
+
+### 4. The current settings action path is sufficient for Phase 3, but not for focused recovery UX
+
+Current state:
+
+- [conversation_entry_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart)
+  already receives `onConfigure`
+- [chat_root_adapter.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/chat_root_adapter.dart)
+  already routes that action into the existing settings overlay path
+- [chat_screen_contract.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/chat_screen_contract.dart)
+  only carries initial profile and secrets for settings launch
+- [connection_settings_host.dart](/home/vince/Projects/codex_pocket/lib/src/features/settings/presentation/connection_settings_host.dart)
+  and
+  [connection_settings_contract.dart](/home/vince/Projects/codex_pocket/lib/src/features/settings/presentation/connection_settings_contract.dart)
+  do not have any focus/highlight contract for opening the sheet on a specific
+  field
+
+Consequence:
+
+- Phase 3 can safely reuse the existing `Connection settings` action for every
+  SSH failure card
+- focused settings, retry flows, or one-tap fingerprint replacement should stay
+  out of scope until Phase 4
+
+### 5. Dedupe/upsert rules still need a first-class transcript owner
+
+Current state:
+
+- [transcript_policy_support.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/transcript_policy_support.dart)
+  only has append behavior for transcript blocks
+- [transcript_policy.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/transcript_policy.dart)
+  already deduplicates unpinned-host-key prompts semantically, but the other
+  SSH failures still append forever
+
+Consequence:
+
+- Phase 3 needs a small SSH surface upsert helper in transcript policy
+- repeated connect/mismatch/auth/launch failures should replace the current SSH
+  surface of the same semantic type instead of appending a new card every time
+
+### 6. `MetaCard` and `ErrorCard` are the wrong host for SSH-specific presentation
+
+Current state:
+
+- [error_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/error_card.dart)
+  renders a title plus one concatenated body string through
+  [meta_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/support/meta_card.dart)
+- [host_fingerprint_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/host_fingerprint_card.dart)
+  already needs a richer layout: host metadata, monospace fingerprint box,
+  action row, and saved-state badge
+
+Consequence:
+
+- Phase 3 should not teach `ErrorCard` to special-case SSH content
+- it should add a shared SSH card frame and let each SSH scenario render inside
+  that frame
+
+## Best Upgrade Path For Phase 3
+
+Phase 3 should keep the runtime event contract stable and move ownership at the
+transcript/model/presentation boundary.
+
+### Recommended Phase 3 outcome
+
+After Phase 3:
+
+- every user-visible SSH transcript surface comes from a dedicated SSH block
+  family, not from `CodexErrorBlock`
+- unpinned trust, connect failure, mismatch, auth failure, and remote launch
+  failure all project through one explicit SSH transcript seam
+- the existing fingerprint-save flow remains narrow and direct
+- other SSH failure cards reuse the existing settings action and expose no
+  one-tap recovery beyond that
+- repeated identical SSH failures update an existing card instead of spamming
+  the transcript
+
+### Recommended structural cut
+
+1. Introduce a sealed SSH transcript block family in
+   [codex_ui_block.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/models/codex_ui_block.dart).
+
+   Recommended shape:
+
+   ```text
+   sealed class CodexSshTranscriptBlock extends CodexUiBlock
+   final class CodexSshUnpinnedHostKeyBlock extends CodexSshTranscriptBlock
+   final class CodexSshConnectFailedBlock extends CodexSshTranscriptBlock
+   final class CodexSshHostKeyMismatchBlock extends CodexSshTranscriptBlock
+   final class CodexSshAuthenticationFailedBlock extends CodexSshTranscriptBlock
+   final class CodexSshRemoteLaunchFailedBlock extends CodexSshTranscriptBlock
+   ```
+
+   Keep scenario-specific data on the concrete blocks instead of stuffing it
+   into one generic map or back into `title` and `body` strings.
+
+2. Change
+   [transcript_policy.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/transcript_policy.dart)
+   so the typed SSH runtime handlers create or upsert these blocks directly.
+
+   Recommended ownership:
+
+   - `applyUnpinnedHostKey()` creates or reuses the unpinned block
+   - `applySshConnectFailed()` creates or updates a connect-failure block
+   - `applySshHostKeyMismatch()` creates or updates a mismatch block
+   - `applySshAuthenticationFailed()` creates or updates an auth-failure block
+   - `applySshRemoteLaunchFailed()` creates or updates a launch-failure block
+
+   Use stable semantic IDs or a dedicated SSH-surface lookup so the same
+   failure replaces an existing card for that scenario.
+
+3. Add one presentation seam for SSH transcript items.
+
+   The cleanest presentation cut is:
+
+   - `ChatTranscriptItemProjector.project()` maps any
+     `CodexSshTranscriptBlock` to one `ChatSshItemContract`
+   - `ConversationEntryCard` routes `ChatSshItemContract` to one SSH card host
+   - the SSH card host switches on the concrete SSH block subtype
+
+   That keeps SSH ownership explicit without adding a parallel one-off item
+   contract for every new card.
+
+4. Introduce a shared SSH card frame instead of teaching
+   [error_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/error_card.dart)
+   about SSH.
+
+   Recommended files:
+
+   ```text
+   lib/src/features/chat/presentation/widgets/transcript/cards/ssh/
+     ssh_card_frame.dart
+     ssh_card_host.dart
+     ssh_unpinned_host_key_card.dart
+     ssh_connect_failed_card.dart
+     ssh_host_key_mismatch_card.dart
+     ssh_auth_failed_card.dart
+     ssh_remote_launch_failed_card.dart
+   ```
+
+   The shared frame should own:
+
+   - severity accent and icon treatment
+   - host metadata row
+   - optional monospace detail panels for fingerprints or command text
+   - action row styling
+
+5. Keep the Phase 3 action set intentionally narrow.
+
+   Safe Phase 3 actions:
+
+   - unpinned host key: `Save fingerprint`, `Connection settings`
+   - connect failure: `Connection settings`
+   - host-key mismatch: `Connection settings`
+   - auth failure: `Connection settings`
+   - remote launch failure: `Connection settings`
+
+   For fingerprints and commands, prefer selectable monospace text over adding
+   clipboard or retry behavior in this phase.
+
+6. Do not widen
+   [chat_session_controller.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/application/chat_session_controller.dart)
+   or
+   [chat_screen_contract.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/chat_screen_contract.dart)
+   unless a concrete card action truly needs it.
+
+   For the recommended Phase 3 cut:
+
+   - `saveObservedHostFingerprint()` already covers the only write action
+   - `onConfigure` already covers the only cross-surface navigation action
+   - settings focus/highlight and retry semantics remain Phase 4 work
+
+### Recommended exact Phase 3 cut order
+
+1. Add the SSH transcript block family.
+2. Replace the Phase 2 generic SSH error projection with typed SSH blocks.
+3. Add reducer tests for typed blocks and SSH dedupe/upsert rules.
+4. Add the shared SSH card frame and scenario cards.
+5. Route SSH blocks through one item contract and one `ConversationEntryCard`
+   branch.
+6. Update widget and integration tests for actions and no-spam behavior.
+
+### Rejected Phase 3 paths
+
+1. Keep using `CodexErrorBlock` and branch inside
+   [error_card.dart](/home/vince/Projects/codex_pocket/lib/src/features/chat/presentation/widgets/transcript/cards/error_card.dart)
+   based on SSH-specific titles or payload text.
+
+   That leaves SSH UI ownership hidden inside a generic error surface.
+
+2. Add one-tap fingerprint replacement for host-key mismatch in Phase 3.
+
+   That is a trust-changing write action and should stay behind explicit
+   settings review.
+
+3. Add retry buttons in Phase 3.
+
+   Retry semantics belong with explicit reconnect ownership and should wait for
+   Phase 4.
+
+4. Extend the settings overlay contract with field focus/highlight right now.
+
+   That is useful, but it is a separate settings-launch contract change and not
+   required to make SSH transcript surfaces first-class.
+
+5. Append every repeated SSH failure chronologically.
+
+   The product need here is clarity and recoverability, not a noisy failure
+   log.
+
+### Tests Phase 3 should add or change
+
+Projection:
+
+- update
+  [chat_screen_presentation_test.dart](/home/vince/Projects/codex_pocket/test/chat_screen_presentation_test.dart)
+  so SSH transcript blocks project to `ChatSshItemContract` instead of
+  `ChatErrorItemContract`
+
+Reducer/policy:
+
+- update
+  [codex_session_reducer_test.dart](/home/vince/Projects/codex_pocket/test/codex_session_reducer_test.dart)
+  so typed SSH events produce typed SSH blocks
+- add reducer tests proving repeated identical SSH failures upsert rather than
+  append
+
+Widget/card rendering:
+
+- expand
+  [codex_ui_block_card_test.dart](/home/vince/Projects/codex_pocket/test/codex_ui_block_card_test.dart)
+  for mismatch/auth/connect/launch cards
+- assert that mismatch does not expose `Save fingerprint` or replace actions
+- assert that auth and launch cards expose `Connection settings` only
+
+Integration:
+
+- expand
+  [chat_screen_app_server_test.dart](/home/vince/Projects/codex_pocket/test/chat_screen_app_server_test.dart)
+  so emitted SSH transport events render the dedicated cards
+- keep the existing fingerprint-save integration test
+- add an integration test proving repeated identical SSH failures do not stack
+  duplicate cards
+
 ## Refactor Goals
 
 1. Model SSH lifecycle as structured events instead of generic diagnostic text.
@@ -736,19 +1041,26 @@ Exit criteria:
 
 ### Phase 3: Add first-class SSH transcript/UI surfaces
 
-Keep the new fingerprint card.
+Keep the new fingerprint card, but stop leaving it as a one-off beside generic
+error cards.
 
-Add dedicated cards or card families for:
+Introduce a dedicated SSH transcript surface family for:
 
+- unpinned host key
 - pinned host-key mismatch
 - authentication failure
 - remote launch failure
+- connection failure
 
 Guidelines:
 
+- fold the existing unpinned-host-key card into the same SSH transcript family
+  instead of keeping one special-case block beside generic errors
+- keep dedupe/upsert ownership in reducer policy, not in widgets
 - mismatch should be high-friction and settings-oriented
 - auth failure should explain which auth mode failed when possible
 - launch failure should point to workspace or command configuration, not trust
+- connection failure should stay concise and settings-oriented
 
 Do not show an endless stream of repeated SSH cards.
 
@@ -757,8 +1069,11 @@ really matters.
 
 Exit criteria:
 
+- user-visible SSH failures are no longer represented by generic
+  `CodexErrorBlock` surfaces
 - the user can see what failed without reading generic transport text
 - each SSH card offers only actions that are safe for that scenario
+- repeated identical SSH failures do not spam the transcript
 
 ### Phase 4: Separate SSH recovery actions from generic settings application
 

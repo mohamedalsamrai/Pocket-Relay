@@ -227,7 +227,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       final block = controller.transcriptBlocks
-          .whereType<CodexUnpinnedHostKeyBlock>()
+          .whereType<CodexSshUnpinnedHostKeyBlock>()
           .single;
 
       await controller.saveObservedHostFingerprint(block.id);
@@ -240,7 +240,7 @@ void main() {
       );
       expect(
         controller.transcriptBlocks
-            .whereType<CodexUnpinnedHostKeyBlock>()
+            .whereType<CodexSshUnpinnedHostKeyBlock>()
             .single
             .isSaved,
         isTrue,
@@ -285,11 +285,10 @@ void main() {
 
       expect(sent, isFalse);
       final errors = controller.transcriptBlocks
-          .whereType<CodexErrorBlock>()
+          .whereType<CodexSshConnectFailedBlock>()
           .toList(growable: false);
       expect(errors, hasLength(1));
-      expect(errors.single.title, 'SSH connection failed');
-      expect(errors.single.body, contains('Connection refused'));
+      expect(errors.single.message, contains('Connection refused'));
       expect(
         await snackBarMessage,
         'Could not send the prompt to the remote Codex session.',
