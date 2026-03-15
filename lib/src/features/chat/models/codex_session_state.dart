@@ -196,18 +196,6 @@ class CodexSessionState {
     if (activeTurn != null) ...projectCodexTurnArtifacts(activeTurn!.artifacts),
   ];
 
-  CodexSessionPendingRequest? get primaryPendingApprovalRequest =>
-      _firstPendingRequest<CodexSessionPendingRequest>(
-        pendingApprovalRequests.values,
-        (request) => request.createdAt,
-      );
-
-  CodexSessionPendingUserInputRequest? get primaryPendingUserInputRequest =>
-      _firstPendingRequest<CodexSessionPendingUserInputRequest>(
-        pendingUserInputRequests.values,
-        (request) => request.createdAt,
-      );
-
   CodexSessionState copyWith({
     CodexRuntimeSessionState? connectionStatus,
     String? threadId,
@@ -382,15 +370,6 @@ bool _shouldAppearInTranscript(CodexUiBlock block) {
     CodexStatusBlock(:final isTranscriptSignal) => isTranscriptSignal,
     _ => true,
   };
-}
-
-T? _firstPendingRequest<T>(
-  Iterable<T> requests,
-  DateTime Function(T request) createdAtOf,
-) {
-  final sorted = requests.toList(growable: false)
-    ..sort((left, right) => createdAtOf(left).compareTo(createdAtOf(right)));
-  return sorted.isEmpty ? null : sorted.first;
 }
 
 class CodexSessionPendingRequest {

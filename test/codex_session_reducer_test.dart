@@ -753,7 +753,7 @@ void main() {
     expect(state.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.status, CodexActiveTurnStatus.blocked);
-    final pendingRequest = state.primaryPendingApprovalRequest!;
+    final pendingRequest = state.pendingApprovalRequests['i:99']!;
     expect(pendingRequest.requestId, 'i:99');
     expect(
       pendingRequest.requestType,
@@ -776,7 +776,6 @@ void main() {
     expect(state.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.status, CodexActiveTurnStatus.running);
-    expect(state.primaryPendingApprovalRequest, isNull);
     final resolvedBlock =
         state.transcriptBlocks.single as CodexApprovalRequestBlock;
     expect(resolvedBlock.title, 'File change approval resolved');
@@ -807,7 +806,7 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests.keys, contains('s:user-input-1'));
-    final pendingRequest = state.primaryPendingUserInputRequest!;
+    final pendingRequest = state.pendingUserInputRequests['s:user-input-1']!;
     expect(pendingRequest.requestId, 's:user-input-1');
     expect(pendingRequest.questions.single.question, 'What is your name?');
 
@@ -826,7 +825,6 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests, isEmpty);
-    expect(state.primaryPendingUserInputRequest, isNull);
     final submittedBlock =
         state.transcriptBlocks.single as CodexUserInputRequestBlock;
     expect(submittedBlock.title, 'Input submitted');

@@ -63,26 +63,25 @@ These are the parts we should build on, not reopen.
 
 ## What Is Still Not Ready For Native Ownership
 
-- Runtime and controller convenience getters for primary pending requests still
-  exist and should be cleaned up once the remaining presentation ownership work
-  is complete.
+- Placement promotion and parity hardening coverage is still incomplete for the
+  explicit pending-request placement seam.
 - The first root architectural adapter does not exist yet.
 
 ## Next Active Work
 
 The next thing to do is not the root architectural adapter.
 
-The next thing to do is Slice 5 of Phase 5:
+The next thing to do is Slice 6 of Phase 5:
 
-- clean up remaining runtime and controller convenience seams for pending
-  placement
+- harden pending-request parity and promotion behavior with ownership-oriented
+  tests
 
 Reason:
 
-- Slice 4 already moved pending-input activation ownership to the transcript
-  surface contract
-- the remaining pending-placement leakage is now in leftover runtime/controller
-  convenience APIs
+- Slice 5 already removed the leftover runtime convenience getters for primary
+  pending requests
+- the remaining work is proving promotion, parity, and non-broadening behavior
+  around the explicit placement seam
 - adding the root adapter before fixing that would freeze an incomplete
   transcript boundary into the adapter seam
 
@@ -824,20 +823,20 @@ upgrade path.
 
 ### Findings
 
-#### 1. Pending-request visibility still originates in runtime-state convenience getters
+#### 1. Pending-request visibility originally came from runtime-state convenience getters
 
 Current files:
 
 - `lib/src/features/chat/models/codex_session_state.dart`
 - `lib/src/features/chat/presentation/chat_transcript_surface_projector.dart`
 
-`CodexSessionState` still exposes:
+Before slices 2 through 5, `CodexSessionState` exposed:
 
 - `primaryPendingApprovalRequest`
 - `primaryPendingUserInputRequest`
 
-`ChatTranscriptSurfaceProjector` still uses those getters to decide which
-pending requests appear in `pinnedItems`.
+Before slice 3, `ChatTranscriptSurfaceProjector` used those getters to decide
+which pending requests appeared in `pinnedItems`.
 
 That means the transcript surface still does not own one of its most important
 remaining product decisions:
@@ -1079,23 +1078,24 @@ as pending placement.
 
 ### Slice 5: Runtime and controller seam cleanup
 
-This is the next active slice.
+Slice 5 is completed on this branch.
 
-Slice 5 should cover:
+Slice 5 covered:
 
 - cleanup of leftover runtime or controller convenience APIs that still encode
   presentation placement policy
-- removing or demoting `primaryPendingApprovalRequest`,
+- removing `primaryPendingApprovalRequest`,
   `primaryPendingUserInputRequest`, and any equivalent controller-level
-  shortcuts
-  from presentation-facing usage
+  shortcuts from presentation-facing usage
 - ensuring runtime state keeps only raw pending request data, timestamps, and
   resolved-history insertion responsibilities
 
-This slice should leave the presentation layer dependent on explicit contracts,
-not convenience getters.
+This slice left the presentation layer dependent on explicit contracts, not
+convenience getters.
 
 ### Slice 6: Parity hardening and promotion coverage
+
+This is the next active slice.
 
 Slice 6 should cover:
 
@@ -1201,15 +1201,15 @@ Phase 5 verification must include:
 
 The next active Phase 5 slice is:
 
-- runtime and controller seam cleanup
+- parity hardening and promotion coverage
 
 Reason:
 
 - it closes the last major transcript-surface ownership gap before adapter work
-- Slice 4 already removed `TranscriptList`'s renderer-side rediscovery of
-  pending user-input activation
-- it removes the remaining runtime/controller convenience APIs that still
-  encode presentation placement policy
+- Slice 5 already removed the remaining runtime/controller convenience APIs
+  that encoded pending placement policy
+- it proves the explicit placement seam behaves correctly as visible requests
+  resolve and promote
 - it gives later adapter work a transcript surface boundary that is explicit
   rather than partially inherited from runtime state
 
