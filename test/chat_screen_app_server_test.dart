@@ -185,6 +185,31 @@ void main() {
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_1',
+              'type': 'fileChange',
+              'status': 'inProgress',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/fileChange/outputDelta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'file_change_1',
+            'delta': 'apply_patch exited successfully',
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
           method: 'item/completed',
           params: <String, Object?>{
             'threadId': 'thread_123',
@@ -215,6 +240,30 @@ void main() {
                 },
               ],
             },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/diff/updated',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'diff':
+                'diff --git a/README.md b/README.md\n'
+                'new file mode 100644\n'
+                '--- /dev/null\n'
+                '+++ b/README.md\n'
+                '@@ -0,0 +1,2 @@\n'
+                '+first line\n'
+                '+second line\n'
+                'diff --git a/lib/app.dart b/lib/app.dart\n'
+                '--- a/lib/app.dart\n'
+                '+++ b/lib/app.dart\n'
+                '@@ -1 +1,2 @@\n'
+                '-old\n'
+                '+new\n'
+                '+second\n',
           },
         ),
       );

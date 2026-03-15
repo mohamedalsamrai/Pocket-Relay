@@ -795,7 +795,7 @@ void main() {
             createdAt: DateTime(2026, 3, 14, 12),
             title: 'Changed files',
             files: const <CodexChangedFile>[
-              CodexChangedFile(path: 'lib/old_name.dart'),
+              CodexChangedFile(path: 'lib/new_name.dart'),
             ],
             unifiedDiff:
                 'diff --git a/lib/old_name.dart b/lib/new_name.dart\n'
@@ -814,8 +814,9 @@ void main() {
 
     expect(find.text('View diff'), findsOneWidget);
     expect(find.text('No patch'), findsNothing);
+    expect(find.text('lib/old_name.dart -> lib/new_name.dart'), findsOneWidget);
 
-    await tester.tap(find.text('lib/old_name.dart'));
+    await tester.tap(find.text('lib/old_name.dart -> lib/new_name.dart'));
     await tester.pumpAndSettle();
 
     expect(find.text('renamed'), findsOneWidget);

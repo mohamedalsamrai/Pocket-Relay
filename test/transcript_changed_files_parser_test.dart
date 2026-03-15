@@ -57,6 +57,7 @@ void main() {
     expect(
       parser.unifiedDiffFromSources(
         snapshot: const <String, Object?>{
+          'text': 'plain tool output',
           'patch':
               'diff --git a/lib/app.dart b/lib/app.dart\n'
               '--- a/lib/app.dart\n'
@@ -69,6 +70,28 @@ void main() {
       contains('diff --git'),
     );
   });
+
+  test(
+    'falls back to structured changes when body contains plain tool output',
+    () {
+      final unifiedDiff = parser.unifiedDiffFromSources(
+        body: 'apply_patch exited successfully',
+        snapshot: const <String, Object?>{
+          'changes': <Object?>[
+            <String, Object?>{
+              'path': 'README.md',
+              'kind': <String, Object?>{'type': 'add'},
+              'diff': 'first line\nsecond line\n',
+            },
+          ],
+        },
+      );
+
+      expect(unifiedDiff, contains('diff --git a/README.md b/README.md'));
+      expect(unifiedDiff, contains('+first line'));
+      expect(unifiedDiff, contains('+second line'));
+    },
+  );
 
   test(
     'builds grouped file stats and synthetic patches from structured changes',
@@ -155,6 +178,7 @@ void main() {
 
     expect(files, hasLength(1));
     expect(files.single.path, 'lib/old_name.dart');
+    expect(files.single.movePath, 'lib/new_name.dart');
     expect(files.single.additions, 1);
     expect(files.single.deletions, 1);
 

@@ -146,7 +146,7 @@ class _ChangedFileRow extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              file.path,
+              _displayPathLabel(file),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -325,7 +325,7 @@ class _ChangedFileDiffSheetState extends State<_ChangedFileDiffSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          file.path,
+                          _displayPathLabel(file),
                           style: TextStyle(
                             color: cards.textPrimary,
                             fontSize: 15,
@@ -595,19 +595,51 @@ List<CodexChangedFile> _displayFiles(
   List<CodexChangedFile> files,
   List<_ParsedDiffPatch> patches,
 ) {
-  if (files.isNotEmpty) {
-    return files;
+  final baseFiles = files.isNotEmpty
+      ? files
+      : patches
+            .map(
+              (patch) => CodexChangedFile(
+                path: patch.renameFromPath ?? patch.path,
+                movePath: patch.renameToPath,
+                additions: patch.additions,
+                deletions: patch.deletions,
+              ),
+            )
+            .toList(growable: false);
+  if (baseFiles.isEmpty) {
+    return const <CodexChangedFile>[];
   }
 
-  return patches
+  return baseFiles
       .map(
-        (patch) => CodexChangedFile(
-          path: patch.path,
-          additions: patch.additions,
-          deletions: patch.deletions,
+        (file) => _enrichFileFromPatch(
+          file,
+          _patchForFile(file, patches, totalFiles: baseFiles.length),
         ),
       )
       .toList(growable: false);
+}
+
+CodexChangedFile _enrichFileFromPatch(
+  CodexChangedFile file,
+  _ParsedDiffPatch? patch,
+) {
+  if (patch == null) {
+    return file;
+  }
+
+  final renameFromPath = patch.renameFromPath;
+  final renameToPath = patch.renameToPath;
+  if (renameFromPath == null && renameToPath == null) {
+    return file;
+  }
+
+  final displayPath = renameFromPath ?? file.path;
+  final movePath = renameToPath == null || renameToPath == displayPath
+      ? file.movePath
+      : renameToPath;
+  return file.copyWith(path: displayPath, movePath: movePath);
 }
 
 _ParsedDiffPatch? _patchForFile(
@@ -741,6 +773,8 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
         additions: additions,
         deletions: deletions,
         matchedPaths: matchedPaths,
+        renameFromPath: renameFromPath,
+        renameToPath: renameToPath,
         lines: currentLines
             .map((line) => _DiffLine(text: line, kind: _classifyDiffLine(line)))
             .toList(growable: false),
@@ -855,6 +889,8 @@ class _ParsedDiffPatch {
     required this.additions,
     required this.deletions,
     required this.matchedPaths,
+    this.renameFromPath,
+    this.renameToPath,
     this.statusLabel,
   });
 
@@ -864,7 +900,17 @@ class _ParsedDiffPatch {
   final int additions;
   final int deletions;
   final Set<String> matchedPaths;
+  final String? renameFromPath;
+  final String? renameToPath;
   final String? statusLabel;
+}
+
+String _displayPathLabel(CodexChangedFile file) {
+  final movePath = file.movePath?.trim();
+  if (movePath == null || movePath.isEmpty || movePath == file.path) {
+    return file.path;
+  }
+  return '${file.path} -> $movePath';
 }
 
 class _DiffStats {

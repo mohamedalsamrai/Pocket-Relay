@@ -270,7 +270,7 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnDiffUpdatedEvent event,
   ) {
-    return _stateWithTranscriptBlock(
+    final nextState = _stateWithTranscriptBlock(
       state,
       CodexChangedFilesBlock(
         id: 'turn_diff_${event.turnId ?? event.createdAt.toIso8601String()}',
@@ -286,6 +286,13 @@ class TranscriptPolicy {
       ),
       turnId: event.turnId,
       threadId: event.threadId,
+    );
+    final activeTurn = nextState.activeTurn;
+    if (activeTurn == null || activeTurn.turnId != event.turnId) {
+      return nextState;
+    }
+    return nextState.copyWith(
+      activeTurn: _removeCompletedFileChangeSegments(activeTurn),
     );
   }
 
@@ -561,6 +568,32 @@ class TranscriptPolicy {
         ...activeTurn.segments,
         CodexTurnBlockSegment(block: block),
       ],
+    );
+  }
+
+  CodexActiveTurnState _removeCompletedFileChangeSegments(
+    CodexActiveTurnState activeTurn,
+  ) {
+    final removedSegmentIds = activeTurn.segments
+        .whereType<CodexTurnChangedFilesSegment>()
+        .where(
+          (segment) => activeTurn.itemsById[segment.itemId]?.isRunning != true,
+        )
+        .map((segment) => segment.id)
+        .toSet();
+    if (removedSegmentIds.isEmpty) {
+      return activeTurn;
+    }
+
+    final nextSegments = activeTurn.segments
+        .where((segment) => !removedSegmentIds.contains(segment.id))
+        .toList(growable: false);
+    final nextItemSegmentIds = Map<String, String>.from(
+      activeTurn.itemSegmentIds,
+    )..removeWhere((_, segmentId) => removedSegmentIds.contains(segmentId));
+    return activeTurn.copyWith(
+      segments: nextSegments,
+      itemSegmentIds: nextItemSegmentIds,
     );
   }
 

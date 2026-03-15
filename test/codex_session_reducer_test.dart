@@ -1234,6 +1234,174 @@ void main() {
     );
   });
 
+  test(
+    'keeps the structured diff when file-change output deltas contain plain text',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          status: CodexRuntimeItemStatus.inProgress,
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          streamKind: CodexRuntimeContentStreamKind.fileChangeOutput,
+          delta: 'apply_patch exited successfully',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(seconds: 1)),
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{
+            'changes': <Object?>[
+              <String, Object?>{
+                'path': 'README.md',
+                'kind': <String, Object?>{'type': 'add'},
+                'diff': 'first line\nsecond line\n',
+              },
+            ],
+          },
+        ),
+      );
+
+      expect(state.transcriptBlocks, hasLength(1));
+      final changedFiles =
+          state.transcriptBlocks.single as CodexChangedFilesBlock;
+      expect(changedFiles.files, hasLength(1));
+      expect(changedFiles.files.single.path, 'README.md');
+      expect(
+        changedFiles.unifiedDiff,
+        contains('diff --git a/README.md b/README.md'),
+      );
+      expect(changedFiles.unifiedDiff, contains('+first line'));
+    },
+  );
+
+  test(
+    'prefers the turn diff snapshot over completed file-change item cards',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{
+            'changes': <Object?>[
+              <String, Object?>{
+                'path': 'README.md',
+                'kind': <String, Object?>{'type': 'add'},
+                'diff': 'first line\n',
+              },
+            ],
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnDiffUpdatedEvent(
+          createdAt: now.add(const Duration(seconds: 1)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              'new file mode 100644\n'
+              '--- /dev/null\n'
+              '+++ b/README.md\n'
+              '@@ -0,0 +1,2 @@\n'
+              '+first line\n'
+              '+second line\n',
+        ),
+      );
+
+      final changedFilesBlocks = state.transcriptBlocks
+          .whereType<CodexChangedFilesBlock>()
+          .toList(growable: false);
+      expect(changedFilesBlocks, hasLength(1));
+      expect(changedFilesBlocks.single.files.single.path, 'README.md');
+      expect(changedFilesBlocks.single.files.single.additions, 2);
+      expect(changedFilesBlocks.single.unifiedDiff, contains('+second line'));
+    },
+  );
+
+  test(
+    'keeps a running file-change item visible until the turn diff finalizes it',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          status: CodexRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{
+            'changes': <Object?>[
+              <String, Object?>{
+                'path': 'README.md',
+                'kind': <String, Object?>{'type': 'add'},
+                'diff': 'first line\n',
+              },
+            ],
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnDiffUpdatedEvent(
+          createdAt: now.add(const Duration(seconds: 1)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              'new file mode 100644\n'
+              '--- /dev/null\n'
+              '+++ b/README.md\n'
+              '@@ -0,0 +1,2 @@\n'
+              '+first line\n'
+              '+second line\n',
+        ),
+      );
+
+      final changedFilesBlocks = state.transcriptBlocks
+          .whereType<CodexChangedFilesBlock>()
+          .toList(growable: false);
+      expect(changedFilesBlocks, hasLength(2));
+      expect(changedFilesBlocks.first.isRunning, isTrue);
+      expect(changedFilesBlocks.last.isRunning, isFalse);
+    },
+  );
+
   test('appends repeated plan updates for the same turn', () {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();

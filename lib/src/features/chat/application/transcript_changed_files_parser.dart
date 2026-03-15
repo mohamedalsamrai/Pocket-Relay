@@ -25,8 +25,8 @@ class TranscriptChangedFilesParser {
           filesByPath[file.path] = file;
           continue;
         }
-        filesByPath[file.path] = CodexChangedFile(
-          path: file.path,
+        filesByPath[file.path] = existing.copyWith(
+          movePath: file.movePath ?? existing.movePath,
           additions: file.additions > 0 ? file.additions : existing.additions,
           deletions: file.deletions > 0 ? file.deletions : existing.deletions,
         );
@@ -92,7 +92,7 @@ class TranscriptChangedFilesParser {
     Map<String, dynamic>? snapshot,
     String? body,
   }) {
-    final diff = _support.stringFromCandidates(<Object?>[
+    final diff = _firstDiffLikeString(<Object?>[
       body,
       snapshot?['unifiedDiff'],
       snapshot?['diff'],
@@ -101,8 +101,8 @@ class TranscriptChangedFilesParser {
       snapshot?['aggregatedOutput'],
       snapshot?['aggregated_output'],
     ]);
-    if (diff != null) {
-      return diff.contains('diff --git') || diff.contains('@@') ? diff : null;
+    if (diff != null && diff.isNotEmpty) {
+      return diff;
     }
 
     final structuredDiff = _synthesizedStructuredUnifiedDiff(snapshot);
@@ -356,6 +356,7 @@ class TranscriptChangedFilesParser {
         _StructuredChangedFile(
           file: CodexChangedFile(
             path: path,
+            movePath: movePath,
             additions: stats.additions,
             deletions: stats.deletions,
           ),
@@ -501,6 +502,23 @@ class TranscriptChangedFilesParser {
 
   String? _asNonEmptyString(Object? value) {
     return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  String? _firstDiffLikeString(List<Object?> candidates) {
+    for (final candidate in candidates) {
+      final value = _asNonEmptyString(candidate);
+      if (value == null || !_looksLikeDiff(value)) {
+        continue;
+      }
+      return value;
+    }
+    return null;
+  }
+
+  bool _looksLikeDiff(String value) {
+    return value.contains('diff --git') ||
+        value.contains('@@') ||
+        (value.contains('--- ') && value.contains('+++ '));
   }
 
   _StructuredChangeKind? _structuredKind(Object? value) {

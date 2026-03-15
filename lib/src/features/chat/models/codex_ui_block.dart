@@ -34,14 +34,34 @@ sealed class CodexUiBlock {
 class CodexChangedFile {
   const CodexChangedFile({
     required this.path,
+    this.movePath,
     this.additions = 0,
     this.deletions = 0,
   });
 
   final String path;
+  final String? movePath;
   final int additions;
   final int deletions;
+
+  CodexChangedFile copyWith({
+    String? path,
+    Object? movePath = _unchangedMovePath,
+    int? additions,
+    int? deletions,
+  }) {
+    return CodexChangedFile(
+      path: path ?? this.path,
+      movePath: identical(movePath, _unchangedMovePath)
+          ? this.movePath
+          : movePath as String?,
+      additions: additions ?? this.additions,
+      deletions: deletions ?? this.deletions,
+    );
+  }
 }
+
+const Object _unchangedMovePath = Object();
 
 enum CodexWorkLogEntryKind {
   commandExecution,
