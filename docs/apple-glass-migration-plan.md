@@ -82,7 +82,6 @@ These are the parts we should build on, not reopen.
 ## What Is Still Not Ready For Native Ownership
 
 - Apple-native renderer implementations are still not started.
-- Default iOS enablement is still not turned on at the app root.
 - Top-level changed-file diff presentation still follows the Flutter transcript
   lane.
 - The transcript feed is still intentionally Flutter-owned while the first
@@ -92,20 +91,21 @@ These are the parts we should build on, not reopen.
 
 Phase 6 is complete.
 
-Phase 7 is now in progress on this branch.
+Phase 7 is now complete on this branch.
 
-The next thing to do is Phase 7 Slice 6:
+The next thing to do is the post-Phase-7 glass styling pass:
 
-- default iOS enablement and parity hardening
+- visual hardening and glass-specific polish on top of the default iOS
+  Cupertino foundation path
 
 Reason:
 
-- Slices 4 and 5 removed the remaining highest-visibility Material shell cues
-  from the explicit iOS foundation path
-- the last Phase 7 ownership gate is making that iOS path the default on
-  iPhone without regressing the existing adapter and shared-contract behavior
-- transcript ownership still needs to remain on the Flutter lane while the
-  surrounding shell becomes Cupertino-first
+- Slice 6 turned the mixed Cupertino shell on by default for iPhone at the app
+  root
+- the iOS path now has parity coverage for settings save, composer send/fail
+  behavior, top-level action presentation, and bootstrap loading
+- transcript ownership remains intentionally on the Flutter lane, so the next
+  work should be visual/styling-focused rather than more ownership refactoring
 
 ## Phase 7 Start Checklist
 
@@ -1983,6 +1983,30 @@ This slice should not attempt a full transcript redesign.
 
 ### Slice 6: Default iOS enablement and parity hardening
 
+This slice is complete on this branch.
+
+Slice 6 delivered:
+
+- turning the mixed Cupertino foundation path on by default for iPhone at the
+  `PocketRelayApp` root instead of requiring an explicit adapter override
+- routing the bootstrap loading shell through the same platform policy so iOS
+  startup no longer flashes a Material `Scaffold` and
+  `CircularProgressIndicator`
+- app-level tests proving the default iOS path now uses:
+  - `CupertinoChatScreenRenderer`
+  - `CupertinoChatAppChrome`
+  - `CupertinoChatComposerRegion`
+  - `FlutterChatTranscriptRegion`
+- app-level parity tests proving:
+  - settings save flows through the Cupertino sheet and updates the active
+    header state
+  - composer send still succeeds and clears the adapter-owned draft
+  - failed send still retains the draft and routes feedback through the
+    Cupertino transient banner
+  - top-level menu actions present through `CupertinoActionSheet`
+- preserving the all-Flutter path as the non-iOS fallback while keeping
+  transcript ownership on the existing Flutter lane
+
 This slice should cover:
 
 - default platform selection for the iOS renderer path
@@ -2049,18 +2073,17 @@ Unless broader behavior is explicitly requested, Phase 7 should preserve:
 - current changed-file diff opening behavior
 - current transcript follow and pending-request behavior
 
-The next active Phase 7 slice is:
+Phase 7 is now complete on this branch.
 
-- default iOS enablement and parity hardening
+The next focused track is:
+
+- visual hardening and glass styling on top of the default iOS Cupertino path
 
 Reason:
 
-- Slices 4 and 5 completed the explicit Cupertino shell, settings, composer,
-  feedback, and first-launch cleanup work for the iOS foundation path
-- the next step is to turn that path on by default for iPhone while proving the
-  adapter still owns routing and the transcript lane remains Flutter-owned
-- this is the last Phase 7 slice before native glass styling can become the
-  next focused track
+- Slice 6 completed the last planned ownership gate for the Phase 7 migration
+- the iPhone path is now default-enabled at the app root with parity coverage
+- further work should change visual treatment, not reopen renderer ownership
 
 ## Minimum Outcome Required Before Any Glass Work
 
