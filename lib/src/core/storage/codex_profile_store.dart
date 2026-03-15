@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences/util/legacy_to_async_migration_util.dart';
 
 abstract class CodexProfileStore {
   Future<SavedProfile> load();
@@ -14,6 +15,8 @@ class SecureCodexProfileStore implements CodexProfileStore {
   static const _profileKey = 'pocket_relay.profile';
   static const _legacyProfileKey = 'codex_pocket.profile';
   static const _obsoletePreferencesKey = 'pocket_relay.preferences';
+  static const _preferencesMigrationKey =
+      'pocket_relay.preferences_async_migration_complete';
   static const _passwordKey = 'pocket_relay.secret.password';
   static const _legacyPasswordKey = 'codex_pocket.secret.password';
   static const _privateKeyKey = 'pocket_relay.secret.private_key';
@@ -24,16 +27,22 @@ class SecureCodexProfileStore implements CodexProfileStore {
       'codex_pocket.secret.private_key_passphrase';
 
   final FlutterSecureStorage _secureStorage;
+  final SharedPreferencesAsync _preferences;
+  Future<void>? _preferencesReady;
 
-  SecureCodexProfileStore({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  SecureCodexProfileStore({
+    FlutterSecureStorage? secureStorage,
+    SharedPreferencesAsync? preferences,
+  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+       _preferences = preferences ?? SharedPreferencesAsync();
 
   @override
   Future<SavedProfile> load() async {
-    final prefs = await SharedPreferences.getInstance();
+    await _ensurePreferencesReady();
     final rawProfile =
-        prefs.getString(_profileKey) ?? prefs.getString(_legacyProfileKey);
-    await prefs.remove(_obsoletePreferencesKey);
+        await _preferences.getString(_profileKey) ??
+        await _preferences.getString(_legacyProfileKey);
+    await _preferences.remove(_obsoletePreferencesKey);
     final profile = rawProfile == null
         ? ConnectionProfile.defaults()
         : ConnectionProfile.fromJson(
@@ -65,8 +74,9 @@ class SecureCodexProfileStore implements CodexProfileStore {
     ConnectionProfile profile,
     ConnectionSecrets secrets,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
+    await _ensurePreferencesReady();
+    await _preferences.setString(_profileKey, jsonEncode(profile.toJson()));
+    await _preferences.remove(_obsoletePreferencesKey);
 
     await _writeSecret(_passwordKey, secrets.password);
     await _writeSecret(_privateKeyKey, secrets.privateKeyPem);
@@ -86,6 +96,19 @@ class SecureCodexProfileStore implements CodexProfileStore {
     return await _secureStorage.read(key: key) ??
         await _secureStorage.read(key: legacyKey) ??
         '';
+  }
+
+  Future<void> _ensurePreferencesReady() {
+    return _preferencesReady ??= _migrateLegacyPreferencesIfNeeded();
+  }
+
+  Future<void> _migrateLegacyPreferencesIfNeeded() async {
+    final legacyPreferences = await SharedPreferences.getInstance();
+    await migrateLegacySharedPreferencesToSharedPreferencesAsyncIfNecessary(
+      legacySharedPreferencesInstance: legacyPreferences,
+      sharedPreferencesAsyncOptions: const SharedPreferencesOptions(),
+      migrationCompletedKey: _preferencesMigrationKey,
+    );
   }
 }
 
