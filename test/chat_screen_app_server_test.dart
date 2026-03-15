@@ -355,6 +355,65 @@ void main() {
     },
   );
 
+  testWidgets('renders consecutive work items in one grouped work card', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'item_cmd_1',
+            'type': 'commandExecution',
+            'status': 'completed',
+            'command': 'git status',
+            'result': <String, Object?>{'output': 'clean', 'exitCode': 0},
+          },
+        },
+      ),
+    );
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'item_search_2',
+            'type': 'webSearch',
+            'status': 'completed',
+            'title': 'Search docs',
+          },
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Work log'), findsOneWidget);
+    expect(find.text('git status'), findsOneWidget);
+    expect(find.text('Search docs'), findsOneWidget);
+  });
+
   testWidgets(
     'promotes the local user echo to sent when the app-server reports the prompt',
     (tester) async {

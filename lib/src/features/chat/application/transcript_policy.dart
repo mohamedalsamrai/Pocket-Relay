@@ -448,7 +448,7 @@ class TranscriptPolicy {
     }
 
     var nextState = state;
-    for (final block in projectCodexTurnSegments(activeTurn.segments)) {
+    for (final block in projectCodexTurnArtifacts(activeTurn.artifacts)) {
       nextState = _support.appendBlock(nextState, block);
     }
     if (includePendingUsage &&
@@ -542,18 +542,18 @@ class TranscriptPolicy {
     CodexActiveTurnState activeTurn,
     CodexUiBlock block,
   ) {
-    final segment = CodexTurnBlockSegment(block: block);
-    var nextSegments = List<CodexTurnSegment>.from(activeTurn.segments);
-    final index = nextSegments.indexWhere(
+    final artifact = CodexTurnBlockArtifact(block: block);
+    var nextArtifacts = List<CodexTurnArtifact>.from(activeTurn.artifacts);
+    final index = nextArtifacts.indexWhere(
       (existing) => existing.id == block.id,
     );
     if (index == -1) {
-      nextSegments = appendCodexTurnSegment(nextSegments, segment);
+      nextArtifacts = appendCodexTurnArtifact(nextArtifacts, artifact);
     } else {
-      nextSegments[index] = segment;
+      nextArtifacts[index] = artifact;
     }
 
-    return activeTurn.copyWith(segments: nextSegments);
+    return activeTurn.copyWith(artifacts: nextArtifacts);
   }
 
   CodexActiveTurnState _appendTurnBlock(
@@ -561,9 +561,9 @@ class TranscriptPolicy {
     CodexUiBlock block,
   ) {
     return activeTurn.copyWith(
-      segments: appendCodexTurnSegment(
-        activeTurn.segments,
-        CodexTurnBlockSegment(block: block),
+      artifacts: appendCodexTurnArtifact(
+        activeTurn.artifacts,
+        CodexTurnBlockArtifact(block: block),
       ),
     );
   }
@@ -574,8 +574,9 @@ class TranscriptPolicy {
     required DateTime createdAt,
   }) {
     final usedIds = <String>{
-      ...state.blocks.map((block) => block.id),
-      ...?state.activeTurn?.segments.map((segment) => segment.id),
+      ...codexUiBlockIds(state.blocks),
+      if (state.activeTurn != null)
+        ...codexTurnArtifactIds(state.activeTurn!.artifacts),
     };
     final baseId = _support.eventEntryId(prefix, createdAt);
     if (!usedIds.contains(baseId)) {

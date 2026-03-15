@@ -13,16 +13,17 @@ class TranscriptItemPolicy {
     TranscriptItemBlockFactory blockFactory =
         const TranscriptItemBlockFactory(),
     TranscriptItemSupport itemSupport = const TranscriptItemSupport(),
-    TranscriptTurnSegmenter turnSegmenter = const TranscriptTurnSegmenter(),
+    TranscriptTurnArtifactBuilder turnArtifactBuilder =
+        const TranscriptTurnArtifactBuilder(),
   }) : _support = support,
        _blockFactory = blockFactory,
        _itemSupport = itemSupport,
-       _turnSegmenter = turnSegmenter;
+       _turnArtifactBuilder = turnArtifactBuilder;
 
   final TranscriptPolicySupport _support;
   final TranscriptItemBlockFactory _blockFactory;
   final TranscriptItemSupport _itemSupport;
-  final TranscriptTurnSegmenter _turnSegmenter;
+  final TranscriptTurnArtifactBuilder _turnArtifactBuilder;
 
   CodexSessionState applyItemLifecycle(
     CodexSessionState state,
@@ -242,16 +243,18 @@ class TranscriptItemPolicy {
     CodexActiveTurnState? activeTurn,
     CodexSessionActiveItem? existing,
   ) {
-    if (activeTurn == null || existing == null || activeTurn.segments.isEmpty) {
+    if (activeTurn == null ||
+        existing == null ||
+        activeTurn.artifacts.isEmpty) {
       return false;
     }
 
-    final currentSegmentId = activeTurn.itemSegmentIds[existing.itemId];
-    if (currentSegmentId == null) {
+    final currentArtifactId = activeTurn.itemArtifactIds[existing.itemId];
+    if (currentArtifactId == null) {
       return false;
     }
 
-    return activeTurn.segments.last.id != currentSegmentId;
+    return activeTurn.artifacts.last.id != currentArtifactId;
   }
 
   String _nextItemEntryId(
@@ -260,8 +263,8 @@ class TranscriptItemPolicy {
     required String itemId,
   }) {
     final usedIds = <String>{
-      ...state.blocks.map((block) => block.id),
-      ...?activeTurn?.segments.map((segment) => segment.id),
+      ...codexUiBlockIds(state.blocks),
+      if (activeTurn != null) ...codexTurnArtifactIds(activeTurn.artifacts),
     };
     final baseId = 'item_$itemId';
     if (!usedIds.contains(baseId)) {
@@ -329,7 +332,7 @@ class TranscriptItemPolicy {
     required int matchIndex,
   }) {
     return matchIndex == blocks.length - 1 &&
-        (activeTurn == null || activeTurn.segments.isEmpty);
+        (activeTurn == null || activeTurn.artifacts.isEmpty);
   }
 
   List<CodexUiBlock> _promoteCommittedUserMessageBlock(
@@ -365,18 +368,18 @@ class TranscriptItemPolicy {
       nextItems.remove(item.itemId);
     }
 
-    final nextItemSegmentIds = <String, String>{...activeTurn.itemSegmentIds};
-    final segmentId = nextItemSegmentIds.remove(item.itemId);
-    final nextSegments = segmentId == null
-        ? activeTurn.segments
-        : activeTurn.segments
-              .where((segment) => segment.id != segmentId)
+    final nextItemArtifactIds = <String, String>{...activeTurn.itemArtifactIds};
+    final artifactId = nextItemArtifactIds.remove(item.itemId);
+    final nextArtifacts = artifactId == null
+        ? activeTurn.artifacts
+        : activeTurn.artifacts
+              .where((artifact) => artifact.id != artifactId)
               .toList(growable: false);
 
     return activeTurn.copyWith(
       itemsById: nextItems,
-      itemSegmentIds: nextItemSegmentIds,
-      segments: nextSegments,
+      itemArtifactIds: nextItemArtifactIds,
+      artifacts: nextArtifacts,
     );
   }
 
@@ -397,7 +400,7 @@ class TranscriptItemPolicy {
       nextItems.remove(item.itemId);
     }
 
-    return _turnSegmenter.upsertItem(
+    return _turnArtifactBuilder.upsertItem(
       activeTurn.copyWith(itemsById: nextItems),
       item,
     );
@@ -411,7 +414,7 @@ class TranscriptItemPolicy {
       return activeTurn;
     }
 
-    return _turnSegmenter.upsertItem(
+    return _turnArtifactBuilder.upsertItem(
       activeTurn.copyWith(
         itemsById: <String, CodexSessionActiveItem>{
           ...activeTurn.itemsById,

@@ -84,6 +84,29 @@ Primary files touched in that slice:
 - [`test/codex_session_reducer_test.dart`](/home/vince/Projects/codex_pocket/test/codex_session_reducer_test.dart)
 - [`test/chat_screen_app_server_test.dart`](/home/vince/Projects/codex_pocket/test/chat_screen_app_server_test.dart)
 
+#### Slice C: Plan rewrite before implementation checkpoint
+
+This happened after `Commit A` landed, but before `Commit B` implementation had
+started.
+
+What went wrong:
+
+- the migration document and handoff were edited to narrow `Commit B` and
+  `Commit C`
+- that clarification was directionally correct, but it was done before logging
+  the deviation itself
+- this created the appearance that the plan had simply evolved cleanly, instead
+  of recording that the previous framing was loose enough to allow another
+  rogue implementation path
+
+What this change actually means:
+
+- the updated `Commit B` / `Commit C` boundaries should be treated as a
+  corrective planning fix, not as implementation progress
+- no live-artifact ownership work was completed as part of this document change
+- the repo must not treat the tighter wording as proof that the migration is
+  back on track by itself
+
 ### Practical Consequence
 
 The "Five Commit Migration Plan" below is now a **target structure**, not an
@@ -95,6 +118,8 @@ Future work must assume:
 - some later-plan behavior is already partially implemented
 - remaining work should start from the current code reality, not from the
   original ideal sequence
+- even the rebased plan has already needed a documented correction of commit
+  boundaries after implementation had begun
 
 If a clean history is still desired, the remaining commits should explicitly say
 that the original sequence was violated and that the history is being resumed
@@ -152,6 +177,11 @@ Exit criterion:
 
 ### Commit B: Replace Ad Hoc Segment Mutation With First-Class Live Artifacts
 
+Status:
+
+- implemented in the current worktree for live artifact ownership
+- remaining immutable-history cleanup is intentionally deferred to Commit C
+
 Goal:
 
 - finish the ownership split that is currently only partially enforced
@@ -161,15 +191,41 @@ Changes:
 - replace generic segment mutation rules with explicit live artifact instances
 - define artifact boundary rules by visible interruption, not by helper
   convention
-- make assistant, reasoning, work, plan, request, and changed-files artifacts
-  all obey the same contiguous-tail rule
+- make assistant, reasoning, work, plan, changed-files, and resolved-request
+  artifacts all obey the same contiguous-tail rule
 - stop relying on shared projection/grouping logic to infer transcript
   semantics after the fact
+- remove render-time work-log grouping from transcript projection and make work
+  grouping a first-class live artifact concern instead
+- stop routing resolved request artifacts through generic segment upsert helpers
+  that still imply mutable transcript ownership
+
+Explicitly not in this commit:
+
+- optimistic user-message provider/local-echo reconciliation
+- cleanup of committed-history mutation for already-sent user messages
+- broader removal of legacy helper APIs whose only remaining caller is the
+  user-message flow
 
 Exit criterion:
 
 - one active contiguous artifact may mutate, and every older artifact is frozen
   by construction
+
+What the current worktree now covers:
+
+- `CodexActiveTurnState` owns explicit live artifacts instead of generic
+  segments
+- assistant, reasoning, plan, changed-files, and resolved-request cards all
+  project one artifact to one visible block
+- work grouping is now owned by a live work artifact instead of being inferred
+  in `transcriptBlocks`
+- consecutive work items append into one live work artifact until another
+  visible artifact interrupts them
+- resolved requests append through the same live-artifact append path instead of
+  a request-only upsert helper
+- reducer and widget coverage exist for grouped work artifacts, interrupted work
+  history, and grouped app-server work rendering
 
 ### Commit C: Remove Remaining Timeline Mutation Exceptions
 
@@ -186,6 +242,12 @@ Changes:
   until resolution
 - make resolution artifacts append-only events
 - remove any remaining helper APIs that imply transcript replacement semantics
+
+Dependency on previous commit:
+
+- do not start this commit until Commit B owns live artifact boundaries directly
+- this commit is for the remaining committed-history mutation seams, not for
+  finishing live artifact grouping by another route
 
 Exit criterion:
 
