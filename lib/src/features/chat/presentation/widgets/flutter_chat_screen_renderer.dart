@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_screen_shell.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
 
 class FlutterChatScreenRenderer extends StatelessWidget {
@@ -23,31 +23,15 @@ class FlutterChatScreenRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.pocketPalette;
-
     return Scaffold(
       appBar: appChrome,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[palette.backgroundTop, palette.backgroundBottom],
-          ),
+      body: ChatScreenGradientBackground(
+        child: ChatScreenBody(
+          screen: screen,
+          transcriptRegion: transcriptRegion,
+          composerRegion: composerRegion,
+          loadingIndicator: const CircularProgressIndicator(),
         ),
-        child: screen.isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  Expanded(child: transcriptRegion),
-                  if (screen.turnIndicator case final turnIndicator?)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                      child: TurnElapsedFooter(turnTimer: turnIndicator.timer),
-                    ),
-                  composerRegion,
-                ],
-              ),
       ),
     );
   }
@@ -69,48 +53,30 @@ class FlutterChatAppChrome extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return AppBar(
       titleSpacing: 18,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            screen.header.title,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          Text(
-            screen.header.subtitle,
-            style: TextStyle(
-              fontSize: 13,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+      title: ChatAppChromeTitle(
+        header: screen.header,
+        style: ChatAppChromeStyle.material,
       ),
       actions: [
         ...screen.toolbarActions.map(
           (action) => IconButton(
             tooltip: action.tooltip,
             onPressed: () => onScreenAction(action.id),
-            icon: Icon(_iconForAction(action)),
+            icon: Icon(
+              chatActionIcon(action, style: ChatAppChromeStyle.material),
+            ),
           ),
         ),
-        PopupMenuButton<ChatScreenActionId>(
-          onSelected: onScreenAction,
-          itemBuilder: (context) {
-            return screen.menuActions
-                .map(
-                  (action) => PopupMenuItem<ChatScreenActionId>(
-                    value: action.id,
-                    child: Text(action.label),
-                  ),
-                )
-                .toList(growable: false);
-          },
-        ),
-        const SizedBox(width: 8),
+        if (screen.menuActions.isNotEmpty) ...[
+          ChatOverflowMenuButton(
+            actions: screen.menuActions,
+            onSelected: onScreenAction,
+            style: ChatAppChromeStyle.material,
+          ),
+          const SizedBox(width: 8),
+        ],
       ],
     );
   }
@@ -192,11 +158,4 @@ class FlutterChatComposerRegion extends StatelessWidget {
       ),
     );
   }
-}
-
-IconData _iconForAction(ChatScreenActionContract action) {
-  return switch (action.icon) {
-    ChatScreenActionIcon.settings => Icons.tune,
-    null => Icons.more_horiz,
-  };
 }

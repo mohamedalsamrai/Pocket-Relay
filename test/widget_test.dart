@@ -201,7 +201,7 @@ void main() {
   );
 
   testWidgets(
-    'presents top-level menu actions through a cupertino action sheet by default on iOS',
+    'presents top-level menu actions through the shared popup menu by default on iOS',
     (tester) async {
       await tester.pumpWidget(
         PocketRelayApp(
@@ -213,7 +213,7 @@ void main() {
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoActionSheet), findsOneWidget);
+      expect(find.byType(CupertinoActionSheet), findsNothing);
       expect(find.text('New thread'), findsOneWidget);
       expect(find.text('Clear transcript'), findsOneWidget);
     },

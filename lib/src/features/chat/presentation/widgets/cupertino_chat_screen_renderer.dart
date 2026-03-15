@@ -1,8 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_screen_shell.dart';
 
 class CupertinoChatScreenRenderer extends StatelessWidget {
   const CupertinoChatScreenRenderer({
@@ -20,20 +19,10 @@ class CupertinoChatScreenRenderer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.pocketPalette;
-
     return CupertinoTheme(
       data: MaterialBasedCupertinoThemeData(materialTheme: Theme.of(context)),
       child: CupertinoPageScaffold(
-        backgroundColor: palette.backgroundTop,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: <Color>[palette.backgroundTop, palette.backgroundBottom],
-            ),
-          ),
+        child: ChatScreenGradientBackground(
           child: SafeArea(
             bottom: false,
             child: Column(
@@ -42,27 +31,12 @@ class CupertinoChatScreenRenderer extends StatelessWidget {
                 Expanded(
                   child: Material(
                     type: MaterialType.transparency,
-                    child: screen.isLoading
-                        ? const Center(child: CupertinoActivityIndicator())
-                        : Column(
-                            children: [
-                              Expanded(child: transcriptRegion),
-                              if (screen.turnIndicator
-                                  case final turnIndicator?)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    14,
-                                    0,
-                                    14,
-                                    0,
-                                  ),
-                                  child: TurnElapsedFooter(
-                                    turnTimer: turnIndicator.timer,
-                                  ),
-                                ),
-                              composerRegion,
-                            ],
-                          ),
+                    child: ChatScreenBody(
+                      screen: screen,
+                      transcriptRegion: transcriptRegion,
+                      composerRegion: composerRegion,
+                      loadingIndicator: const CupertinoActivityIndicator(),
+                    ),
                   ),
                 ),
               ],

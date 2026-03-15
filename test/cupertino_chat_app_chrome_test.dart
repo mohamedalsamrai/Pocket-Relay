@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -10,7 +11,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_ch
 
 void main() {
   testWidgets(
-    'cupertino app chrome forwards toolbar and menu actions through iOS presentation',
+    'cupertino app chrome forwards toolbar and menu actions through the shared popup menu',
     (tester) async {
       final actions = <ChatScreenActionId>[];
 
@@ -39,6 +40,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('cupertino_menu_actions')));
       await tester.pumpAndSettle();
 
+      expect(find.byType(CupertinoActionSheet), findsNothing);
       expect(find.text('New thread'), findsOneWidget);
       expect(find.text('Clear transcript'), findsOneWidget);
 
