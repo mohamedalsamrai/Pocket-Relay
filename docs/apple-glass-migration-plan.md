@@ -27,7 +27,7 @@ renderer can consume the same ownership model.
 - Phase 2, connection settings form contract extraction: completed on this
   branch
 - Phase 3, pending user-input form contract extraction: slice 1 completed on
-  this branch, slice 2 not started
+  this branch, slice 2 completed on this branch, slice 3 not started
 - Root architectural adapter work: not started
 - Apple-native glass components: not started
 
@@ -124,17 +124,19 @@ Phase 3 is the next migration slice:
 
 - pending user-input form contract extraction
 
-This section records the current investigation and the recommended path.
+This section records the initial investigation that defined Phase 3. Slice 1
+and slice 2 have since completed. The findings below describe the baseline that
+justified that work plus the constraints that still matter for slice 3.
 
 ### Findings
 
-#### 1. `UserInputRequestCard` still owns real behavior
+#### 1. Before slice 2, `UserInputRequestCard` owned real behavior
 
-Current file:
+Original file:
 
 - `lib/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart`
 
-The current card still owns:
+At that point the card still owned:
 
 - dynamic `TextEditingController` creation
 - field identity and answer synchronization
@@ -142,7 +144,7 @@ The current card still owns:
 - fallback single-field creation when no questions exist
 - answer payload assembly on submit
 
-That means the renderer still owns the real product behavior for this surface.
+That was the ownership problem slice 2 needed to remove.
 
 #### 2. The application layer already owns transport branching
 
@@ -214,17 +216,19 @@ available.
 That fallback must move into the shared presenter. It should not remain a
 widget-only special case.
 
-#### 6. Current tests still prove rendering more than ownership
+#### 6. Before slice 2, tests proved rendering more than ownership
 
-The current tests prove that Flutter can render and submit the current card, but
-they do not yet prove:
+At that point the tests proved that Flutter could render and submit the current
+card, but they did not yet prove:
 
 - request-form ownership above the card
 - request-keyed draft persistence
 - elicitation fallback field modeling
 - submission lifecycle behavior such as duplicate-submit prevention
 
-Phase 3 needs those tests before native parity work becomes credible.
+Slice 2 added the widget-level ownership coverage. Slice 3 still needs the
+remaining app-level runtime verification before native parity work becomes
+credible.
 
 ## Phase 3 Slice Breakdown
 
@@ -268,22 +272,33 @@ Slice 1 completed scope:
 
 ### Slice 2: Request-state host and card refactor
 
-This is the next active slice.
+This slice is complete on this branch.
 
-Slice 2 will cover:
+Slice 2 covers:
 
 - request state ownership above the card keyed by `requestId`
 - routing the shared request contract into transcript rendering
 - reducing `UserInputRequestCard` to renderer and input plumbing
+- preserving pending request drafts across transcript rebuilds and movement
+- pruning stale request form state when a request disappears from the active
+  pending set
+- widget coverage for:
+  - submit flow through the shared draft host
+  - option-chip updates through the shared draft host
+  - request replacement by `requestId`
+  - draft persistence across transcript movement
 
 ### Slice 3: Runtime path verification
+
+This is the next active slice.
 
 Slice 3 will cover:
 
 - app-level verification that the shared request contract still submits through
   the existing controller path
 - MCP elicitation path coverage
-- draft persistence and rebuild behavior checks
+- any remaining end-to-end request lifecycle checks not already covered by
+  slice 2
 
 ## Best Upgrade Path For Phase 3
 

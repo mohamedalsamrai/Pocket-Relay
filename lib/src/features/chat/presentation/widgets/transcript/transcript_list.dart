@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 
@@ -41,8 +43,7 @@ class _TranscriptListState extends State<TranscriptList> {
   final _scrollController = ScrollController();
   bool _shouldFollowTranscript = true;
 
-  bool get _hasVisibleConversation =>
-      !widget.surface.showsEmptyState;
+  bool get _hasVisibleConversation => !widget.surface.showsEmptyState;
 
   @override
   void initState() {
@@ -72,6 +73,13 @@ class _TranscriptListState extends State<TranscriptList> {
 
   @override
   Widget build(BuildContext context) {
+    return PendingUserInputFormScope(
+      activeRequestIds: _activePendingUserInputRequestIds(),
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final emptyState = widget.surface.emptyState;
     if (emptyState != null) {
       return EmptyState(
@@ -117,7 +125,8 @@ class _TranscriptListState extends State<TranscriptList> {
                         final block = entry.$2.block;
                         return Padding(
                           padding: EdgeInsets.only(
-                            bottom: index == widget.surface.pinnedItems.length - 1
+                            bottom:
+                                index == widget.surface.pinnedItems.length - 1
                                 ? 0
                                 : 8,
                           ),
@@ -188,5 +197,27 @@ class _TranscriptListState extends State<TranscriptList> {
 
     return activeMetrics.maxScrollExtent - activeMetrics.pixels <=
         _autoScrollResumeDistance;
+  }
+
+  Set<String> _activePendingUserInputRequestIds() {
+    final activeRequestIds = <String>{};
+
+    for (final item in widget.surface.mainItems) {
+      final block = item.block;
+      if (block case final CodexUserInputRequestBlock userInputBlock
+          when !userInputBlock.isResolved) {
+        activeRequestIds.add(userInputBlock.requestId);
+      }
+    }
+
+    for (final item in widget.surface.pinnedItems) {
+      final block = item.block;
+      if (block case final CodexUserInputRequestBlock userInputBlock
+          when !userInputBlock.isResolved) {
+        activeRequestIds.add(userInputBlock.requestId);
+      }
+    }
+
+    return activeRequestIds;
   }
 }

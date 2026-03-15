@@ -5,13 +5,13 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/command_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/error_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/pending_user_input_request_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/plan_update_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart';
 
@@ -46,8 +46,9 @@ class ConversationEntryCard extends StatelessWidget {
       final CodexPlanUpdateBlock planUpdateBlock => PlanUpdateCard(
         block: planUpdateBlock,
       ),
-      final CodexProposedPlanBlock proposedPlanBlock =>
-        ProposedPlanCard(block: proposedPlanBlock),
+      final CodexProposedPlanBlock proposedPlanBlock => ProposedPlanCard(
+        block: proposedPlanBlock,
+      ),
       final CodexCommandExecutionBlock commandBlock => CommandCard(
         block: commandBlock,
       ),
@@ -80,10 +81,11 @@ class ConversationEntryCard extends StatelessWidget {
         onApprove: onApproveRequest,
         onDeny: onDenyRequest,
       ),
-      final CodexUserInputRequestBlock userInputBlock => UserInputRequestCard(
-        block: userInputBlock,
-        onSubmit: onSubmitUserInput,
-      ),
+      final CodexUserInputRequestBlock userInputBlock =>
+        PendingUserInputRequestHost(
+          block: userInputBlock,
+          onSubmit: onSubmitUserInput,
+        ),
       final CodexStatusBlock statusBlock => StatusCard(block: statusBlock),
       final CodexErrorBlock errorBlock => ErrorCard(block: errorBlock),
       final CodexUsageBlock usageBlock => UsageCard(block: usageBlock),

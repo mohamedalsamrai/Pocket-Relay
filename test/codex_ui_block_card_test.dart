@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
@@ -277,6 +278,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
+        activeRequestIds: const <String>{'input_1'},
         child: ConversationEntryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_1',
@@ -311,11 +313,64 @@ void main() {
     });
   });
 
+  testWidgets(
+    'routes user-input option chips through the shared request draft state',
+    (tester) async {
+      Map<String, List<String>>? submittedAnswers;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          activeRequestIds: const <String>{'input_1'},
+          child: ConversationEntryCard(
+            block: CodexUserInputRequestBlock(
+              id: 'input_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              requestId: 'input_1',
+              requestType: CodexCanonicalRequestType.toolUserInput,
+              title: 'Input required',
+              body: 'Codex needs clarification.',
+              questions: const <CodexRuntimeUserInputQuestion>[
+                CodexRuntimeUserInputQuestion(
+                  id: 'q1',
+                  header: 'Project',
+                  question: 'Which project should I use?',
+                  options: <CodexRuntimeUserInputOption>[
+                    CodexRuntimeUserInputOption(
+                      label: 'Pocket Relay',
+                      description: 'Use the mobile app project.',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            onSubmitUserInput: (_, answers) async {
+              submittedAnswers = answers;
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Pocket Relay'));
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.controller?.text, 'Pocket Relay');
+
+      await tester.tap(find.text('Submit response'));
+      await tester.pump();
+
+      expect(submittedAnswers, <String, List<String>>{
+        'q1': <String>['Pocket Relay'],
+      });
+    },
+  );
+
   testWidgets('resyncs user-input fields when the backing request changes', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
+        activeRequestIds: const <String>{'input_1'},
         child: ConversationEntryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_1',
@@ -341,6 +396,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
+        activeRequestIds: const <String>{'input_2'},
         child: ConversationEntryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_2',
@@ -370,6 +426,55 @@ void main() {
     final textField = tester.widget<TextField>(find.byType(TextField));
     expect(textField.controller?.text, '/workspace/mobile');
   });
+
+  testWidgets(
+    'preserves user-input drafts when a request moves within the transcript surface',
+    (tester) async {
+      final controller = TranscriptListController();
+      final block = CodexUserInputRequestBlock(
+        id: 'input_1',
+        createdAt: DateTime(2026, 3, 14, 12),
+        requestId: 'input_1',
+        requestType: CodexCanonicalRequestType.toolUserInput,
+        title: 'Input required',
+        body: 'Codex needs clarification.',
+        questions: const <CodexRuntimeUserInputQuestion>[
+          CodexRuntimeUserInputQuestion(
+            id: 'q1',
+            header: 'Project',
+            question: 'Which project should I use?',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            controller: controller,
+            surface: _surfaceContract(mainItems: <CodexUiBlock>[block]),
+            onConfigure: () {},
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Pocket Relay');
+      await tester.pump();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            controller: controller,
+            surface: _surfaceContract(pinnedItems: <CodexUiBlock>[block]),
+            onConfigure: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.controller?.text, 'Pocket Relay');
+    },
+  );
 
   testWidgets(
     'renders proposed plans with extracted title and collapse control',
@@ -932,12 +1037,18 @@ ChatTranscriptSurfaceContract _surfaceContract({
 Widget _buildTestApp({
   required Widget child,
   ThemeMode themeMode = ThemeMode.light,
+  Set<String> activeRequestIds = const <String>{},
 }) {
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     darkTheme: buildPocketTheme(Brightness.dark),
     themeMode: themeMode,
-    home: Scaffold(body: child),
+    home: Scaffold(
+      body: PendingUserInputFormScope(
+        activeRequestIds: activeRequestIds,
+        child: child,
+      ),
+    ),
   );
 }
 
