@@ -127,6 +127,10 @@ cleanup.
 
 ### Commit A: Explicit Turn Snapshot State
 
+Status:
+
+- implemented in the current worktree after the partial immutability rebase
+
 Goal:
 
 - stop treating `turn/diff/updated` as either a transcript owner or a silent

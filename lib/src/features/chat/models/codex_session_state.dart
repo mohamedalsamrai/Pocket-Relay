@@ -680,6 +680,26 @@ final class CodexTurnBlockSegment extends CodexTurnSegment {
   final CodexUiBlock block;
 }
 
+final class CodexTurnDiffSnapshot {
+  const CodexTurnDiffSnapshot({
+    required this.turnId,
+    required this.createdAt,
+    required this.unifiedDiff,
+  });
+
+  final String turnId;
+  final DateTime createdAt;
+  final String unifiedDiff;
+
+  CodexTurnDiffSnapshot copyWith({DateTime? createdAt, String? unifiedDiff}) {
+    return CodexTurnDiffSnapshot(
+      turnId: turnId,
+      createdAt: createdAt ?? this.createdAt,
+      unifiedDiff: unifiedDiff ?? this.unifiedDiff,
+    );
+  }
+}
+
 class CodexActiveTurnState {
   const CodexActiveTurnState({
     required this.turnId,
@@ -692,6 +712,7 @@ class CodexActiveTurnState {
     this.pendingApprovalRequests = const <String, CodexSessionPendingRequest>{},
     this.pendingUserInputRequests =
         const <String, CodexSessionPendingUserInputRequest>{},
+    this.turnDiffSnapshot,
     this.pendingThreadTokenUsageBlock,
     this.latestUsageSummary,
     this.hasWork = false,
@@ -708,6 +729,7 @@ class CodexActiveTurnState {
   final Map<String, CodexSessionPendingRequest> pendingApprovalRequests;
   final Map<String, CodexSessionPendingUserInputRequest>
   pendingUserInputRequests;
+  final CodexTurnDiffSnapshot? turnDiffSnapshot;
   final CodexUsageBlock? pendingThreadTokenUsageBlock;
   final String? latestUsageSummary;
   final bool hasWork;
@@ -726,6 +748,8 @@ class CodexActiveTurnState {
     Map<String, String>? itemSegmentIds,
     Map<String, CodexSessionPendingRequest>? pendingApprovalRequests,
     Map<String, CodexSessionPendingUserInputRequest>? pendingUserInputRequests,
+    CodexTurnDiffSnapshot? turnDiffSnapshot,
+    bool clearTurnDiffSnapshot = false,
     CodexUsageBlock? pendingThreadTokenUsageBlock,
     bool clearPendingThreadTokenUsageBlock = false,
     String? latestUsageSummary,
@@ -745,6 +769,9 @@ class CodexActiveTurnState {
           pendingApprovalRequests ?? this.pendingApprovalRequests,
       pendingUserInputRequests:
           pendingUserInputRequests ?? this.pendingUserInputRequests,
+      turnDiffSnapshot: clearTurnDiffSnapshot
+          ? null
+          : (turnDiffSnapshot ?? this.turnDiffSnapshot),
       pendingThreadTokenUsageBlock: clearPendingThreadTokenUsageBlock
           ? null
           : (pendingThreadTokenUsageBlock ?? this.pendingThreadTokenUsageBlock),

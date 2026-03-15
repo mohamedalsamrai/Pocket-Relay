@@ -1279,7 +1279,131 @@ void main() {
     expect(state.blocks, isEmpty);
     expect(state.transcriptBlocks, hasLength(1));
     expect(state.transcriptBlocks.single, isA<CodexProposedPlanBlock>());
+    expect(state.activeTurn?.turnDiffSnapshot, isNotNull);
+    expect(
+      state.activeTurn?.turnDiffSnapshot?.unifiedDiff,
+      contains('diff --git a/lib/main.dart b/lib/main.dart'),
+    );
   });
+
+  test(
+    'replaces the active turn diff snapshot when repeated updates arrive',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeTurnStartedEvent(
+          createdAt: now,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnDiffUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              '--- a/README.md\n'
+              '+++ b/README.md\n'
+              '@@ -1 +1 @@\n'
+              '-old\n'
+              '+new\n',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnDiffUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 200)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              '--- a/README.md\n'
+              '+++ b/README.md\n'
+              '@@ -1 +1,2 @@\n'
+              '-old\n'
+              '+new\n'
+              '+second\n',
+        ),
+      );
+
+      expect(state.blocks, isEmpty);
+      expect(state.transcriptBlocks, isEmpty);
+      expect(
+        state.activeTurn?.turnDiffSnapshot?.createdAt,
+        now.add(const Duration(milliseconds: 200)),
+      );
+      expect(
+        state.activeTurn?.turnDiffSnapshot?.unifiedDiff,
+        contains('+second'),
+      );
+    },
+  );
+
+  test(
+    'ignores mismatched turn diff snapshots instead of rolling back turns',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeTurnStartedEvent(
+          createdAt: now,
+          threadId: 'thread_123',
+          turnId: 'turn_456',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 50)),
+          threadId: 'thread_123',
+          turnId: 'turn_456',
+          itemId: 'item_456',
+          streamKind: CodexRuntimeContentStreamKind.assistantText,
+          delta: 'Current turn',
+        ),
+      );
+
+      final baselineBlocks = List<CodexUiBlock>.from(state.blocks);
+      final baselineSegments = List<CodexTurnSegment>.from(
+        state.activeTurn?.segments ?? const <CodexTurnSegment>[],
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnDiffUpdatedEvent(
+          createdAt: now.add(const Duration(seconds: 1)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          unifiedDiff:
+              'diff --git a/README.md b/README.md\n'
+              '--- a/README.md\n'
+              '+++ b/README.md\n'
+              '@@ -1 +1 @@\n'
+              '-old\n'
+              '+new\n',
+        ),
+      );
+
+      expect(state.activeTurn?.turnId, 'turn_456');
+      expect(state.activeTurn?.segments, baselineSegments);
+      expect(state.activeTurn?.turnDiffSnapshot, isNull);
+      expect(state.blocks, baselineBlocks);
+      expect(state.transcriptBlocks.last, isA<CodexTextBlock>());
+      expect(
+        (state.transcriptBlocks.last as CodexTextBlock).body,
+        'Current turn',
+      );
+    },
+  );
 
   test('renders a multi-file file-change item as one changed-files block', () {
     final reducer = TranscriptReducer();
@@ -1533,6 +1657,11 @@ void main() {
         changedFilesBlocks.single.unifiedDiff,
         isNot(contains('+second line')),
       );
+      expect(state.activeTurn?.turnDiffSnapshot, isNotNull);
+      expect(
+        state.activeTurn?.turnDiffSnapshot?.unifiedDiff,
+        contains('+second line'),
+      );
     },
   );
 
@@ -1584,6 +1713,11 @@ void main() {
           .toList(growable: false);
       expect(changedFilesBlocks, hasLength(1));
       expect(changedFilesBlocks.single.isRunning, isTrue);
+      expect(state.activeTurn?.turnDiffSnapshot, isNotNull);
+      expect(
+        state.activeTurn?.turnDiffSnapshot?.unifiedDiff,
+        contains('+second line'),
+      );
     },
   );
 
