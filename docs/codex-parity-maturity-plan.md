@@ -69,16 +69,22 @@ Target behavior:
 
 Current Pocket Relay behavior:
 
-- events reduce directly into immutable blocks
-- grouping is mostly post-hoc
+- the explicit live-artifact model is already in place
+- committed transcript history is append-only
+- only the active tail may mutate
+- plans, changed files, and resolved requests now follow chronology rules much
+  more closely
 
 Target behavior:
 
-- add an explicit in-flight segment model
 - flush assistant streaming before work cells begin
 - flush work groups before assistant streaming resumes
+- freeze the live tail before approval or user-input overlays take over
+- finish the final emulator/manual parity sweep and stale-doc cleanup
 
-This is the main architectural gap between “functional” and “Codex-like”.
+This is no longer the main architectural rewrite gap. The rewrite largely
+landed under the transcript immutability migration, and the remaining work is
+the Commit D parity close-out.
 
 ### 3. Reasoning presentation
 
@@ -151,19 +157,22 @@ Why next:
 
 - this is the largest visible parity gap after timing
 
-### Phase 3: In-flight segment model
+### Phase 3: Transcript chronology close-out
 
 Scope:
 
-- introduce a session-level active transcript segment
-- define explicit flush rules for assistant output, work logs, and request
-  boundaries
-- keep immutable blocks as committed history only
+- run the final emulator/manual chronology sweep against the local Codex
+  reference
+- verify assistant/work/request/plan/file-change ordering under real runtime
+  flows
+- clean stale docs/tests that still describe transcript segmentation as future
+  work
+- only patch code if the sweep finds a remaining mismatch
 
 Why next:
 
-- this is the structural change that will make parity work stop feeling like
-  exceptions layered onto reducers
+- the structural rewrite already landed; the remaining job is proving parity
+  and removing stale migration wording
 
 ### Phase 4: Markdown/file-link normalization
 

@@ -15,6 +15,38 @@ The core product requirement is now explicit:
 This plan exists because previous fixes were too local and treated individual
 symptoms instead of the ownership model.
 
+### Current Repo Status
+
+As of `2026-03-15`, the structural migration is substantially complete.
+
+Committed migration slices:
+
+- `98f3a04` rebased the migration from the current code reality
+- `bbe95b0` moved `turn/diff/updated` into active turn snapshot state
+- `660bcd5` introduced explicit live transcript artifacts
+- `a50e417` made local user prompts immutable transcript history
+- `5e16045` added the main Commit D chronology/parity scenario matrix
+- `30decf7` added widget coverage that request-open freezes the visible running
+  assistant card
+
+What is now true in code:
+
+- committed transcript history is append-only
+- only the active tail may mutate
+- repeated plan updates append instead of replacing older cards
+- sequential file changes stay as separate transcript history
+- `turn/diff/updated` is authoritative turn state, not a visible transcript
+  owner
+- pending approvals and user-input requests stay off-timeline until resolution
+- opening a request freezes the live tail before the pending overlay takes over
+- local user prompts no longer mutate when provider echoes arrive later
+
+Practical estimate:
+
+- migration completion: about `85-90%`
+- transcript parity confidence against local reference Codex: about `80-85%`
+- remaining work is the final Commit D close-out, not another ownership rewrite
+
 ## Deviation Log
 
 The implementation path in the current worktree did **not** follow the ideal
@@ -284,6 +316,46 @@ Changes:
 - run emulator checks on those scenarios
 - remove stale tests and docs that still encode the old mutable-timeline model
 - update handoff docs from the final state rather than from migration intent
+
+Scenario checklist:
+
+- `interrupted/resumed same-item artifacts`: reducer and widget coverage exists
+- `interleaved assistant -> work -> assistant chronology`: reducer and widget
+  coverage exists
+- `repeated plan updates`: reducer and widget coverage exists
+- `sequential distinct file-change artifacts`: reducer and widget coverage
+  exists
+- `request resolution chronology`: reducer and widget coverage exists for
+  pending-off-timeline, live-tail freeze on request-open, and
+  resolved-in-history behavior
+- `emulator/manual parity sweep`: still required after the runtime matrix lands
+- `stale mutable-model docs/tests cleanup`: still required after the sweep
+
+Current status:
+
+- the automated reducer/widget scenario matrix for Commit D is landed
+- the remaining work is now manual/emulator verification plus final cleanup of
+  stale migration wording
+
+Remaining Commit D work:
+
+- run an emulator/manual parity sweep for:
+  - assistant -> work -> assistant chronology
+  - streaming assistant -> approval open -> resolved -> assistant resumes
+  - streaming assistant -> user input open -> resolved -> assistant resumes
+  - repeated plan updates in one turn
+  - sequential distinct file-change items in one turn
+  - same-item resume after warnings or request interruptions
+- verify that no already-rendered history card mutates or reorders during those
+  flows
+- compare the observed behavior against local reference Codex chronology rules,
+  especially around stream flushes before work/request artifacts
+- if the manual sweep finds a mismatch, add the smallest focused reducer/widget
+  regression before patching behavior
+- clean remaining stale docs/tests that still describe transcript segmentation
+  as future work instead of current baseline plus final sweep
+- once the sweep is complete, reduce the migration docs from a live plan into a
+  shorter final-state summary
 
 Exit criterion:
 

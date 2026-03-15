@@ -32,6 +32,9 @@ Important note:
 - that rebased path has itself already needed a documented boundary correction:
   `Commit B` and `Commit C` were tightened in the docs before preserving that
   this was a planning correction rather than implementation progress
+- the transcript migration has now landed through the automated Commit D
+  scenario matrix in `5e16045` and `30decf7`; the remaining work is the final
+  manual/emulator parity sweep and stale-doc cleanup
 
 This document is the short operational handoff for the next agent.
 
@@ -61,29 +64,62 @@ Reference Codex areas:
 - `.reference/codex/codex-rs/tui/src/chatwidget.rs`
 - `.reference/codex/codex-rs/tui/src/history_cell.rs`
 
-### 2. In-flight transcript segmentation
+### 2. Transcript chronology parity finish
 
 Current state:
 
-- the worktree is in a partial transcript-immutability migration state
-- some append-only and tail-freezing behavior is already implemented
-- the migration did not follow the originally documented clean commit sequence
+- the transcript ownership rewrite is already in place
+- the migration did not follow the originally documented clean commit sequence,
+  but the rebased plan in `docs/transcript-immutability-migration-plan.md` is
+  the authoritative record
 - live artifacts now explicitly own assistant/reasoning/plan/changed-files/work
   and resolved-request transcript runs
 - render-time work-log grouping has been removed in favor of live work
   artifacts
 - local user prompts no longer mutate when provider user-message echoes arrive
 - duplicate request-resolution notifications are now idempotent
+- opening an approval or user-input request now freezes the current live tail
+  before the pending overlay takes over
+- reducer and widget parity coverage landed for:
+  - interrupted/resumed assistant history
+  - assistant -> work -> assistant chronology
+  - repeated plan updates
+  - sequential distinct file-change artifacts
+  - pending request chronology and request-open tail freeze
+
+Practical status:
+
+- transcript immutability migration: about `85-90%` done
+- transcript parity confidence vs local reference Codex: about `80-85%`
 
 Target state:
 
 - flush assistant output before tool/work cells begin
 - flush work groups before assistant output resumes
+- freeze the current live artifact before request overlays take over
 - keep committed transcript history separate from active streaming state
 
 The transcript ownership model is now substantially in place. The remaining
-work here is parity verification and behavior sweep, not another ownership
-rewrite.
+work here is emulator/manual parity verification and stale-doc cleanup, not
+another ownership rewrite.
+
+Remaining concrete tasks:
+
+- run the emulator/manual Commit D sweep for:
+  - assistant -> work -> assistant
+  - assistant -> approval open -> resolved -> assistant resumes
+  - assistant -> user-input open -> resolved -> assistant resumes
+  - repeated plan updates
+  - sequential file changes
+  - resumed same-item output after warnings/requests
+- confirm during that sweep that older transcript cards never mutate or reorder
+- compare those flows against `.reference/codex/codex-rs/tui/src/chatwidget.rs`
+  chronology behavior
+- if a mismatch appears, add the smallest focused reducer/widget regression and
+  patch only that behavior
+- clean stale docs that still describe transcript segmentation as future work,
+  especially `docs/codex-parity-maturity-plan.md` and this handoff once the
+  sweep is complete
 
 Primary code areas:
 
@@ -145,13 +181,14 @@ Reference Codex areas:
 
 ## Recommended Execution Order
 
-1. Reasoning parity
-2. In-flight transcript segmentation
+1. Finish transcript chronology parity close-out (`Commit D`)
+2. Reasoning parity
 3. Markdown and file-link normalization
 4. Work-only completion semantics
 
-This order matters. Reasoning and segmentation affect the shape of the
-transcript. File-link work should come after the display pipeline is more
+This order matters. The transcript ownership rewrite is already in place, so it
+should be closed out with the manual parity sweep before broader parity work
+moves on. File-link work should still come after the display pipeline is more
 settled.
 
 ## Guard Rails For The Next Agent
