@@ -134,7 +134,8 @@ class TranscriptTurnArtifactBuilder {
     var nextArtifacts = List<CodexTurnArtifact>.from(turn.artifacts);
     String artifactId;
 
-    if (nextArtifacts.lastOrNull case final CodexTurnChangedFilesArtifact last) {
+    if (nextArtifacts.lastOrNull
+        case final CodexTurnChangedFilesArtifact last) {
       nextArtifacts[nextArtifacts.length - 1] = _changedFilesArtifactWithEntry(
         last,
         entry,
@@ -267,8 +268,7 @@ class TranscriptTurnArtifactBuilder {
 
   bool _isWorkBlockKind(CodexUiBlockKind blockKind) {
     return switch (blockKind) {
-      CodexUiBlockKind.workLogEntry ||
-      CodexUiBlockKind.commandExecution => true,
+      CodexUiBlockKind.workLogEntry => true,
       _ => false,
     };
   }

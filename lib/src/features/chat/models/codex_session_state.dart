@@ -363,11 +363,6 @@ CodexUiBlock _freezeCodexUiBlock(CodexUiBlock block) {
     CodexChangedFilesBlock(:final isRunning) when isRunning => block.copyWith(
       isRunning: false,
     ),
-    CodexCommandExecutionBlock(:final isRunning) when isRunning =>
-      block.copyWith(isRunning: false),
-    CodexWorkLogEntryBlock(:final isRunning) when isRunning => block.copyWith(
-      isRunning: false,
-    ),
     _ => block,
   };
 }
@@ -395,7 +390,7 @@ CodexApprovalRequestBlock _pendingApprovalBlock(
     createdAt: request.createdAt,
     requestId: request.requestId,
     requestType: request.requestType,
-    title: _requestTitle(request.requestType),
+    title: codexRequestTitle(request.requestType),
     body: request.detail ?? 'Codex needs a decision before it can continue.',
   );
 }
@@ -408,13 +403,13 @@ CodexUserInputRequestBlock _pendingUserInputBlock(
     createdAt: request.createdAt,
     requestId: request.requestId,
     requestType: request.requestType,
-    title: _requestTitle(request.requestType),
-    body: request.detail ?? _questionsSummary(request.questions),
+    title: codexRequestTitle(request.requestType),
+    body: request.detail ?? codexQuestionsSummary(request.questions),
     questions: request.questions,
   );
 }
 
-String _requestTitle(CodexCanonicalRequestType requestType) {
+String codexRequestTitle(CodexCanonicalRequestType requestType) {
   return switch (requestType) {
     CodexCanonicalRequestType.commandExecutionApproval => 'Command approval',
     CodexCanonicalRequestType.fileReadApproval => 'File read approval',
@@ -431,10 +426,20 @@ String _requestTitle(CodexCanonicalRequestType requestType) {
   };
 }
 
-String _questionsSummary(List<CodexRuntimeUserInputQuestion> questions) {
+String codexQuestionsSummary(List<CodexRuntimeUserInputQuestion> questions) {
   return questions
       .map((question) => '${question.header}: ${question.question}')
       .join('\n\n');
+}
+
+String codexAnswersSummary(Map<String, List<String>> answers) {
+  if (answers.isEmpty) {
+    return 'The requested input was submitted.';
+  }
+
+  return answers.entries
+      .map((entry) => '${entry.key}: ${entry.value.join(', ')}')
+      .join('\n');
 }
 
 class CodexSessionPendingRequest {
@@ -672,9 +677,8 @@ final class CodexTurnChangedFilesArtifact extends CodexTurnArtifact {
   final String title;
   final List<CodexChangedFilesEntry> entries;
 
-  List<CodexChangedFile> get files => entries
-      .expand((entry) => entry.files)
-      .toList(growable: false);
+  List<CodexChangedFile> get files =>
+      entries.expand((entry) => entry.files).toList(growable: false);
 
   String? get unifiedDiff {
     final parts = entries

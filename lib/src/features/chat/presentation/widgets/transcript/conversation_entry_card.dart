@@ -3,7 +3,6 @@ import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/assistant_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/command_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/error_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/plan_update_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
@@ -46,28 +45,8 @@ class ConversationEntryCard extends StatelessWidget {
       final CodexPlanUpdateBlock planUpdateBlock => PlanUpdateCard(
         block: planUpdateBlock,
       ),
-      final CodexProposedPlanBlock proposedPlanBlock =>
-        ProposedPlanCard(block: proposedPlanBlock),
-      final CodexCommandExecutionBlock commandBlock => CommandCard(
-        block: commandBlock,
-      ),
-      final CodexWorkLogEntryBlock workLogEntryBlock => WorkLogGroupCard(
-        block: CodexWorkLogGroupBlock(
-          id: workLogEntryBlock.id,
-          createdAt: workLogEntryBlock.createdAt,
-          entries: <CodexWorkLogEntry>[
-            CodexWorkLogEntry(
-              id: workLogEntryBlock.id,
-              createdAt: workLogEntryBlock.createdAt,
-              entryKind: workLogEntryBlock.entryKind,
-              title: workLogEntryBlock.title,
-              turnId: workLogEntryBlock.turnId,
-              preview: workLogEntryBlock.preview,
-              isRunning: workLogEntryBlock.isRunning,
-              exitCode: workLogEntryBlock.exitCode,
-            ),
-          ],
-        ),
+      final CodexProposedPlanBlock proposedPlanBlock => ProposedPlanCard(
+        block: proposedPlanBlock,
       ),
       final CodexWorkLogGroupBlock workLogGroupBlock => WorkLogGroupCard(
         block: workLogGroupBlock,
