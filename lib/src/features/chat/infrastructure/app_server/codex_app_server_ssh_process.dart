@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 
@@ -64,7 +64,9 @@ Future<CodexAppServerProcess> openSshCodexAppServerProcess({
     ),
   );
 
-  final session = await client.execute(_buildRemoteCommand(profile: profile));
+  final session = await client.execute(
+    buildSshCodexAppServerCommand(profile: profile),
+  );
   return _SshCodexAppServerProcess(client: client, session: session);
 }
 
@@ -85,16 +87,12 @@ List<SSHKeyPair>? _buildIdentities(
   return SSHKeyPair.fromPem(privateKey, passphrase.isEmpty ? null : passphrase);
 }
 
-String _buildRemoteCommand({required ConnectionProfile profile}) {
-  final codexArgs = <String>[
-    profile.codexPath.trim(),
-    'app-server',
-    '--listen',
-    'stdio://',
-  ];
-  final codexCommand = codexArgs.map(shellEscape).join(' ');
+@visibleForTesting
+String buildSshCodexAppServerCommand({required ConnectionProfile profile}) {
+  final launcher = profile.codexPath.trim();
   final command =
-      'cd ${shellEscape(profile.workspaceDir.trim())} && $codexCommand';
+      'cd ${shellEscape(profile.workspaceDir.trim())} && '
+      '$launcher app-server --listen stdio://';
   return 'bash -lc ${shellEscape(command)}';
 }
 

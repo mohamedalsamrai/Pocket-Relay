@@ -246,12 +246,14 @@ class _ConnectionSheetState extends State<ConnectionSheet> {
                         TextFormField(
                           controller: _codexPathController,
                           decoration: const InputDecoration(
-                            labelText: 'Codex binary',
-                            hintText: 'codex',
+                            labelText: 'Codex launch command',
+                            hintText: 'codex or just codex-mcp',
+                            helperText:
+                                'Command run inside the workspace before app-server args are appended.',
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Codex binary is required';
+                              return 'Codex launch command is required';
                             }
                             return null;
                           },

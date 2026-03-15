@@ -91,7 +91,7 @@ android-dev:
 
 [no-exit-message]
 [script]
-codex-mcp:
+codex-mcp *args:
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -115,6 +115,17 @@ codex-mcp:
     export FLUTTER_ROOT="$flutter_root"
     export FLUTTER_SDK="$flutter_root"
     export PATH="$flutter_bin:$PATH"
+    export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:$PATH"
+
+    fnm_bin="${FNM_DIR:-$HOME/.local/share/fnm}/fnm"
+    if ! command -v codex >/dev/null 2>&1; then
+      if command -v fnm >/dev/null 2>&1; then
+        eval "$(fnm env --shell bash)"
+      elif [ -x "$fnm_bin" ]; then
+        export PATH="$(dirname "$fnm_bin"):$PATH"
+        eval "$("$fnm_bin" env --shell bash)"
+      fi
+    fi
 
     if ! command -v flutter >/dev/null 2>&1; then
       echo "Flutter binary not found on PATH after adding $flutter_bin" >&2
@@ -130,7 +141,8 @@ codex-mcp:
       --dangerously-bypass-approvals-and-sandbox \
       -C "$project_root" \
       -c "mcp_servers.dart.command=\"$dart_bin\"" \
-      -c "mcp_servers.dart.args=[\"mcp-server\",\"--flutter-sdk\",\"$flutter_root\",\"--force-roots-fallback\",\"--tools\",\"all\"]"
+      -c "mcp_servers.dart.args=[\"mcp-server\",\"--flutter-sdk\",\"$flutter_root\",\"--force-roots-fallback\",\"--tools\",\"all\"]" \
+      {{args}}
 
 [no-exit-message]
 [script]
