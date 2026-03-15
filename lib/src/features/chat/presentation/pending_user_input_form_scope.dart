@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_draft.dart';
 
 class PendingUserInputFormScope extends StatefulWidget {
@@ -42,23 +42,23 @@ class PendingUserInputFormScopeState extends State<PendingUserInputFormScope> {
     _store.pruneActiveRequestIds(widget.activeRequestIds);
   }
 
-  PendingUserInputFormState stateFor(CodexUserInputRequestBlock block) {
-    return _store.stateFor(block);
+  PendingUserInputFormState stateFor(ChatUserInputRequestContract request) {
+    return _store.stateFor(request);
   }
 
   void updateField(
-    CodexUserInputRequestBlock block,
+    ChatUserInputRequestContract request,
     String fieldId,
     String value,
   ) {
-    _store.updateField(block, fieldId, value);
+    _store.updateField(request, fieldId, value);
   }
 
   void setSubmissionState(
-    CodexUserInputRequestBlock block,
+    ChatUserInputRequestContract request,
     PendingUserInputSubmissionState submissionState,
   ) {
-    _store.setSubmissionState(block, submissionState);
+    _store.setSubmissionState(request, submissionState);
   }
 
   @override
@@ -85,17 +85,17 @@ class PendingUserInputFormStore {
   final Map<String, _PendingUserInputFormEntry> _entries =
       <String, _PendingUserInputFormEntry>{};
 
-  PendingUserInputFormState stateFor(CodexUserInputRequestBlock block) {
-    if (block.isResolved) {
-      _entries.remove(block.requestId);
-      return PendingUserInputFormState.initial(block: block);
+  PendingUserInputFormState stateFor(ChatUserInputRequestContract request) {
+    if (request.isResolved) {
+      _entries.remove(request.requestId);
+      return PendingUserInputFormState.initial(request: request);
     }
 
-    final fieldIds = _fieldIdsFor(block);
-    final existing = _entries[block.requestId];
+    final fieldIds = _fieldIdsFor(request);
+    final existing = _entries[request.requestId];
     if (existing == null || !_sameFieldIds(existing.fieldIds, fieldIds)) {
-      final nextState = PendingUserInputFormState.initial(block: block);
-      _entries[block.requestId] = _PendingUserInputFormEntry(
+      final nextState = PendingUserInputFormState.initial(request: request);
+      _entries[request.requestId] = _PendingUserInputFormEntry(
         fieldIds: fieldIds,
         formState: nextState,
       );
@@ -106,12 +106,12 @@ class PendingUserInputFormStore {
   }
 
   void updateField(
-    CodexUserInputRequestBlock block,
+    ChatUserInputRequestContract request,
     String fieldId,
     String value,
   ) {
-    final entry = _entryFor(block);
-    _entries[block.requestId] = entry.copyWith(
+    final entry = _entryFor(request);
+    _entries[request.requestId] = entry.copyWith(
       formState: entry.formState.copyWith(
         draft: entry.formState.draft.copyWithField(fieldId, value),
       ),
@@ -119,11 +119,11 @@ class PendingUserInputFormStore {
   }
 
   void setSubmissionState(
-    CodexUserInputRequestBlock block,
+    ChatUserInputRequestContract request,
     PendingUserInputSubmissionState submissionState,
   ) {
-    final entry = _entryFor(block);
-    _entries[block.requestId] = entry.copyWith(
+    final entry = _entryFor(request);
+    _entries[request.requestId] = entry.copyWith(
       formState: entry.formState.copyWith(submissionState: submissionState),
     );
   }
@@ -134,21 +134,21 @@ class PendingUserInputFormStore {
     );
   }
 
-  _PendingUserInputFormEntry _entryFor(CodexUserInputRequestBlock block) {
-    final current = stateFor(block);
-    return _entries[block.requestId] ??
+  _PendingUserInputFormEntry _entryFor(ChatUserInputRequestContract request) {
+    final current = stateFor(request);
+    return _entries[request.requestId] ??
         _PendingUserInputFormEntry(
-          fieldIds: _fieldIdsFor(block),
+          fieldIds: _fieldIdsFor(request),
           formState: current,
         );
   }
 
-  Set<String> _fieldIdsFor(CodexUserInputRequestBlock block) {
-    if (block.questions.isEmpty) {
+  Set<String> _fieldIdsFor(ChatUserInputRequestContract request) {
+    if (request.questions.isEmpty) {
       return const <String>{pendingUserInputFallbackFieldId};
     }
 
-    return block.questions.map((question) => question.id).toSet();
+    return request.questions.map((question) => question.id).toSet();
   }
 
   bool _sameFieldIds(Set<String> left, Set<String> right) {

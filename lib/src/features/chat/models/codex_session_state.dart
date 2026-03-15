@@ -192,14 +192,16 @@ class CodexSessionState {
     if (activeTurn != null) ...projectCodexTurnArtifacts(activeTurn!.artifacts),
   ];
 
-  CodexApprovalRequestBlock? get primaryPendingApprovalBlock =>
-      _firstPendingBlock<CodexApprovalRequestBlock>(
-        pendingApprovalRequests.values.map(_pendingApprovalBlock),
+  CodexSessionPendingRequest? get primaryPendingApprovalRequest =>
+      _firstPendingRequest<CodexSessionPendingRequest>(
+        pendingApprovalRequests.values,
+        (request) => request.createdAt,
       );
 
-  CodexUserInputRequestBlock? get primaryPendingUserInputBlock =>
-      _firstPendingBlock<CodexUserInputRequestBlock>(
-        pendingUserInputRequests.values.map(_pendingUserInputBlock),
+  CodexSessionPendingUserInputRequest? get primaryPendingUserInputRequest =>
+      _firstPendingRequest<CodexSessionPendingUserInputRequest>(
+        pendingUserInputRequests.values,
+        (request) => request.createdAt,
       );
 
   CodexSessionState copyWith({
@@ -366,60 +368,13 @@ bool _shouldAppearInTranscript(CodexUiBlock block) {
   };
 }
 
-T? _firstPendingBlock<T extends CodexUiBlock>(Iterable<T> blocks) {
-  final sorted = blocks.toList(growable: false)
-    ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
+T? _firstPendingRequest<T>(
+  Iterable<T> requests,
+  DateTime Function(T request) createdAtOf,
+) {
+  final sorted = requests.toList(growable: false)
+    ..sort((left, right) => createdAtOf(left).compareTo(createdAtOf(right)));
   return sorted.isEmpty ? null : sorted.first;
-}
-
-CodexApprovalRequestBlock _pendingApprovalBlock(
-  CodexSessionPendingRequest request,
-) {
-  return CodexApprovalRequestBlock(
-    id: 'request_${request.requestId}',
-    createdAt: request.createdAt,
-    requestId: request.requestId,
-    requestType: request.requestType,
-    title: _requestTitle(request.requestType),
-    body: request.detail ?? 'Codex needs a decision before it can continue.',
-  );
-}
-
-CodexUserInputRequestBlock _pendingUserInputBlock(
-  CodexSessionPendingUserInputRequest request,
-) {
-  return CodexUserInputRequestBlock(
-    id: 'request_${request.requestId}',
-    createdAt: request.createdAt,
-    requestId: request.requestId,
-    requestType: request.requestType,
-    title: _requestTitle(request.requestType),
-    body: request.detail ?? _questionsSummary(request.questions),
-    questions: request.questions,
-  );
-}
-
-String _requestTitle(CodexCanonicalRequestType requestType) {
-  return switch (requestType) {
-    CodexCanonicalRequestType.commandExecutionApproval => 'Command approval',
-    CodexCanonicalRequestType.fileReadApproval => 'File read approval',
-    CodexCanonicalRequestType.fileChangeApproval => 'File change approval',
-    CodexCanonicalRequestType.applyPatchApproval => 'Patch approval',
-    CodexCanonicalRequestType.execCommandApproval => 'Command approval',
-    CodexCanonicalRequestType.permissionsRequestApproval =>
-      'Permissions request',
-    CodexCanonicalRequestType.toolUserInput => 'Input required',
-    CodexCanonicalRequestType.mcpServerElicitation => 'MCP input required',
-    CodexCanonicalRequestType.dynamicToolCall => 'Tool call',
-    CodexCanonicalRequestType.authTokensRefresh => 'Auth refresh',
-    CodexCanonicalRequestType.unknown => 'Request',
-  };
-}
-
-String _questionsSummary(List<CodexRuntimeUserInputQuestion> questions) {
-  return questions
-      .map((question) => '${question.header}: ${question.question}')
-      .join('\n\n');
 }
 
 class CodexSessionPendingRequest {

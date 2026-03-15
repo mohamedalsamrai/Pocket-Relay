@@ -64,13 +64,13 @@ class ConversationEntryCard extends StatelessWidget {
         onOpenDiff: onOpenChangedFileDiff,
       ),
       final ChatApprovalRequestItemContract approvalItem => ApprovalRequestCard(
-        block: approvalItem.block,
+        request: approvalItem.request,
         onApprove: onApproveRequest,
         onDeny: onDenyRequest,
       ),
       final ChatUserInputRequestItemContract userInputItem =>
         PendingUserInputRequestHost(
-          block: userInputItem.block,
+          request: userInputItem.request,
           onSubmit: onSubmitUserInput,
         ),
       final ChatStatusItemContract statusItem => StatusCard(

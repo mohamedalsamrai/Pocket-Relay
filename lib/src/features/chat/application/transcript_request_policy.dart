@@ -1,5 +1,6 @@
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
 import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_request_display.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -100,7 +101,7 @@ class TranscriptRequestPolicy {
       createdAt: event.createdAt,
       requestId: requestId,
       requestType: event.requestType,
-      title: '${requestTitle(event.requestType)} resolved',
+      title: '${codexRequestTitle(event.requestType)} resolved',
       body: 'Codex received a response for this request.',
     );
     final nextState = state.copyWith(
@@ -186,7 +187,7 @@ class TranscriptRequestPolicy {
       requestId: requestId,
       requestType: CodexCanonicalRequestType.toolUserInput,
       title: 'Input submitted',
-      body: answersSummary(event.answers),
+      body: codexAnswersSummary(event.answers),
       isResolved: true,
       answers: event.answers,
     );
@@ -208,39 +209,6 @@ class TranscriptRequestPolicy {
       turnId: event.turnId,
       threadId: event.threadId,
     );
-  }
-
-  String requestTitle(CodexCanonicalRequestType requestType) {
-    return switch (requestType) {
-      CodexCanonicalRequestType.commandExecutionApproval => 'Command approval',
-      CodexCanonicalRequestType.fileReadApproval => 'File read approval',
-      CodexCanonicalRequestType.fileChangeApproval => 'File change approval',
-      CodexCanonicalRequestType.applyPatchApproval => 'Patch approval',
-      CodexCanonicalRequestType.execCommandApproval => 'Command approval',
-      CodexCanonicalRequestType.permissionsRequestApproval =>
-        'Permissions request',
-      CodexCanonicalRequestType.toolUserInput => 'Input required',
-      CodexCanonicalRequestType.mcpServerElicitation => 'MCP input required',
-      CodexCanonicalRequestType.dynamicToolCall => 'Tool call',
-      CodexCanonicalRequestType.authTokensRefresh => 'Auth refresh',
-      CodexCanonicalRequestType.unknown => 'Request',
-    };
-  }
-
-  String questionsSummary(List<CodexRuntimeUserInputQuestion> questions) {
-    return questions
-        .map((question) => '${question.header}: ${question.question}')
-        .join('\n\n');
-  }
-
-  String answersSummary(Map<String, List<String>> answers) {
-    if (answers.isEmpty) {
-      return 'The requested input was submitted.';
-    }
-
-    return answers.entries
-        .map((entry) => '${entry.key}: ${entry.value.join(', ')}')
-        .join('\n');
   }
 
   CodexUiBlock _resolvedRequestBlock({

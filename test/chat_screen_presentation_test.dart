@@ -3,6 +3,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
@@ -151,8 +152,20 @@ void main() {
           isA<ChatApprovalRequestItemContract>(),
         );
         expect(
+          (surface.pinnedItems.first as ChatApprovalRequestItemContract)
+              .request
+              .title,
+          'File change approval',
+        );
+        expect(
           surface.pinnedItems.last,
           isA<ChatUserInputRequestItemContract>(),
+        );
+        expect(
+          (surface.pinnedItems.last as ChatUserInputRequestItemContract)
+              .request
+              .body,
+          'Need extra info',
         );
       },
     );
@@ -169,6 +182,53 @@ void main() {
         expect(surface.emptyState?.isConfigured, isFalse);
         expect(surface.mainItems, isEmpty);
         expect(surface.pinnedItems, isEmpty);
+      },
+    );
+  });
+
+  group('ChatRequestProjector', () {
+    const projector = ChatRequestProjector();
+
+    test('projects pending approval requests into presentation contracts', () {
+      final request = CodexSessionPendingRequest(
+        requestId: 'request_approval',
+        requestType: CodexCanonicalRequestType.execCommandApproval,
+        createdAt: DateTime(2026, 3, 15, 12, 0, 1),
+      );
+
+      final contract = projector.projectPendingApprovalRequest(request);
+
+      expect(contract.id, 'request_request_approval');
+      expect(contract.requestId, request.requestId);
+      expect(contract.title, 'Command approval');
+      expect(contract.body, 'Codex needs a decision before it can continue.');
+      expect(contract.isResolved, isFalse);
+    });
+
+    test(
+      'projects pending user-input requests into presentation contracts',
+      () {
+        final request = CodexSessionPendingUserInputRequest(
+          requestId: 'request_input',
+          requestType: CodexCanonicalRequestType.toolUserInput,
+          createdAt: DateTime(2026, 3, 15, 12, 0, 2),
+          questions: const <CodexRuntimeUserInputQuestion>[
+            CodexRuntimeUserInputQuestion(
+              id: 'project',
+              header: 'Project',
+              question: 'Which project should I use?',
+            ),
+          ],
+        );
+
+        final contract = projector.projectPendingUserInputRequest(request);
+
+        expect(contract.id, 'request_request_input');
+        expect(contract.requestId, request.requestId);
+        expect(contract.title, 'Input required');
+        expect(contract.body, 'Project: Which project should I use?');
+        expect(contract.questions, request.questions);
+        expect(contract.isResolved, isFalse);
       },
     );
   });

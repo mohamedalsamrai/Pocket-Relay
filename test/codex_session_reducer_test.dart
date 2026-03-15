@@ -550,8 +550,13 @@ void main() {
     expect(state.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.status, CodexActiveTurnStatus.blocked);
-    final requestBlock = state.primaryPendingApprovalBlock!;
-    expect(requestBlock.title, 'File change approval');
+    final pendingRequest = state.primaryPendingApprovalRequest!;
+    expect(pendingRequest.requestId, 'i:99');
+    expect(
+      pendingRequest.requestType,
+      CodexCanonicalRequestType.fileChangeApproval,
+    );
+    expect(pendingRequest.detail, 'Write files');
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -568,7 +573,7 @@ void main() {
     expect(state.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.status, CodexActiveTurnStatus.running);
-    expect(state.primaryPendingApprovalBlock, isNull);
+    expect(state.primaryPendingApprovalRequest, isNull);
     final resolvedBlock =
         state.transcriptBlocks.single as CodexApprovalRequestBlock;
     expect(resolvedBlock.title, 'File change approval resolved');
@@ -599,8 +604,9 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests.keys, contains('s:user-input-1'));
-    final inputBlock = state.primaryPendingUserInputBlock!;
-    expect(inputBlock.title, 'Input required');
+    final pendingRequest = state.primaryPendingUserInputRequest!;
+    expect(pendingRequest.requestId, 's:user-input-1');
+    expect(pendingRequest.questions.single.question, 'What is your name?');
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -617,7 +623,7 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests, isEmpty);
-    expect(state.primaryPendingUserInputBlock, isNull);
+    expect(state.primaryPendingUserInputRequest, isNull);
     final submittedBlock =
         state.transcriptBlocks.single as CodexUserInputRequestBlock;
     expect(submittedBlock.title, 'Input submitted');

@@ -30,6 +30,8 @@ renderer can consume the same ownership model.
   branch
 - Phase 4, transcript card and overlay seam tightening: completed on this
   branch
+- Phase 5, transcript surface parity and pending-request placement: in progress
+  on this branch
 - Root architectural adapter work: not started
 - Apple-native glass components: not started
 
@@ -45,6 +47,9 @@ renderer can consume the same ownership model.
 - The connection settings surface already renders from a shared form contract.
 - Pending user-input requests already render from a shared request contract and
   request-keyed form-state host.
+- Pending pinned approval and user-input request shaping is now owned by shared
+  presentation request contracts and projectors rather than runtime-shaped
+  transcript blocks.
 - Changed-files rows and per-file diff sheets now render from shared contracts,
   with diff-sheet launch owned above the card widget.
 - Transcript follow behavior is now modeled above `TranscriptList` and routed
@@ -54,10 +59,31 @@ These are the parts we should build on, not reopen.
 
 ## What Is Still Not Ready For Native Ownership
 
-- Transcript item dispatch is still mostly a Flutter-only block-to-widget
-  switch.
-- The screen-level transcript contract still collapses pending requests to the
-  primary approval and primary user-input items.
+- Pending-request selection and pinned placement still depend on
+  `CodexSessionState.primaryPendingApprovalRequest` and
+  `primaryPendingUserInputRequest`.
+- The screen-level transcript contract still inherits that hidden placement
+  policy instead of owning it explicitly.
+- The first root architectural adapter does not exist yet.
+
+## Next Active Work
+
+The next thing to do is not the root architectural adapter.
+
+The next thing to do is Slice 2 of Phase 5:
+
+- define an explicit presentation-owned pending-request placement projector over
+  raw pending maps
+
+Reason:
+
+- Slice 1 already moved pending pinned-request shaping above runtime state
+- the runtime model still decides which pending approval and pending user-input
+  items are visible through convenience getters
+- `ChatTranscriptSurfaceProjector` still inherits that hidden selection policy
+  instead of owning it
+- adding the root adapter before fixing that would freeze an incomplete
+  transcript boundary into the adapter seam
 
 ## Target Architecture
 
@@ -72,6 +98,7 @@ session state.
 The app should own shared presentation contracts for:
 
 - top-level chat screen state
+- transcript surface item placement and pending-request visibility
 - connection settings form state
 - pending user-input request form state
 - overlay and effect boundaries needed above renderer code
@@ -778,12 +805,415 @@ Phase 4 verification must include:
   widget-local `showModalBottomSheet(...)`
 - transcript behavior tests for follow policy if slice 3 is included
 
+## What Comes After Phase 4
+
 ### Phase 5
 
-Introduce the first root architectural adapter once the remaining shared
-contracts are in place.
+Make pending-request visibility and pinned placement a fully explicit
+presentation-owned transcript surface contract.
+
+## Phase 5 Deep Investigation
+
+Phase 5 is the next migration phase:
+
+- transcript surface parity and pending-request placement
+
+This section records the current Phase 5 investigation and the recommended
+upgrade path.
+
+### Findings
+
+#### 1. Pending-request visibility still originates in runtime-state convenience getters
+
+Current files:
+
+- `lib/src/features/chat/models/codex_session_state.dart`
+- `lib/src/features/chat/presentation/chat_transcript_surface_projector.dart`
+
+`CodexSessionState` still exposes:
+
+- `primaryPendingApprovalRequest`
+- `primaryPendingUserInputRequest`
+
+`ChatTranscriptSurfaceProjector` still uses those getters to decide which
+pending requests appear in `pinnedItems`.
+
+That means the transcript surface still does not own one of its most important
+remaining product decisions:
+
+- which pending requests are visible
+- which pending requests are suppressed
+- why those requests appear in the pinned region at all
+
+As long as that policy remains hidden in runtime-state convenience getters, the
+transcript surface contract is still incomplete for adapter and native-parity
+work.
+
+#### 2. The current placement semantics are real product behavior, but they are implicit
+
+Current file:
+
+- `lib/src/features/chat/models/codex_session_state.dart`
+
+`_firstPendingBlock(...)` sorts candidate blocks by `createdAt` ascending and
+returns the first entry.
+
+Combined with the current surface projector, the visible behavior today is:
+
+- at most one pending approval request is visible
+- at most one pending user-input request is visible
+- the oldest request wins within each type
+- pinned-region ordering is approval first, then user-input
+
+Those are product semantics, not implementation trivia. If Phase 5 preserves
+them, it must preserve them explicitly in presentation code.
+
+#### 3. Slice 1 closed the pinned-request shaping gap, but not the placement gap
+
+Current file:
+
+- `lib/src/features/chat/presentation/chat_request_projector.dart`
+
+Slice 1 moved pinned pending-request shaping out of runtime state and into a
+presentation-owned request projector plus request contracts.
+
+That means title/body derivation for pending pinned requests is no longer the
+open ownership problem.
+
+The remaining Phase 5 problem is narrower:
+
+- which pending requests are visible
+- how those visible requests are selected and ordered in the pinned region
+
+#### 4. Pending user-input form activation still depends on widget-side item scanning
+
+Current files:
+
+- `lib/src/features/chat/presentation/widgets/transcript/transcript_list.dart`
+- `lib/src/features/chat/presentation/pending_user_input_form_scope.dart`
+
+`TranscriptList` still discovers active pending user-input request IDs by
+scanning `mainItems` and `pinnedItems`, then passes that derived set into
+`PendingUserInputFormScope`.
+
+That is a smaller gap than the selection problem, but it is the same class of
+problem:
+
+- the widget layer is rediscovering transcript-surface policy from rendered
+  items
+- request-form lifetime is not yet driven by one explicit placement contract
+
+Phase 5 should decide whether active pending user-input request IDs are part of
+the transcript surface contract. If they are not, the document should say why.
+If they are, `TranscriptList` should stop deriving them locally.
+
+#### 5. Live request history now has an artifact path, but pending placement still does not
+
+Current files:
+
+- `lib/src/features/chat/models/codex_session_state.dart`
+- `lib/src/features/chat/application/transcript_request_policy.dart`
+
+The latest `master` changes moved live transcript projection onto explicit turn
+artifacts.
+
+That matters for Phase 5 because resolved request history now already has a
+clear runtime path:
+
+- pending request state still lives in active-turn pending maps
+- resolved request events are converted into resolved request blocks
+- those resolved request blocks are inserted or replaced through the active-turn
+  artifact path and later appear in transcript history
+
+So Phase 5 does not need to invent request lifetime or transcript-history
+placement from scratch.
+
+Phase 5 still must remove the remaining hidden seam:
+
+- selection of which pending requests are visible while unresolved
+- pinned-region shaping for those visible pending requests
+- any request-activation data the pending-input form host depends on
+
+#### 6. Existing tests prove one mixed pinned pair, not placement ownership
+
+Current files:
+
+- `test/chat_screen_presentation_test.dart`
+- `test/codex_session_reducer_test.dart`
+
+Current tests prove:
+
+- pending approvals and pending user-input requests can exist in runtime state
+- one approval and one user-input item can appear in `pinnedItems`
+- resolved request history remains visible in the transcript after resolution
+
+Current tests do not yet prove:
+
+- which request wins when multiple approvals are pending
+- which request wins when multiple user-input requests are pending
+- whether pinned ordering is presentation-owned instead of inherited from
+  runtime convenience getters
+- whether visible pending-user-input IDs for the form scope derive from the
+  same contract as pinned placement
+- whether resolving the visible request promotes the next correct request
+
+So Phase 5 must add ownership-oriented placement tests, not just preserve the
+current one-approval-plus-one-input rendering check.
+
+#### 7. The root adapter should not be introduced around this still-hidden transcript seam
+
+Current files:
+
+- `lib/src/features/chat/presentation/chat_screen_contract.dart`
+- `lib/src/features/chat/presentation/chat_transcript_surface_projector.dart`
+
+The transcript surface is now substantially cleaner after Phase 4, but it still
+does not explicitly own pending-request placement.
+
+If the root architectural adapter is introduced before this seam is fixed, the
+adapter boundary would freeze an incomplete transcript contract into the next
+architecture layer.
+
+That would make later native parity harder, not easier.
+
+## Best Upgrade Path For Phase 5
+
+The best Phase 5 path is not to start by adding the root architectural adapter.
+
+The correct order is:
+
+1. extract presentation-owned pending-request shaping primitives below the chat
+   screen contract
+2. define a presentation-owned placement projector over raw pending maps
+3. integrate that placement projector into the transcript surface contract
+4. thread any request-activation data needed by the pending-input form host
+   through that same surface contract
+5. clean up remaining runtime and controller convenience seams
+6. only then begin root architectural adapter work
+
+That order matters because the transcript surface still has one last important
+hidden behavior seam.
+
+The `master` merge narrows the scope, but it does not change the order:
+
+- keep the active-turn artifact model for resolved request history
+- focus Phase 5 on unresolved pending-request selection, pinned placement, and
+  request-activation ownership
+
+## Phase 5 Slice Breakdown
+
+Phase 5 should be split into 6 slices.
+
+Each slice should be independently landable and should leave the transcript
+surface in a coherent intermediate state.
+
+### Slice 1: Pending-request presentation primitives
+
+This is the next active slice.
+
+Slice 1 is completed on this branch.
+
+Slice 1 covered:
+
+- one presentation-owned pending-request contract or projector input model
+- extraction of pinned pending-request shaping from
+  runtime-state helpers into presentation projectors
+- explicit renderer-neutral shaping for approval and user-input pending blocks
+- tests proving the new presentation-owned shaping matches current card inputs
+- preserving the current active-turn artifact path for resolved request history
+
+This slice did not change placement behavior. It only moved pending
+pinned-request representation above runtime state.
+
+### Slice 2: Placement rule projector
+
+This is the next active slice.
+
+Slice 2 should cover:
+
+- one presentation-owned pending-request placement projector
+- explicit current-behavior selection rules for pending approvals and pending
+  user-input requests
+- explicit pinned-region ordering rules
+- tests for multiple pending requests of the same type
+- tests for mixed approval-plus-input ordering
+
+This slice should make the current placement semantics explicit:
+
+- oldest approval wins
+- oldest user-input request wins
+- approval appears before user-input in the pinned region
+- at most one item of each type is visible unless broader behavior is requested
+
+### Slice 3: Transcript surface integration
+
+Slice 3 should cover:
+
+- threading the new placement projector through
+  `ChatTranscriptSurfaceProjector`
+- replacing direct presentation use of
+  `CodexSessionState.primaryPendingApprovalRequest` and
+  `primaryPendingUserInputRequest`
+- preserving current empty-state behavior and pinned-region rendering inputs
+- presenter or projector tests proving the transcript surface now consumes the
+  placement projector instead of runtime convenience getters
+
+This slice is where the transcript surface stops inheriting hidden pending
+placement behavior from runtime state.
+
+### Slice 4: Pending-input activation ownership
+
+Slice 4 should cover:
+
+- deciding whether visible pending-user-input request IDs belong in the surface
+  contract
+- if they do, routing `PendingUserInputFormScope` activation from the explicit
+  contract instead of `TranscriptList` item scanning
+- widget tests proving pending-input draft lifetime follows explicit contract
+  data rather than renderer-side rediscovery
+
+This slice should finish ownership of pending-input activation at the same
+boundary as pending placement.
+
+### Slice 5: Runtime and controller seam cleanup
+
+Slice 5 should cover:
+
+- cleanup of leftover runtime or controller convenience APIs that still encode
+  presentation placement policy
+- removing or demoting `primaryPendingApprovalRequest`,
+  `primaryPendingUserInputRequest`, and any equivalent controller-level
+  shortcuts
+  from presentation-facing usage
+- ensuring runtime state keeps only raw pending request data, timestamps, and
+  resolved-history insertion responsibilities
+
+This slice should leave the presentation layer dependent on explicit contracts,
+not convenience getters.
+
+### Slice 6: Parity hardening and promotion coverage
+
+Slice 6 should cover:
+
+- ownership-oriented widget and app-level tests for placement promotion when the
+  visible request resolves
+- tests proving the next correct pending request becomes visible after the
+  current visible request resolves
+- verification that pinned placement does not broaden unexpectedly under
+  multiple pending requests
+- verification that the pending-input draft host still behaves correctly under
+  the explicit placement contract
+
+This slice completes Phase 5 and is the gate before Phase 6 root adapter work.
+
+## Phase 5 Execution Spec
+
+### Scope
+
+Phase 5 must extract the following into shared presentation code:
+
+- one pending-request placement contract or projector owning:
+  - visible pending approval selection
+  - visible pending user-input selection
+  - pinned-region ordering
+  - pinned request item shaping for the transcript surface
+  - any visible pending-user-input activation IDs needed by the shared request
+    form host
+- one transcript-surface integration path that consumes that contract instead of
+  runtime-state primary-request getters
+
+### Explicit Non-Goals
+
+Phase 5 must not:
+
+- broaden the visible pending-request surface beyond current product behavior
+  unless explicitly requested
+- redesign approval and user-input cards
+- rework resolved request lifetime or the active-turn artifact model
+- move the entire transcript feed to native ownership
+- introduce the root architectural adapter before the placement seam is fixed
+- start Apple-native glass rendering work
+
+### Required Ownership Boundary
+
+After Phase 5:
+
+- `CodexSessionState` may still store pending request maps and timestamps
+- `TranscriptRequestPolicy` may still own resolved-request history insertion
+  through the active-turn artifact path
+- `CodexSessionState` must not remain the owner of:
+  - which pending requests are visible in the transcript surface
+  - which pending requests are pinned
+  - pinned ordering between approvals and user-input items
+  - renderer-facing pinned request shaping
+- `ChatTranscriptSurfaceProjector` may still assemble the overall transcript
+  surface contract
+- `ChatTranscriptSurfaceProjector` must do so through a presentation-owned
+  placement contract or projector instead of raw runtime convenience getters
+- `TranscriptList` may still host the scroll view and pinned-region layout
+- `TranscriptList` must not remain the source of active pending-user-input ID
+  derivation if that data is part of the transcript surface contract
+
+### Required Semantics To Preserve
+
+Unless broader behavior is explicitly requested, Phase 5 should preserve:
+
+- at most one visible pending approval request
+- at most one visible pending user-input request
+- oldest request wins within each type
+- pinned-region order remains approval first, then user-input
+- resolved requests leave the pinned region and remain visible in the transcript
+  as resolved entries
+
+## Phase 5 Exit Criteria
+
+Phase 5 is complete only when all of the following are true:
+
+- pending-request visibility is derived in presentation code rather than runtime
+  convenience getters
+- pinned request item shaping is owned above the runtime model
+- transcript surface placement rules are explicit and test-covered
+- visible pending-user-input activation is either explicit in the surface
+  contract or deliberately documented as out of scope with a reason
+- the root architectural adapter can start without inheriting hidden
+  pending-placement behavior
+
+## Phase 5 Verification Plan
+
+Phase 5 verification must include:
+
+- projector or presenter tests proving:
+  - multiple pending approvals select the correct visible item
+  - multiple pending user-input requests select the correct visible item
+  - mixed approval-plus-input ordering remains explicit
+  - visible pending-user-input activation IDs match the placement contract if
+    that data is in scope
+- widget tests proving the transcript renderer consumes the explicit placement
+  contract instead of rediscovering placement rules locally
+- widget or integration tests proving pending-input draft state remains correct
+  as visible pending requests change
+- app-level tests proving that when the visible pending request resolves, the
+  next correct request becomes visible without broadening the UI unexpectedly
+
+The next active Phase 5 slice is:
+
+- placement rule projector
+
+Reason:
+
+- it closes the last major transcript-surface ownership gap before adapter work
+- Slice 1 already removed pinned pending-request shaping from runtime state
+- it makes pending-request selection and pinned ordering explicit instead of
+  inherited from runtime convenience getters
+- it gives later adapter work a transcript surface boundary that is explicit
+  rather than partially inherited from runtime state
 
 ### Phase 6
+
+Introduce the first root architectural adapter once the remaining shared
+contracts, including Phase 5 transcript placement work, are stable.
+
+### Phase 7
 
 Begin Apple-native glass work only after the above contracts and adapter
 boundaries are stable.

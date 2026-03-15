@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class ApprovalRequestCard extends StatelessWidget {
   const ApprovalRequestCard({
     super.key,
-    required this.block,
+    required this.request,
     this.onApprove,
     this.onDeny,
   });
 
-  final CodexApprovalRequestBlock block;
+  final ChatApprovalRequestContract request;
   final Future<void> Function(String requestId)? onApprove;
   final Future<void> Function(String requestId)? onDeny;
 
@@ -19,7 +19,8 @@ class ApprovalRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = ConversationCardPalette.of(context);
     final accent = amberAccent(Theme.of(context).brightness);
-    final canRespond = !block.isResolved && onApprove != null && onDeny != null;
+    final canRespond =
+        !request.isResolved && onApprove != null && onDeny != null;
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 680),
@@ -46,7 +47,7 @@ class ApprovalRequestCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    block.title,
+                    request.title,
                     style: TextStyle(
                       color: accent,
                       fontSize: 12.5,
@@ -54,17 +55,17 @@ class ApprovalRequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (block.isResolved)
+                if (request.isResolved)
                   TranscriptBadge(
-                    label: block.resolutionLabel ?? 'resolved',
+                    label: request.resolutionLabel ?? 'resolved',
                     color: accent,
                   ),
               ],
             ),
-            if (block.body.trim().isNotEmpty) ...[
+            if (request.body.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
               SelectableText(
-                block.body,
+                request.body,
                 style: TextStyle(
                   color: cards.textSecondary,
                   fontSize: 13,
@@ -76,12 +77,16 @@ class ApprovalRequestCard extends StatelessWidget {
             Row(
               children: [
                 OutlinedButton(
-                  onPressed: canRespond ? () => onDeny!(block.requestId) : null,
+                  onPressed: canRespond
+                      ? () => onDeny!(request.requestId)
+                      : null,
                   child: const Text('Deny'),
                 ),
                 const SizedBox(width: 10),
                 FilledButton(
-                  onPressed: canRespond ? () => onApprove!(block.requestId) : null,
+                  onPressed: canRespond
+                      ? () => onApprove!(request.requestId)
+                      : null,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFB45309),
                     foregroundColor: Colors.white,

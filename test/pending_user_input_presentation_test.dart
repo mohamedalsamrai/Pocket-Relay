@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_draft.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_presenter.dart';
 
@@ -9,13 +9,14 @@ void main() {
     const presenter = PendingUserInputPresenter();
 
     test('maps questions, options, and draft answers into field contracts', () {
-      final block = CodexUserInputRequestBlock(
+      final request = ChatUserInputRequestContract(
         id: 'input_1',
         createdAt: DateTime(2026, 3, 15, 12),
         requestId: 'input_1',
         requestType: CodexCanonicalRequestType.toolUserInput,
         title: 'Input required',
         body: 'Codex needs clarification.',
+        isResolved: false,
         questions: const <CodexRuntimeUserInputQuestion>[
           CodexRuntimeUserInputQuestion(
             id: 'q1',
@@ -30,14 +31,17 @@ void main() {
           ),
         ],
       );
-      final formState = PendingUserInputFormState.initial(block: block)
+      final formState = PendingUserInputFormState.initial(request: request)
           .copyWith(
-            draft: PendingUserInputDraft.fromBlock(
-              block,
+            draft: PendingUserInputDraft.fromRequest(
+              request,
             ).copyWithField('q1', 'Pocket Relay'),
           );
 
-      final contract = presenter.present(block: block, formState: formState);
+      final contract = presenter.present(
+        request: request,
+        formState: formState,
+      );
       final field = contract.fields.single;
 
       expect(contract.requestId, 'input_1');
@@ -57,23 +61,27 @@ void main() {
     });
 
     test('derives a fallback response field when no questions exist', () {
-      final block = CodexUserInputRequestBlock(
+      final request = ChatUserInputRequestContract(
         id: 'input_2',
         createdAt: DateTime(2026, 3, 15, 12),
         requestId: 'input_2',
         requestType: CodexCanonicalRequestType.mcpServerElicitation,
         title: 'MCP input required',
         body: 'Choose a directory.',
+        isResolved: false,
       );
-      final formState = PendingUserInputFormState.initial(block: block)
+      final formState = PendingUserInputFormState.initial(request: request)
           .copyWith(
-            draft: PendingUserInputDraft.fromBlock(block).copyWithField(
+            draft: PendingUserInputDraft.fromRequest(request).copyWithField(
               pendingUserInputFallbackFieldId,
               ' /workspace/mobile ',
             ),
           );
 
-      final contract = presenter.present(block: block, formState: formState);
+      final contract = presenter.present(
+        request: request,
+        formState: formState,
+      );
       final field = contract.fields.single;
 
       expect(field.id, pendingUserInputFallbackFieldId);
@@ -88,13 +96,14 @@ void main() {
     });
 
     test('normalizes empty answers out of the submit payload', () {
-      final block = CodexUserInputRequestBlock(
+      final request = ChatUserInputRequestContract(
         id: 'input_3',
         createdAt: DateTime(2026, 3, 15, 12),
         requestId: 'input_3',
         requestType: CodexCanonicalRequestType.toolUserInput,
         title: 'Input required',
         body: 'Need both answers.',
+        isResolved: false,
         questions: const <CodexRuntimeUserInputQuestion>[
           CodexRuntimeUserInputQuestion(
             id: 'q1',
@@ -115,7 +124,10 @@ void main() {
             .copyWithField('q2', '   '),
       );
 
-      final contract = presenter.present(block: block, formState: formState);
+      final contract = presenter.present(
+        request: request,
+        formState: formState,
+      );
 
       expect(contract.fields[1].inputLabel, 'Custom answer');
       expect(contract.fields[1].maxLines, 4);
@@ -124,8 +136,8 @@ void main() {
       });
     });
 
-    test('derives resolved read-only state from the block', () {
-      final block = CodexUserInputRequestBlock(
+    test('derives resolved read-only state from the request contract', () {
+      final request = ChatUserInputRequestContract(
         id: 'input_4',
         createdAt: DateTime(2026, 3, 15, 12),
         requestId: 'input_4',
@@ -145,9 +157,12 @@ void main() {
           'q1': <String>['Vince'],
         },
       );
-      final formState = PendingUserInputFormState.initial(block: block);
+      final formState = PendingUserInputFormState.initial(request: request);
 
-      final contract = presenter.present(block: block, formState: formState);
+      final contract = presenter.present(
+        request: request,
+        formState: formState,
+      );
       final field = contract.fields.single;
 
       expect(contract.isResolved, isTrue);
@@ -159,13 +174,14 @@ void main() {
     });
 
     test('disables submit while the request is submitting', () {
-      final block = CodexUserInputRequestBlock(
+      final request = ChatUserInputRequestContract(
         id: 'input_5',
         createdAt: DateTime(2026, 3, 15, 12),
         requestId: 'input_5',
         requestType: CodexCanonicalRequestType.toolUserInput,
         title: 'Input required',
         body: 'Need clarification.',
+        isResolved: false,
         questions: const <CodexRuntimeUserInputQuestion>[
           CodexRuntimeUserInputQuestion(
             id: 'q1',
@@ -174,15 +190,18 @@ void main() {
           ),
         ],
       );
-      final formState = PendingUserInputFormState.initial(block: block)
+      final formState = PendingUserInputFormState.initial(request: request)
           .copyWith(
-            draft: PendingUserInputDraft.fromBlock(
-              block,
+            draft: PendingUserInputDraft.fromRequest(
+              request,
             ).copyWithField('q1', 'Pocket Relay'),
             submissionState: PendingUserInputSubmissionState.submitting,
           );
 
-      final contract = presenter.present(block: block, formState: formState);
+      final contract = presenter.present(
+        request: request,
+        formState: formState,
+      );
 
       expect(contract.isSubmitting, isTrue);
       expect(contract.isSubmitEnabled, isFalse);

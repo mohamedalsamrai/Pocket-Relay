@@ -202,15 +202,15 @@ class _TranscriptListState extends State<TranscriptList> {
 
     for (final item in widget.surface.mainItems) {
       if (item case final ChatUserInputRequestItemContract userInputItem
-          when !userInputItem.block.isResolved) {
-        activeRequestIds.add(userInputItem.block.requestId);
+          when !userInputItem.request.isResolved) {
+        activeRequestIds.add(userInputItem.request.requestId);
       }
     }
 
     for (final item in widget.surface.pinnedItems) {
       if (item case final ChatUserInputRequestItemContract userInputItem
-          when !userInputItem.block.isResolved) {
-        activeRequestIds.add(userInputItem.block.requestId);
+          when !userInputItem.request.isResolved) {
+        activeRequestIds.add(userInputItem.request.requestId);
       }
     }
 

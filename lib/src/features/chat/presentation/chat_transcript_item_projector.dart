@@ -1,14 +1,18 @@
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_item_projector.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 
 class ChatTranscriptItemProjector {
   const ChatTranscriptItemProjector({
     ChatChangedFilesItemProjector changedFilesItemProjector =
         const ChatChangedFilesItemProjector(),
-  }) : _changedFilesItemProjector = changedFilesItemProjector;
+    ChatRequestProjector requestProjector = const ChatRequestProjector(),
+  }) : _changedFilesItemProjector = changedFilesItemProjector,
+       _requestProjector = requestProjector;
 
   final ChatChangedFilesItemProjector _changedFilesItemProjector;
+  final ChatRequestProjector _requestProjector;
 
   ChatTranscriptItemContract project(CodexUiBlock block) {
     return switch (block) {
@@ -37,9 +41,13 @@ class ChatTranscriptItemProjector {
       final CodexChangedFilesBlock changedFilesBlock =>
         _changedFilesItemProjector.project(changedFilesBlock),
       final CodexApprovalRequestBlock approvalBlock =>
-        ChatApprovalRequestItemContract(block: approvalBlock),
+        ChatApprovalRequestItemContract(
+          request: _requestProjector.projectApprovalBlock(approvalBlock),
+        ),
       final CodexUserInputRequestBlock userInputBlock =>
-        ChatUserInputRequestItemContract(block: userInputBlock),
+        ChatUserInputRequestItemContract(
+          request: _requestProjector.projectUserInputBlock(userInputBlock),
+        ),
       final CodexStatusBlock statusBlock => ChatStatusItemContract(
         block: statusBlock,
       ),

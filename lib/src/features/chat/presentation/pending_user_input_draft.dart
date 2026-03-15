@@ -1,4 +1,4 @@
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 
 const String pendingUserInputFallbackFieldId = 'response';
 
@@ -9,9 +9,11 @@ class PendingUserInputDraft {
     this.answersByFieldId = const <String, String>{},
   });
 
-  factory PendingUserInputDraft.fromBlock(CodexUserInputRequestBlock block) {
+  factory PendingUserInputDraft.fromRequest(
+    ChatUserInputRequestContract request,
+  ) {
     return PendingUserInputDraft(
-      answersByFieldId: block.answers.map<String, String>((fieldId, answers) {
+      answersByFieldId: request.answers.map<String, String>((fieldId, answers) {
         return MapEntry<String, String>(fieldId, answers.join(', '));
       }),
     );
@@ -43,10 +45,10 @@ class PendingUserInputFormState {
   });
 
   factory PendingUserInputFormState.initial({
-    required CodexUserInputRequestBlock block,
+    required ChatUserInputRequestContract request,
   }) {
     return PendingUserInputFormState(
-      draft: PendingUserInputDraft.fromBlock(block),
+      draft: PendingUserInputDraft.fromRequest(request),
     );
   }
 

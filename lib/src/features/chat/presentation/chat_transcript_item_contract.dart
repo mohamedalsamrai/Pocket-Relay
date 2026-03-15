@@ -1,5 +1,6 @@
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 
 sealed class ChatTranscriptItemContract {
   const ChatTranscriptItemContract();
@@ -94,22 +95,22 @@ final class ChatChangedFilesItemContract extends ChatTranscriptItemContract {
 }
 
 final class ChatApprovalRequestItemContract extends ChatTranscriptItemContract {
-  const ChatApprovalRequestItemContract({required this.block});
+  const ChatApprovalRequestItemContract({required this.request});
 
-  final CodexApprovalRequestBlock block;
+  final ChatApprovalRequestContract request;
 
   @override
-  String get id => block.id;
+  String get id => request.id;
 }
 
 final class ChatUserInputRequestItemContract
     extends ChatTranscriptItemContract {
-  const ChatUserInputRequestItemContract({required this.block});
+  const ChatUserInputRequestItemContract({required this.request});
 
-  final CodexUserInputRequestBlock block;
+  final ChatUserInputRequestContract request;
 
   @override
-  String get id => block.id;
+  String get id => request.id;
 }
 
 final class ChatStatusItemContract extends ChatTranscriptItemContract {

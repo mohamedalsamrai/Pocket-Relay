@@ -53,15 +53,6 @@ class ChatSessionController extends ChangeNotifier {
   CodexSessionState get sessionState => _sessionState;
   bool get isLoading => _isLoading;
   List<CodexUiBlock> get transcriptBlocks => _sessionState.transcriptBlocks;
-  CodexApprovalRequestBlock? get pendingApprovalBlock =>
-      _sessionState.primaryPendingApprovalBlock;
-  CodexUserInputRequestBlock? get pendingUserInputBlock =>
-      _sessionState.primaryPendingUserInputBlock;
-
-  bool get hasVisibleConversation =>
-      transcriptBlocks.isNotEmpty ||
-      pendingApprovalBlock != null ||
-      pendingUserInputBlock != null;
 
   Future<void> initialize() async {
     if (_didInitialize) {
