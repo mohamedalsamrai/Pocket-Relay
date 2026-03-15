@@ -93,19 +93,7 @@ String buildSshCodexAppServerCommand({required ConnectionProfile profile}) {
   final command =
       'cd ${shellEscape(profile.workspaceDir.trim())} && '
       '$launcher app-server --listen stdio://';
-  final escapedCommand = shellEscape(command);
-  final loginShellWrapper =
-      'if [ -n "\${SHELL:-}" ] && [ -x "\${SHELL:-}" ]; then '
-      'exec "\$SHELL" -lc $escapedCommand; '
-      'fi; '
-      'if command -v getent >/dev/null 2>&1; then '
-      '_pocket_relay_shell="\$(getent passwd "\$(id -un)" | cut -d: -f7)"; '
-      'if [ -n "\$_pocket_relay_shell" ] && [ -x "\$_pocket_relay_shell" ]; then '
-      'exec "\$_pocket_relay_shell" -lc $escapedCommand; '
-      'fi; '
-      'fi; '
-      'exec /bin/sh -lc $escapedCommand';
-  return 'sh -lc ${shellEscape(loginShellWrapper)}';
+  return 'bash -lc ${shellEscape(command)}';
 }
 
 class _SshCodexAppServerProcess implements CodexAppServerProcess {

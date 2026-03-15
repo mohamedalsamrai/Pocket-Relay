@@ -19,6 +19,7 @@ Reference Codex source is available locally at:
 The most relevant planning documents already in the repo are:
 
 - `docs/codex-parity-maturity-plan.md`
+- `docs/transcript-immutability-migration-plan.md`
 - `docs/component-lifecycle-audit-plan.md`
 
 This document is the short operational handoff for the next agent.
@@ -172,8 +173,9 @@ These are not active blockers, but they should be watched during future work:
 Start by reading:
 
 1. `docs/next-agent-handoff.md`
-2. `docs/codex-parity-maturity-plan.md`
-3. `docs/component-lifecycle-audit-plan.md`
+2. `docs/transcript-immutability-migration-plan.md`
+3. `docs/codex-parity-maturity-plan.md`
+4. `docs/component-lifecycle-audit-plan.md`
 
 Then inspect:
 
