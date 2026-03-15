@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
@@ -17,6 +18,7 @@ class TranscriptList extends StatefulWidget {
     required this.controller,
     required this.surface,
     required this.onConfigure,
+    this.onOpenChangedFileDiff,
     this.onApproveRequest,
     this.onDenyRequest,
     this.onSubmitUserInput,
@@ -25,6 +27,7 @@ class TranscriptList extends StatefulWidget {
   final TranscriptListController controller;
   final ChatTranscriptSurfaceContract surface;
   final VoidCallback onConfigure;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
   final Future<void> Function(
@@ -103,6 +106,7 @@ class _TranscriptListState extends State<TranscriptList> {
                   item: item,
                   onApproveRequest: widget.onApproveRequest,
                   onDenyRequest: widget.onDenyRequest,
+                  onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
                   onSubmitUserInput: widget.onSubmitUserInput,
                 );
               },
@@ -134,6 +138,7 @@ class _TranscriptListState extends State<TranscriptList> {
                             item: item,
                             onApproveRequest: widget.onApproveRequest,
                             onDenyRequest: widget.onDenyRequest,
+                            onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
                             onSubmitUserInput: widget.onSubmitUserInput,
                           ),
                         );

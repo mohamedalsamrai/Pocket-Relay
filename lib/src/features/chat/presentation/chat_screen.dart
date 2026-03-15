@@ -4,11 +4,13 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -157,6 +159,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           onConfigure: () => _requestConnectionSettings(screen),
                           onApproveRequest: _sessionController.approveRequest,
                           onDenyRequest: _sessionController.denyRequest,
+                          onOpenChangedFileDiff: _requestChangedFileDiff,
                           onSubmitUserInput: _sessionController.submitUserInput,
                         ),
                       ),
@@ -236,6 +239,20 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<void> _openChangedFileDiffSheet(
+    ChatChangedFileDiffContract diff,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangedFileDiffSheet(diff: diff);
+      },
+    );
+  }
+
   void _requestConnectionSettings(ChatScreenContract screen) {
     final effect = _effectMapper.mapAction(
       action: ChatScreenActionId.openSettings,
@@ -245,6 +262,10 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     _handleScreenEffect(effect);
+  }
+
+  void _requestChangedFileDiff(ChatChangedFileDiffContract diff) {
+    _handleScreenEffect(ChatOpenChangedFileDiffEffect(payload: diff));
   }
 
   void _handleScreenAction(
@@ -295,6 +316,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _showSnackBar(message);
       case ChatOpenConnectionSettingsEffect(:final payload):
         unawaited(_openSettingsSheet(payload));
+      case ChatOpenChangedFileDiffEffect(:final payload):
+        unawaited(_openChangedFileDiffSheet(payload));
     }
   }
 

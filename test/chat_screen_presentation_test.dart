@@ -190,6 +190,43 @@ void main() {
         expect(groupItem.block.entries.single.exitCode, 0);
       },
     );
+
+    test(
+      'projects changed-files blocks into structured changed-files item contracts',
+      () {
+        final block = CodexChangedFilesBlock(
+          id: 'changed_files_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          title: 'Changed files',
+          files: const <CodexChangedFile>[
+            CodexChangedFile(path: 'lib/app.dart', additions: 1),
+          ],
+          unifiedDiff:
+              'diff --git a/lib/app.dart b/lib/app.dart\n'
+              '--- a/lib/app.dart\n'
+              '+++ b/lib/app.dart\n'
+              '@@ -1 +1 @@\n'
+              '-old\n'
+              '+new\n',
+        );
+
+        final item = projector.project(block);
+
+        expect(item, isA<ChatChangedFilesItemContract>());
+        final changedFilesItem = item as ChatChangedFilesItemContract;
+        expect(changedFilesItem.id, block.id);
+        expect(changedFilesItem.title, block.title);
+        expect(changedFilesItem.fileCount, 1);
+        expect(changedFilesItem.headerStats.additions, 1);
+        expect(changedFilesItem.headerStats.deletions, 0);
+        expect(changedFilesItem.rows.single.displayPathLabel, 'lib/app.dart');
+        expect(changedFilesItem.rows.single.diff, isNotNull);
+        expect(
+          changedFilesItem.rows.single.diff?.lines.first.text,
+          'diff --git a/lib/app.dart b/lib/app.dart',
+        );
+      },
+    );
   });
 
   test('maps snackbar messages into screen effects', () {

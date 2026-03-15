@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/assistant_message_card.dart';
@@ -21,12 +22,14 @@ class ConversationEntryCard extends StatelessWidget {
     required this.item,
     this.onApproveRequest,
     this.onDenyRequest,
+    this.onOpenChangedFileDiff,
     this.onSubmitUserInput,
   });
 
   final ChatTranscriptItemContract item;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(
     String requestId,
     Map<String, List<String>> answers,
@@ -57,7 +60,8 @@ class ConversationEntryCard extends StatelessWidget {
         block: workLogGroupItem.block,
       ),
       final ChatChangedFilesItemContract changedFilesItem => ChangedFilesCard(
-        block: changedFilesItem.block,
+        item: changedFilesItem,
+        onOpenDiff: onOpenChangedFileDiff,
       ),
       final ChatApprovalRequestItemContract approvalItem => ApprovalRequestCard(
         block: approvalItem.block,

@@ -29,7 +29,7 @@ renderer can consume the same ownership model.
 - Phase 3, pending user-input form contract extraction: completed on this
   branch
 - Phase 4, transcript card and overlay seam tightening: slice 1 completed on
-  this branch, slice 2 not started
+  this branch, slice 2 completed on this branch, slice 3 not started
 - Root architectural adapter work: not started
 - Apple-native glass components: not started
 
@@ -45,6 +45,8 @@ renderer can consume the same ownership model.
 - The connection settings surface already renders from a shared form contract.
 - Pending user-input requests already render from a shared request contract and
   request-keyed form-state host.
+- Changed-files rows and per-file diff sheets now render from shared contracts,
+  with diff-sheet launch owned above the card widget.
 
 These are the parts we should build on, not reopen.
 
@@ -52,7 +54,6 @@ These are the parts we should build on, not reopen.
 
 - Transcript item dispatch is still mostly a Flutter-only block-to-widget
   switch.
-- Changed-file diff presentation still originates inside a Flutter card.
 - Transcript follow behavior is still widget-local.
 - The screen-level transcript contract still collapses pending requests to the
   primary approval and primary user-input items.
@@ -643,9 +644,9 @@ transcript item layer.
 
 ### Slice 2: Changed-files contract and diff overlay boundary
 
-This is the next active slice.
+This slice is complete on this branch.
 
-Slice 2 should cover:
+Slice 2 covers:
 
 - one renderer-neutral changed-files item contract
 - file-row contracts with display labels, availability state, and summary stats
@@ -653,10 +654,12 @@ Slice 2 should cover:
 - a modeled event/effect boundary for opening a diff sheet from a transcript row
 - removing widget-local diff parsing and sheet launching from `ChangedFilesCard`
 
-This is the highest-value Phase 4 slice because it removes the largest
-remaining card-local ownership gap.
+This slice removed the largest remaining card-local ownership gap in the
+transcript.
 
 ### Slice 3: Transcript follow behavior contract
+
+This is the next active slice.
 
 This slice should cover:
 

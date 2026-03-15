@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class ChangedFilesCard extends StatelessWidget {
-  const ChangedFilesCard({super.key, required this.block});
+  const ChangedFilesCard({super.key, required this.item, this.onOpenDiff});
 
-  final CodexChangedFilesBlock block;
+  final ChatChangedFilesItemContract item;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenDiff;
 
   @override
   Widget build(BuildContext context) {
     final cards = ConversationCardPalette.of(context);
     final accent = amberAccent(Theme.of(context).brightness);
-    final patches = _parseUnifiedDiff(block.unifiedDiff);
-    final files = _displayFiles(block.files, patches);
-    final headerStats = _resolveHeaderStats(files: files, patches: patches);
     final fileCountLabel =
-        '${files.length} ${files.length == 1 ? 'file' : 'files'}';
-    final hasStats = headerStats.additions > 0 || headerStats.deletions > 0;
+        '${item.fileCount} ${item.fileCount == 1 ? 'file' : 'files'}';
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 700),
@@ -45,7 +43,7 @@ class ChangedFilesCard extends StatelessWidget {
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    block.title,
+                    item.title,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -54,7 +52,7 @@ class ChangedFilesCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (block.isRunning) const InlinePulseChip(label: 'updating'),
+                if (item.isRunning) const InlinePulseChip(label: 'updating'),
               ],
             ),
             const SizedBox(height: 10),
@@ -69,36 +67,32 @@ class ChangedFilesCard extends StatelessWidget {
                     letterSpacing: 0.2,
                   ),
                 ),
-                if (hasStats) ...[
+                if (item.hasHeaderStats) ...[
                   const SizedBox(width: 8),
                   Text(
-                    '+${headerStats.additions} -${headerStats.deletions}',
+                    '+${item.headerStats.additions} -${item.headerStats.deletions}',
                     style: TextStyle(color: cards.textSecondary, fontSize: 12),
                   ),
                 ],
               ],
             ),
             const SizedBox(height: 8),
-            if (files.isEmpty)
+            if (item.rows.isEmpty)
               Text(
                 'Waiting for changed files…',
                 style: TextStyle(color: cards.textMuted),
               )
             else
               Column(
-                children: files
+                children: item.rows
                     .map(
-                      (file) => Padding(
+                      (row) => Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: _ChangedFileRow(
-                          file: file,
-                          patch: _patchForFile(
-                            file,
-                            patches,
-                            totalFiles: files.length,
-                          ),
+                          row: row,
                           accent: accent,
                           cards: cards,
+                          onOpenDiff: onOpenDiff,
                         ),
                       ),
                     )
@@ -113,22 +107,21 @@ class ChangedFilesCard extends StatelessWidget {
 
 class _ChangedFileRow extends StatelessWidget {
   const _ChangedFileRow({
-    required this.file,
-    required this.patch,
+    required this.row,
     required this.accent,
     required this.cards,
+    this.onOpenDiff,
   });
 
-  final CodexChangedFile file;
-  final _ParsedDiffPatch? patch;
+  final ChatChangedFileRowContract row;
   final Color accent;
   final ConversationCardPalette cards;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenDiff;
 
-  bool get _canOpenPatch => patch != null;
+  bool get _canOpenPatch => row.canOpenDiff;
 
   @override
   Widget build(BuildContext context) {
-    final stats = _resolveFileStats(file: file, patch: patch);
     final body = Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -146,7 +139,7 @@ class _ChangedFileRow extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              _displayPathLabel(file),
+              row.displayPathLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -157,16 +150,16 @@ class _ChangedFileRow extends StatelessWidget {
               ),
             ),
           ),
-          if (stats.additions > 0 || stats.deletions > 0) ...[
+          if (row.stats.hasChanges) ...[
             const SizedBox(width: 8),
             Text(
-              '+${stats.additions} -${stats.deletions}',
+              '+${row.stats.additions} -${row.stats.deletions}',
               style: TextStyle(fontSize: 11, color: cards.textMuted),
             ),
           ],
           const SizedBox(width: 8),
           _ChangedFileActionChip(
-            label: _canOpenPatch ? 'View diff' : 'No patch',
+            label: row.actionLabel,
             accent: accent,
             cards: cards,
             isEnabled: _canOpenPatch,
@@ -175,7 +168,7 @@ class _ChangedFileRow extends StatelessWidget {
       ),
     );
 
-    if (!_canOpenPatch) {
+    if (!_canOpenPatch || onOpenDiff == null) {
       return body;
     }
 
@@ -183,25 +176,9 @@ class _ChangedFileRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openDiffSheet(context, file: file, patch: patch!),
+        onTap: () => onOpenDiff!(row.diff!),
         child: body,
       ),
-    );
-  }
-
-  Future<void> _openDiffSheet(
-    BuildContext context, {
-    required CodexChangedFile file,
-    required _ParsedDiffPatch patch,
-  }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _ChangedFileDiffSheet(file: file, patch: patch, accent: accent);
-      },
     );
   }
 }
@@ -252,39 +229,29 @@ class _ChangedFileActionChip extends StatelessWidget {
   }
 }
 
-class _ChangedFileDiffSheet extends StatefulWidget {
-  const _ChangedFileDiffSheet({
-    required this.file,
-    required this.patch,
-    required this.accent,
-  });
+class ChangedFileDiffSheet extends StatefulWidget {
+  const ChangedFileDiffSheet({super.key, required this.diff});
 
-  final CodexChangedFile file;
-  final _ParsedDiffPatch patch;
-  final Color accent;
+  final ChatChangedFileDiffContract diff;
 
   @override
-  State<_ChangedFileDiffSheet> createState() => _ChangedFileDiffSheetState();
+  State<ChangedFileDiffSheet> createState() => _ChangedFileDiffSheetState();
 }
 
-class _ChangedFileDiffSheetState extends State<_ChangedFileDiffSheet> {
-  static const int _previewLineLimit = 320;
-
+class _ChangedFileDiffSheetState extends State<ChangedFileDiffSheet> {
   bool _showFullDiff = false;
 
   @override
   Widget build(BuildContext context) {
-    final file = widget.file;
-    final patch = widget.patch;
-    final accent = widget.accent;
+    final diff = widget.diff;
+    final accent = amberAccent(Theme.of(context).brightness);
     final cards = ConversationCardPalette.of(context);
     final pocket = context.pocketPalette;
-    final statusLabel = patch.statusLabel;
-    final stats = _resolveFileStats(file: file, patch: patch);
-    final hasPreviewLimit = patch.lines.length > _previewLineLimit;
+    final statusLabel = diff.statusLabel;
+    final hasPreviewLimit = diff.hasPreviewLimit;
     final visibleLines = _showFullDiff || !hasPreviewLimit
-        ? patch.lines
-        : patch.lines.take(_previewLineLimit).toList(growable: false);
+        ? diff.lines
+        : diff.lines.take(diff.previewLineLimit).toList(growable: false);
 
     return FractionallySizedBox(
       heightFactor: 0.9,
@@ -325,7 +292,7 @@ class _ChangedFileDiffSheetState extends State<_ChangedFileDiffSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _displayPathLabel(file),
+                          diff.displayPathLabel,
                           style: TextStyle(
                             color: cards.textPrimary,
                             fontSize: 15,
@@ -339,17 +306,17 @@ class _ChangedFileDiffSheetState extends State<_ChangedFileDiffSheet> {
                           runSpacing: 8,
                           children: [
                             _SheetChip(
-                              label: '+${stats.additions} additions',
+                              label: '+${diff.stats.additions} additions',
                               accent: tealAccent(cards.brightness),
                               cards: cards,
                             ),
                             _SheetChip(
-                              label: '-${stats.deletions} deletions',
+                              label: '-${diff.stats.deletions} deletions',
                               accent: redAccent(cards.brightness),
                               cards: cards,
                             ),
                             _SheetChip(
-                              label: '${patch.lines.length} lines',
+                              label: '${diff.lineCount} lines',
                               accent: neutralAccent(cards.brightness),
                               cards: cards,
                             ),
@@ -398,7 +365,7 @@ class _ChangedFileDiffSheetState extends State<_ChangedFileDiffSheet> {
                         child: Text(
                           _showFullDiff
                               ? 'Full diff loaded.'
-                              : 'Showing the first $_previewLineLimit lines to keep the sheet responsive.',
+                              : 'Showing the first ${diff.previewLineLimit} lines to keep the sheet responsive.',
                           style: TextStyle(
                             color: cards.textSecondary,
                             fontSize: 11.5,
@@ -504,7 +471,7 @@ class _SheetChip extends StatelessWidget {
 class _DiffLineView extends StatelessWidget {
   const _DiffLineView({required this.line, required this.cards});
 
-  final _DiffLine line;
+  final ChatChangedFileDiffLineContract line;
   final ConversationCardPalette cards;
 
   @override
@@ -528,11 +495,11 @@ class _DiffLineView extends StatelessWidget {
   }
 
   _DiffLineStyle _styleForLine(
-    _DiffLineKind kind,
+    ChatChangedFileDiffLineKind kind,
     ConversationCardPalette cards,
   ) {
     return switch (kind) {
-      _DiffLineKind.addition => _DiffLineStyle(
+      ChatChangedFileDiffLineKind.addition => _DiffLineStyle(
         background: Color.alphaBlend(
           tealAccent(
             cards.brightness,
@@ -541,7 +508,7 @@ class _DiffLineView extends StatelessWidget {
         ),
         foreground: cards.terminalText,
       ),
-      _DiffLineKind.deletion => _DiffLineStyle(
+      ChatChangedFileDiffLineKind.deletion => _DiffLineStyle(
         background: Color.alphaBlend(
           redAccent(
             cards.brightness,
@@ -550,7 +517,7 @@ class _DiffLineView extends StatelessWidget {
         ),
         foreground: cards.terminalText,
       ),
-      _DiffLineKind.hunk => _DiffLineStyle(
+      ChatChangedFileDiffLineKind.hunk => _DiffLineStyle(
         background: Color.alphaBlend(
           blueAccent(
             cards.brightness,
@@ -562,7 +529,7 @@ class _DiffLineView extends StatelessWidget {
         ).withValues(alpha: cards.isDark ? 0.92 : 1),
         fontWeight: FontWeight.w700,
       ),
-      _DiffLineKind.meta => _DiffLineStyle(
+      ChatChangedFileDiffLineKind.meta => _DiffLineStyle(
         background: Color.alphaBlend(
           amberAccent(
             cards.brightness,
@@ -571,7 +538,7 @@ class _DiffLineView extends StatelessWidget {
         ),
         foreground: cards.textSecondary,
       ),
-      _DiffLineKind.context => _DiffLineStyle(
+      ChatChangedFileDiffLineKind.context => _DiffLineStyle(
         background: cards.terminalBody,
         foreground: cards.terminalText,
       ),
@@ -589,333 +556,4 @@ class _DiffLineStyle {
   final Color background;
   final Color foreground;
   final FontWeight fontWeight;
-}
-
-List<CodexChangedFile> _displayFiles(
-  List<CodexChangedFile> files,
-  List<_ParsedDiffPatch> patches,
-) {
-  final baseFiles = files.isNotEmpty
-      ? files
-      : patches
-            .map(
-              (patch) => CodexChangedFile(
-                path: patch.renameFromPath ?? patch.path,
-                movePath: patch.renameToPath,
-                additions: patch.additions,
-                deletions: patch.deletions,
-              ),
-            )
-            .toList(growable: false);
-  if (baseFiles.isEmpty) {
-    return const <CodexChangedFile>[];
-  }
-
-  return baseFiles
-      .map(
-        (file) => _enrichFileFromPatch(
-          file,
-          _patchForFile(file, patches, totalFiles: baseFiles.length),
-        ),
-      )
-      .toList(growable: false);
-}
-
-CodexChangedFile _enrichFileFromPatch(
-  CodexChangedFile file,
-  _ParsedDiffPatch? patch,
-) {
-  if (patch == null) {
-    return file;
-  }
-
-  final renameFromPath = patch.renameFromPath;
-  final renameToPath = patch.renameToPath;
-  if (renameFromPath == null && renameToPath == null) {
-    return file;
-  }
-
-  final displayPath = renameFromPath ?? file.path;
-  final movePath = renameToPath == null || renameToPath == displayPath
-      ? file.movePath
-      : renameToPath;
-  return file.copyWith(path: displayPath, movePath: movePath);
-}
-
-_ParsedDiffPatch? _patchForFile(
-  CodexChangedFile file,
-  List<_ParsedDiffPatch> patches, {
-  required int totalFiles,
-}) {
-  if (patches.isEmpty) {
-    return null;
-  }
-
-  final normalizedPath = _normalizeDiffPath(file.path);
-  for (final patch in patches) {
-    if (patch.matchedPaths.contains(normalizedPath)) {
-      return patch;
-    }
-  }
-
-  if (totalFiles == 1 &&
-      patches.length == 1 &&
-      patches.single.matchedPaths.isEmpty) {
-    return patches.single;
-  }
-
-  return null;
-}
-
-_DiffStats _resolveHeaderStats({
-  required List<CodexChangedFile> files,
-  required List<_ParsedDiffPatch> patches,
-}) {
-  final fileStats = files.fold<_DiffStats>(
-    const _DiffStats(),
-    (sum, file) => _DiffStats(
-      additions: sum.additions + file.additions,
-      deletions: sum.deletions + file.deletions,
-    ),
-  );
-  if (fileStats.additions > 0 || fileStats.deletions > 0) {
-    return fileStats;
-  }
-
-  return patches.fold<_DiffStats>(
-    const _DiffStats(),
-    (sum, patch) => _DiffStats(
-      additions: sum.additions + patch.additions,
-      deletions: sum.deletions + patch.deletions,
-    ),
-  );
-}
-
-_DiffStats _resolveFileStats({
-  required CodexChangedFile file,
-  required _ParsedDiffPatch? patch,
-}) {
-  if (file.additions > 0 || file.deletions > 0 || patch == null) {
-    return _DiffStats(additions: file.additions, deletions: file.deletions);
-  }
-
-  return _DiffStats(additions: patch.additions, deletions: patch.deletions);
-}
-
-List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
-  final trimmed = unifiedDiff?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return const <_ParsedDiffPatch>[];
-  }
-
-  final lines = trimmed.split(RegExp(r'\r?\n'));
-  final patches = <_ParsedDiffPatch>[];
-  final currentLines = <String>[];
-  String? diffPath;
-  String? newPath;
-  String? oldPath;
-  String? renameToPath;
-  String? renameFromPath;
-  var additions = 0;
-  var deletions = 0;
-  var isNewFile = false;
-  var isDeletedFile = false;
-
-  void resetState() {
-    currentLines.clear();
-    diffPath = null;
-    newPath = null;
-    oldPath = null;
-    renameToPath = null;
-    renameFromPath = null;
-    additions = 0;
-    deletions = 0;
-    isNewFile = false;
-    isDeletedFile = false;
-  }
-
-  void commitPatch() {
-    if (currentLines.isEmpty) {
-      return;
-    }
-
-    final resolvedPath =
-        renameToPath ??
-        newPath ??
-        diffPath ??
-        renameFromPath ??
-        oldPath ??
-        'Unknown file';
-    final matchedPaths = <String>{
-      _normalizeDiffPath(diffPath),
-      _normalizeDiffPath(newPath),
-      _normalizeDiffPath(oldPath),
-      _normalizeDiffPath(renameToPath),
-      _normalizeDiffPath(renameFromPath),
-      _normalizeDiffPath(resolvedPath),
-    }..removeWhere((path) => path.isEmpty);
-    final statusLabel = switch ((
-      isNewFile,
-      isDeletedFile,
-      renameToPath != null,
-    )) {
-      (true, _, _) => 'new file',
-      (_, true, _) => 'deleted file',
-      (_, _, true) => 'renamed',
-      _ => null,
-    };
-
-    patches.add(
-      _ParsedDiffPatch(
-        path: resolvedPath,
-        rawPatch: currentLines.join('\n'),
-        statusLabel: statusLabel,
-        additions: additions,
-        deletions: deletions,
-        matchedPaths: matchedPaths,
-        renameFromPath: renameFromPath,
-        renameToPath: renameToPath,
-        lines: currentLines
-            .map((line) => _DiffLine(text: line, kind: _classifyDiffLine(line)))
-            .toList(growable: false),
-      ),
-    );
-  }
-
-  resetState();
-
-  for (final line in lines) {
-    if (line.startsWith('diff --git ')) {
-      commitPatch();
-      resetState();
-      final match = RegExp(r'^diff --git a/(.+?) b/(.+)$').firstMatch(line);
-      diffPath = _normalizeDiffPath(match?.group(2));
-    } else if (line.startsWith('--- ') &&
-        currentLines.isNotEmpty &&
-        (oldPath != null ||
-            newPath != null ||
-            additions > 0 ||
-            deletions > 0)) {
-      commitPatch();
-      resetState();
-    }
-
-    currentLines.add(line);
-
-    if (line.startsWith('new file mode ')) {
-      isNewFile = true;
-    } else if (line.startsWith('deleted file mode ')) {
-      isDeletedFile = true;
-    } else if (line.startsWith('rename from ')) {
-      renameFromPath = _normalizeDiffPath(
-        line.substring('rename from '.length),
-      );
-    } else if (line.startsWith('rename to ')) {
-      renameToPath = _normalizeDiffPath(line.substring('rename to '.length));
-    } else if (line.startsWith('--- ')) {
-      oldPath = _normalizeDiffPath(line.substring(4).trim());
-    } else if (line.startsWith('+++ ')) {
-      newPath = _normalizeDiffPath(line.substring(4).trim());
-    } else if (line.startsWith('+') && !line.startsWith('+++')) {
-      additions += 1;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
-      deletions += 1;
-    }
-  }
-
-  commitPatch();
-  return patches;
-}
-
-String _normalizeDiffPath(String? rawPath) {
-  if (rawPath == null) {
-    return '';
-  }
-
-  final trimmed = rawPath.trim();
-  if (trimmed.isEmpty || trimmed == '/dev/null') {
-    return '';
-  }
-
-  if (trimmed.startsWith('a/') || trimmed.startsWith('b/')) {
-    return trimmed.substring(2);
-  }
-
-  return trimmed;
-}
-
-_DiffLineKind _classifyDiffLine(String line) {
-  if (line.startsWith('@@')) {
-    return _DiffLineKind.hunk;
-  }
-
-  if (line.startsWith('diff --git ') ||
-      line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ') ||
-      line.startsWith('new file mode ') ||
-      line.startsWith('deleted file mode ') ||
-      line.startsWith('rename from ') ||
-      line.startsWith('rename to ') ||
-      line.startsWith('similarity index ')) {
-    return _DiffLineKind.meta;
-  }
-
-  if (line.startsWith('+')) {
-    return _DiffLineKind.addition;
-  }
-
-  if (line.startsWith('-')) {
-    return _DiffLineKind.deletion;
-  }
-
-  return _DiffLineKind.context;
-}
-
-enum _DiffLineKind { meta, hunk, addition, deletion, context }
-
-class _DiffLine {
-  const _DiffLine({required this.text, required this.kind});
-
-  final String text;
-  final _DiffLineKind kind;
-}
-
-class _ParsedDiffPatch {
-  const _ParsedDiffPatch({
-    required this.path,
-    required this.rawPatch,
-    required this.lines,
-    required this.additions,
-    required this.deletions,
-    required this.matchedPaths,
-    this.renameFromPath,
-    this.renameToPath,
-    this.statusLabel,
-  });
-
-  final String path;
-  final String rawPatch;
-  final List<_DiffLine> lines;
-  final int additions;
-  final int deletions;
-  final Set<String> matchedPaths;
-  final String? renameFromPath;
-  final String? renameToPath;
-  final String? statusLabel;
-}
-
-String _displayPathLabel(CodexChangedFile file) {
-  final movePath = file.movePath?.trim();
-  if (movePath == null || movePath.isEmpty || movePath == file.path) {
-    return file.path;
-  }
-  return '${file.path} -> $movePath';
-}
-
-class _DiffStats {
-  const _DiffStats({this.additions = 0, this.deletions = 0});
-
-  final int additions;
-  final int deletions;
 }

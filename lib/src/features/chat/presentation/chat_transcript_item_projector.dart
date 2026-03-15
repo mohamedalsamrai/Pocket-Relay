@@ -1,8 +1,14 @@
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_item_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 
 class ChatTranscriptItemProjector {
-  const ChatTranscriptItemProjector();
+  const ChatTranscriptItemProjector({
+    ChatChangedFilesItemProjector changedFilesItemProjector =
+        const ChatChangedFilesItemProjector(),
+  }) : _changedFilesItemProjector = changedFilesItemProjector;
+
+  final ChatChangedFilesItemProjector _changedFilesItemProjector;
 
   ChatTranscriptItemContract project(CodexUiBlock block) {
     return switch (block) {
@@ -29,7 +35,7 @@ class ChatTranscriptItemProjector {
       final CodexWorkLogGroupBlock workLogGroupBlock =>
         ChatWorkLogGroupItemContract(block: workLogGroupBlock),
       final CodexChangedFilesBlock changedFilesBlock =>
-        ChatChangedFilesItemContract(block: changedFilesBlock),
+        _changedFilesItemProjector.project(changedFilesBlock),
       final CodexApprovalRequestBlock approvalBlock =>
         ChatApprovalRequestItemContract(block: approvalBlock),
       final CodexUserInputRequestBlock userInputBlock =>
