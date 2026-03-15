@@ -196,7 +196,7 @@ String? _itemTitle(CodexCanonicalItemType itemType) {
     CodexCanonicalItemType.reasoning => 'Reasoning',
     CodexCanonicalItemType.plan => 'Plan',
     CodexCanonicalItemType.commandExecution => 'Ran command',
-    CodexCanonicalItemType.fileChange => 'File change',
+    CodexCanonicalItemType.fileChange => 'Changed files',
     CodexCanonicalItemType.mcpToolCall => 'MCP tool call',
     CodexCanonicalItemType.dynamicToolCall => 'Tool call',
     CodexCanonicalItemType.webSearch => 'Web search',

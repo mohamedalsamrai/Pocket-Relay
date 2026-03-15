@@ -164,6 +164,79 @@ void main() {
   });
 
   testWidgets(
+    'renders one grouped changed-files card for a multi-file file-change item',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_1',
+              'type': 'fileChange',
+              'status': 'completed',
+              'changes': <Object?>[
+                <String, Object?>{
+                  'path': 'README.md',
+                  'kind': <String, Object?>{'type': 'add'},
+                  'diff': 'first line\nsecond line\n',
+                },
+                <String, Object?>{
+                  'path': 'lib/app.dart',
+                  'kind': <String, Object?>{
+                    'type': 'update',
+                    'move_path': null,
+                  },
+                  'diff':
+                      '--- a/lib/app.dart\n'
+                      '+++ b/lib/app.dart\n'
+                      '@@ -1 +1,2 @@\n'
+                      '-old\n'
+                      '+new\n'
+                      '+second\n',
+                },
+              ],
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Changed files'), findsOneWidget);
+      expect(find.text('2 files'), findsOneWidget);
+      expect(find.text('+4 -1'), findsOneWidget);
+      expect(find.text('README.md'), findsOneWidget);
+      expect(find.text('lib/app.dart'), findsOneWidget);
+      expect(find.text('View diff'), findsNWidgets(2));
+
+      await tester.tap(find.text('README.md'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('+first line'), findsOneWidget);
+      expect(find.text('+second line'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'promotes the local user echo to sent when the app-server reports the prompt',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();

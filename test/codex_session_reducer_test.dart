@@ -1179,6 +1179,61 @@ void main() {
     expect(changedFiles.unifiedDiff, contains('diff --git'));
   });
 
+  test('renders a multi-file file-change item as one changed-files block', () {
+    final reducer = TranscriptReducer();
+    final now = DateTime(2026, 3, 14, 12);
+
+    final state = reducer.reduceRuntimeEvent(
+      CodexSessionState.initial(),
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.fileChange,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'file_change_1',
+        status: CodexRuntimeItemStatus.completed,
+        snapshot: const <String, Object?>{
+          'changes': <Object?>[
+            <String, Object?>{
+              'path': 'README.md',
+              'kind': <String, Object?>{'type': 'add'},
+              'diff': 'first line\nsecond line\n',
+            },
+            <String, Object?>{
+              'path': 'lib/app.dart',
+              'kind': <String, Object?>{'type': 'update', 'move_path': null},
+              'diff':
+                  '--- a/lib/app.dart\n'
+                  '+++ b/lib/app.dart\n'
+                  '@@ -1 +1,2 @@\n'
+                  '-old\n'
+                  '+new\n'
+                  '+second\n',
+            },
+          ],
+        },
+      ),
+    );
+
+    expect(state.transcriptBlocks, hasLength(1));
+    final changedFiles =
+        state.transcriptBlocks.single as CodexChangedFilesBlock;
+    expect(changedFiles.files, hasLength(2));
+    expect(changedFiles.files.first.path, 'README.md');
+    expect(changedFiles.files.first.additions, 2);
+    expect(changedFiles.files.last.path, 'lib/app.dart');
+    expect(changedFiles.files.last.additions, 2);
+    expect(changedFiles.files.last.deletions, 1);
+    expect(
+      changedFiles.unifiedDiff,
+      contains('diff --git a/README.md b/README.md'),
+    );
+    expect(
+      changedFiles.unifiedDiff,
+      contains('diff --git a/lib/app.dart b/lib/app.dart'),
+    );
+  });
+
   test('appends repeated plan updates for the same turn', () {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
