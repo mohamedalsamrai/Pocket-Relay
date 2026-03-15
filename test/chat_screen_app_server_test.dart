@@ -700,6 +700,107 @@ void main() {
     },
   );
 
+  testWidgets(
+    'starts a new changed-files card when the same file-change item resumes after a warning',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_1',
+              'type': 'fileChange',
+              'status': 'inProgress',
+              'changes': <Object?>[
+                <String, Object?>{
+                  'path': 'README.md',
+                  'kind': <String, Object?>{'type': 'add'},
+                  'diff': 'first line\n',
+                },
+              ],
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'configWarning',
+          params: <String, Object?>{'summary': 'Intervening warning'},
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_1',
+              'type': 'fileChange',
+              'status': 'completed',
+              'changes': <Object?>[
+                <String, Object?>{
+                  'path': 'README.md',
+                  'kind': <String, Object?>{'type': 'add'},
+                  'diff': 'first line\n',
+                },
+                <String, Object?>{
+                  'path': 'lib/app.dart',
+                  'kind': <String, Object?>{'type': 'update'},
+                  'diff':
+                      '--- a/lib/app.dart\n'
+                      '+++ b/lib/app.dart\n'
+                      '@@ -1 +1 @@\n'
+                      '-old\n'
+                      '+new\n',
+                },
+              ],
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Changed files'), findsNWidgets(2));
+      expect(find.text('README.md'), findsNWidgets(2));
+      expect(find.text('lib/app.dart'), findsOneWidget);
+      expect(find.textContaining('Intervening warning'), findsOneWidget);
+
+      final firstChangedFilesDy = tester
+          .getTopLeft(find.text('Changed files').first)
+          .dy;
+      final warningDy = tester
+          .getTopLeft(find.textContaining('Intervening warning'))
+          .dy;
+      final secondChangedFilesDy = tester
+          .getTopLeft(find.text('Changed files').last)
+          .dy;
+
+      expect(firstChangedFilesDy, lessThan(warningDy));
+      expect(warningDy, lessThan(secondChangedFilesDy));
+    },
+  );
+
   testWidgets('approval actions are routed to the app-server client', (
     tester,
   ) async {
@@ -916,6 +1017,118 @@ void main() {
   );
 
   testWidgets(
+    'freezes running work before approval opens and resumes work after resolution',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'command_1',
+              'type': 'commandExecution',
+              'status': 'inProgress',
+              'command': 'git status',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/commandExecution/outputDelta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'command_1',
+            'delta': 'clean',
+          },
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Work log'), findsOneWidget);
+      expect(find.text('git status'), findsOneWidget);
+      expect(find.text('running'), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 'i:99',
+          method: 'item/fileChange/requestApproval',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'command_1',
+            'reason': 'Write files',
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('git status'), findsOneWidget);
+      expect(find.text('running'), findsNothing);
+      expect(find.text('File change approval'), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'serverRequest/resolved',
+          params: <String, Object?>{'threadId': 'thread_123', 'requestId': 99},
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'search_2',
+              'type': 'webSearch',
+              'status': 'completed',
+              'title': 'Search docs',
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Work log'), findsNWidgets(2));
+      expect(find.text('File change approval resolved'), findsOneWidget);
+      expect(find.text('Search docs'), findsOneWidget);
+
+      final firstWorkDy = tester.getTopLeft(find.text('git status')).dy;
+      final resolvedDy = tester
+          .getTopLeft(find.text('File change approval resolved'))
+          .dy;
+      final resumedWorkDy = tester.getTopLeft(find.text('Search docs')).dy;
+
+      expect(firstWorkDy, lessThan(resolvedDy));
+      expect(resolvedDy, lessThan(resumedWorkDy));
+    },
+  );
+
+  testWidgets(
     'shows the live turn timer above the composer without needing an assistant block',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
@@ -1046,6 +1259,210 @@ void main() {
           'q1': <String>['Vince'],
         },
       );
+    },
+  );
+
+  testWidgets(
+    'keeps the richer user-input transcript card when a generic resolved event arrives later',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:user-input-1',
+          method: 'item/tool/requestUserInput',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'questions': <Object>[
+              <String, Object?>{
+                'id': 'q1',
+                'header': 'Name',
+                'question': 'What is your name?',
+              },
+            ],
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/tool/requestUserInput/answered',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'requestId': 'user-input-1',
+            'answers': <String, Object?>{
+              'q1': <Object>['Vince'],
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input submitted'), findsOneWidget);
+      expect(find.textContaining('Vince'), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'serverRequest/resolved',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'requestId': 'user-input-1',
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input submitted'), findsOneWidget);
+      expect(find.textContaining('Vince'), findsOneWidget);
+      expect(find.text('Input required resolved'), findsNothing);
+      expect(find.text('Request resolved'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'keeps user-input chronology when assistant output resumes after submission',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'assistant_1',
+              'type': 'agentMessage',
+              'status': 'inProgress',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/agentMessage/delta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'assistant_1',
+            'delta': 'Before request',
+          },
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Before request'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:user-input-1',
+          method: 'item/tool/requestUserInput',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'assistant_1',
+            'questions': <Object>[
+              <String, Object?>{
+                'id': 'q1',
+                'header': 'Name',
+                'question': 'What is your name?',
+              },
+            ],
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input required'), findsOneWidget);
+      expect(find.text('Before request'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/tool/requestUserInput/answered',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'assistant_1',
+            'requestId': 'user-input-1',
+            'answers': <String, Object?>{
+              'q1': <Object>['Vince'],
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input required'), findsNothing);
+      expect(find.text('Input submitted'), findsOneWidget);
+      expect(find.textContaining('Vince'), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/agentMessage/delta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'assistant_1',
+            'delta': 'After request',
+          },
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('After request'), findsOneWidget);
+
+      final beforeDy = tester.getTopLeft(find.text('Before request')).dy;
+      final submittedDy = tester.getTopLeft(find.text('Input submitted')).dy;
+      final afterDy = tester.getTopLeft(find.text('After request')).dy;
+
+      expect(beforeDy, lessThan(submittedDy));
+      expect(submittedDy, lessThan(afterDy));
     },
   );
 

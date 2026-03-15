@@ -1007,6 +1007,70 @@ void main() {
     },
   );
 
+  test(
+    'keeps the richer user-input resolution when a generic resolved event arrives later',
+    () {
+      final reducer = TranscriptReducer();
+      var state = CodexSessionState.initial();
+      final now = DateTime(2026, 3, 14, 12);
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeUserInputRequestedEvent(
+          createdAt: now,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_123',
+          requestId: 's:user-input-1',
+          questions: const <CodexRuntimeUserInputQuestion>[
+            CodexRuntimeUserInputQuestion(
+              id: 'q1',
+              header: 'Name',
+              question: 'What is your name?',
+            ),
+          ],
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeUserInputResolvedEvent(
+          createdAt: now.add(const Duration(milliseconds: 10)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_123',
+          requestId: 's:user-input-1',
+          answers: const <String, List<String>>{
+            'q1': <String>['Vince'],
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeRequestResolvedEvent(
+          createdAt: now.add(const Duration(milliseconds: 20)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_123',
+          requestId: 's:user-input-1',
+          requestType: CodexCanonicalRequestType.unknown,
+        ),
+      );
+
+      final resolvedBlocks = state.transcriptBlocks
+          .whereType<CodexUserInputRequestBlock>()
+          .toList(growable: false);
+      expect(resolvedBlocks, hasLength(1));
+      expect(resolvedBlocks.single.title, 'Input submitted');
+      expect(resolvedBlocks.single.body, contains('Vince'));
+      expect(
+        state.transcriptBlocks.whereType<CodexApprovalRequestBlock>(),
+        isEmpty,
+      );
+    },
+  );
+
   test('tracks thread and turn ids and captures usage summaries', () {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();

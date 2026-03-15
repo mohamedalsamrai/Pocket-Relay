@@ -421,14 +421,20 @@ class TranscriptRequestPolicy {
       return state;
     }
 
-    return state.copyWith(
-      activeTurn: _replaceTailTurnBlock(
-        activeTurn,
-        _resolvedRequestBlockWithCreatedAt(
-          block,
-          createdAt: activeTurn.artifacts[existingIndex].createdAt,
-        ),
+    final existingArtifact = activeTurn.artifacts[existingIndex];
+    final nextBlock = _mergeResolvedRequestBlocks(
+      switch (existingArtifact) {
+        CodexTurnBlockArtifact(:final block) => block,
+        _ => null,
+      },
+      _resolvedRequestBlockWithCreatedAt(
+        block,
+        createdAt: existingArtifact.createdAt,
       ),
+    );
+
+    return state.copyWith(
+      activeTurn: _replaceTailTurnBlock(activeTurn, nextBlock),
     );
   }
 
@@ -498,5 +504,83 @@ class TranscriptRequestPolicy {
       ),
       _ => block,
     };
+  }
+
+  CodexUiBlock _mergeResolvedRequestBlocks(
+    CodexUiBlock? existingBlock,
+    CodexUiBlock incomingBlock,
+  ) {
+    if (existingBlock == null) {
+      return incomingBlock;
+    }
+
+    return switch ((existingBlock, incomingBlock)) {
+      (
+        CodexUserInputRequestBlock existing,
+        CodexUserInputRequestBlock incoming,
+      ) =>
+        _mergeUserInputResolvedBlocks(existing, incoming),
+      (
+        CodexApprovalRequestBlock existing,
+        CodexApprovalRequestBlock incoming,
+      ) =>
+        _mergeApprovalResolvedBlocks(existing, incoming),
+      (
+        CodexUserInputRequestBlock existing,
+        CodexApprovalRequestBlock incoming,
+      ) =>
+        incoming.requestType == CodexCanonicalRequestType.unknown
+            ? existing
+            : incoming,
+      (
+        CodexApprovalRequestBlock existing,
+        CodexUserInputRequestBlock incoming,
+      ) =>
+        _isRichUserInputResolution(incoming) ||
+                existing.requestType == CodexCanonicalRequestType.unknown
+            ? incoming
+            : incoming,
+      _ => incomingBlock,
+    };
+  }
+
+  CodexUserInputRequestBlock _mergeUserInputResolvedBlocks(
+    CodexUserInputRequestBlock existing,
+    CodexUserInputRequestBlock incoming,
+  ) {
+    final incomingIsRich = _isRichUserInputResolution(incoming);
+    final existingIsRich = _isRichUserInputResolution(existing);
+    if (existingIsRich && !incomingIsRich) {
+      return existing;
+    }
+
+    return incoming.copyWith(
+      questions: incoming.questions.isNotEmpty
+          ? incoming.questions
+          : existing.questions,
+      answers: incoming.answers.isNotEmpty
+          ? incoming.answers
+          : existing.answers,
+      body: incoming.body.isNotEmpty ? incoming.body : existing.body,
+    );
+  }
+
+  CodexApprovalRequestBlock _mergeApprovalResolvedBlocks(
+    CodexApprovalRequestBlock existing,
+    CodexApprovalRequestBlock incoming,
+  ) {
+    final existingIsSpecific =
+        existing.requestType != CodexCanonicalRequestType.unknown;
+    final incomingIsSpecific =
+        incoming.requestType != CodexCanonicalRequestType.unknown;
+    if (existingIsSpecific && !incomingIsSpecific) {
+      return existing;
+    }
+
+    return incoming;
+  }
+
+  bool _isRichUserInputResolution(CodexUserInputRequestBlock block) {
+    return block.answers.isNotEmpty || block.title == 'Input submitted';
   }
 }
