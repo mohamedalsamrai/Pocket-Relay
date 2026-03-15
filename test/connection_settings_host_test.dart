@@ -61,6 +61,27 @@ void main() {
   );
 
   testWidgets(
+    'cupertino settings renderer establishes its own text style host under MaterialApp',
+    (tester) async {
+      await tester.pumpWidget(_buildCupertinoSettingsApp(onSubmit: (_) {}));
+
+      final profileLabelText = tester.widget<RichText>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is RichText &&
+              widget.text.toPlainText() == 'Profile label',
+        ),
+      );
+
+      expect(profileLabelText.text.style?.decoration, TextDecoration.none);
+      expect(
+        profileLabelText.text.style?.decorationColor,
+        isNot(const Color(0xFFFFFF00)),
+      );
+    },
+  );
+
+  testWidgets(
     'shared host submits the same payload semantics through both settings renderers',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2200);

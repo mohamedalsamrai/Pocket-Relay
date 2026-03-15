@@ -9,27 +9,42 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
 void main() {
-  testWidgets('forwards toolbar, empty-state, and menu actions', (
+  testWidgets('renders the explicit shell regions', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: FlutterChatScreenRenderer(
+          screen: _screenContract(),
+          appChrome: const _TestAppChrome(),
+          transcriptRegion: const Center(child: Text('Transcript region')),
+          composerRegion: const Text('Composer region'),
+        ),
+      ),
+    );
+
+    expect(find.text('Injected chrome'), findsOneWidget);
+    expect(find.text('Transcript region'), findsOneWidget);
+    expect(find.text('Composer region'), findsOneWidget);
+  });
+
+  testWidgets('forwards toolbar and menu actions through app chrome', (
     tester,
   ) async {
     final actions = <ChatScreenActionId>[];
 
     await tester.pumpWidget(
-      _buildRendererApp(
-        screen: _screenContract(
-          isConfigured: false,
-          emptyState: const ChatEmptyStateContract(isConfigured: false),
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: Scaffold(
+          appBar: FlutterChatAppChrome(
+            screen: _screenContract(),
+            onScreenAction: actions.add,
+          ),
         ),
-        onScreenAction: actions.add,
       ),
     );
 
     await tester.tap(find.byTooltip('Connection settings'));
-    await tester.pump();
-
-    final configureButton = find.widgetWithText(FilledButton, 'Configure remote');
-    await tester.ensureVisible(configureButton);
-    await tester.tap(configureButton);
     await tester.pump();
 
     await tester.tap(find.byType(PopupMenuButton<ChatScreenActionId>));
@@ -39,24 +54,61 @@ void main() {
 
     expect(actions, <ChatScreenActionId>[
       ChatScreenActionId.openSettings,
-      ChatScreenActionId.openSettings,
       ChatScreenActionId.newThread,
     ]);
   });
 
-  testWidgets('forwards composer interactions through renderer callbacks', (
+  testWidgets('forwards empty-state actions through transcript region', (
+    tester,
+  ) async {
+    final actions = <ChatScreenActionId>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: Scaffold(
+          body: FlutterChatTranscriptRegion(
+            screen: _screenContract(
+              isConfigured: false,
+              emptyState: const ChatEmptyStateContract(isConfigured: false),
+            ),
+            onScreenAction: actions.add,
+            onAutoFollowEligibilityChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    final configureButton = find.widgetWithText(
+      FilledButton,
+      'Configure remote',
+    );
+    await tester.ensureVisible(configureButton);
+    await tester.tap(configureButton);
+    await tester.pump();
+
+    expect(actions, <ChatScreenActionId>[ChatScreenActionId.openSettings]);
+  });
+
+  testWidgets('forwards composer interactions through composer region', (
     tester,
   ) async {
     final draftValues = <String>[];
     var sendCalls = 0;
 
     await tester.pumpWidget(
-      _buildRendererApp(
-        screen: _screenContract(),
-        onComposerDraftChanged: draftValues.add,
-        onSendPrompt: () async {
-          sendCalls += 1;
-        },
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: Scaffold(
+          body: FlutterChatComposerRegion(
+            composer: _screenContract().composer,
+            onComposerDraftChanged: draftValues.add,
+            onSendPrompt: () async {
+              sendCalls += 1;
+            },
+            onStopActiveTurn: () async {},
+          ),
+        ),
       ),
     );
 
@@ -67,25 +119,6 @@ void main() {
     expect(draftValues, <String>['Plan phase 6']);
     expect(sendCalls, 1);
   });
-}
-
-Widget _buildRendererApp({
-  required ChatScreenContract screen,
-  ValueChanged<ChatScreenActionId>? onScreenAction,
-  ValueChanged<String>? onComposerDraftChanged,
-  Future<void> Function()? onSendPrompt,
-}) {
-  return MaterialApp(
-    theme: buildPocketTheme(Brightness.light),
-    home: FlutterChatScreenRenderer(
-      screen: screen,
-      onScreenAction: onScreenAction ?? (_) {},
-      onAutoFollowEligibilityChanged: (_) {},
-      onComposerDraftChanged: onComposerDraftChanged ?? (_) {},
-      onSendPrompt: onSendPrompt ?? () async {},
-      onStopActiveTurn: () async {},
-    ),
-  );
 }
 
 ChatScreenContract _screenContract({
@@ -140,4 +173,16 @@ ChatScreenContract _screenContract({
       initialSecrets: const ConnectionSecrets(),
     ),
   );
+}
+
+class _TestAppChrome extends StatelessWidget implements PreferredSizeWidget {
+  const _TestAppChrome();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(title: const Text('Injected chrome'));
+  }
 }

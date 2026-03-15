@@ -7,7 +7,6 @@ import 'package:pocket_relay/src/app.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
@@ -36,7 +35,6 @@ void main() {
     expect(find.text('Pocket Relay'), findsOneWidget);
     expect(find.text('Configure remote'), findsWidgets);
     expect(find.byType(ChatRootAdapter), findsOneWidget);
-    expect(find.byType(ChatScreen), findsNothing);
     expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
     expect(find.byType(FlutterChatAppChrome), findsOneWidget);
     expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
@@ -55,7 +53,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ChatRootAdapter), findsOneWidget);
-      expect(find.byType(ChatScreen), findsNothing);
       expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
       expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
       expect(find.byType(CupertinoChatComposerRegion), findsOneWidget);

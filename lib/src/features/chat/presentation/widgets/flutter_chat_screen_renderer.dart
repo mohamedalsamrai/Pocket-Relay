@@ -11,84 +11,22 @@ class FlutterChatScreenRenderer extends StatelessWidget {
   const FlutterChatScreenRenderer({
     super.key,
     required this.screen,
-    this.onScreenAction,
-    this.onAutoFollowEligibilityChanged,
-    this.onComposerDraftChanged,
-    this.onSendPrompt,
-    this.onStopActiveTurn,
-    this.surfaceChangeToken,
-    this.onOpenChangedFileDiff,
-    this.onApproveRequest,
-    this.onDenyRequest,
-    this.onSubmitUserInput,
-    this.appChrome,
-    this.transcriptRegion,
-    this.composerRegion,
-  }) : assert(
-         appChrome != null || onScreenAction != null,
-         'onScreenAction is required when no appChrome region is provided.',
-       ),
-       assert(
-         transcriptRegion != null ||
-             (onScreenAction != null && onAutoFollowEligibilityChanged != null),
-         'Transcript callbacks are required when no transcriptRegion is provided.',
-       ),
-       assert(
-         composerRegion != null ||
-             (onComposerDraftChanged != null &&
-                 onSendPrompt != null &&
-                 onStopActiveTurn != null),
-         'Composer callbacks are required when no composerRegion is provided.',
-       );
+    required this.appChrome,
+    required this.transcriptRegion,
+    required this.composerRegion,
+  });
 
   final ChatScreenContract screen;
-  final ValueChanged<ChatScreenActionId>? onScreenAction;
-  final ValueChanged<bool>? onAutoFollowEligibilityChanged;
-  final ValueChanged<String>? onComposerDraftChanged;
-  final Future<void> Function()? onSendPrompt;
-  final Future<void> Function()? onStopActiveTurn;
-  final Object? surfaceChangeToken;
-  final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
-  final Future<void> Function(String requestId)? onApproveRequest;
-  final Future<void> Function(String requestId)? onDenyRequest;
-  final Future<void> Function(
-    String requestId,
-    Map<String, List<String>> answers,
-  )?
-  onSubmitUserInput;
-  final PreferredSizeWidget? appChrome;
-  final Widget? transcriptRegion;
-  final Widget? composerRegion;
+  final PreferredSizeWidget appChrome;
+  final Widget transcriptRegion;
+  final Widget composerRegion;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.pocketPalette;
-    final resolvedAppChrome =
-        appChrome ??
-        FlutterChatAppChrome(screen: screen, onScreenAction: onScreenAction!);
-    final resolvedTranscriptRegion =
-        transcriptRegion ??
-        FlutterChatTranscriptRegion(
-          screen: screen,
-          surfaceChangeToken: surfaceChangeToken,
-          onScreenAction: onScreenAction!,
-          onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged!,
-          onApproveRequest: onApproveRequest,
-          onDenyRequest: onDenyRequest,
-          onOpenChangedFileDiff: onOpenChangedFileDiff,
-          onSubmitUserInput: onSubmitUserInput,
-        );
-    final resolvedComposerRegion =
-        composerRegion ??
-        FlutterChatComposerRegion(
-          composer: screen.composer,
-          onComposerDraftChanged: onComposerDraftChanged!,
-          onSendPrompt: onSendPrompt!,
-          onStopActiveTurn: onStopActiveTurn!,
-        );
 
     return Scaffold(
-      appBar: resolvedAppChrome,
+      appBar: appChrome,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -101,13 +39,13 @@ class FlutterChatScreenRenderer extends StatelessWidget {
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  Expanded(child: resolvedTranscriptRegion),
+                  Expanded(child: transcriptRegion),
                   if (screen.turnIndicator case final turnIndicator?)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
                       child: TurnElapsedFooter(turnTimer: turnIndicator.timer),
                     ),
-                  resolvedComposerRegion,
+                  composerRegion,
                 ],
               ),
       ),
