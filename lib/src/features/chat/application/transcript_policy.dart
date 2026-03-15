@@ -2,6 +2,7 @@ import 'package:pocket_relay/src/features/chat/application/transcript_changed_fi
 import 'package:pocket_relay/src/features/chat/application/transcript_item_policy.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_request_policy.dart';
+import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
 import 'package:pocket_relay/src/core/utils/duration_utils.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
@@ -46,16 +47,7 @@ class TranscriptPolicy {
     String? message,
     DateTime? createdAt,
   }) {
-    final cleared = state.copyWith(
-      clearThreadId: true,
-      clearTurnId: true,
-      turnTimers: const <String, CodexSessionTurnTimer>{},
-      activeItems: const <String, CodexSessionActiveItem>{},
-      pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
-      pendingUserInputRequests:
-          const <String, CodexSessionPendingUserInputRequest>{},
-      clearPendingThreadTokenUsageBlock: true,
-    );
+    final cleared = state.copyWith(clearThreadId: true, clearActiveTurn: true);
     if (message == null || message.trim().isEmpty) {
       return cleared;
     }
@@ -76,48 +68,33 @@ class TranscriptPolicy {
   CodexSessionState clearTranscript(CodexSessionState state) {
     return state.copyWith(
       clearThreadId: true,
-      clearTurnId: true,
-      turnTimers: const <String, CodexSessionTurnTimer>{},
+      clearActiveTurn: true,
       blocks: const <CodexUiBlock>[],
-      activeItems: const <String, CodexSessionActiveItem>{},
-      pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
-      pendingUserInputRequests:
-          const <String, CodexSessionPendingUserInputRequest>{},
       clearLatestUsageSummary: true,
-      clearPendingThreadTokenUsageBlock: true,
     );
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
-    return state.copyWith(
-      clearThreadId: true,
-      clearTurnId: true,
-      turnTimers: const <String, CodexSessionTurnTimer>{},
-      clearPendingThreadTokenUsageBlock: true,
-    );
+    return state.copyWith(clearThreadId: true, clearActiveTurn: true);
   }
 
   CodexSessionState applySessionExited(
     CodexSessionState state,
     CodexRuntimeSessionExitedEvent event,
   ) {
-    final completedTurnTimers = _support.completeTurnTimer(
-      state.turnTimers,
-      state.turnId,
+    final completedTimer = _support.completeTurnTimer(
+      state.activeTurn?.timer,
       event.createdAt,
     );
+    final elapsed = state.activeTurn == null
+        ? null
+        : completedTimer.elapsedAt(event.createdAt);
     final nextState = state.copyWith(
       connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
           ? CodexRuntimeSessionState.error
           : CodexRuntimeSessionState.stopped,
       clearThreadId: true,
-      clearTurnId: true,
-      turnTimers: completedTurnTimers,
-      activeItems: const <String, CodexSessionActiveItem>{},
-      pendingApprovalRequests: const <String, CodexSessionPendingRequest>{},
-      pendingUserInputRequests:
-          const <String, CodexSessionPendingUserInputRequest>{},
-      clearPendingThreadTokenUsageBlock: true,
+      clearActiveTurn: true,
     );
     if (event.exitKind != CodexRuntimeSessionExitKind.error) {
       return nextState;
@@ -128,7 +105,9 @@ class TranscriptPolicy {
         id: _support.eventEntryId('session-exit', event.createdAt),
         createdAt: event.createdAt,
         title: 'Session exited',
-        body: event.reason ?? 'The Codex session ended.',
+        body: elapsed == null
+            ? (event.reason ?? 'The Codex session ended.')
+            : '${event.reason ?? 'The Codex session ended.'}\n\nElapsed ${formatElapsedDuration(elapsed)}.',
       ),
     );
   }
@@ -137,20 +116,20 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnCompletedEvent event,
   ) {
-    final completedTurnTimers = _support.completeTurnTimer(
-      state.turnTimers,
-      event.turnId ?? state.turnId,
+    final completedTimer = _support.completeTurnTimer(
+      state.activeTurn?.timer,
       event.createdAt,
     );
-    final completedTimer = completedTurnTimers[event.turnId ?? state.turnId];
+    final elapsed = state.activeTurn == null
+        ? null
+        : completedTimer.elapsedAt(event.createdAt);
     var nextState = state.copyWith(
       connectionStatus: CodexRuntimeSessionState.ready,
-      clearTurnId: true,
-      turnTimers: completedTurnTimers,
+      clearActiveTurn: true,
       latestUsageSummary: _support.buildRuntimeUsageSummary(event),
-      clearPendingThreadTokenUsageBlock: true,
     );
-    final pendingThreadTokenUsageBlock = state.pendingThreadTokenUsageBlock;
+    final pendingThreadTokenUsageBlock =
+        state.activeTurn?.pendingThreadTokenUsageBlock;
     if (pendingThreadTokenUsageBlock != null) {
       nextState = _support.upsertBlock(nextState, pendingThreadTokenUsageBlock);
     }
@@ -159,7 +138,7 @@ class TranscriptPolicy {
       CodexTurnBoundaryBlock(
         id: _support.eventEntryId('turn-end', event.createdAt),
         createdAt: event.createdAt,
-        elapsed: completedTimer?.elapsedAt(event.createdAt),
+        elapsed: elapsed,
       ),
     );
   }
@@ -168,19 +147,17 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnAbortedEvent event,
   ) {
-    final completedTurnTimers = _support.completeTurnTimer(
-      state.turnTimers,
-      event.turnId ?? state.turnId,
+    final completedTimer = _support.completeTurnTimer(
+      state.activeTurn?.timer,
       event.createdAt,
     );
-    final completedTimer = completedTurnTimers[event.turnId ?? state.turnId];
-    final elapsed = completedTimer?.elapsedAt(event.createdAt);
+    final elapsed = state.activeTurn == null
+        ? null
+        : completedTimer.elapsedAt(event.createdAt);
     return _support.upsertBlock(
       state.copyWith(
         connectionStatus: CodexRuntimeSessionState.ready,
-        clearTurnId: true,
-        turnTimers: completedTurnTimers,
-        clearPendingThreadTokenUsageBlock: true,
+        clearActiveTurn: true,
       ),
       CodexStatusBlock(
         id: _support.eventEntryId('status', event.createdAt),
@@ -300,12 +277,21 @@ class TranscriptPolicy {
     CodexRuntimeStatusEvent event,
   ) {
     if (event.rawMethod == 'thread/tokenUsage/updated') {
+      final usageBlock = CodexUsageBlock(
+        id: _support.eventEntryId('thread-usage', event.createdAt),
+        createdAt: event.createdAt,
+        title: event.title,
+        body: event.message,
+      );
+      final activeTurn = _ensureActiveTurn(
+        state.activeTurn,
+        turnId: event.turnId,
+        threadId: event.threadId,
+        createdAt: event.createdAt,
+      );
       return state.copyWith(
-        pendingThreadTokenUsageBlock: CodexUsageBlock(
-          id: _support.eventEntryId('thread-usage', event.createdAt),
-          createdAt: event.createdAt,
-          title: event.title,
-          body: event.message,
+        activeTurn: activeTurn?.copyWith(
+          pendingThreadTokenUsageBlock: usageBlock,
         ),
       );
     }
@@ -335,6 +321,27 @@ class TranscriptPolicy {
         createdAt: event.createdAt,
         title: 'Runtime error',
         body: event.message,
+      ),
+    );
+  }
+
+  CodexActiveTurnState? _ensureActiveTurn(
+    CodexActiveTurnState? activeTurn, {
+    required String? turnId,
+    required String? threadId,
+    required DateTime createdAt,
+  }) {
+    if (activeTurn != null || turnId == null) {
+      return activeTurn;
+    }
+
+    return CodexActiveTurnState(
+      turnId: turnId,
+      threadId: threadId,
+      timer: CodexSessionTurnTimer(
+        turnId: turnId,
+        startedAt: createdAt,
+        activeSegmentStartedMonotonicAt: CodexMonotonicClock.now(),
       ),
     );
   }

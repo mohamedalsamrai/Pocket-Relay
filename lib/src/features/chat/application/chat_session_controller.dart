@@ -371,7 +371,7 @@ class ChatSessionController extends ChangeNotifier {
     try {
       await appServerClient.abortTurn(
         threadId: _sessionState.threadId,
-        turnId: _sessionState.turnId,
+        turnId: _sessionState.activeTurn?.turnId,
       );
     } catch (error) {
       _reportAppServerFailure(

@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class CommandCard extends StatelessWidget {
-  const CommandCard({super.key, required this.block, this.turnTimer});
+  const CommandCard({super.key, required this.block});
 
   final CodexCommandExecutionBlock block;
-  final CodexSessionTurnTimer? turnTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -94,14 +91,6 @@ class CommandCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (turnTimer != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                child: TurnElapsedFooter(
-                  turnTimer: turnTimer!,
-                  accent: runningColor,
-                ),
-              ),
           ],
         ),
       ),

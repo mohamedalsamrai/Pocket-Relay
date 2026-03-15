@@ -1,4 +1,5 @@
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
+import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -19,30 +20,35 @@ class TranscriptRequestPolicy {
       return state;
     }
 
-    final wasBlocking = _support.hasBlockingRequest(state);
+    final turnId = event.turnId ?? state.activeTurn?.turnId;
+    final threadId = event.threadId ?? state.activeTurn?.threadId;
+    final activeTurn = _ensureActiveTurn(
+      state.activeTurn,
+      turnId: turnId,
+      threadId: threadId,
+      createdAt: event.createdAt,
+    );
+    final wasBlocking = activeTurn?.hasBlockingRequests ?? false;
     if (event.requestType == CodexCanonicalRequestType.mcpServerElicitation) {
       final pendingUserInput = CodexSessionPendingUserInputRequest(
         requestId: requestId,
         requestType: event.requestType,
         createdAt: event.createdAt,
-        threadId: event.threadId,
-        turnId: event.turnId,
+        threadId: threadId,
+        turnId: turnId,
         itemId: event.itemId,
         detail: event.detail,
         args: event.args,
       );
       final nextState = state.copyWith(
-        pendingUserInputRequests: <String, CodexSessionPendingUserInputRequest>{
-          ...state.pendingUserInputRequests,
-          requestId: pendingUserInput,
-        },
-        turnTimers: wasBlocking
-            ? state.turnTimers
-            : _support.pauseTurnTimer(
-                state.turnTimers,
-                event.turnId ?? state.turnId,
-                event.createdAt,
-              ),
+        activeTurn: _activeTurnForPendingInput(
+          activeTurn,
+          requestId: requestId,
+          pendingRequest: pendingUserInput,
+          turnTimer: wasBlocking
+              ? activeTurn?.timer
+              : _support.pauseTurnTimer(activeTurn?.timer, event.createdAt),
+        ),
       );
       return _support.upsertBlock(
         nextState,
@@ -61,25 +67,22 @@ class TranscriptRequestPolicy {
       requestId: requestId,
       requestType: event.requestType,
       createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
+      threadId: threadId,
+      turnId: turnId,
       itemId: event.itemId,
       detail: event.detail,
       args: event.args,
     );
 
     final nextState = state.copyWith(
-      pendingApprovalRequests: <String, CodexSessionPendingRequest>{
-        ...state.pendingApprovalRequests,
-        requestId: pendingRequest,
-      },
-      turnTimers: wasBlocking
-          ? state.turnTimers
-          : _support.pauseTurnTimer(
-              state.turnTimers,
-              event.turnId ?? state.turnId,
-              event.createdAt,
-            ),
+      activeTurn: _activeTurnForPendingApproval(
+        activeTurn,
+        requestId: requestId,
+        pendingRequest: pendingRequest,
+        turnTimer: wasBlocking
+            ? activeTurn?.timer
+            : _support.pauseTurnTimer(activeTurn?.timer, event.createdAt),
+      ),
     );
     return _support.upsertBlock(
       nextState,
@@ -104,23 +107,25 @@ class TranscriptRequestPolicy {
     }
 
     final nextApprovalRequests = <String, CodexSessionPendingRequest>{
-      ...state.pendingApprovalRequests,
+      ...?state.activeTurn?.pendingApprovalRequests,
     }..remove(requestId);
     final nextInputRequests = <String, CodexSessionPendingUserInputRequest>{
-      ...state.pendingUserInputRequests,
+      ...?state.activeTurn?.pendingUserInputRequests,
     }..remove(requestId);
+    final hasBlockingRequestsRemaining =
+        nextApprovalRequests.isNotEmpty || nextInputRequests.isNotEmpty;
 
     final nextState = state.copyWith(
-      pendingApprovalRequests: nextApprovalRequests,
-      pendingUserInputRequests: nextInputRequests,
-      turnTimers:
-          nextApprovalRequests.isNotEmpty || nextInputRequests.isNotEmpty
-          ? state.turnTimers
-          : _support.resumeTurnTimer(
-              state.turnTimers,
-              event.turnId ?? state.turnId,
-              event.createdAt,
-            ),
+      activeTurn: _activeTurnAfterRequestResolved(
+        state.activeTurn,
+        requestId: requestId,
+        turnTimer: hasBlockingRequestsRemaining
+            ? state.activeTurn?.timer
+            : _support.resumeTurnTimer(
+                state.activeTurn?.timer,
+                event.createdAt,
+              ),
+      ),
     );
     return _support.upsertBlock(
       nextState,
@@ -144,30 +149,35 @@ class TranscriptRequestPolicy {
       return state;
     }
 
-    final wasBlocking = _support.hasBlockingRequest(state);
+    final turnId = event.turnId ?? state.activeTurn?.turnId;
+    final threadId = event.threadId ?? state.activeTurn?.threadId;
+    final activeTurn = _ensureActiveTurn(
+      state.activeTurn,
+      turnId: turnId,
+      threadId: threadId,
+      createdAt: event.createdAt,
+    );
+    final wasBlocking = activeTurn?.hasBlockingRequests ?? false;
     final pendingRequest = CodexSessionPendingUserInputRequest(
       requestId: requestId,
       requestType: CodexCanonicalRequestType.toolUserInput,
       createdAt: event.createdAt,
-      threadId: event.threadId,
-      turnId: event.turnId,
+      threadId: threadId,
+      turnId: turnId,
       itemId: event.itemId,
       questions: event.questions,
       args: event.rawPayload,
     );
 
     final nextState = state.copyWith(
-      pendingUserInputRequests: <String, CodexSessionPendingUserInputRequest>{
-        ...state.pendingUserInputRequests,
-        requestId: pendingRequest,
-      },
-      turnTimers: wasBlocking
-          ? state.turnTimers
-          : _support.pauseTurnTimer(
-              state.turnTimers,
-              event.turnId ?? state.turnId,
-              event.createdAt,
-            ),
+      activeTurn: _activeTurnForPendingInput(
+        activeTurn,
+        requestId: requestId,
+        pendingRequest: pendingRequest,
+        turnTimer: wasBlocking
+            ? activeTurn?.timer
+            : _support.pauseTurnTimer(activeTurn?.timer, event.createdAt),
+      ),
     );
     return _support.upsertBlock(
       nextState,
@@ -193,19 +203,22 @@ class TranscriptRequestPolicy {
     }
 
     final nextInputRequests = <String, CodexSessionPendingUserInputRequest>{
-      ...state.pendingUserInputRequests,
+      ...?state.activeTurn?.pendingUserInputRequests,
     }..remove(requestId);
+    final hasBlockingRequestsRemaining =
+        state.activeTurn?.pendingApprovalRequests.isNotEmpty == true ||
+        nextInputRequests.isNotEmpty;
     final nextState = state.copyWith(
-      pendingUserInputRequests: nextInputRequests,
-      turnTimers:
-          state.pendingApprovalRequests.isNotEmpty ||
-              nextInputRequests.isNotEmpty
-          ? state.turnTimers
-          : _support.resumeTurnTimer(
-              state.turnTimers,
-              event.turnId ?? state.turnId,
-              event.createdAt,
-            ),
+      activeTurn: _activeTurnAfterUserInputResolved(
+        state.activeTurn,
+        requestId: requestId,
+        turnTimer: hasBlockingRequestsRemaining
+            ? state.activeTurn?.timer
+            : _support.resumeTurnTimer(
+                state.activeTurn?.timer,
+                event.createdAt,
+              ),
+      ),
     );
     return _support.upsertBlock(
       nextState,
@@ -287,6 +300,116 @@ class TranscriptRequestPolicy {
       body: body,
       isResolved: true,
       resolutionLabel: 'resolved',
+    );
+  }
+
+  CodexActiveTurnState? _activeTurnForPendingApproval(
+    CodexActiveTurnState? activeTurn, {
+    required String requestId,
+    required CodexSessionPendingRequest pendingRequest,
+    required CodexSessionTurnTimer? turnTimer,
+  }) {
+    if (activeTurn == null || activeTurn.turnId != pendingRequest.turnId) {
+      return activeTurn;
+    }
+
+    return activeTurn.copyWith(
+      timer: turnTimer,
+      status: CodexActiveTurnStatus.blocked,
+      pendingApprovalRequests: <String, CodexSessionPendingRequest>{
+        ...activeTurn.pendingApprovalRequests,
+        requestId: pendingRequest,
+      },
+    );
+  }
+
+  CodexActiveTurnState? _activeTurnForPendingInput(
+    CodexActiveTurnState? activeTurn, {
+    required String requestId,
+    required CodexSessionPendingUserInputRequest pendingRequest,
+    required CodexSessionTurnTimer? turnTimer,
+  }) {
+    if (activeTurn == null || activeTurn.turnId != pendingRequest.turnId) {
+      return activeTurn;
+    }
+
+    return activeTurn.copyWith(
+      timer: turnTimer,
+      status: CodexActiveTurnStatus.blocked,
+      pendingUserInputRequests: <String, CodexSessionPendingUserInputRequest>{
+        ...activeTurn.pendingUserInputRequests,
+        requestId: pendingRequest,
+      },
+    );
+  }
+
+  CodexActiveTurnState? _activeTurnAfterRequestResolved(
+    CodexActiveTurnState? activeTurn, {
+    required String requestId,
+    required CodexSessionTurnTimer? turnTimer,
+  }) {
+    if (activeTurn == null) {
+      return null;
+    }
+
+    final nextApprovals = <String, CodexSessionPendingRequest>{
+      ...activeTurn.pendingApprovalRequests,
+    }..remove(requestId);
+    final nextInputs = <String, CodexSessionPendingUserInputRequest>{
+      ...activeTurn.pendingUserInputRequests,
+    }..remove(requestId);
+
+    return activeTurn.copyWith(
+      timer: turnTimer,
+      status: nextApprovals.isNotEmpty || nextInputs.isNotEmpty
+          ? CodexActiveTurnStatus.blocked
+          : CodexActiveTurnStatus.running,
+      pendingApprovalRequests: nextApprovals,
+      pendingUserInputRequests: nextInputs,
+    );
+  }
+
+  CodexActiveTurnState? _activeTurnAfterUserInputResolved(
+    CodexActiveTurnState? activeTurn, {
+    required String requestId,
+    required CodexSessionTurnTimer? turnTimer,
+  }) {
+    if (activeTurn == null) {
+      return null;
+    }
+
+    final nextInputs = <String, CodexSessionPendingUserInputRequest>{
+      ...activeTurn.pendingUserInputRequests,
+    }..remove(requestId);
+
+    return activeTurn.copyWith(
+      timer: turnTimer,
+      status:
+          activeTurn.pendingApprovalRequests.isNotEmpty || nextInputs.isNotEmpty
+          ? CodexActiveTurnStatus.blocked
+          : CodexActiveTurnStatus.running,
+      pendingUserInputRequests: nextInputs,
+    );
+  }
+
+  CodexActiveTurnState? _ensureActiveTurn(
+    CodexActiveTurnState? activeTurn, {
+    required String? turnId,
+    required String? threadId,
+    required DateTime createdAt,
+  }) {
+    if (activeTurn != null || turnId == null) {
+      return activeTurn;
+    }
+
+    return CodexActiveTurnState(
+      turnId: turnId,
+      threadId: threadId,
+      timer: CodexSessionTurnTimer(
+        turnId: turnId,
+        startedAt: createdAt,
+        activeSegmentStartedMonotonicAt: CodexMonotonicClock.now(),
+      ),
     );
   }
 }

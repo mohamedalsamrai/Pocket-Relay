@@ -161,15 +161,9 @@ class CodexSessionState {
   const CodexSessionState({
     this.connectionStatus = CodexRuntimeSessionState.stopped,
     this.threadId,
-    this.turnId,
-    this.turnTimers = const <String, CodexSessionTurnTimer>{},
-    this.pendingApprovalRequests = const <String, CodexSessionPendingRequest>{},
-    this.pendingUserInputRequests =
-        const <String, CodexSessionPendingUserInputRequest>{},
-    this.activeItems = const <String, CodexSessionActiveItem>{},
+    this.activeTurn,
     this.blocks = const <CodexUiBlock>[],
     this.latestUsageSummary,
-    this.pendingThreadTokenUsageBlock,
   });
 
   factory CodexSessionState.initial() {
@@ -178,15 +172,21 @@ class CodexSessionState {
 
   final CodexRuntimeSessionState connectionStatus;
   final String? threadId;
-  final String? turnId;
-  final Map<String, CodexSessionTurnTimer> turnTimers;
-  final Map<String, CodexSessionPendingRequest> pendingApprovalRequests;
-  final Map<String, CodexSessionPendingUserInputRequest>
-  pendingUserInputRequests;
-  final Map<String, CodexSessionActiveItem> activeItems;
+  final CodexActiveTurnState? activeTurn;
   final List<CodexUiBlock> blocks;
   final String? latestUsageSummary;
-  final CodexUsageBlock? pendingThreadTokenUsageBlock;
+
+  Map<String, CodexSessionPendingRequest> get pendingApprovalRequests =>
+      activeTurn?.pendingApprovalRequests ??
+      const <String, CodexSessionPendingRequest>{};
+
+  Map<String, CodexSessionPendingUserInputRequest>
+  get pendingUserInputRequests =>
+      activeTurn?.pendingUserInputRequests ??
+      const <String, CodexSessionPendingUserInputRequest>{};
+
+  Map<String, CodexSessionActiveItem> get activeItems =>
+      activeTurn?.itemsById ?? const <String, CodexSessionActiveItem>{};
 
   bool get isBusy => connectionStatus == CodexRuntimeSessionState.running;
 
@@ -215,35 +215,20 @@ class CodexSessionState {
     CodexRuntimeSessionState? connectionStatus,
     String? threadId,
     bool clearThreadId = false,
-    String? turnId,
-    bool clearTurnId = false,
-    Map<String, CodexSessionTurnTimer>? turnTimers,
-    Map<String, CodexSessionPendingRequest>? pendingApprovalRequests,
-    Map<String, CodexSessionPendingUserInputRequest>? pendingUserInputRequests,
-    Map<String, CodexSessionActiveItem>? activeItems,
+    CodexActiveTurnState? activeTurn,
+    bool clearActiveTurn = false,
     List<CodexUiBlock>? blocks,
     String? latestUsageSummary,
     bool clearLatestUsageSummary = false,
-    CodexUsageBlock? pendingThreadTokenUsageBlock,
-    bool clearPendingThreadTokenUsageBlock = false,
   }) {
     return CodexSessionState(
       connectionStatus: connectionStatus ?? this.connectionStatus,
       threadId: clearThreadId ? null : (threadId ?? this.threadId),
-      turnId: clearTurnId ? null : (turnId ?? this.turnId),
-      turnTimers: turnTimers ?? this.turnTimers,
-      pendingApprovalRequests:
-          pendingApprovalRequests ?? this.pendingApprovalRequests,
-      pendingUserInputRequests:
-          pendingUserInputRequests ?? this.pendingUserInputRequests,
-      activeItems: activeItems ?? this.activeItems,
+      activeTurn: clearActiveTurn ? null : (activeTurn ?? this.activeTurn),
       blocks: blocks ?? this.blocks,
       latestUsageSummary: clearLatestUsageSummary
           ? null
           : (latestUsageSummary ?? this.latestUsageSummary),
-      pendingThreadTokenUsageBlock: clearPendingThreadTokenUsageBlock
-          ? null
-          : (pendingThreadTokenUsageBlock ?? this.pendingThreadTokenUsageBlock),
     );
   }
 }
@@ -406,6 +391,156 @@ class CodexSessionActiveItem {
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
       snapshot: snapshot ?? this.snapshot,
+    );
+  }
+}
+
+enum CodexActiveTurnStatus { running, blocked, completing }
+
+sealed class CodexTurnSegment {
+  const CodexTurnSegment({required this.id, required this.createdAt});
+
+  final String id;
+  final DateTime createdAt;
+}
+
+final class CodexTurnTextSegment extends CodexTurnSegment {
+  const CodexTurnTextSegment({
+    required super.id,
+    required super.createdAt,
+    required this.kind,
+    required this.title,
+    required this.body,
+    this.itemId,
+    this.isStreaming = false,
+  });
+
+  final CodexUiBlockKind kind;
+  final String title;
+  final String body;
+  final String? itemId;
+  final bool isStreaming;
+}
+
+final class CodexTurnWorkSegment extends CodexTurnSegment {
+  const CodexTurnWorkSegment({
+    required super.id,
+    required super.createdAt,
+    this.itemId,
+    this.entries = const <CodexWorkLogEntry>[],
+  });
+
+  final String? itemId;
+  final List<CodexWorkLogEntry> entries;
+}
+
+final class CodexTurnPlanSegment extends CodexTurnSegment {
+  const CodexTurnPlanSegment({
+    required super.id,
+    required super.createdAt,
+    required this.title,
+    required this.markdown,
+    this.itemId,
+    this.isStreaming = false,
+  });
+
+  final String title;
+  final String markdown;
+  final String? itemId;
+  final bool isStreaming;
+}
+
+final class CodexTurnChangedFilesSegment extends CodexTurnSegment {
+  const CodexTurnChangedFilesSegment({
+    required super.id,
+    required super.createdAt,
+    required this.title,
+    this.itemId,
+    this.files = const <CodexChangedFile>[],
+    this.unifiedDiff,
+    this.isStreaming = false,
+  });
+
+  final String title;
+  final String? itemId;
+  final List<CodexChangedFile> files;
+  final String? unifiedDiff;
+  final bool isStreaming;
+}
+
+class CodexActiveTurnState {
+  const CodexActiveTurnState({
+    required this.turnId,
+    this.threadId,
+    required this.timer,
+    this.status = CodexActiveTurnStatus.running,
+    this.segments = const <CodexTurnSegment>[],
+    this.itemsById = const <String, CodexSessionActiveItem>{},
+    this.itemSegmentIds = const <String, String>{},
+    this.pendingApprovalRequests = const <String, CodexSessionPendingRequest>{},
+    this.pendingUserInputRequests =
+        const <String, CodexSessionPendingUserInputRequest>{},
+    this.pendingThreadTokenUsageBlock,
+    this.latestUsageSummary,
+    this.hasWork = false,
+    this.hasReasoning = false,
+  });
+
+  final String turnId;
+  final String? threadId;
+  final CodexSessionTurnTimer timer;
+  final CodexActiveTurnStatus status;
+  final List<CodexTurnSegment> segments;
+  final Map<String, CodexSessionActiveItem> itemsById;
+  final Map<String, String> itemSegmentIds;
+  final Map<String, CodexSessionPendingRequest> pendingApprovalRequests;
+  final Map<String, CodexSessionPendingUserInputRequest>
+  pendingUserInputRequests;
+  final CodexUsageBlock? pendingThreadTokenUsageBlock;
+  final String? latestUsageSummary;
+  final bool hasWork;
+  final bool hasReasoning;
+
+  bool get hasBlockingRequests =>
+      pendingApprovalRequests.isNotEmpty || pendingUserInputRequests.isNotEmpty;
+
+  CodexActiveTurnState copyWith({
+    String? turnId,
+    String? threadId,
+    CodexSessionTurnTimer? timer,
+    CodexActiveTurnStatus? status,
+    List<CodexTurnSegment>? segments,
+    Map<String, CodexSessionActiveItem>? itemsById,
+    Map<String, String>? itemSegmentIds,
+    Map<String, CodexSessionPendingRequest>? pendingApprovalRequests,
+    Map<String, CodexSessionPendingUserInputRequest>? pendingUserInputRequests,
+    CodexUsageBlock? pendingThreadTokenUsageBlock,
+    bool clearPendingThreadTokenUsageBlock = false,
+    String? latestUsageSummary,
+    bool clearLatestUsageSummary = false,
+    bool? hasWork,
+    bool? hasReasoning,
+  }) {
+    return CodexActiveTurnState(
+      turnId: turnId ?? this.turnId,
+      threadId: threadId ?? this.threadId,
+      timer: timer ?? this.timer,
+      status: status ?? this.status,
+      segments: segments ?? this.segments,
+      itemsById: itemsById ?? this.itemsById,
+      itemSegmentIds: itemSegmentIds ?? this.itemSegmentIds,
+      pendingApprovalRequests:
+          pendingApprovalRequests ?? this.pendingApprovalRequests,
+      pendingUserInputRequests:
+          pendingUserInputRequests ?? this.pendingUserInputRequests,
+      pendingThreadTokenUsageBlock: clearPendingThreadTokenUsageBlock
+          ? null
+          : (pendingThreadTokenUsageBlock ?? this.pendingThreadTokenUsageBlock),
+      latestUsageSummary: clearLatestUsageSummary
+          ? null
+          : (latestUsageSummary ?? this.latestUsageSummary),
+      hasWork: hasWork ?? this.hasWork,
+      hasReasoning: hasReasoning ?? this.hasReasoning,
     );
   }
 }

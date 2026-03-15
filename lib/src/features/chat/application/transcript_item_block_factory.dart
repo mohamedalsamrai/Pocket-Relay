@@ -32,9 +32,9 @@ class TranscriptItemBlockFactory {
         id: item.entryId,
         createdAt: item.createdAt,
         title: title,
-        entryKind: _workLogEntryKindFor(item.itemType),
+        entryKind: workLogEntryKindFor(item.itemType),
         turnId: item.turnId,
-        preview: _workLogPreview(item),
+        preview: workLogPreview(item),
         isRunning: item.isRunning,
         exitCode: item.exitCode,
       ),
@@ -143,7 +143,9 @@ class TranscriptItemBlockFactory {
     };
   }
 
-  CodexWorkLogEntryKind _workLogEntryKindFor(CodexCanonicalItemType itemType) {
+  CodexWorkLogEntryKind workLogEntryKindFor(
+    CodexCanonicalItemType itemType,
+  ) {
     return switch (itemType) {
       CodexCanonicalItemType.commandExecution =>
         CodexWorkLogEntryKind.commandExecution,
@@ -161,7 +163,7 @@ class TranscriptItemBlockFactory {
     };
   }
 
-  String? _workLogPreview(CodexSessionActiveItem item) {
+  String? workLogPreview(CodexSessionActiveItem item) {
     final body = item.body.trim();
     if (body.isEmpty) {
       return null;

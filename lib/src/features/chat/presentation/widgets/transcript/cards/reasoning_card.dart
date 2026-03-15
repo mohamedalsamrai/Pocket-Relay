@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/markdown_style_factory.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class ReasoningCard extends StatelessWidget {
-  const ReasoningCard({super.key, required this.block, this.turnTimer});
+  const ReasoningCard({super.key, required this.block});
 
   final CodexTextBlock block;
-  final CodexSessionTurnTimer? turnTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -79,8 +76,6 @@ class ReasoningCard extends StatelessWidget {
               selectable: true,
               styleSheet: markdownStyle,
             ),
-            if (turnTimer != null)
-              TurnElapsedFooter(turnTimer: turnTimer!, accent: palette.accent),
           ],
         ),
       ),

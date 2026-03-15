@@ -147,6 +147,69 @@ void main() {
   });
 
   testWidgets(
+    'shows the live turn timer above the composer without needing an assistant block',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'thread/started',
+          params: <String, Object?>{
+            'thread': <String, Object?>{'id': 'thread_123'},
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{
+              'id': 'turn_live',
+              'model': 'gpt-5.3-codex',
+            },
+          },
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.textContaining('Elapsed'), findsOneWidget);
+      expect(find.text('Assistant message'), findsNothing);
+
+      final timerChip = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.padding ==
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      );
+      final timerRect = tester.getRect(timerChip);
+      final inputRect = tester.getRect(find.byType(TextField).first);
+      final screenCenterX = tester.getRect(find.byType(Scaffold)).center.dx;
+
+      expect(timerRect.top, lessThan(inputRect.top));
+      expect(inputRect.top - timerRect.bottom, greaterThan(0));
+      expect((timerRect.center.dx - screenCenterX).abs(), lessThanOrEqualTo(1));
+    },
+  );
+
+  testWidgets(
     'user-input requests are submitted through the app-server client',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();

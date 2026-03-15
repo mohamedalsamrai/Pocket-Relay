@@ -70,6 +70,12 @@ void main() {
 
       expect(state.connectionStatus, CodexRuntimeSessionState.running);
       expect(state.activeItems, isEmpty);
+      expect(state.activeTurn, isNotNull);
+      expect(state.activeTurn?.itemsById, isEmpty);
+      expect(state.activeTurn?.segments, hasLength(1));
+      final segment = state.activeTurn!.segments.single as CodexTurnTextSegment;
+      expect(segment.kind, CodexUiBlockKind.assistantMessage);
+      expect(segment.body, 'Hello, world');
       expect(state.blocks, hasLength(1));
       final block = state.blocks.single as CodexTextBlock;
       expect(block.kind, CodexUiBlockKind.assistantMessage);
@@ -269,6 +275,15 @@ void main() {
 
     state = reducer.reduceRuntimeEvent(
       state,
+      CodexRuntimeTurnStartedEvent(
+        createdAt: now.subtract(const Duration(seconds: 1)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+
+    state = reducer.reduceRuntimeEvent(
+      state,
       CodexRuntimeRequestOpenedEvent(
         createdAt: now,
         threadId: 'thread_123',
@@ -281,6 +296,8 @@ void main() {
     );
 
     expect(state.pendingApprovalRequests.keys, contains('i:99'));
+    expect(state.activeTurn?.pendingApprovalRequests.keys, contains('i:99'));
+    expect(state.activeTurn?.status, CodexActiveTurnStatus.blocked);
     final requestBlock = state.blocks.single as CodexApprovalRequestBlock;
     expect(requestBlock.title, 'File change approval');
 
@@ -297,6 +314,8 @@ void main() {
     );
 
     expect(state.pendingApprovalRequests, isEmpty);
+    expect(state.activeTurn?.pendingApprovalRequests, isEmpty);
+    expect(state.activeTurn?.status, CodexActiveTurnStatus.running);
     final resolvedBlock = state.blocks.single as CodexApprovalRequestBlock;
     expect(resolvedBlock.title, 'File change approval resolved');
     expect(resolvedBlock.isResolved, isTrue);
@@ -372,6 +391,7 @@ void main() {
         turnId: 'turn_123',
       ),
     );
+    expect(state.activeTurn?.timer.startedAt, now);
     monotonicNow = const Duration(seconds: 5);
     state = reducer.reduceRuntimeEvent(
       state,
@@ -389,13 +409,8 @@ void main() {
     );
 
     expect(state.threadId, 'thread_123');
-    expect(state.turnId, isNull);
+    expect(state.activeTurn, isNull);
     expect(state.latestUsageSummary, 'input 12 · cached 3 · output 7');
-    expect(state.turnTimers['turn_123']?.startedAt, now);
-    expect(
-      state.turnTimers['turn_123']?.elapsedAt(completedAt),
-      const Duration(seconds: 5),
-    );
     expect(state.blocks, hasLength(1));
     final boundary = state.blocks.last as CodexTurnBoundaryBlock;
     expect(boundary.elapsed, const Duration(seconds: 5));
@@ -426,11 +441,9 @@ void main() {
       ),
     );
 
-    expect(state.turnId, isNull);
-    expect(
-      state.turnTimers['turn_123']?.elapsedAt(exitedAt),
-      const Duration(seconds: 9),
-    );
+    expect(state.activeTurn, isNull);
+    final errorBlock = state.blocks.single as CodexErrorBlock;
+    expect(errorBlock.body, contains('Elapsed 0:09'));
   });
 
   test(
@@ -461,8 +474,6 @@ void main() {
         ),
       );
 
-      final timer = state.turnTimers['turn_123'];
-      expect(timer?.elapsedAt(completedAt), const Duration(seconds: 5));
       expect(
         (state.blocks.single as CodexTurnBoundaryBlock).elapsed,
         const Duration(seconds: 5),
@@ -500,9 +511,9 @@ void main() {
         ),
       );
 
-      expect(state.turnTimers['turn_123']?.isPaused, isTrue);
+      expect(state.activeTurn?.timer.isPaused, isTrue);
       expect(
-        state.turnTimers['turn_123']?.elapsedAt(
+        state.activeTurn?.timer.elapsedAt(
           startedAt.add(const Duration(seconds: 20)),
           monotonicNow: const Duration(seconds: 20),
         ),
@@ -522,7 +533,7 @@ void main() {
         ),
       );
 
-      expect(state.turnTimers['turn_123']?.isPaused, isFalse);
+      expect(state.activeTurn?.timer.isPaused, isFalse);
 
       monotonicNow = const Duration(seconds: 25);
       state = reducer.reduceRuntimeEvent(
@@ -535,10 +546,6 @@ void main() {
         ),
       );
 
-      expect(
-        state.turnTimers['turn_123']?.elapsedAt(startedAt),
-        const Duration(seconds: 9),
-      );
       expect(
         (state.blocks.last as CodexTurnBoundaryBlock).elapsed,
         const Duration(seconds: 9),
@@ -616,7 +623,7 @@ void main() {
 
     expect(state.blocks, isEmpty);
     expect(state.transcriptBlocks, isEmpty);
-    expect(state.pendingThreadTokenUsageBlock, isNotNull);
+    expect(state.activeTurn?.pendingThreadTokenUsageBlock, isNotNull);
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -630,7 +637,10 @@ void main() {
     );
 
     expect(state.blocks, isEmpty);
-    expect(state.pendingThreadTokenUsageBlock, isNotNull);
+    expect(
+      state.activeTurn?.pendingThreadTokenUsageBlock?.body,
+      contains('input 24'),
+    );
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -647,12 +657,63 @@ void main() {
       ),
     );
 
-    expect(state.pendingThreadTokenUsageBlock, isNull);
+    expect(state.activeTurn, isNull);
     expect(state.blocks.whereType<CodexUsageBlock>(), hasLength(1));
     expect((state.blocks.first as CodexUsageBlock).title, 'Thread token usage');
     expect((state.blocks.first as CodexUsageBlock).body, contains('input 24'));
     expect(state.blocks.last, isA<CodexTurnBoundaryBlock>());
   });
+
+  test(
+    'creates active turn state on turn start and tracks reasoning/work flags',
+    () {
+      final reducer = TranscriptReducer();
+      var state = CodexSessionState.initial();
+      final now = DateTime(2026, 3, 14, 12);
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeTurnStartedEvent(
+          createdAt: now,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+        ),
+      );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 1)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_reasoning',
+          streamKind: CodexRuntimeContentStreamKind.reasoningText,
+          delta: 'Thinking through the patch.',
+        ),
+      );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemStartedEvent(
+          createdAt: now.add(const Duration(seconds: 1)),
+          itemType: CodexCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_command',
+          status: CodexRuntimeItemStatus.inProgress,
+          detail: 'git status',
+        ),
+      );
+
+      expect(state.activeTurn, isNotNull);
+      expect(state.activeTurn?.turnId, 'turn_123');
+      expect(state.activeTurn?.threadId, 'thread_123');
+      expect(state.activeTurn?.timer.turnId, 'turn_123');
+      expect(state.activeTurn?.hasReasoning, isTrue);
+      expect(state.activeTurn?.hasWork, isTrue);
+      expect(state.activeTurn?.segments, hasLength(2));
+      expect(state.activeTurn?.segments.first, isA<CodexTurnTextSegment>());
+      expect(state.activeTurn?.segments.last, isA<CodexTurnWorkSegment>());
+    },
+  );
 
   test('groups consecutive work-log entries in transcript blocks', () {
     final reducer = TranscriptReducer();

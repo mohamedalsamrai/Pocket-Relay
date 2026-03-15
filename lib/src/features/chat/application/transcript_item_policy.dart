@@ -1,6 +1,8 @@
 import 'package:pocket_relay/src/features/chat/application/transcript_item_block_factory.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_item_support.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
+import 'package:pocket_relay/src/features/chat/application/transcript_turn_segmenter.dart';
+import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -11,33 +13,40 @@ class TranscriptItemPolicy {
     TranscriptItemBlockFactory blockFactory =
         const TranscriptItemBlockFactory(),
     TranscriptItemSupport itemSupport = const TranscriptItemSupport(),
+    TranscriptTurnSegmenter turnSegmenter = const TranscriptTurnSegmenter(),
   }) : _support = support,
        _blockFactory = blockFactory,
-       _itemSupport = itemSupport;
+       _itemSupport = itemSupport,
+       _turnSegmenter = turnSegmenter;
 
   final TranscriptPolicySupport _support;
   final TranscriptItemBlockFactory _blockFactory;
   final TranscriptItemSupport _itemSupport;
+  final TranscriptTurnSegmenter _turnSegmenter;
 
   CodexSessionState applyItemLifecycle(
     CodexSessionState state,
     CodexRuntimeItemLifecycleEvent event, {
     required bool removeAfterUpsert,
   }) {
-    final existing = state.activeItems[event.itemId!];
+    final activeTurn = _ensureActiveTurn(
+      state.activeTurn,
+      turnId: event.turnId,
+      threadId: event.threadId,
+      createdAt: event.createdAt,
+    );
+    final existing =
+        activeTurn?.itemsById[event.itemId!] ??
+        state.activeItems[event.itemId!];
     final nextItem = _activeItemFromLifecycle(event, existing: existing);
     final nextBlock = _blockFactory.blockFromActiveItem(nextItem);
-    final nextActiveItems = <String, CodexSessionActiveItem>{
-      ...state.activeItems,
-      event.itemId!: nextItem,
-    };
 
     final nextState = state.copyWith(
-      activeItems: removeAfterUpsert
-          ? <String, CodexSessionActiveItem>{
-              ...nextActiveItems..remove(event.itemId!),
-            }
-          : nextActiveItems,
+      activeTurn: _nextActiveTurnForLifecycle(
+        activeTurn,
+        nextItem,
+        removeAfterUpsert: removeAfterUpsert,
+      ),
     );
 
     if (_shouldSuppressItemBlock(state, nextItem)) {
@@ -58,8 +67,14 @@ class TranscriptItemPolicy {
       return state;
     }
 
+    final activeTurn = _ensureActiveTurn(
+      state.activeTurn,
+      turnId: turnId,
+      threadId: threadId,
+      createdAt: event.createdAt,
+    );
     final existing =
-        state.activeItems[itemId] ?? _activeItemFromContentDelta(event);
+        activeTurn?.itemsById[itemId] ?? _activeItemFromContentDelta(event);
     final updatedItem = existing.copyWith(
       body: '${existing.body}${event.delta}',
       isRunning: true,
@@ -67,10 +82,7 @@ class TranscriptItemPolicy {
 
     return _support.upsertBlock(
       state.copyWith(
-        activeItems: <String, CodexSessionActiveItem>{
-          ...state.activeItems,
-          itemId: updatedItem,
-        },
+        activeTurn: _nextActiveTurnForContentDelta(activeTurn, updatedItem),
       ),
       _blockFactory.blockFromActiveItem(updatedItem),
     );
@@ -185,5 +197,68 @@ class TranscriptItemPolicy {
   int? _extractExitCode(Map<String, dynamic>? snapshot) {
     final value = snapshot?['exitCode'] ?? snapshot?['exit_code'];
     return value is num ? value.toInt() : null;
+  }
+
+  CodexActiveTurnState? _nextActiveTurnForLifecycle(
+    CodexActiveTurnState? activeTurn,
+    CodexSessionActiveItem item, {
+    required bool removeAfterUpsert,
+  }) {
+    if (activeTurn == null || activeTurn.turnId != item.turnId) {
+      return activeTurn;
+    }
+
+    final nextItems = <String, CodexSessionActiveItem>{
+      ...activeTurn.itemsById,
+      item.itemId: item,
+    };
+    if (removeAfterUpsert) {
+      nextItems.remove(item.itemId);
+    }
+
+    return _turnSegmenter.upsertItem(
+      activeTurn.copyWith(itemsById: nextItems),
+      item,
+    );
+  }
+
+  CodexActiveTurnState? _nextActiveTurnForContentDelta(
+    CodexActiveTurnState? activeTurn,
+    CodexSessionActiveItem item,
+  ) {
+    if (activeTurn == null || activeTurn.turnId != item.turnId) {
+      return activeTurn;
+    }
+
+    return _turnSegmenter.upsertItem(
+      activeTurn.copyWith(
+        itemsById: <String, CodexSessionActiveItem>{
+          ...activeTurn.itemsById,
+          item.itemId: item,
+        },
+      ),
+      item,
+    );
+  }
+
+  CodexActiveTurnState? _ensureActiveTurn(
+    CodexActiveTurnState? activeTurn, {
+    required String? turnId,
+    required String? threadId,
+    required DateTime createdAt,
+  }) {
+    if (activeTurn != null || turnId == null) {
+      return activeTurn;
+    }
+
+    return CodexActiveTurnState(
+      turnId: turnId,
+      threadId: threadId,
+      timer: CodexSessionTurnTimer(
+        turnId: turnId,
+        startedAt: createdAt,
+        activeSegmentStartedMonotonicAt: CodexMonotonicClock.now(),
+      ),
+    );
   }
 }

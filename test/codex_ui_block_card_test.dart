@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
 
 void main() {
@@ -122,21 +123,12 @@ void main() {
     expect(_findDecoratedContainerColorForText(tester, 'Codex'), isNull);
   });
 
-  testWidgets('renders a live elapsed footer for a running assistant turn', (
+  testWidgets('renders a live elapsed footer as a standalone widget', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
-          block: CodexTextBlock(
-            id: 'assistant_live_1',
-            kind: CodexUiBlockKind.assistantMessage,
-            createdAt: DateTime(2026, 3, 14, 12),
-            title: 'Codex',
-            body: 'Streaming response.',
-            turnId: 'turn_live',
-            isRunning: true,
-          ),
+        child: TurnElapsedFooter(
           turnTimer: CodexSessionTurnTimer(
             turnId: 'turn_live',
             startedAt: DateTime.now().subtract(const Duration(seconds: 5)),
@@ -148,20 +140,12 @@ void main() {
     expect(find.textContaining('Elapsed'), findsOneWidget);
   });
 
-  testWidgets('renders a completed elapsed footer with the final duration', (
+  testWidgets('renders a completed elapsed footer as a standalone widget', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
-          block: CodexTextBlock(
-            id: 'assistant_done_1',
-            kind: CodexUiBlockKind.assistantMessage,
-            createdAt: DateTime(2026, 3, 14, 12),
-            title: 'Codex',
-            body: 'Final response.',
-            turnId: 'turn_done',
-          ),
+        child: TurnElapsedFooter(
           turnTimer: CodexSessionTurnTimer(
             turnId: 'turn_done',
             startedAt: DateTime(2026, 3, 14, 12),
@@ -172,47 +156,6 @@ void main() {
     );
 
     expect(find.text('Completed in 1:08'), findsOneWidget);
-  });
-
-  testWidgets('shows the elapsed footer only on the last eligible block', (
-    tester,
-  ) async {
-    final timer = CodexSessionTurnTimer(
-      turnId: 'turn_1',
-      startedAt: DateTime(2026, 3, 14, 12),
-      completedAt: DateTime(2026, 3, 14, 12, 0, 9),
-    );
-
-    await tester.pumpWidget(
-      _buildTestApp(
-        child: TranscriptList(
-          controller: TranscriptListController(),
-          isConfigured: true,
-          transcriptBlocks: <CodexUiBlock>[
-            CodexTextBlock(
-              id: 'reasoning_1',
-              kind: CodexUiBlockKind.reasoning,
-              createdAt: DateTime(2026, 3, 14, 12),
-              title: 'Reasoning',
-              body: 'Planning the patch.',
-              turnId: 'turn_1',
-            ),
-            CodexTextBlock(
-              id: 'assistant_1',
-              kind: CodexUiBlockKind.assistantMessage,
-              createdAt: DateTime(2026, 3, 14, 12, 0, 1),
-              title: 'Codex',
-              body: 'Patch applied.',
-              turnId: 'turn_1',
-            ),
-          ],
-          turnTimers: <String, CodexSessionTurnTimer>{'turn_1': timer},
-          onConfigure: () {},
-        ),
-      ),
-    );
-
-    expect(find.text('Completed in 0:09'), findsOneWidget);
   });
 
   testWidgets('renders approval request actions', (tester) async {
@@ -410,7 +353,6 @@ void main() {
                 markdown: markdownLines.join('\n'),
               ),
             ],
-            turnTimers: const <String, CodexSessionTurnTimer>{},
             onConfigure: () {},
           ),
         ),
@@ -433,7 +375,6 @@ void main() {
                 markdown: markdownLines.join('\n'),
               ),
             ],
-            turnTimers: const <String, CodexSessionTurnTimer>{},
             onConfigure: () {},
           ),
         ),
@@ -576,23 +517,14 @@ void main() {
     expect(find.text('end · 1:05'), findsOneWidget);
   });
 
-  testWidgets('renders a live elapsed footer on the active streaming card', (
+  testWidgets('renders a live elapsed footer with the current duration', (
     tester,
   ) async {
     final startedAt = DateTime.now().subtract(const Duration(seconds: 5));
 
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
-          block: CodexTextBlock(
-            id: 'assistant_live_1',
-            kind: CodexUiBlockKind.assistantMessage,
-            createdAt: DateTime(2026, 3, 14, 12),
-            title: 'Codex',
-            body: 'Streaming response',
-            turnId: 'turn_123',
-            isRunning: true,
-          ),
+        child: TurnElapsedFooter(
           turnTimer: CodexSessionTurnTimer(
             turnId: 'turn_123',
             startedAt: startedAt,

@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class WorkLogGroupCard extends StatefulWidget {
-  const WorkLogGroupCard({super.key, required this.block, this.turnTimer});
+  const WorkLogGroupCard({super.key, required this.block});
 
   final CodexWorkLogGroupBlock block;
-  final CodexSessionTurnTimer? turnTimer;
 
   @override
   State<WorkLogGroupCard> createState() => _WorkLogGroupCardState();
@@ -84,11 +81,6 @@ class _WorkLogGroupCardState extends State<WorkLogGroupCard> {
                 ),
               ),
             ],
-            if (widget.turnTimer != null)
-              TurnElapsedFooter(
-                turnTimer: widget.turnTimer!,
-                accent: tealAccent(Theme.of(context).brightness),
-              ),
           ],
         ),
       ),

@@ -6,76 +6,48 @@ import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 class TranscriptPolicySupport {
   const TranscriptPolicySupport();
 
-  Map<String, CodexSessionTurnTimer> completeTurnTimer(
-    Map<String, CodexSessionTurnTimer> turnTimers,
-    String? turnId,
+  CodexSessionTurnTimer completeTurnTimer(
+    CodexSessionTurnTimer? turnTimer,
     DateTime completedAt,
   ) {
-    if (turnId == null || turnId.isEmpty) {
-      return turnTimers;
+    if (turnTimer == null) {
+      return CodexSessionTurnTimer(
+        turnId: 'completed-${completedAt.microsecondsSinceEpoch}',
+        startedAt: completedAt,
+        completedAt: completedAt,
+        completedElapsed: Duration.zero,
+      );
     }
-
-    final existing = turnTimers[turnId];
-    return <String, CodexSessionTurnTimer>{
-      ...turnTimers,
-      turnId:
-          existing?.complete(
-            completedAt: completedAt,
-            monotonicAt: CodexMonotonicClock.now(),
-          ) ??
-          CodexSessionTurnTimer(
-            turnId: turnId,
-            startedAt: completedAt,
-            completedAt: completedAt,
-            completedElapsed: Duration.zero,
-          ),
-    };
+    return turnTimer.complete(
+      completedAt: completedAt,
+      monotonicAt: CodexMonotonicClock.now(),
+    );
   }
 
-  Map<String, CodexSessionTurnTimer> pauseTurnTimer(
-    Map<String, CodexSessionTurnTimer> turnTimers,
-    String? turnId,
+  CodexSessionTurnTimer? pauseTurnTimer(
+    CodexSessionTurnTimer? turnTimer,
     DateTime pausedAt,
   ) {
-    if (turnId == null || turnId.isEmpty) {
-      return turnTimers;
+    if (turnTimer == null) {
+      return null;
     }
-
-    final existing = turnTimers[turnId];
-    if (existing == null) {
-      return turnTimers;
-    }
-
-    return <String, CodexSessionTurnTimer>{
-      ...turnTimers,
-      turnId: existing.pause(
-        pausedAt: pausedAt,
-        monotonicAt: CodexMonotonicClock.now(),
-      ),
-    };
+    return turnTimer.pause(
+      pausedAt: pausedAt,
+      monotonicAt: CodexMonotonicClock.now(),
+    );
   }
 
-  Map<String, CodexSessionTurnTimer> resumeTurnTimer(
-    Map<String, CodexSessionTurnTimer> turnTimers,
-    String? turnId,
+  CodexSessionTurnTimer? resumeTurnTimer(
+    CodexSessionTurnTimer? turnTimer,
     DateTime resumedAt,
   ) {
-    if (turnId == null || turnId.isEmpty) {
-      return turnTimers;
+    if (turnTimer == null) {
+      return null;
     }
-
-    final existing = turnTimers[turnId];
-    if (existing == null) {
-      return turnTimers;
-    }
-
-    return <String, CodexSessionTurnTimer>{
-      ...turnTimers,
-      turnId: existing.resume(
-        resumedAt: resumedAt,
-        monotonicAt: CodexMonotonicClock.now(),
-      ),
-    };
+    return turnTimer.resume(
+      resumedAt: resumedAt,
+      monotonicAt: CodexMonotonicClock.now(),
+    );
   }
 
   bool hasBlockingRequest(CodexSessionState state) {

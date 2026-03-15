@@ -6,6 +6,7 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 import 'package:flutter/material.dart';
@@ -86,6 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final palette = context.pocketPalette;
         final profile = _sessionController.profile;
         final sessionState = _sessionController.sessionState;
+        final activeTurnTimer = sessionState.activeTurn?.timer;
 
         return Scaffold(
           appBar: AppBar(
@@ -159,8 +161,6 @@ class _ChatScreenState extends State<ChatScreen> {
                           controller: _transcriptListController,
                           isConfigured: profile.isReady,
                           transcriptBlocks: _sessionController.transcriptBlocks,
-                          turnTimers:
-                              _sessionController.sessionState.turnTimers,
                           pendingApprovalBlock:
                               _sessionController.pendingApprovalBlock,
                           pendingUserInputBlock:
@@ -171,10 +171,15 @@ class _ChatScreenState extends State<ChatScreen> {
                           onSubmitUserInput: _sessionController.submitUserInput,
                         ),
                       ),
+                      if (activeTurnTimer != null && activeTurnTimer.isRunning)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                          child: TurnElapsedFooter(turnTimer: activeTurnTimer),
+                        ),
                       SafeArea(
                         top: false,
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                           child: ChatComposer(
                             controller: _composerController,
                             enabled:
