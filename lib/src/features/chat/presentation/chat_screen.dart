@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
@@ -37,7 +38,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final _composerController = TextEditingController();
+  final _composerDraftHost = ChatComposerDraftHost();
   final _transcriptFollowHost = ChatTranscriptFollowHost();
   final _effectMapper = const ChatScreenEffectMapper();
   final _screenPresenter = const ChatScreenPresenter();
@@ -81,7 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _screenEffectSubscription?.cancel();
     _sessionController.dispose();
     _transcriptFollowHost.dispose();
-    _composerController.dispose();
+    _composerDraftHost.dispose();
     super.dispose();
   }
 
@@ -90,6 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[
         _sessionController,
+        _composerDraftHost,
         _transcriptFollowHost,
       ]),
       builder: (context, _) {
@@ -186,8 +188,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                           child: ChatComposer(
-                            controller: _composerController,
                             contract: screen.composer,
+                            onChanged: _composerDraftHost.updateText,
                             onSend: _sendPrompt,
                             onStop: _stopActiveTurn,
                           ),
@@ -213,6 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
       profile: _sessionController.profile,
       secrets: _sessionController.secrets,
       sessionState: _sessionController.sessionState,
+      composerDraft: _composerDraftHost.draft,
       transcriptFollow: _transcriptFollowHost.contract,
     );
   }
@@ -301,12 +304,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendPrompt() async {
-    final sent = await _sessionController.sendPrompt(_composerController.text);
+    final sent = await _sessionController.sendPrompt(
+      _composerDraftHost.draft.text,
+    );
     if (sent) {
       _transcriptFollowHost.requestFollow(
         source: ChatTranscriptFollowRequestSource.sendPrompt,
       );
-      _composerController.clear();
+      _composerDraftHost.clear();
     }
   }
 

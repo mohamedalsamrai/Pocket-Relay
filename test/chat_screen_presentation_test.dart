@@ -3,6 +3,8 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
@@ -37,6 +39,7 @@ void main() {
           profile: profile,
           secrets: secrets,
           sessionState: CodexSessionState.initial(),
+          composerDraft: const ChatComposerDraft(),
           transcriptFollow: _defaultTranscriptFollowContract,
         );
 
@@ -54,6 +57,7 @@ void main() {
           ],
         );
         expect(contract.composer.isTextInputEnabled, isTrue);
+        expect(contract.composer.draftText, isEmpty);
         expect(contract.composer.primaryAction, ChatComposerPrimaryAction.send);
         expect(contract.connectionSettings.initialProfile, same(profile));
         expect(contract.connectionSettings.initialSecrets, same(secrets));
@@ -82,9 +86,11 @@ void main() {
         profile: _configuredProfile(),
         secrets: const ConnectionSecrets(password: 'secret'),
         sessionState: sessionState,
+        composerDraft: const ChatComposerDraft(text: 'Keep draft'),
         transcriptFollow: _defaultTranscriptFollowContract,
       );
 
+      expect(contract.composer.draftText, 'Keep draft');
       expect(contract.composer.isBusy, isTrue);
       expect(contract.composer.isTextInputEnabled, isFalse);
       expect(contract.composer.primaryAction, ChatComposerPrimaryAction.stop);
@@ -651,6 +657,20 @@ void main() {
     );
   });
 
+  group('ChatComposerDraftHost', () {
+    test('models draft updates and clear behavior above the renderer', () {
+      final host = ChatComposerDraftHost();
+
+      expect(host.draft.text, isEmpty);
+
+      host.updateText('  draft text  ');
+      expect(host.draft.text, '  draft text  ');
+
+      host.clear();
+      expect(host.draft.text, isEmpty);
+    });
+  });
+
   test('maps snackbar messages into screen effects', () {
     const mapper = ChatScreenEffectMapper();
 
@@ -670,6 +690,7 @@ void main() {
       profile: profile,
       secrets: secrets,
       sessionState: CodexSessionState.initial(),
+      composerDraft: const ChatComposerDraft(),
       transcriptFollow: _defaultTranscriptFollowContract,
     );
 

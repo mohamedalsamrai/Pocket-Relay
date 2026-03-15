@@ -63,6 +63,7 @@ enum ChatComposerPrimaryAction { send, stop }
 
 class ChatComposerContract {
   const ChatComposerContract({
+    required this.draftText,
     required this.isTextInputEnabled,
     required this.isPrimaryActionEnabled,
     required this.isBusy,
@@ -70,6 +71,7 @@ class ChatComposerContract {
     required this.primaryAction,
   });
 
+  final String draftText;
   final bool isTextInputEnabled;
   final bool isPrimaryActionEnabled;
   final bool isBusy;

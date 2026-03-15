@@ -28,7 +28,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Hello Codex');
+    final composerField = find.byType(TextField).first;
+    await tester.enterText(composerField, 'Hello Codex');
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -36,6 +37,7 @@ void main() {
     expect(appServerClient.startSessionCalls, 1);
     expect(appServerClient.sentMessages, <String>['Hello Codex']);
     expect(find.text('Hello Codex'), findsOneWidget);
+    expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
