@@ -43,6 +43,42 @@ void main() {
 
     expect(find.text('Configure remote'), findsNothing);
   });
+
+  testWidgets('uses adaptive grouped surfaces in dark mode', (tester) async {
+    await tester.pumpWidget(
+      const CupertinoApp(
+        theme: CupertinoThemeData(brightness: Brightness.dark),
+        home: CupertinoPageScaffold(
+          child: CupertinoEmptyState(isConfigured: true, onConfigure: _noop),
+        ),
+      ),
+    );
+
+    final card = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('cupertino_empty_state_card')),
+    );
+    final context = tester.element(
+      find.byKey(const ValueKey('cupertino_empty_state_card')),
+    );
+    final decoration = card.decoration as BoxDecoration;
+
+    expect(
+      decoration.color,
+      CupertinoDynamicColor.resolve(
+        CupertinoColors.secondarySystemGroupedBackground,
+        context,
+      ).withValues(alpha: 0.92),
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.text('Remote Codex, cleaned up for a phone screen'),
+          )
+          .style
+          ?.color,
+      CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+    );
+  });
 }
 
 void _noop() {}

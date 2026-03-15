@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -82,6 +83,38 @@ void main() {
   );
 
   testWidgets(
+    'cupertino settings renderer uses adaptive grouped surfaces in dark mode',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildCupertinoSettingsApp(
+          brightness: Brightness.dark,
+          onSubmit: (_) {},
+        ),
+      );
+
+      final surface = tester.widget<DecoratedBox>(
+        find.byKey(const ValueKey('cupertino_settings_surface')),
+      );
+      final context = tester.element(
+        find.byKey(const ValueKey('cupertino_settings_surface')),
+      );
+      final decoration = surface.decoration as BoxDecoration;
+
+      expect(
+        decoration.color,
+        CupertinoDynamicColor.resolve(
+          CupertinoColors.systemGroupedBackground,
+          context,
+        ).withValues(alpha: 0.92),
+      );
+      expect(
+        tester.widget<Text>(find.text('Remote target')).style?.color,
+        CupertinoDynamicColor.resolve(CupertinoColors.label, context),
+      );
+    },
+  );
+
+  testWidgets(
     'shared host submits the same payload semantics through both settings renderers',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2200);
@@ -141,10 +174,13 @@ void main() {
 }
 
 Widget _buildMaterialSettingsApp({
+  Brightness brightness = Brightness.light,
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
 }) {
   return MaterialApp(
-    theme: buildPocketTheme(Brightness.light),
+    theme: buildPocketTheme(brightness),
+    darkTheme: buildPocketTheme(Brightness.dark),
+    themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
     home: Scaffold(
       body: _buildHost(
         onSubmit: onSubmit,
@@ -157,10 +193,13 @@ Widget _buildMaterialSettingsApp({
 }
 
 Widget _buildCupertinoSettingsApp({
+  Brightness brightness = Brightness.light,
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
 }) {
   return MaterialApp(
-    theme: buildPocketTheme(Brightness.light),
+    theme: buildPocketTheme(brightness),
+    darkTheme: buildPocketTheme(Brightness.dark),
+    themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
     home: Scaffold(
       body: _buildHost(
         onSubmit: onSubmit,

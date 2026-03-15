@@ -134,6 +134,14 @@ class _CupertinoChatAppChromeTitle extends StatelessWidget {
     final titleTextStyle = CupertinoTheme.of(
       context,
     ).textTheme.navTitleTextStyle;
+    final subtitleTextStyle = CupertinoTheme.of(context).textTheme.textStyle
+        .copyWith(
+          fontSize: 11,
+          color: CupertinoDynamicColor.resolve(
+            CupertinoColors.secondaryLabel,
+            context,
+          ),
+        );
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -148,10 +156,7 @@ class _CupertinoChatAppChromeTitle extends StatelessWidget {
           header.subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 11,
-            color: CupertinoColors.secondaryLabel,
-          ),
+          style: subtitleTextStyle,
         ),
       ],
     );

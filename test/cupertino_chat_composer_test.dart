@@ -117,16 +117,65 @@ void main() {
 
     expect(stopCalls, 1);
   });
+
+  testWidgets('uses adaptive cupertino text colors in dark mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildComposerApp(
+        brightness: Brightness.dark,
+        contract: const ChatComposerContract(
+          draftText: '',
+          isTextInputEnabled: true,
+          isPrimaryActionEnabled: true,
+          isBusy: false,
+          placeholder: 'Describe what you want Codex to do…',
+          primaryAction: ChatComposerPrimaryAction.send,
+        ),
+      ),
+    );
+
+    final field = tester.widget<CupertinoTextField>(find.byType(CupertinoTextField));
+    final surfaceContext = tester.element(
+      find.byKey(const ValueKey('cupertino_composer_surface')),
+    );
+    final surface = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('cupertino_composer_surface')),
+    );
+    final decoration = surface.decoration as BoxDecoration;
+
+    expect(
+      field.style?.color,
+      CupertinoDynamicColor.resolve(CupertinoColors.label, surfaceContext),
+    );
+    expect(
+      field.placeholderStyle?.color,
+      CupertinoDynamicColor.resolve(
+        CupertinoColors.placeholderText,
+        surfaceContext,
+      ),
+    );
+    expect(
+      decoration.color,
+      CupertinoDynamicColor.resolve(
+        CupertinoColors.secondarySystemGroupedBackground,
+        surfaceContext,
+      ).withValues(alpha: 0.82),
+    );
+  });
 }
 
 Widget _buildComposerApp({
   required ChatComposerContract contract,
+  Brightness brightness = Brightness.light,
   ValueChanged<String>? onChanged,
   Future<void> Function()? onSend,
   Future<void> Function()? onStop,
 }) {
   return MaterialApp(
-    theme: buildPocketTheme(Brightness.light),
+    theme: buildPocketTheme(brightness),
+    darkTheme: buildPocketTheme(Brightness.dark),
+    themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
     home: Scaffold(
       body: CupertinoChatComposer(
         contract: contract,

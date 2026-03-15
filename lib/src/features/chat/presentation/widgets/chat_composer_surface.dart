@@ -125,15 +125,24 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       context,
     );
     final surfaceColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.systemBackground,
+      CupertinoColors.secondarySystemGroupedBackground,
       context,
     ).withValues(alpha: 0.82);
+    final labelColor = CupertinoDynamicColor.resolve(
+      CupertinoColors.label,
+      context,
+    );
+    final placeholderColor = CupertinoDynamicColor.resolve(
+      CupertinoColors.placeholderText,
+      context,
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: DecoratedBox(
+          key: const ValueKey('cupertino_composer_surface'),
           decoration: BoxDecoration(
             color: surfaceColor,
             borderRadius: BorderRadius.circular(28),
@@ -156,6 +165,8 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
                 maxLines: 6,
                 textInputAction: TextInputAction.newline,
                 placeholder: widget.contract.placeholder,
+                style: TextStyle(color: labelColor),
+                placeholderStyle: TextStyle(color: placeholderColor),
                 onChanged: widget.onChanged,
                 padding: const EdgeInsets.fromLTRB(4, 10, 10, 10),
                 decoration: const BoxDecoration(),

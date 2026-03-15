@@ -47,7 +47,7 @@ class ChatEmptyStateBody extends StatelessWidget {
           Text(
             'Remote Codex, cleaned up for a phone screen',
             textAlign: TextAlign.center,
-            style: _titleStyle(),
+            style: _titleStyle(context),
           ),
           const SizedBox(height: 10),
           Text(
@@ -104,15 +104,30 @@ class ChatEmptyStateBody extends StatelessWidget {
   }
 
   Widget _buildCupertinoCard(Widget content) {
-    return CupertinoPopupSurface(
-      blurSigma: 18,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Color(0xF1F6F6F8),
-          borderRadius: BorderRadius.all(Radius.circular(28)),
-        ),
-        child: content,
-      ),
+    return Builder(
+      builder: (context) {
+        final surfaceColor = CupertinoDynamicColor.resolve(
+          CupertinoColors.secondarySystemGroupedBackground,
+          context,
+        ).withValues(alpha: 0.92);
+        final borderColor = CupertinoDynamicColor.resolve(
+          CupertinoColors.separator,
+          context,
+        ).withValues(alpha: 0.18);
+
+        return CupertinoPopupSurface(
+          blurSigma: 18,
+          child: DecoratedBox(
+            key: const ValueKey('cupertino_empty_state_card'),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: const BorderRadius.all(Radius.circular(28)),
+              border: Border.all(color: borderColor),
+            ),
+            child: content,
+          ),
+        );
+      },
     );
   }
 
@@ -158,17 +173,17 @@ class ChatEmptyStateBody extends StatelessWidget {
     );
   }
 
-  TextStyle _titleStyle() {
+  TextStyle _titleStyle(BuildContext context) {
     return switch (style) {
       ChatEmptyStateVisualStyle.material => const TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w800,
         height: 1.2,
       ),
-      ChatEmptyStateVisualStyle.cupertino => const TextStyle(
+      ChatEmptyStateVisualStyle.cupertino => TextStyle(
         fontSize: 25,
         fontWeight: FontWeight.w700,
-        color: CupertinoColors.label,
+        color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
         height: 1.18,
       ),
     };
@@ -180,10 +195,13 @@ class ChatEmptyStateBody extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         height: 1.5,
       ),
-      ChatEmptyStateVisualStyle.cupertino => const TextStyle(
+      ChatEmptyStateVisualStyle.cupertino => TextStyle(
         fontSize: 15,
         height: 1.45,
-        color: CupertinoColors.secondaryLabel,
+        color: CupertinoDynamicColor.resolve(
+          CupertinoColors.secondaryLabel,
+          context,
+        ),
       ),
     };
   }
@@ -239,16 +257,27 @@ class _ChecklistPill extends StatelessWidget {
   }
 
   Widget _buildCupertinoPill(BuildContext context) {
+    final fillColor = CupertinoDynamicColor.resolve(
+      CupertinoColors.secondarySystemFill,
+      context,
+    );
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5.resolveFrom(context),
+        color: fillColor,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 13, color: CupertinoColors.label),
+          style: TextStyle(
+            fontSize: 13,
+            color: CupertinoDynamicColor.resolve(
+              CupertinoColors.label,
+              context,
+            ),
+          ),
         ),
       ),
     );

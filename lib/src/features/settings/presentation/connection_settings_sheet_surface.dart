@@ -28,7 +28,7 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
       children: [
         _buildDragHandle(context),
         const SizedBox(height: 18),
-        Text(contract.title, style: _titleStyle()),
+        Text(contract.title, style: _titleStyle(context)),
         const SizedBox(height: 8),
         Text(contract.description, style: _descriptionStyle(context)),
         const SizedBox(height: 20),
@@ -98,7 +98,7 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        _buildFooter(contract),
+        _buildFooter(context, contract),
       ],
     );
 
@@ -156,10 +156,16 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
                   child: CupertinoPopupSurface(
                     blurSigma: 18,
                     child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Color(0xF4F5F5F7),
-                        borderRadius: BorderRadius.vertical(
+                      key: const ValueKey('cupertino_settings_surface'),
+                      decoration: BoxDecoration(
+                        color: _cupertinoSheetSurfaceColor(context),
+                        borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(28),
+                        ),
+                        border: Border.all(
+                          color: _cupertinoSeparatorColor(
+                            context,
+                          ).withValues(alpha: 0.18),
                         ),
                       ),
                       child: ConstrainedBox(
@@ -248,10 +254,10 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
       ),
       ConnectionSettingsSheetStyle.cupertino => DecoratedBox(
         decoration: BoxDecoration(
-          color: CupertinoColors.white.withValues(alpha: 0.7),
+          color: _cupertinoSectionColor(context),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: CupertinoColors.systemGrey4.withValues(alpha: 0.5),
+            color: _cupertinoSeparatorColor(context).withValues(alpha: 0.18),
           ),
         ),
         child: Padding(
@@ -261,10 +267,10 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: CupertinoColors.label,
+                  color: _cupertinoLabelColor(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -304,10 +310,10 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
         children: [
           Text(
             field.label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: CupertinoColors.secondaryLabel,
+              color: _cupertinoSecondaryLabelColor(context),
             ),
           ),
           const SizedBox(height: 6),
@@ -320,6 +326,20 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
             minLines: field.minLines,
             maxLines: field.maxLines,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            style: TextStyle(color: _cupertinoLabelColor(context)),
+            placeholderStyle: TextStyle(
+              color: CupertinoDynamicColor.resolve(
+                CupertinoColors.placeholderText,
+                context,
+              ),
+            ),
+            decoration: BoxDecoration(
+              color: _cupertinoFieldColor(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _cupertinoSeparatorColor(context).withValues(alpha: 0.14),
+              ),
+            ),
             onChanged: (value) {
               actions.onFieldChanged(field.id, value);
             },
@@ -328,9 +348,9 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               helperText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: _cupertinoSecondaryLabelColor(context),
               ),
             ),
           ],
@@ -338,9 +358,12 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               errorText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.systemRed,
+                color: CupertinoDynamicColor.resolve(
+                  CupertinoColors.systemRed,
+                  context,
+                ),
               ),
             ),
           ],
@@ -420,18 +443,18 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
                 children: [
                   Text(
                     toggle.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: CupertinoColors.label,
+                      color: _cupertinoLabelColor(context),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     toggle.subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: CupertinoColors.secondaryLabel,
+                      color: _cupertinoSecondaryLabelColor(context),
                     ),
                   ),
                 ],
@@ -450,7 +473,10 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     };
   }
 
-  Widget _buildFooter(ConnectionSettingsContract contract) {
+  Widget _buildFooter(
+    BuildContext context,
+    ConnectionSettingsContract contract,
+  ) {
     return switch (style) {
       ConnectionSettingsSheetStyle.material => Row(
         children: [
@@ -473,13 +499,16 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
         children: [
           Expanded(
             child: CupertinoButton(
-              color: CupertinoColors.systemGrey5,
+              color: CupertinoDynamicColor.resolve(
+                CupertinoColors.secondarySystemFill,
+                context,
+              ),
               padding: const EdgeInsets.symmetric(vertical: 14),
               onPressed: actions.onCancel,
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: CupertinoColors.label,
+                  color: _cupertinoLabelColor(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -498,16 +527,16 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     };
   }
 
-  TextStyle _titleStyle() {
+  TextStyle _titleStyle(BuildContext context) {
     return switch (style) {
       ConnectionSettingsSheetStyle.material => const TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w800,
       ),
-      ConnectionSettingsSheetStyle.cupertino => const TextStyle(
+      ConnectionSettingsSheetStyle.cupertino => TextStyle(
         fontSize: 27,
         fontWeight: FontWeight.w700,
-        color: CupertinoColors.label,
+        color: _cupertinoLabelColor(context),
       ),
     };
   }
@@ -518,10 +547,10 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         height: 1.45,
       ),
-      ConnectionSettingsSheetStyle.cupertino => const TextStyle(
+      ConnectionSettingsSheetStyle.cupertino => TextStyle(
         fontSize: 14,
         height: 1.35,
-        color: CupertinoColors.secondaryLabel,
+        color: _cupertinoSecondaryLabelColor(context),
       ),
     };
   }
@@ -545,5 +574,41 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
       ConnectionSettingsAuthOptionIcon.password => CupertinoIcons.lock_fill,
       ConnectionSettingsAuthOptionIcon.privateKey => CupertinoIcons.lock_shield,
     };
+  }
+
+  Color _cupertinoSheetSurfaceColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.systemGroupedBackground,
+      context,
+    ).withValues(alpha: 0.92);
+  }
+
+  Color _cupertinoSectionColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.secondarySystemGroupedBackground,
+      context,
+    );
+  }
+
+  Color _cupertinoFieldColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.tertiarySystemGroupedBackground,
+      context,
+    );
+  }
+
+  Color _cupertinoSeparatorColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(CupertinoColors.separator, context);
+  }
+
+  Color _cupertinoLabelColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(CupertinoColors.label, context);
+  }
+
+  Color _cupertinoSecondaryLabelColor(BuildContext context) {
+    return CupertinoDynamicColor.resolve(
+      CupertinoColors.secondaryLabel,
+      context,
+    );
   }
 }
