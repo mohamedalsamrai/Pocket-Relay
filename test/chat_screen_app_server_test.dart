@@ -749,6 +749,80 @@ void main() {
     );
   });
 
+  testWidgets('freezes a running assistant card when approval opens', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/started',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'assistant_1',
+            'type': 'agentMessage',
+            'status': 'inProgress',
+          },
+        },
+      ),
+    );
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/agentMessage/delta',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'itemId': 'assistant_1',
+          'delta': 'Before request',
+        },
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Before request'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    appServerClient.emit(
+      const CodexAppServerRequestEvent(
+        requestId: 'i:99',
+        method: 'item/fileChange/requestApproval',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'itemId': 'assistant_1',
+          'reason': 'Write files',
+        },
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Before request'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.text('File change approval'), findsOneWidget);
+  });
+
   testWidgets(
     'keeps pending approvals off the transcript until resolution and preserves chronology',
     (tester) async {
