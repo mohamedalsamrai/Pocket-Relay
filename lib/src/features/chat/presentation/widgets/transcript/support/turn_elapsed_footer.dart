@@ -66,6 +66,7 @@ class _TurnElapsedFooterState extends State<TurnElapsedFooter> {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

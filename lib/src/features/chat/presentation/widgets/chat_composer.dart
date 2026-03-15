@@ -45,8 +45,7 @@ class ChatComposer extends StatelessWidget {
               maxLines: 6,
               textInputAction: TextInputAction.newline,
               decoration: const InputDecoration(
-                hintText:
-                    'Ask Codex to inspect, edit, explain, or run something on the remote box…',
+                hintText: 'Describe what you want Codex to do…',
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
