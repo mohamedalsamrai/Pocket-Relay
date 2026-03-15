@@ -22,11 +22,13 @@ class TranscriptRequestPolicy {
 
     final turnId = event.turnId ?? state.activeTurn?.turnId;
     final threadId = event.threadId ?? state.activeTurn?.threadId;
-    final activeTurn = _ensureActiveTurn(
-      state.activeTurn,
-      turnId: turnId,
-      threadId: threadId,
-      createdAt: event.createdAt,
+    final activeTurn = _freezeTailArtifact(
+      _ensureActiveTurn(
+        state.activeTurn,
+        turnId: turnId,
+        threadId: threadId,
+        createdAt: event.createdAt,
+      ),
     );
     final wasBlocking = activeTurn?.hasBlockingRequests ?? false;
     if (event.requestType == CodexCanonicalRequestType.mcpServerElicitation) {
@@ -134,11 +136,13 @@ class TranscriptRequestPolicy {
 
     final turnId = event.turnId ?? state.activeTurn?.turnId;
     final threadId = event.threadId ?? state.activeTurn?.threadId;
-    final activeTurn = _ensureActiveTurn(
-      state.activeTurn,
-      turnId: turnId,
-      threadId: threadId,
-      createdAt: event.createdAt,
+    final activeTurn = _freezeTailArtifact(
+      _ensureActiveTurn(
+        state.activeTurn,
+        turnId: turnId,
+        threadId: threadId,
+        createdAt: event.createdAt,
+      ),
     );
     final wasBlocking = activeTurn?.hasBlockingRequests ?? false;
     final pendingRequest = CodexSessionPendingUserInputRequest(
@@ -438,6 +442,21 @@ class TranscriptRequestPolicy {
         CodexTurnBlockArtifact(block: block),
       ),
     );
+  }
+
+  CodexActiveTurnState? _freezeTailArtifact(CodexActiveTurnState? activeTurn) {
+    if (activeTurn == null || activeTurn.artifacts.isEmpty) {
+      return activeTurn;
+    }
+
+    final frozenTail = freezeCodexTurnArtifact(activeTurn.artifacts.last);
+    if (identical(frozenTail, activeTurn.artifacts.last)) {
+      return activeTurn;
+    }
+
+    final nextArtifacts = List<CodexTurnArtifact>.from(activeTurn.artifacts);
+    nextArtifacts[nextArtifacts.length - 1] = frozenTail;
+    return activeTurn.copyWith(artifacts: nextArtifacts);
   }
 
   CodexActiveTurnState _replaceTailTurnBlock(

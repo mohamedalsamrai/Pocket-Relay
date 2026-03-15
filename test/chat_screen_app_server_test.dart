@@ -391,6 +391,85 @@ void main() {
     },
   );
 
+  testWidgets(
+    'keeps assistant, work, and resumed assistant in chronological order',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'assistant_1',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'Before work',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'command_1',
+              'type': 'commandExecution',
+              'status': 'completed',
+              'command': 'git status',
+              'result': <String, Object?>{'output': 'clean', 'exitCode': 0},
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'assistant_2',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'After work',
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final beforeWorkDy = tester.getTopLeft(find.text('Before work')).dy;
+      final workDy = tester.getTopLeft(find.text('git status')).dy;
+      final afterWorkDy = tester.getTopLeft(find.text('After work')).dy;
+
+      expect(find.text('Work log'), findsOneWidget);
+      expect(beforeWorkDy, lessThan(workDy));
+      expect(workDy, lessThan(afterWorkDy));
+    },
+  );
+
   testWidgets('renders consecutive work items in one grouped work card', (
     tester,
   ) async {
@@ -544,6 +623,83 @@ void main() {
     },
   );
 
+  testWidgets(
+    'renders sequential distinct file-change items as separate changed-files cards',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_1',
+              'type': 'fileChange',
+              'status': 'completed',
+              'changes': <Object?>[
+                <String, Object?>{
+                  'path': 'README.md',
+                  'kind': <String, Object?>{'type': 'add'},
+                  'diff': 'first line\n',
+                },
+              ],
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'file_change_2',
+              'type': 'fileChange',
+              'status': 'completed',
+              'changes': <Object?>[
+                <String, Object?>{
+                  'path': 'lib/app.dart',
+                  'kind': <String, Object?>{'type': 'update'},
+                  'diff':
+                      '--- a/lib/app.dart\n'
+                      '+++ b/lib/app.dart\n'
+                      '@@ -1 +1 @@\n'
+                      '-old\n'
+                      '+new\n',
+                },
+              ],
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Changed files'), findsNWidgets(2));
+      final readmeDy = tester.getTopLeft(find.text('README.md')).dy;
+      final appDy = tester.getTopLeft(find.text('lib/app.dart')).dy;
+      expect(readmeDy, lessThan(appDy));
+    },
+  );
+
   testWidgets('approval actions are routed to the app-server client', (
     tester,
   ) async {
@@ -592,6 +748,98 @@ void main() {
       ],
     );
   });
+
+  testWidgets(
+    'keeps pending approvals off the transcript until resolution and preserves chronology',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'assistant_before',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'Before request',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 'i:99',
+          method: 'item/fileChange/requestApproval',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'assistant_before',
+            'reason': 'Write files',
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Before request'), findsOneWidget);
+      expect(find.text('File change approval'), findsOneWidget);
+      expect(find.text('File change approval resolved'), findsNothing);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'serverRequest/resolved',
+          params: <String, Object?>{'threadId': 'thread_123', 'requestId': 99},
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'assistant_after',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'After request',
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('File change approval'), findsNothing);
+      expect(find.text('File change approval resolved'), findsOneWidget);
+
+      final beforeRequestDy = tester.getTopLeft(find.text('Before request')).dy;
+      final resolvedDy = tester
+          .getTopLeft(find.text('File change approval resolved'))
+          .dy;
+      final afterRequestDy = tester.getTopLeft(find.text('After request')).dy;
+
+      expect(beforeRequestDy, lessThan(resolvedDy));
+      expect(resolvedDy, lessThan(afterRequestDy));
+    },
+  );
 
   testWidgets(
     'shows the live turn timer above the composer without needing an assistant block',

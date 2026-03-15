@@ -778,6 +778,44 @@ void main() {
     expect(resolvedBlock.isResolved, isTrue);
   });
 
+  test('freezes a running assistant artifact when an approval opens', () {
+    final reducer = TranscriptReducer();
+    final now = DateTime(2026, 3, 14, 12);
+    var state = reducer.reduceRuntimeEvent(
+      CodexSessionState.initial(),
+      CodexRuntimeContentDeltaEvent(
+        createdAt: now,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'assistant_123',
+        streamKind: CodexRuntimeContentStreamKind.assistantText,
+        delta: 'Before request',
+      ),
+    );
+
+    final runningBlockBeforeRequest =
+        state.transcriptBlocks.single as CodexTextBlock;
+    expect(runningBlockBeforeRequest.isRunning, isTrue);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeRequestOpenedEvent(
+        createdAt: now.add(const Duration(milliseconds: 100)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'assistant_123',
+        requestId: 'approval_1',
+        requestType: CodexCanonicalRequestType.fileChangeApproval,
+        detail: 'Write files',
+      ),
+    );
+
+    expect(state.primaryPendingApprovalBlock?.requestId, 'approval_1');
+    final frozenBlock = state.transcriptBlocks.single as CodexTextBlock;
+    expect(frozenBlock.body, 'Before request');
+    expect(frozenBlock.isRunning, isFalse);
+  });
+
   test('opens and resolves user-input requests', () {
     final reducer = TranscriptReducer();
     var state = CodexSessionState.initial();
@@ -827,6 +865,82 @@ void main() {
     expect(submittedBlock.body, contains('Vince'));
     expect(submittedBlock.isResolved, isTrue);
   });
+
+  test(
+    'freezes a running assistant artifact when user input is requested and forks resumed output after resolution',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_123',
+          streamKind: CodexRuntimeContentStreamKind.assistantText,
+          delta: 'Before request',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeUserInputRequestedEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_123',
+          requestId: 's:user-input-1',
+          questions: const <CodexRuntimeUserInputQuestion>[
+            CodexRuntimeUserInputQuestion(
+              id: 'q1',
+              header: 'Name',
+              question: 'What is your name?',
+            ),
+          ],
+        ),
+      );
+
+      final frozenBeforeInput = state.transcriptBlocks.single as CodexTextBlock;
+      expect(frozenBeforeInput.body, 'Before request');
+      expect(frozenBeforeInput.isRunning, isFalse);
+      expect(state.primaryPendingUserInputBlock?.requestId, 's:user-input-1');
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeUserInputResolvedEvent(
+          createdAt: now.add(const Duration(milliseconds: 200)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_123',
+          requestId: 's:user-input-1',
+          answers: const <String, List<String>>{
+            'q1': <String>['Vince'],
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 300)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_123',
+          streamKind: CodexRuntimeContentStreamKind.assistantText,
+          delta: 'After request',
+        ),
+      );
+
+      expect(state.transcriptBlocks, hasLength(3));
+      final blocks = state.transcriptBlocks;
+      expect((blocks[0] as CodexTextBlock).body, 'Before request');
+      expect((blocks[0] as CodexTextBlock).isRunning, isFalse);
+      expect(blocks[1], isA<CodexUserInputRequestBlock>());
+      expect((blocks[2] as CodexTextBlock).body, 'After request');
+      expect((blocks[2] as CodexTextBlock).isRunning, isTrue);
+    },
+  );
 
   test(
     'coalesces duplicate user-input resolution events into one request block',
@@ -1614,6 +1728,216 @@ void main() {
       expect(state.transcriptBlocks.first, isA<CodexWorkLogGroupBlock>());
       expect(state.transcriptBlocks[1], isA<CodexApprovalRequestBlock>());
       expect(state.transcriptBlocks.last, isA<CodexWorkLogGroupBlock>());
+    },
+  );
+
+  test(
+    'keeps assistant and work artifacts in chronological order when they interleave',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.assistantMessage,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_1',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{'text': 'Before work'},
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          itemType: CodexCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_1',
+          status: CodexRuntimeItemStatus.completed,
+          detail: 'git status',
+          snapshot: const <String, Object?>{
+            'result': <String, Object?>{'output': 'clean'},
+            'exitCode': 0,
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(milliseconds: 200)),
+          itemType: CodexCanonicalItemType.assistantMessage,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_2',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{'text': 'After work'},
+        ),
+      );
+
+      expect(state.transcriptBlocks, hasLength(3));
+      expect(state.transcriptBlocks.first, isA<CodexTextBlock>());
+      expect(state.transcriptBlocks[1], isA<CodexWorkLogGroupBlock>());
+      expect(state.transcriptBlocks.last, isA<CodexTextBlock>());
+      expect(
+        (state.transcriptBlocks.first as CodexTextBlock).body,
+        'Before work',
+      );
+      expect(
+        (state.transcriptBlocks[1] as CodexWorkLogGroupBlock)
+            .entries
+            .single
+            .title,
+        'git status',
+      );
+      expect(
+        (state.transcriptBlocks.last as CodexTextBlock).body,
+        'After work',
+      );
+    },
+  );
+
+  test(
+    'appends distinct file-change items as separate changed-files artifacts',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_1',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{
+            'changes': <Object?>[
+              <String, Object?>{
+                'path': 'README.md',
+                'kind': <String, Object?>{'type': 'add'},
+                'diff': 'first line\n',
+              },
+            ],
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          itemType: CodexCanonicalItemType.fileChange,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'file_change_2',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{
+            'changes': <Object?>[
+              <String, Object?>{
+                'path': 'lib/app.dart',
+                'kind': <String, Object?>{'type': 'update'},
+                'diff':
+                    '--- a/lib/app.dart\n'
+                    '+++ b/lib/app.dart\n'
+                    '@@ -1 +1 @@\n'
+                    '-old\n'
+                    '+new\n',
+              },
+            ],
+          },
+        ),
+      );
+
+      final changedFilesBlocks = state.transcriptBlocks
+          .whereType<CodexChangedFilesBlock>()
+          .toList(growable: false);
+      expect(changedFilesBlocks, hasLength(2));
+      expect(changedFilesBlocks.first.id, isNot(changedFilesBlocks.last.id));
+      expect(changedFilesBlocks.first.files.single.path, 'README.md');
+      expect(changedFilesBlocks.last.files.single.path, 'lib/app.dart');
+    },
+  );
+
+  test(
+    'keeps pending approvals off the transcript until resolution and preserves chronology',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.assistantMessage,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_before',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{'text': 'Before request'},
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeRequestOpenedEvent(
+          createdAt: now.add(const Duration(milliseconds: 100)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_before',
+          requestId: 'approval_1',
+          requestType: CodexCanonicalRequestType.fileChangeApproval,
+          detail: 'Write files',
+        ),
+      );
+
+      expect(state.transcriptBlocks, hasLength(1));
+      expect(state.primaryPendingApprovalBlock, isNotNull);
+      expect(state.primaryPendingApprovalBlock?.requestId, 'approval_1');
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeRequestResolvedEvent(
+          createdAt: now.add(const Duration(milliseconds: 200)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_before',
+          requestId: 'approval_1',
+          requestType: CodexCanonicalRequestType.fileChangeApproval,
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(milliseconds: 300)),
+          itemType: CodexCanonicalItemType.assistantMessage,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'assistant_after',
+          status: CodexRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{'text': 'After request'},
+        ),
+      );
+
+      expect(state.primaryPendingApprovalBlock, isNull);
+      expect(state.transcriptBlocks, hasLength(3));
+      expect(
+        (state.transcriptBlocks.first as CodexTextBlock).body,
+        'Before request',
+      );
+      expect(state.transcriptBlocks[1], isA<CodexApprovalRequestBlock>());
+      expect(
+        (state.transcriptBlocks[1] as CodexApprovalRequestBlock).title,
+        'File change approval resolved',
+      );
+      expect(
+        (state.transcriptBlocks.last as CodexTextBlock).body,
+        'After request',
+      );
     },
   );
 

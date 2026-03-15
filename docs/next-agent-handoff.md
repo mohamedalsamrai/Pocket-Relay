@@ -74,16 +74,19 @@ Current state:
   artifacts
 - local user prompts no longer mutate when provider user-message echoes arrive
 - duplicate request-resolution notifications are now idempotent
+- opening an approval or user-input request now freezes the current live tail
+  before the pending overlay takes over
 
 Target state:
 
 - flush assistant output before tool/work cells begin
 - flush work groups before assistant output resumes
+- freeze the current live artifact before request overlays take over
 - keep committed transcript history separate from active streaming state
 
 The transcript ownership model is now substantially in place. The remaining
-work here is parity verification and behavior sweep, not another ownership
-rewrite.
+work here is emulator/manual parity verification and stale-doc cleanup, not
+another ownership rewrite.
 
 Primary code areas:
 

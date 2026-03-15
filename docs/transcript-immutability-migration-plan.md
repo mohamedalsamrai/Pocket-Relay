@@ -285,6 +285,20 @@ Changes:
 - remove stale tests and docs that still encode the old mutable-timeline model
 - update handoff docs from the final state rather than from migration intent
 
+Scenario checklist:
+
+- `interrupted/resumed same-item artifacts`: reducer and widget coverage exists
+- `interleaved assistant -> work -> assistant chronology`: reducer and widget
+  coverage exists
+- `repeated plan updates`: reducer and widget coverage exists
+- `sequential distinct file-change artifacts`: reducer and widget coverage
+  exists
+- `request resolution chronology`: reducer and widget coverage exists for
+  pending-off-timeline, live-tail freeze on request-open, and
+  resolved-in-history behavior
+- `emulator/manual parity sweep`: still required after the runtime matrix lands
+- `stale mutable-model docs/tests cleanup`: still required after the sweep
+
 Exit criterion:
 
 - the remaining transcript behavior is described by current docs, not by
