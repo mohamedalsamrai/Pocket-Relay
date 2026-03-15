@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 
@@ -13,22 +13,16 @@ class TranscriptList extends StatefulWidget {
   const TranscriptList({
     super.key,
     required this.controller,
-    required this.isConfigured,
-    required this.transcriptBlocks,
+    required this.surface,
     required this.onConfigure,
-    this.pendingApprovalBlock,
-    this.pendingUserInputBlock,
     this.onApproveRequest,
     this.onDenyRequest,
     this.onSubmitUserInput,
   });
 
   final TranscriptListController controller;
-  final bool isConfigured;
-  final List<CodexUiBlock> transcriptBlocks;
+  final ChatTranscriptSurfaceContract surface;
   final VoidCallback onConfigure;
-  final CodexApprovalRequestBlock? pendingApprovalBlock;
-  final CodexUserInputRequestBlock? pendingUserInputBlock;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
   final Future<void> Function(
@@ -48,9 +42,7 @@ class _TranscriptListState extends State<TranscriptList> {
   bool _shouldFollowTranscript = true;
 
   bool get _hasVisibleConversation =>
-      widget.transcriptBlocks.isNotEmpty ||
-      widget.pendingApprovalBlock != null ||
-      widget.pendingUserInputBlock != null;
+      !widget.surface.showsEmptyState;
 
   @override
   void initState() {
@@ -80,9 +72,10 @@ class _TranscriptListState extends State<TranscriptList> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasVisibleConversation) {
+    final emptyState = widget.surface.emptyState;
+    if (emptyState != null) {
       return EmptyState(
-        isConfigured: widget.isConfigured,
+        isConfigured: emptyState.isConfigured,
         onConfigure: widget.onConfigure,
       );
     }
@@ -96,7 +89,8 @@ class _TranscriptListState extends State<TranscriptList> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
               itemBuilder: (context, index) {
-                final block = widget.transcriptBlocks[index];
+                final item = widget.surface.mainItems[index];
+                final block = item.block;
                 return ConversationEntryCard(
                   key: ValueKey<String>('transcript_${block.id}'),
                   block: block,
@@ -106,43 +100,37 @@ class _TranscriptListState extends State<TranscriptList> {
                 );
               },
               separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemCount: widget.transcriptBlocks.length,
+              itemCount: widget.surface.mainItems.length,
             ),
           ),
         ),
-        if (widget.pendingApprovalBlock != null ||
-            widget.pendingUserInputBlock != null)
+        if (widget.surface.pinnedItems.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
                 child: Column(
-                  children: [
-                    if (widget.pendingApprovalBlock != null)
-                      ConversationEntryCard(
-                        key: ValueKey<String>(
-                          'pending_${widget.pendingApprovalBlock!.id}',
-                        ),
-                        block: widget.pendingApprovalBlock!,
-                        onApproveRequest: widget.onApproveRequest,
-                        onDenyRequest: widget.onDenyRequest,
-                        onSubmitUserInput: widget.onSubmitUserInput,
-                      ),
-                    if (widget.pendingApprovalBlock != null &&
-                        widget.pendingUserInputBlock != null)
-                      const SizedBox(height: 8),
-                    if (widget.pendingUserInputBlock != null)
-                      ConversationEntryCard(
-                        key: ValueKey<String>(
-                          'pending_${widget.pendingUserInputBlock!.id}',
-                        ),
-                        block: widget.pendingUserInputBlock!,
-                        onApproveRequest: widget.onApproveRequest,
-                        onDenyRequest: widget.onDenyRequest,
-                        onSubmitUserInput: widget.onSubmitUserInput,
-                      ),
-                  ],
+                  children: widget.surface.pinnedItems.indexed
+                      .map((entry) {
+                        final index = entry.$1;
+                        final block = entry.$2.block;
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == widget.surface.pinnedItems.length - 1
+                                ? 0
+                                : 8,
+                          ),
+                          child: ConversationEntryCard(
+                            key: ValueKey<String>('pinned_${block.id}'),
+                            block: block,
+                            onApproveRequest: widget.onApproveRequest,
+                            onDenyRequest: widget.onDenyRequest,
+                            onSubmitUserInput: widget.onSubmitUserInput,
+                          ),
+                        );
+                      })
+                      .toList(growable: false),
                 ),
               ),
             ),

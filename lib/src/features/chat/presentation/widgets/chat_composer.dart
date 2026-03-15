@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 
 class ChatComposer extends StatelessWidget {
   const ChatComposer({
     super.key,
     required this.controller,
-    required this.enabled,
-    required this.isBusy,
+    required this.contract,
     required this.onSend,
     required this.onStop,
   });
 
   final TextEditingController controller;
-  final bool enabled;
-  final bool isBusy;
+  final ChatComposerContract contract;
   final Future<void> Function() onSend;
   final Future<void> Function() onStop;
 
@@ -40,12 +39,12 @@ class ChatComposer extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              enabled: enabled && !isBusy,
+              enabled: contract.isTextInputEnabled,
               minLines: 1,
               maxLines: 6,
               textInputAction: TextInputAction.newline,
-              decoration: const InputDecoration(
-                hintText: 'Describe what you want Codex to do…',
+              decoration: InputDecoration(
+                hintText: contract.placeholder,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -56,16 +55,16 @@ class ChatComposer extends StatelessWidget {
           const SizedBox(width: 10),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: isBusy
+            child: contract.primaryAction == ChatComposerPrimaryAction.stop
                 ? FilledButton.tonalIcon(
                     key: const ValueKey('stop'),
-                    onPressed: onStop,
+                    onPressed: contract.isPrimaryActionEnabled ? onStop : null,
                     icon: const Icon(Icons.stop_circle_outlined),
                     label: const Text('Stop'),
                   )
                 : IconButton.filled(
                     key: const ValueKey('send'),
-                    onPressed: enabled ? onSend : null,
+                    onPressed: contract.isPrimaryActionEnabled ? onSend : null,
                     icon: const Icon(Icons.send_rounded),
                   ),
           ),

@@ -4,6 +4,7 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
@@ -425,15 +426,16 @@ void main() {
         _buildTestApp(
           child: TranscriptList(
             controller: controller,
-            isConfigured: true,
-            transcriptBlocks: <CodexUiBlock>[
-              CodexProposedPlanBlock(
-                id: 'plan_1',
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Proposed plan',
-                markdown: markdownLines.join('\n'),
-              ),
-            ],
+            surface: _surfaceContract(
+              mainItems: <CodexUiBlock>[
+                CodexProposedPlanBlock(
+                  id: 'plan_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Proposed plan',
+                  markdown: markdownLines.join('\n'),
+                ),
+              ],
+            ),
             onConfigure: () {},
           ),
         ),
@@ -447,15 +449,16 @@ void main() {
         _buildTestApp(
           child: TranscriptList(
             controller: controller,
-            isConfigured: true,
-            transcriptBlocks: <CodexUiBlock>[
-              CodexProposedPlanBlock(
-                id: 'plan_2',
-                createdAt: DateTime(2026, 3, 14, 12, 0, 5),
-                title: 'Proposed plan',
-                markdown: markdownLines.join('\n'),
-              ),
-            ],
+            surface: _surfaceContract(
+              mainItems: <CodexUiBlock>[
+                CodexProposedPlanBlock(
+                  id: 'plan_2',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 5),
+                  title: 'Proposed plan',
+                  markdown: markdownLines.join('\n'),
+                ),
+              ],
+            ),
             onConfigure: () {},
           ),
         ),
@@ -906,6 +909,24 @@ void main() {
     expect(find.text('Show preview'), findsOneWidget);
     expect(find.text('+line 359'), findsOneWidget);
   });
+}
+
+ChatTranscriptSurfaceContract _surfaceContract({
+  bool isConfigured = true,
+  List<CodexUiBlock> mainItems = const <CodexUiBlock>[],
+  List<CodexUiBlock> pinnedItems = const <CodexUiBlock>[],
+  ChatEmptyStateContract? emptyState,
+}) {
+  return ChatTranscriptSurfaceContract(
+    isConfigured: isConfigured,
+    mainItems: mainItems
+        .map((block) => ChatTranscriptItemContract(block: block))
+        .toList(growable: false),
+    pinnedItems: pinnedItems
+        .map((block) => ChatTranscriptItemContract(block: block))
+        .toList(growable: false),
+    emptyState: emptyState,
+  );
 }
 
 Widget _buildTestApp({

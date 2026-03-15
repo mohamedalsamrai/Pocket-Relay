@@ -4,6 +4,10 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
@@ -30,16 +34,16 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _composerController = TextEditingController();
   final _transcriptListController = TranscriptListController();
+  final _effectMapper = const ChatScreenEffectMapper();
+  final _screenPresenter = const ChatScreenPresenter();
   late ChatSessionController _sessionController;
-  StreamSubscription<String>? _snackBarSubscription;
+  StreamSubscription<ChatScreenEffect>? _screenEffectSubscription;
 
   @override
   void initState() {
     super.initState();
     _sessionController = _buildSessionController();
-    _snackBarSubscription = _sessionController.snackBarMessages.listen(
-      _showSnackBar,
-    );
+    _bindScreenEffects();
     unawaited(_sessionController.initialize());
   }
 
@@ -52,12 +56,10 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    _snackBarSubscription?.cancel();
+    _screenEffectSubscription?.cancel();
     _sessionController.dispose();
     _sessionController = _buildSessionController();
-    _snackBarSubscription = _sessionController.snackBarMessages.listen(
-      _showSnackBar,
-    );
+    _bindScreenEffects();
     unawaited(_sessionController.initialize());
   }
 
@@ -71,7 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _snackBarSubscription?.cancel();
+    _screenEffectSubscription?.cancel();
     _sessionController.dispose();
     _transcriptListController.dispose();
     _composerController.dispose();
@@ -83,11 +85,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return AnimatedBuilder(
       animation: _sessionController,
       builder: (context, _) {
+        final screen = _buildScreenContract();
         final theme = Theme.of(context);
         final palette = context.pocketPalette;
-        final profile = _sessionController.profile;
-        final sessionState = _sessionController.sessionState;
-        final activeTurnTimer = sessionState.activeTurn?.timer;
 
         return Scaffold(
           appBar: AppBar(
@@ -95,14 +95,12 @@ class _ChatScreenState extends State<ChatScreen> {
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pocket Relay',
+                Text(
+                  screen.header.title,
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
                 Text(
-                  profile.isReady
-                      ? '${profile.label} · ${profile.host}'
-                      : 'Configure a remote box',
+                  screen.header.subtitle,
                   style: TextStyle(
                     fontSize: 13,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -111,31 +109,26 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
             actions: [
-              IconButton(
-                tooltip: 'Connection settings',
-                onPressed: _openSettingsSheet,
-                icon: const Icon(Icons.tune),
+              ...screen.toolbarActions.map(
+                (action) => IconButton(
+                  tooltip: action.tooltip,
+                  onPressed: () => _handleScreenAction(action.id, screen),
+                  icon: Icon(_iconForAction(action)),
+                ),
               ),
-              PopupMenuButton<_TranscriptAction>(
+              PopupMenuButton<ChatScreenActionId>(
                 onSelected: (action) {
-                  switch (action) {
-                    case _TranscriptAction.newThread:
-                      _startFreshConversation();
-                    case _TranscriptAction.clearTranscript:
-                      _clearTranscript();
-                  }
+                  _handleScreenAction(action, screen);
                 },
                 itemBuilder: (context) {
-                  return const [
-                    PopupMenuItem(
-                      value: _TranscriptAction.newThread,
-                      child: Text('New thread'),
-                    ),
-                    PopupMenuItem(
-                      value: _TranscriptAction.clearTranscript,
-                      child: Text('Clear transcript'),
-                    ),
-                  ];
+                  return screen.menuActions
+                      .map(
+                        (action) => PopupMenuItem<ChatScreenActionId>(
+                          value: action.id,
+                          child: Text(action.label),
+                        ),
+                      )
+                      .toList(growable: false);
                 },
               ),
               const SizedBox(width: 8),
@@ -152,29 +145,24 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            child: _sessionController.isLoading
+            child: screen.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
                     children: [
                       Expanded(
                         child: TranscriptList(
                           controller: _transcriptListController,
-                          isConfigured: profile.isReady,
-                          transcriptBlocks: _sessionController.transcriptBlocks,
-                          pendingApprovalBlock:
-                              _sessionController.pendingApprovalBlock,
-                          pendingUserInputBlock:
-                              _sessionController.pendingUserInputBlock,
-                          onConfigure: _openSettingsSheet,
+                          surface: screen.transcriptSurface,
+                          onConfigure: () => _openSettingsSheet(screen),
                           onApproveRequest: _sessionController.approveRequest,
                           onDenyRequest: _sessionController.denyRequest,
                           onSubmitUserInput: _sessionController.submitUserInput,
                         ),
                       ),
-                      if (activeTurnTimer != null && activeTurnTimer.isRunning)
+                      if (screen.turnIndicator case final turnIndicator?)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                          child: TurnElapsedFooter(turnTimer: activeTurnTimer),
+                          child: TurnElapsedFooter(turnTimer: turnIndicator.timer),
                         ),
                       SafeArea(
                         top: false,
@@ -182,10 +170,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                           child: ChatComposer(
                             controller: _composerController,
-                            enabled:
-                                profile.isReady &&
-                                !_sessionController.isLoading,
-                            isBusy: sessionState.isBusy,
+                            contract: screen.composer,
                             onSend: _sendPrompt,
                             onStop: _stopActiveTurn,
                           ),
@@ -199,7 +184,22 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _openSettingsSheet() async {
+  void _bindScreenEffects() {
+    _screenEffectSubscription = _sessionController.snackBarMessages
+        .map(_effectMapper.mapSnackBarMessage)
+        .listen(_handleScreenEffect);
+  }
+
+  ChatScreenContract _buildScreenContract() {
+    return _screenPresenter.present(
+      isLoading: _sessionController.isLoading,
+      profile: _sessionController.profile,
+      secrets: _sessionController.secrets,
+      sessionState: _sessionController.sessionState,
+    );
+  }
+
+  Future<void> _openSettingsSheet(ChatScreenContract screen) async {
     final result = await showModalBottomSheet<ConnectionSheetResult>(
       context: context,
       isScrollControlled: true,
@@ -207,8 +207,8 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return ConnectionSheet(
-          initialProfile: _sessionController.profile,
-          initialSecrets: _sessionController.secrets,
+          initialProfile: screen.connectionSettings.initialProfile,
+          initialSecrets: screen.connectionSettings.initialSecrets,
         );
       },
     );
@@ -229,6 +229,20 @@ class _ChatScreenState extends State<ChatScreen> {
       profile: result.profile,
       secrets: result.secrets,
     );
+  }
+
+  void _handleScreenAction(
+    ChatScreenActionId action,
+    ChatScreenContract screen,
+  ) {
+    switch (action) {
+      case ChatScreenActionId.openSettings:
+        unawaited(_openSettingsSheet(screen));
+      case ChatScreenActionId.newThread:
+        _startFreshConversation();
+      case ChatScreenActionId.clearTranscript:
+        _clearTranscript();
+    }
   }
 
   Future<void> _sendPrompt() async {
@@ -253,6 +267,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _sessionController.clearTranscript();
   }
 
+  void _handleScreenEffect(ChatScreenEffect effect) {
+    switch (effect) {
+      case ChatShowSnackBarEffect(:final message):
+        _showSnackBar(message);
+    }
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) {
       return;
@@ -263,4 +284,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-enum _TranscriptAction { newThread, clearTranscript }
+IconData _iconForAction(ChatScreenActionContract action) {
+  return switch (action.icon) {
+    ChatScreenActionIcon.settings => Icons.tune,
+    null => Icons.more_horiz,
+  };
+}
