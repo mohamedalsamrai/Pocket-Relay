@@ -37,7 +37,7 @@ class PlanUpdateCard extends StatelessWidget {
                 Icon(Icons.checklist_rtl, size: 16, color: accent),
                 const SizedBox(width: 7),
                 Text(
-                  'Plan',
+                  'Updated Plan',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

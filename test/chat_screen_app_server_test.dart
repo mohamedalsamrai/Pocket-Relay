@@ -97,6 +97,72 @@ void main() {
     expect(find.textContaining('end'), findsOneWidget);
   });
 
+  testWidgets('appends plan update cards instead of replacing them', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'turn/plan/updated',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'explanation': 'Starting with the initial structure.',
+          'plan': <Map<String, Object?>>[
+            <String, Object?>{
+              'step': 'Inspect transcript ownership',
+              'status': 'in_progress',
+            },
+          ],
+        },
+      ),
+    );
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'turn/plan/updated',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'explanation': 'Refining after reading the reducer.',
+          'plan': <Map<String, Object?>>[
+            <String, Object?>{
+              'step': 'Inspect transcript ownership',
+              'status': 'completed',
+            },
+            <String, Object?>{
+              'step': 'Append visible plan updates',
+              'status': 'in_progress',
+            },
+          ],
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Updated Plan'), findsNWidgets(2));
+    expect(find.text('Starting with the initial structure.'), findsOneWidget);
+    expect(find.text('Refining after reading the reducer.'), findsOneWidget);
+    expect(find.text('Append visible plan updates'), findsOneWidget);
+  });
+
   testWidgets(
     'promotes the local user echo to sent when the app-server reports the prompt',
     (tester) async {

@@ -1179,6 +1179,61 @@ void main() {
     expect(changedFiles.unifiedDiff, contains('diff --git'));
   });
 
+  test('appends repeated plan updates for the same turn', () {
+    final reducer = TranscriptReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeTurnPlanUpdatedEvent(
+        createdAt: now,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        explanation: 'Starting with the initial structure.',
+        steps: const <CodexRuntimePlanStep>[
+          CodexRuntimePlanStep(
+            step: 'Inspect transcript ownership',
+            status: CodexRuntimePlanStepStatus.inProgress,
+          ),
+        ],
+      ),
+    );
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeTurnPlanUpdatedEvent(
+        createdAt: now.add(const Duration(seconds: 1)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        explanation: 'Refining after reading the reducer.',
+        steps: const <CodexRuntimePlanStep>[
+          CodexRuntimePlanStep(
+            step: 'Inspect transcript ownership',
+            status: CodexRuntimePlanStepStatus.completed,
+          ),
+          CodexRuntimePlanStep(
+            step: 'Append visible plan updates',
+            status: CodexRuntimePlanStepStatus.inProgress,
+          ),
+        ],
+      ),
+    );
+
+    final plans = state.transcriptBlocks
+        .whereType<CodexPlanUpdateBlock>()
+        .toList(growable: false);
+
+    expect(plans, hasLength(2));
+    expect(plans.first.id, isNot(plans.last.id));
+    expect(plans.first.explanation, 'Starting with the initial structure.');
+    expect(plans.first.steps.single.step, 'Inspect transcript ownership');
+    expect(plans.last.explanation, 'Refining after reading the reducer.');
+    expect(plans.last.steps, hasLength(2));
+    expect(plans.last.steps.first.status, CodexRuntimePlanStepStatus.completed);
+    expect(plans.last.steps.last.step, 'Append visible plan updates');
+  });
+
   test('sorts committed and live transcript rows by creation time', () {
     final reducer = TranscriptReducer();
     final startedAt = DateTime(2026, 3, 14, 12);

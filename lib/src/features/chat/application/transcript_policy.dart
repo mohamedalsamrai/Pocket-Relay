@@ -249,10 +249,14 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeTurnPlanUpdatedEvent event,
   ) {
-    return _stateWithTranscriptBlock(
+    return _stateWithAppendedTranscriptBlock(
       state,
       CodexPlanUpdateBlock(
-        id: 'turn_plan_${event.turnId ?? event.createdAt.toIso8601String()}',
+        id: _nextTranscriptEventBlockId(
+          state,
+          prefix: 'turn-plan',
+          createdAt: event.createdAt,
+        ),
         createdAt: event.createdAt,
         explanation: event.explanation,
         steps: event.steps,
@@ -511,6 +515,25 @@ class TranscriptPolicy {
     return state.copyWith(activeTurn: _upsertTurnBlock(activeTurn, block));
   }
 
+  CodexSessionState _stateWithAppendedTranscriptBlock(
+    CodexSessionState state,
+    CodexUiBlock block, {
+    required String? turnId,
+    required String? threadId,
+  }) {
+    final activeTurn = _ensureActiveTurn(
+      state.activeTurn,
+      turnId: turnId,
+      threadId: threadId,
+      createdAt: block.createdAt,
+    );
+    if (activeTurn == null) {
+      return _support.appendBlock(state, block);
+    }
+
+    return state.copyWith(activeTurn: _appendTurnBlock(activeTurn, block));
+  }
+
   CodexActiveTurnState _upsertTurnBlock(
     CodexActiveTurnState activeTurn,
     CodexUiBlock block,
@@ -527,5 +550,40 @@ class TranscriptPolicy {
     }
 
     return activeTurn.copyWith(segments: nextSegments);
+  }
+
+  CodexActiveTurnState _appendTurnBlock(
+    CodexActiveTurnState activeTurn,
+    CodexUiBlock block,
+  ) {
+    return activeTurn.copyWith(
+      segments: <CodexTurnSegment>[
+        ...activeTurn.segments,
+        CodexTurnBlockSegment(block: block),
+      ],
+    );
+  }
+
+  String _nextTranscriptEventBlockId(
+    CodexSessionState state, {
+    required String prefix,
+    required DateTime createdAt,
+  }) {
+    final usedIds = <String>{
+      ...state.blocks.map((block) => block.id),
+      ...?state.activeTurn?.segments.map((segment) => segment.id),
+    };
+    final baseId = _support.eventEntryId(prefix, createdAt);
+    if (!usedIds.contains(baseId)) {
+      return baseId;
+    }
+
+    var ordinal = 2;
+    var candidate = '$baseId-$ordinal';
+    while (usedIds.contains(candidate)) {
+      ordinal += 1;
+      candidate = '$baseId-$ordinal';
+    }
+    return candidate;
   }
 }

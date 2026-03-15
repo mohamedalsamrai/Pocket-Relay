@@ -67,6 +67,10 @@ class TranscriptPolicySupport {
     return state.copyWith(blocks: nextBlocks);
   }
 
+  CodexSessionState appendBlock(CodexSessionState state, CodexUiBlock block) {
+    return state.copyWith(blocks: <CodexUiBlock>[...state.blocks, block]);
+  }
+
   CodexStatusBlock statusEntry({
     required String prefix,
     required String title,
