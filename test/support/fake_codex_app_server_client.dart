@@ -57,6 +57,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? connectError;
   Object? startSessionError;
   Object? sendUserMessageError;
+  Completer<void>? sendUserMessageGate;
 
   bool _isConnected = false;
   String? _threadId;
@@ -112,6 +113,9 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     required String text,
     String? model,
   }) async {
+    if (sendUserMessageGate case final gate? when !gate.isCompleted) {
+      await gate.future;
+    }
     if (sendUserMessageError != null) {
       throw sendUserMessageError!;
     }

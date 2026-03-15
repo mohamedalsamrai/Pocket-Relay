@@ -31,4 +31,15 @@ class ChatTranscriptFollowHost extends ChangeNotifier {
     _isAutoFollowEnabled = isNearBottom;
     notifyListeners();
   }
+
+  void reset() {
+    if (_isAutoFollowEnabled && _request == null && _nextRequestId == 0) {
+      return;
+    }
+
+    _isAutoFollowEnabled = true;
+    _nextRequestId = 0;
+    _request = null;
+    notifyListeners();
+  }
 }

@@ -18,4 +18,8 @@ class ChatComposerDraftHost extends ChangeNotifier {
   void clear() {
     updateText('');
   }
+
+  void reset() {
+    clear();
+  }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -7,7 +9,10 @@ import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_a
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 
 import 'support/fake_codex_app_server_client.dart';
@@ -151,27 +156,278 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'supports an injected renderer path while adapter callbacks still own behavior',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      final overlayDelegate = _FakeChatRootOverlayDelegate();
+      final rendererDelegate = _FakeChatRootRendererDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          rendererDelegate: rendererDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Injected app chrome'), findsOneWidget);
+      expect(find.text('Injected transcript region'), findsOneWidget);
+      expect(find.text('Injected composer region'), findsOneWidget);
+      expect(find.byType(FlutterChatAppChrome), findsNothing);
+      expect(find.byType(FlutterChatTranscriptRegion), findsNothing);
+      expect(find.byType(FlutterChatComposerRegion), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('fake_settings')));
+      await tester.pumpAndSettle();
+
+      expect(overlayDelegate.connectionSettingsPayloads, hasLength(1));
+
+      await tester.tap(find.byKey(const ValueKey('fake_diff')));
+      await tester.pump();
+
+      expect(overlayDelegate.changedFileDiffs, hasLength(1));
+      expect(
+        overlayDelegate.changedFileDiffs.single.displayPathLabel,
+        'Injected diff',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('fake_send')));
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.sentMessages, <String>['Injected prompt']);
+      expect(
+        rendererDelegate.renderersByRegion,
+        <ChatRootRegion, ChatRootRegionRenderer>{
+          ChatRootRegion.appChrome: ChatRootRegionRenderer.flutter,
+          ChatRootRegion.transcript: ChatRootRegionRenderer.flutter,
+          ChatRootRegion.composer: ChatRootRegionRenderer.flutter,
+        },
+      );
+    },
+  );
+
+  testWidgets('clears adapter-owned draft state when dependencies rebind', (
+    tester,
+  ) async {
+    final firstClient = FakeCodexAppServerClient();
+    final secondClient = FakeCodexAppServerClient();
+    final overlayDelegate = _FakeChatRootOverlayDelegate();
+    addTearDown(firstClient.close);
+    addTearDown(secondClient.close);
+
+    await tester.pumpWidget(
+      _buildAdapterApp(
+        appServerClient: firstClient,
+        overlayDelegate: overlayDelegate,
+        savedProfile: _savedProfile(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final composerField = find.byType(TextField).first;
+    await tester.enterText(composerField, 'Stale draft');
+
+    await tester.pumpWidget(
+      _buildAdapterApp(
+        appServerClient: secondClient,
+        overlayDelegate: overlayDelegate,
+        savedProfile: _savedProfile(
+          profile: _configuredProfile().copyWith(
+            label: 'Fresh Box',
+            host: 'fresh.example.com',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+    expect(find.text('Fresh Box · fresh.example.com'), findsOneWidget);
+  });
+
+  testWidgets(
+    'ignores stale connection-settings results after the adapter rebinds',
+    (tester) async {
+      final firstClient = FakeCodexAppServerClient();
+      final secondClient = FakeCodexAppServerClient();
+      final pendingResult = Completer<ConnectionSettingsSubmitPayload?>();
+      final overlayDelegate = _FakeChatRootOverlayDelegate(
+        connectionSettingsResultFuture: pendingResult.future,
+      );
+      addTearDown(firstClient.close);
+      addTearDown(secondClient.close);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: firstClient,
+          overlayDelegate: overlayDelegate,
+          savedProfile: _savedProfile(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: secondClient,
+          overlayDelegate: overlayDelegate,
+          savedProfile: _savedProfile(
+            profile: _configuredProfile().copyWith(
+              label: 'Fresh Box',
+              host: 'fresh.example.com',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      pendingResult.complete(
+        ConnectionSettingsSubmitPayload(
+          profile: _configuredProfile().copyWith(
+            label: 'Stale Box',
+            host: 'stale.example.com',
+          ),
+          secrets: const ConnectionSecrets(password: 'stale-secret'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fresh Box · fresh.example.com'), findsOneWidget);
+      expect(find.text('Stale Box · stale.example.com'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'ignores stale connection-settings results after the overlay delegate changes',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      final profileStore = MemoryCodexProfileStore(
+        initialValue: _savedProfile(),
+      );
+      final savedProfile = _savedProfile();
+      final pendingResult = Completer<ConnectionSettingsSubmitPayload?>();
+      final firstOverlayDelegate = _FakeChatRootOverlayDelegate(
+        connectionSettingsResultFuture: pendingResult.future,
+      );
+      final secondOverlayDelegate = _FakeChatRootOverlayDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          profileStore: profileStore,
+          overlayDelegate: firstOverlayDelegate,
+          savedProfile: savedProfile,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          profileStore: profileStore,
+          overlayDelegate: secondOverlayDelegate,
+          savedProfile: savedProfile,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      pendingResult.complete(
+        ConnectionSettingsSubmitPayload(
+          profile: _configuredProfile().copyWith(
+            label: 'Stale Box',
+            host: 'stale.example.com',
+          ),
+          secrets: const ConnectionSecrets(password: 'stale-secret'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dev Box · devbox.local'), findsOneWidget);
+      expect(find.text('Stale Box · stale.example.com'), findsNothing);
+      expect(secondOverlayDelegate.connectionSettingsPayloads, isEmpty);
+    },
+  );
+
+  testWidgets('ignores stale send completions after the adapter rebinds', (
+    tester,
+  ) async {
+    final firstClient = FakeCodexAppServerClient()
+      ..sendUserMessageGate = Completer<void>();
+    final secondClient = FakeCodexAppServerClient();
+    final overlayDelegate = _FakeChatRootOverlayDelegate();
+    addTearDown(firstClient.close);
+    addTearDown(secondClient.close);
+
+    await tester.pumpWidget(
+      _buildAdapterApp(
+        appServerClient: firstClient,
+        overlayDelegate: overlayDelegate,
+        savedProfile: _savedProfile(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final composerField = find.byType(TextField).first;
+    await tester.enterText(composerField, 'Old prompt');
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pump();
+
+    await tester.pumpWidget(
+      _buildAdapterApp(
+        appServerClient: secondClient,
+        overlayDelegate: overlayDelegate,
+        savedProfile: _savedProfile(
+          profile: _configuredProfile().copyWith(
+            label: 'Fresh Box',
+            host: 'fresh.example.com',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(composerField, 'New draft');
+
+    firstClient.sendUserMessageGate?.complete();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<TextField>(composerField).controller?.text,
+      'New draft',
+    );
+    expect(secondClient.sentMessages, isEmpty);
+  });
 }
 
 Widget _buildAdapterApp({
   required FakeCodexAppServerClient appServerClient,
   required _FakeChatRootOverlayDelegate overlayDelegate,
+  ChatRootRendererDelegate rendererDelegate =
+      const FlutterChatRootRendererDelegate(),
+  CodexProfileStore? profileStore,
+  SavedProfile? savedProfile,
 }) {
+  final resolvedSavedProfile = savedProfile ?? _savedProfile();
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     home: ChatRootAdapter(
-      profileStore: MemoryCodexProfileStore(
-        initialValue: SavedProfile(
-          profile: _configuredProfile(),
-          secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-      ),
+      profileStore:
+          profileStore ??
+          MemoryCodexProfileStore(initialValue: resolvedSavedProfile),
       appServerClient: appServerClient,
-      initialSavedProfile: SavedProfile(
-        profile: _configuredProfile(),
-        secrets: const ConnectionSecrets(password: 'secret'),
-      ),
+      initialSavedProfile: resolvedSavedProfile,
       overlayDelegate: overlayDelegate,
+      rendererDelegate: rendererDelegate,
     ),
   );
 }
@@ -184,10 +440,25 @@ ConnectionProfile _configuredProfile() {
   );
 }
 
+SavedProfile _savedProfile({
+  ConnectionProfile? profile,
+  ConnectionSecrets secrets = const ConnectionSecrets(password: 'secret'),
+}) {
+  return SavedProfile(
+    profile: profile ?? _configuredProfile(),
+    secrets: secrets,
+  );
+}
+
 class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
-  _FakeChatRootOverlayDelegate({this.connectionSettingsResult});
+  _FakeChatRootOverlayDelegate({
+    this.connectionSettingsResult,
+    this.connectionSettingsResultFuture,
+  });
 
   final ConnectionSettingsSubmitPayload? connectionSettingsResult;
+  final Future<ConnectionSettingsSubmitPayload?>?
+  connectionSettingsResultFuture;
   final List<ChatConnectionSettingsLaunchContract> connectionSettingsPayloads =
       <ChatConnectionSettingsLaunchContract>[];
   final List<ChatChangedFileDiffContract> changedFileDiffs =
@@ -200,7 +471,7 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
     required ChatConnectionSettingsLaunchContract connectionSettings,
   }) async {
     connectionSettingsPayloads.add(connectionSettings);
-    return connectionSettingsResult;
+    return connectionSettingsResultFuture ?? connectionSettingsResult;
   }
 
   @override
@@ -214,5 +485,121 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
   @override
   void showSnackBar({required BuildContext context, required String message}) {
     snackBarMessages.add(message);
+  }
+}
+
+class _FakeChatRootRendererDelegate implements ChatRootRendererDelegate {
+  final renderersByRegion = <ChatRootRegion, ChatRootRegionRenderer>{};
+
+  @override
+  PreferredSizeWidget buildAppChrome({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+  }) {
+    renderersByRegion[ChatRootRegion.appChrome] = renderer;
+    return _FakePreferredAppChrome(
+      child: Row(
+        children: [
+          const Expanded(child: Text('Injected app chrome')),
+          TextButton(
+            key: const ValueKey('fake_settings'),
+            onPressed: () => onScreenAction(ChatScreenActionId.openSettings),
+            child: const Text('Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget buildTranscriptRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required Object? surfaceChangeToken,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+    required ValueChanged<bool> onAutoFollowEligibilityChanged,
+    void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff,
+    Future<void> Function(String requestId)? onApproveRequest,
+    Future<void> Function(String requestId)? onDenyRequest,
+    Future<void> Function(String requestId, Map<String, List<String>> answers)?
+    onSubmitUserInput,
+  }) {
+    renderersByRegion[ChatRootRegion.transcript] = renderer;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Injected transcript region'),
+          TextButton(
+            key: const ValueKey('fake_diff'),
+            onPressed: () {
+              onOpenChangedFileDiff?.call(
+                const ChatChangedFileDiffContract(
+                  id: 'diff_1',
+                  displayPathLabel: 'Injected diff',
+                  stats: ChatChangedFileStatsContract(
+                    additions: 1,
+                    deletions: 0,
+                  ),
+                  lines: <ChatChangedFileDiffLineContract>[
+                    ChatChangedFileDiffLineContract(
+                      text: '+injected line',
+                      kind: ChatChangedFileDiffLineKind.addition,
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: const Text('Open diff'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget buildComposerRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatComposerContract composer,
+    required ValueChanged<String> onComposerDraftChanged,
+    required Future<void> Function() onSendPrompt,
+    required Future<void> Function() onStopActiveTurn,
+  }) {
+    renderersByRegion[ChatRootRegion.composer] = renderer;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Expanded(child: Text('Injected composer region')),
+            TextButton(
+              key: const ValueKey('fake_send'),
+              onPressed: () async {
+                onComposerDraftChanged('Injected prompt');
+                await onSendPrompt();
+              },
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FakePreferredAppChrome extends StatelessWidget
+    implements PreferredSizeWidget {
+  const _FakePreferredAppChrome({required this.child});
+
+  final Widget child;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(title: child);
   }
 }

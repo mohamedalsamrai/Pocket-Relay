@@ -655,6 +655,20 @@ void main() {
         );
       },
     );
+
+    test('reset restores default follow state', () {
+      final host = ChatTranscriptFollowHost();
+
+      host.updateAutoFollowEligibility(isNearBottom: false);
+      host.requestFollow(
+        source: ChatTranscriptFollowRequestSource.clearTranscript,
+      );
+
+      host.reset();
+
+      expect(host.contract.isAutoFollowEnabled, isTrue);
+      expect(host.contract.request, isNull);
+    });
   });
 
   group('ChatComposerDraftHost', () {
@@ -667,6 +681,15 @@ void main() {
       expect(host.draft.text, '  draft text  ');
 
       host.clear();
+      expect(host.draft.text, isEmpty);
+    });
+
+    test('reset clears draft state above the renderer', () {
+      final host = ChatComposerDraftHost();
+
+      host.updateText('draft to reset');
+      host.reset();
+
       expect(host.draft.text, isEmpty);
     });
   });

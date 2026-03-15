@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_a
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
@@ -25,6 +26,7 @@ class ChatRootAdapter extends StatefulWidget {
     this.initialSavedProfile,
     this.regionPolicy = const ChatRootRegionPolicy.allFlutter(),
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
+    this.rendererDelegate = const FlutterChatRootRendererDelegate(),
   });
 
   final CodexProfileStore profileStore;
@@ -32,6 +34,7 @@ class ChatRootAdapter extends StatefulWidget {
   final SavedProfile? initialSavedProfile;
   final ChatRootRegionPolicy regionPolicy;
   final ChatRootOverlayDelegate overlayDelegate;
+  final ChatRootRendererDelegate rendererDelegate;
 
   @override
   State<ChatRootAdapter> createState() => _ChatRootAdapterState();
@@ -65,6 +68,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     _screenEffectSubscription?.cancel();
     _sessionController.dispose();
     _sessionController = _buildSessionController();
+    _composerDraftHost.reset();
+    _transcriptFollowHost.reset();
     _bindScreenEffects();
     unawaited(_sessionController.initialize());
   }
@@ -99,42 +104,39 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
   }
 
   PreferredSizeWidget _buildAppChrome(ChatScreenContract screen) {
-    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.appChrome)) {
-      ChatRootRegionRenderer.flutter => FlutterChatAppChrome(
-        screen: screen,
-        onScreenAction: (action) => _handleScreenAction(action, screen),
-      ),
-    };
+    return widget.rendererDelegate.buildAppChrome(
+      renderer: widget.regionPolicy.rendererFor(ChatRootRegion.appChrome),
+      screen: screen,
+      onScreenAction: (action) => _handleScreenAction(action, screen),
+    );
   }
 
   Widget _buildTranscriptRegion(ChatScreenContract screen) {
-    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.transcript)) {
-      ChatRootRegionRenderer.flutter => FlutterChatTranscriptRegion(
-        screen: screen,
-        surfaceChangeToken: _sessionController.sessionState,
-        onScreenAction: (action) => _handleScreenAction(action, screen),
-        onAutoFollowEligibilityChanged: (isNearBottom) {
-          _transcriptFollowHost.updateAutoFollowEligibility(
-            isNearBottom: isNearBottom,
-          );
-        },
-        onApproveRequest: _sessionController.approveRequest,
-        onDenyRequest: _sessionController.denyRequest,
-        onOpenChangedFileDiff: _requestChangedFileDiff,
-        onSubmitUserInput: _sessionController.submitUserInput,
-      ),
-    };
+    return widget.rendererDelegate.buildTranscriptRegion(
+      renderer: widget.regionPolicy.rendererFor(ChatRootRegion.transcript),
+      screen: screen,
+      surfaceChangeToken: _sessionController.sessionState,
+      onScreenAction: (action) => _handleScreenAction(action, screen),
+      onAutoFollowEligibilityChanged: (isNearBottom) {
+        _transcriptFollowHost.updateAutoFollowEligibility(
+          isNearBottom: isNearBottom,
+        );
+      },
+      onApproveRequest: _sessionController.approveRequest,
+      onDenyRequest: _sessionController.denyRequest,
+      onOpenChangedFileDiff: _requestChangedFileDiff,
+      onSubmitUserInput: _sessionController.submitUserInput,
+    );
   }
 
   Widget _buildComposerRegion(ChatScreenContract screen) {
-    return switch (widget.regionPolicy.rendererFor(ChatRootRegion.composer)) {
-      ChatRootRegionRenderer.flutter => FlutterChatComposerRegion(
-        composer: screen.composer,
-        onComposerDraftChanged: _composerDraftHost.updateText,
-        onSendPrompt: _sendPrompt,
-        onStopActiveTurn: _stopActiveTurn,
-      ),
-    };
+    return widget.rendererDelegate.buildComposerRegion(
+      renderer: widget.regionPolicy.rendererFor(ChatRootRegion.composer),
+      composer: screen.composer,
+      onComposerDraftChanged: _composerDraftHost.updateText,
+      onSendPrompt: _sendPrompt,
+      onStopActiveTurn: _stopActiveTurn,
+    );
   }
 
   ChatSessionController _buildSessionController() {
@@ -169,29 +171,38 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       return;
     }
 
-    final result = switch (widget.regionPolicy.rendererFor(
+    final controller = _sessionController;
+    final overlayDelegate = widget.overlayDelegate;
+    final settingsRenderer = widget.regionPolicy.rendererFor(
       ChatRootRegion.settingsOverlay,
-    )) {
+    );
+
+    final result = switch (settingsRenderer) {
       ChatRootRegionRenderer.flutter =>
-        await widget.overlayDelegate.openConnectionSettings(
+        await overlayDelegate.openConnectionSettings(
           context: context,
           connectionSettings: connectionSettings,
         ),
     };
 
-    if (result == null) {
+    if (!mounted ||
+        controller != _sessionController ||
+        overlayDelegate != widget.overlayDelegate ||
+        settingsRenderer !=
+            widget.regionPolicy.rendererFor(ChatRootRegion.settingsOverlay) ||
+        result == null) {
       return;
     }
 
     final connectionChanged =
-        result.profile != _sessionController.profile ||
-        result.secrets != _sessionController.secrets;
+        result.profile != controller.profile ||
+        result.secrets != controller.secrets;
 
     if (!connectionChanged) {
       return;
     }
 
-    await _sessionController.applyConnectionSettings(
+    await controller.applyConnectionSettings(
       profile: result.profile,
       secrets: result.secrets,
     );
@@ -233,9 +244,12 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
   }
 
   Future<void> _sendPrompt() async {
-    final sent = await _sessionController.sendPrompt(
-      _composerDraftHost.draft.text,
-    );
+    final controller = _sessionController;
+    final sent = await controller.sendPrompt(_composerDraftHost.draft.text);
+    if (!mounted || controller != _sessionController || !sent) {
+      return;
+    }
+
     if (sent) {
       _transcriptFollowHost.requestFollow(
         source: ChatTranscriptFollowRequestSource.sendPrompt,

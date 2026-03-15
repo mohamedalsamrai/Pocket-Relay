@@ -32,7 +32,7 @@ renderer can consume the same ownership model.
   branch
 - Phase 5, transcript surface parity and pending-request placement: completed
   on this branch
-- Phase 6, root architectural adapter: in progress on this branch
+- Phase 6, root architectural adapter: completed on this branch
 - Apple-native glass components: not started
 
 ## What Is Already Solid
@@ -73,30 +73,36 @@ renderer can consume the same ownership model.
 - Renderer ownership is now explicit for app chrome, transcript, composer, and
   settings overlay through `ChatRootRegionPolicy`, with all-Flutter as the
   current default path.
+- Adapter-side renderer selection now routes through `ChatRootRendererDelegate`,
+  and injected renderer-path tests prove the adapter still owns settings, diff,
+  and send behavior.
 
 These are the parts we should build on, not reopen.
 
 ## What Is Still Not Ready For Native Ownership
 
-- Adapter parity hardening is still incomplete.
-- The adapter still does not prove an injected or non-default renderer path.
+- Apple-native renderer implementations are still not started.
+- The transcript feed is still intentionally Flutter-owned while the first
+  native surfaces are cut.
 
 ## Next Active Work
 
-Phase 5 is complete.
+Phase 6 is complete.
 
-The next thing to do is Slice 5 of Phase 6:
+The next thing to do is Phase 7:
 
-- harden adapter parity and injected-renderer ownership
+- begin Apple-native glass work on the first adapter-managed surfaces
 
 Reason:
 
 - the transcript surface boundary is now explicit and test-covered enough to
   support adapter work
-- Slice 4 moved overlay execution behind `ChatRootOverlayDelegate`
-- Slice 4 made region ownership explicit for the first adapter-managed regions
-- the next blocker is proving the adapter owns selection and parity rather than
-  only encoding the default all-Flutter path
+- the root adapter, overlay delegate, region policy, and renderer delegate are
+  now in place and test-covered
+- the codebase now has a real app-level seam where native regions can be added
+  without redoing transcript or composer ownership
+- the first native candidates remain app chrome, composer, and connection
+  settings, while transcript stays Flutter-owned for now
 
 ## Target Architecture
 
@@ -1274,9 +1280,8 @@ Current file:
 - region selection through `ChatRootRegionPolicy`
 - host wiring into the extracted Flutter renderer regions
 
-That means the adapter seam now owns the right categories of work, but the
-remaining Phase 6 task is proving parity and selection through stronger tests
-and injected renderer paths.
+That means the adapter seam now owns the right categories of work. Phase 6 is
+complete, and the next work is using that seam for the first native regions.
 
 #### 3. Composer state is now ready for adapter ownership
 
@@ -1302,8 +1307,9 @@ Flutter composer renderer.
 
 That blocker is now removed. Slice 2 extracted the pure Flutter screen
 renderer away from controller and overlay hosting, Slice 3 moved the host
-ownership into the adapter, and Slice 4 added explicit overlay and region
-delegation. The next remaining Phase 6 blocker is parity hardening.
+ownership into the adapter, Slice 4 added explicit overlay and region
+delegation, and Slice 5 hardened parity through injected renderer tests. The
+next work is Phase 7 native rendering.
 
 #### 4. Overlay payloads are ready, but overlay execution is still Flutter-hardwired
 
@@ -1344,7 +1350,7 @@ The transcript feed should still remain Flutter-owned for now, but the adapter
 should make it possible to keep transcript rendering in Flutter while later
 swapping app chrome, composer, and settings surfaces.
 
-#### 6. Current tests now cover delegation, but not injected selection yet
+#### 6. Current tests now cover injected selection and adapter parity
 
 Current files:
 
@@ -1360,16 +1366,11 @@ Current tests now prove:
 - that the all-Flutter adapter path preserves current behavior
 - that settings, changed-file diff, and snackbar execution route through the
   adapter overlay delegate
+- that an injected renderer path still routes settings, changed-file diffs, and
+  send behavior through adapter-owned callbacks
 
-But they do not yet prove:
-
-- that a renderer can be replaced or injected without changing controller or
-  contract logic
-- that adapter region selection changes behavior independently of the renderer
-  internals
-
-So the next Phase 6 slices need delegation-oriented and selection-oriented
-tests, not just another round of Flutter parity checks.
+That is enough to treat the root adapter seam as stable for the first native
+Phase 7 cuts.
 
 ## Best Upgrade Path For Phase 6
 
@@ -1485,14 +1486,16 @@ ownership for major regions instead of simply wrapping one full-screen widget.
 
 ### Slice 5: Adapter parity hardening
 
-Slice 5 should cover:
+This slice is complete on this branch.
+
+Slice 5 delivered:
 
 - ownership-oriented tests proving `PocketRelayApp` depends on the adapter
   rather than `ChatScreen` directly
 - tests proving renderer callbacks do not own controller or overlay behavior
-- tests proving all-Flutter adapter mode preserves current behavior
-- at least one fake or injected renderer path proving the adapter owns
-  selection rather than the renderer tree
+- tests proving the all-Flutter adapter mode preserves current behavior
+- an injected renderer path through `ChatRootRendererDelegate` proving the
+  adapter owns selection rather than the renderer tree
 
 This slice completes Phase 6 and is the gate before Phase 7 glass work.
 
@@ -1547,9 +1550,11 @@ Unless broader behavior is explicitly requested, Phase 6 should preserve:
 - current composer send/stop behavior
 - current failed-send draft retention behavior
 
-The next active Phase 6 slice is:
+Phase 6 is now complete.
 
-- adapter parity hardening
+The next active phase is:
+
+- Phase 7 Apple-native glass work
 
 Reason:
 
@@ -1559,8 +1564,8 @@ Reason:
 - Slice 3 introduced the adapter host itself
 - Slice 4 moved overlay execution and region ownership behind explicit adapter
   delegates
-- the next structural cut is proving parity and adapter-owned selection with
-  stronger ownership tests and injected renderer paths
+- Slice 5 proved parity and adapter-owned selection with stronger ownership
+  tests and an injected renderer path
 
 ### Phase 7
 

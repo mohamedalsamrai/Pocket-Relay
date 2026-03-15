@@ -1,0 +1,97 @@
+import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
+
+abstract interface class ChatRootRendererDelegate {
+  PreferredSizeWidget buildAppChrome({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+  });
+
+  Widget buildTranscriptRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required Object? surfaceChangeToken,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+    required ValueChanged<bool> onAutoFollowEligibilityChanged,
+    void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff,
+    Future<void> Function(String requestId)? onApproveRequest,
+    Future<void> Function(String requestId)? onDenyRequest,
+    Future<void> Function(String requestId, Map<String, List<String>> answers)?
+    onSubmitUserInput,
+  });
+
+  Widget buildComposerRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatComposerContract composer,
+    required ValueChanged<String> onComposerDraftChanged,
+    required Future<void> Function() onSendPrompt,
+    required Future<void> Function() onStopActiveTurn,
+  });
+}
+
+class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
+  const FlutterChatRootRendererDelegate();
+
+  @override
+  PreferredSizeWidget buildAppChrome({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+  }) {
+    return switch (renderer) {
+      ChatRootRegionRenderer.flutter => FlutterChatAppChrome(
+        screen: screen,
+        onScreenAction: onScreenAction,
+      ),
+    };
+  }
+
+  @override
+  Widget buildTranscriptRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatScreenContract screen,
+    required Object? surfaceChangeToken,
+    required ValueChanged<ChatScreenActionId> onScreenAction,
+    required ValueChanged<bool> onAutoFollowEligibilityChanged,
+    void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff,
+    Future<void> Function(String requestId)? onApproveRequest,
+    Future<void> Function(String requestId)? onDenyRequest,
+    Future<void> Function(String requestId, Map<String, List<String>> answers)?
+    onSubmitUserInput,
+  }) {
+    return switch (renderer) {
+      ChatRootRegionRenderer.flutter => FlutterChatTranscriptRegion(
+        screen: screen,
+        surfaceChangeToken: surfaceChangeToken,
+        onScreenAction: onScreenAction,
+        onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged,
+        onApproveRequest: onApproveRequest,
+        onDenyRequest: onDenyRequest,
+        onOpenChangedFileDiff: onOpenChangedFileDiff,
+        onSubmitUserInput: onSubmitUserInput,
+      ),
+    };
+  }
+
+  @override
+  Widget buildComposerRegion({
+    required ChatRootRegionRenderer renderer,
+    required ChatComposerContract composer,
+    required ValueChanged<String> onComposerDraftChanged,
+    required Future<void> Function() onSendPrompt,
+    required Future<void> Function() onStopActiveTurn,
+  }) {
+    return switch (renderer) {
+      ChatRootRegionRenderer.flutter => FlutterChatComposerRegion(
+        composer: composer,
+        onComposerDraftChanged: onComposerDraftChanged,
+        onSendPrompt: onSendPrompt,
+        onStopActiveTurn: onStopActiveTurn,
+      ),
+    };
+  }
+}
