@@ -1,18 +1,19 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class UserInputRequestCard extends StatefulWidget {
-  const UserInputRequestCard({super.key, required this.block, this.onSubmit});
+  const UserInputRequestCard({
+    super.key,
+    required this.contract,
+    this.onFieldChanged,
+    this.onSubmit,
+  });
 
-  final CodexUserInputRequestBlock block;
-  final Future<void> Function(
-    String requestId,
-    Map<String, List<String>> answers,
-  )?
-  onSubmit;
+  final PendingUserInputContract contract;
+  final void Function(String fieldId, String value)? onFieldChanged;
+  final Future<void> Function()? onSubmit;
 
   @override
   State<UserInputRequestCard> createState() => _UserInputRequestCardState();
@@ -25,19 +26,13 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
   @override
   void initState() {
     super.initState();
-    _syncControllersFromBlock(widget.block);
+    _syncControllersFromContract(widget.contract);
   }
 
   @override
   void didUpdateWidget(covariant UserInputRequestCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.block.requestId == widget.block.requestId &&
-        _sameFieldIds(oldWidget.block, widget.block) &&
-        _sameAnswers(oldWidget.block.answers, widget.block.answers)) {
-      return;
-    }
-
-    _syncControllersFromBlock(widget.block);
+    _syncControllersFromContract(widget.contract);
   }
 
   @override
@@ -48,70 +43,54 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
     super.dispose();
   }
 
-  void _syncControllersFromBlock(CodexUserInputRequestBlock block) {
-    final fieldIds = _fieldIdsFor(block);
+  void _syncControllersFromContract(PendingUserInputContract contract) {
+    final fieldIds = contract.fields.map((field) => field.id).toSet();
 
     for (final entry in _controllers.entries.toList(growable: false)) {
-      if (!fieldIds.contains(entry.key)) {
-        entry.value.dispose();
-        _controllers.remove(entry.key);
-      }
-    }
-
-    for (final fieldId in fieldIds) {
-      final answerText = block.answers[fieldId]?.join(', ') ?? '';
-      final controller = _controllers[fieldId];
-      if (controller == null) {
-        _controllers[fieldId] = TextEditingController(text: answerText);
+      if (fieldIds.contains(entry.key)) {
         continue;
       }
-      if (controller.text != answerText) {
-        controller.value = controller.value.copyWith(
-          text: answerText,
-          selection: TextSelection.collapsed(offset: answerText.length),
-          composing: TextRange.empty,
-        );
+      entry.value.dispose();
+      _controllers.remove(entry.key);
+    }
+
+    for (final field in contract.fields) {
+      final controller = _controllers[field.id];
+      if (controller == null) {
+        _controllers[field.id] = TextEditingController(text: field.value);
+        continue;
       }
-    }
-  }
-
-  Set<String> _fieldIdsFor(CodexUserInputRequestBlock block) {
-    if (block.questions.isEmpty) {
-      return const <String>{'response'};
-    }
-    return block.questions.map((question) => question.id).toSet();
-  }
-
-  bool _sameFieldIds(
-    CodexUserInputRequestBlock previous,
-    CodexUserInputRequestBlock next,
-  ) {
-    final previousIds = _fieldIdsFor(previous);
-    final nextIds = _fieldIdsFor(next);
-    return setEquals(previousIds, nextIds);
-  }
-
-  bool _sameAnswers(
-    Map<String, List<String>> previous,
-    Map<String, List<String>> next,
-  ) {
-    if (previous.length != next.length) {
-      return false;
-    }
-    for (final entry in previous.entries) {
-      final nextValues = next[entry.key];
-      if (nextValues == null || !listEquals(entry.value, nextValues)) {
-        return false;
+      if (controller.text == field.value) {
+        continue;
       }
+      controller.value = controller.value.copyWith(
+        text: field.value,
+        selection: TextSelection.collapsed(offset: field.value.length),
+        composing: TextRange.empty,
+      );
     }
-    return true;
+  }
+
+  void _applyFieldValue(String fieldId, String value) {
+    final controller = _controllers[fieldId];
+    if (controller == null) {
+      return;
+    }
+
+    controller.value = controller.value.copyWith(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+      composing: TextRange.empty,
+    );
+    widget.onFieldChanged?.call(fieldId, value);
   }
 
   @override
   Widget build(BuildContext context) {
     final cards = ConversationCardPalette.of(context);
     final accent = blueAccent(Theme.of(context).brightness);
-    final canSubmit = !widget.block.isResolved && widget.onSubmit != null;
+    final canSubmit =
+        widget.contract.isSubmitEnabled && widget.onSubmit != null;
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 680),
@@ -131,7 +110,7 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.block.title,
+                    widget.contract.title,
                     style: TextStyle(
                       color: accent,
                       fontSize: 12.5,
@@ -139,14 +118,14 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
                     ),
                   ),
                 ),
-                if (widget.block.isResolved)
-                  TranscriptBadge(label: 'submitted', color: accent),
+                if (widget.contract.statusBadgeLabel case final badgeLabel?)
+                  TranscriptBadge(label: badgeLabel, color: accent),
               ],
             ),
-            if (widget.block.body.trim().isNotEmpty) ...[
+            if (widget.contract.body.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
               SelectableText(
-                widget.block.body,
+                widget.contract.body,
                 style: TextStyle(
                   color: cards.textSecondary,
                   fontSize: 13,
@@ -158,8 +137,8 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
             ..._buildFields(),
             const SizedBox(height: 10),
             FilledButton(
-              onPressed: canSubmit ? _submit : null,
-              child: const Text('Submit response'),
+              onPressed: canSubmit ? widget.onSubmit : null,
+              child: Text(widget.contract.submitLabel),
             ),
           ],
         ),
@@ -169,88 +148,73 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
 
   List<Widget> _buildFields() {
     final cards = ConversationCardPalette.of(context);
-    if (widget.block.questions.isEmpty) {
-      return <Widget>[
-        TextField(
-          controller: _controllers['response'],
-          minLines: 2,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Response',
-            border: OutlineInputBorder(),
-          ),
-        ),
-      ];
-    }
 
-    return widget.block.questions.map((question) {
-      final controller = _controllers[question.id]!;
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              question.header,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: cards.textPrimary,
-                fontSize: 12.5,
-              ),
+    return widget.contract.fields
+        .map((field) {
+          final controller = _controllers[field.id]!;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (field.header case final header?) ...[
+                  Text(
+                    header,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: cards.textPrimary,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                if (field.prompt case final prompt?) ...[
+                  Text(
+                    prompt,
+                    style: TextStyle(
+                      color: cards.textSecondary,
+                      fontSize: 12,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+                if (field.options.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: field.options
+                        .map(
+                          (option) => ActionChip(
+                            label: Text(option.label),
+                            onPressed: field.isReadOnly
+                                ? null
+                                : () =>
+                                      _applyFieldValue(field.id, option.label),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  obscureText: field.isSecret,
+                  readOnly: field.isReadOnly,
+                  minLines: field.minLines,
+                  maxLines: field.maxLines,
+                  onChanged: field.isReadOnly
+                      ? null
+                      : (value) => widget.onFieldChanged?.call(field.id, value),
+                  decoration: InputDecoration(
+                    labelText: field.inputLabel,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              question.question,
-              style: TextStyle(
-                color: cards.textSecondary,
-                fontSize: 12,
-                height: 1.25,
-              ),
-            ),
-            if (question.options.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: question.options
-                    .map(
-                      (option) => ActionChip(
-                        label: Text(option.label),
-                        onPressed: widget.block.isResolved
-                            ? null
-                            : () => controller.text = option.label,
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-            const SizedBox(height: 8),
-            TextField(
-              controller: controller,
-              obscureText: question.isSecret,
-              minLines: 1,
-              maxLines: question.isOther ? 4 : 2,
-              decoration: InputDecoration(
-                labelText: question.isOther ? 'Custom answer' : 'Answer',
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-  Future<void> _submit() async {
-    final answers = <String, List<String>>{};
-    for (final entry in _controllers.entries) {
-      final value = entry.value.text.trim();
-      if (value.isEmpty) {
-        continue;
-      }
-      answers[entry.key] = <String>[value];
-    }
-
-    await widget.onSubmit?.call(widget.block.requestId, answers);
+          );
+        })
+        .toList(growable: false);
   }
 }

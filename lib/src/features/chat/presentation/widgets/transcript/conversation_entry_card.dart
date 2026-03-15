@@ -1,31 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/assistant_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/error_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/pending_user_input_request_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/plan_update_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart';
 
 class ConversationEntryCard extends StatelessWidget {
   const ConversationEntryCard({
     super.key,
-    required this.block,
+    required this.item,
     this.onApproveRequest,
     this.onDenyRequest,
+    this.onOpenChangedFileDiff,
     this.onSubmitUserInput,
   });
 
-  final CodexUiBlock block;
+  final ChatTranscriptItemContract item;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(
     String requestId,
     Map<String, List<String>> answers,
@@ -34,40 +37,49 @@ class ConversationEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (block) {
-      final CodexUserMessageBlock userBlock => UserMessageCard(
-        block: userBlock,
+    return switch (item) {
+      final ChatUserMessageItemContract userItem => UserMessageCard(
+        block: userItem.block,
       ),
-      final CodexTextBlock textBlock
-          when textBlock.kind == CodexUiBlockKind.reasoning =>
-        ReasoningCard(block: textBlock),
-      final CodexTextBlock textBlock => AssistantMessageCard(block: textBlock),
-      final CodexPlanUpdateBlock planUpdateBlock => PlanUpdateCard(
-        block: planUpdateBlock,
+      final ChatReasoningItemContract reasoningItem => ReasoningCard(
+        block: reasoningItem.block,
       ),
-      final CodexProposedPlanBlock proposedPlanBlock => ProposedPlanCard(
-        block: proposedPlanBlock,
+      final ChatAssistantMessageItemContract assistantItem =>
+        AssistantMessageCard(block: assistantItem.block),
+      final ChatPlanUpdateItemContract planUpdateItem => PlanUpdateCard(
+        block: planUpdateItem.block,
       ),
-      final CodexWorkLogGroupBlock workLogGroupBlock => WorkLogGroupCard(
-        block: workLogGroupBlock,
+      final ChatProposedPlanItemContract proposedPlanItem => ProposedPlanCard(
+        block: proposedPlanItem.block,
       ),
-      final CodexChangedFilesBlock changedFilesBlock => ChangedFilesCard(
-        block: changedFilesBlock,
+      final ChatWorkLogGroupItemContract workLogGroupItem => WorkLogGroupCard(
+        block: workLogGroupItem.block,
       ),
-      final CodexApprovalRequestBlock approvalBlock => ApprovalRequestCard(
-        block: approvalBlock,
+      final ChatChangedFilesItemContract changedFilesItem => ChangedFilesCard(
+        item: changedFilesItem,
+        onOpenDiff: onOpenChangedFileDiff,
+      ),
+      final ChatApprovalRequestItemContract approvalItem => ApprovalRequestCard(
+        request: approvalItem.request,
         onApprove: onApproveRequest,
         onDeny: onDenyRequest,
       ),
-      final CodexUserInputRequestBlock userInputBlock => UserInputRequestCard(
-        block: userInputBlock,
-        onSubmit: onSubmitUserInput,
+      final ChatUserInputRequestItemContract userInputItem =>
+        PendingUserInputRequestHost(
+          request: userInputItem.request,
+          onSubmit: onSubmitUserInput,
+        ),
+      final ChatStatusItemContract statusItem => StatusCard(
+        block: statusItem.block,
       ),
-      final CodexStatusBlock statusBlock => StatusCard(block: statusBlock),
-      final CodexErrorBlock errorBlock => ErrorCard(block: errorBlock),
-      final CodexUsageBlock usageBlock => UsageCard(block: usageBlock),
-      final CodexTurnBoundaryBlock boundaryBlock => TurnBoundaryCard(
-        block: boundaryBlock,
+      final ChatErrorItemContract errorItem => ErrorCard(
+        block: errorItem.block,
+      ),
+      final ChatUsageItemContract usageItem => UsageCard(
+        block: usageItem.block,
+      ),
+      final ChatTurnBoundaryItemContract boundaryItem => TurnBoundaryCard(
+        block: boundaryItem.block,
       ),
     };
   }

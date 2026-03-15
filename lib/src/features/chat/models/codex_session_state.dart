@@ -194,16 +194,6 @@ class CodexSessionState {
     if (activeTurn != null) ...projectCodexTurnArtifacts(activeTurn!.artifacts),
   ];
 
-  CodexApprovalRequestBlock? get primaryPendingApprovalBlock =>
-      _firstPendingBlock<CodexApprovalRequestBlock>(
-        pendingApprovalRequests.values.map(_pendingApprovalBlock),
-      );
-
-  CodexUserInputRequestBlock? get primaryPendingUserInputBlock =>
-      _firstPendingBlock<CodexUserInputRequestBlock>(
-        pendingUserInputRequests.values.map(_pendingUserInputBlock),
-      );
-
   CodexSessionState copyWith({
     CodexRuntimeSessionState? connectionStatus,
     String? threadId,
@@ -335,9 +325,13 @@ CodexTurnArtifact freezeCodexTurnArtifact(CodexTurnArtifact artifact) {
         id: artifact.id,
         createdAt: artifact.createdAt,
         title: artifact.title,
+        itemId: artifact.itemId,
+        files: artifact.files,
+        unifiedDiff: artifact.unifiedDiff,
         entries: artifact.entries
             .map((entry) => entry.copyWith(isRunning: false))
             .toList(growable: false),
+        isStreaming: false,
       ),
     CodexTurnBlockArtifact(:final block) => CodexTurnBlockArtifact(
       block: _freezeCodexUiBlock(block),
@@ -367,69 +361,6 @@ bool _shouldAppearInTranscript(CodexUiBlock block) {
     CodexStatusBlock(:final isTranscriptSignal) => isTranscriptSignal,
     _ => true,
   };
-}
-
-T? _firstPendingBlock<T extends CodexUiBlock>(Iterable<T> blocks) {
-  final sorted = blocks.toList(growable: false)
-    ..sort((left, right) => left.createdAt.compareTo(right.createdAt));
-  return sorted.isEmpty ? null : sorted.first;
-}
-
-CodexApprovalRequestBlock _pendingApprovalBlock(
-  CodexSessionPendingRequest request,
-) {
-  return CodexApprovalRequestBlock(
-    id: 'request_${request.requestId}',
-    createdAt: request.createdAt,
-    requestId: request.requestId,
-    requestType: request.requestType,
-    title: codexRequestTitle(request.requestType),
-    body: request.detail ?? 'Codex needs a decision before it can continue.',
-  );
-}
-
-CodexUserInputRequestBlock _pendingUserInputBlock(
-  CodexSessionPendingUserInputRequest request,
-) {
-  return CodexUserInputRequestBlock(
-    id: 'request_${request.requestId}',
-    createdAt: request.createdAt,
-    requestId: request.requestId,
-    requestType: request.requestType,
-    title: codexRequestTitle(request.requestType),
-    body: request.detail ?? codexQuestionsSummary(request.questions),
-    questions: request.questions,
-  );
-}
-
-String codexRequestTitle(CodexCanonicalRequestType requestType) {
-  return switch (requestType) {
-    CodexCanonicalRequestType.commandExecutionApproval => 'Command approval',
-    CodexCanonicalRequestType.fileChangeApproval => 'File change approval',
-    CodexCanonicalRequestType.applyPatchApproval => 'Patch approval',
-    CodexCanonicalRequestType.execCommandApproval => 'Command approval',
-    CodexCanonicalRequestType.permissionsRequestApproval =>
-      'Permissions request',
-    CodexCanonicalRequestType.toolUserInput => 'Input required',
-    CodexCanonicalRequestType.mcpServerElicitation => 'MCP input required',
-    CodexCanonicalRequestType.unknown => 'Request',
-  };
-}
-
-String codexQuestionsSummary(List<CodexRuntimeUserInputQuestion> questions) {
-  return questions
-      .map((question) => '${question.header}: ${question.question}')
-      .join('\n\n');
-}
-
-String codexAnswersSummary(Map<String, List<String>> answers) {
-  if (answers.isEmpty) {
-    return 'The requested input was submitted.';
-  }
-
-  return answers.entries
-      .map((entry) => '${entry.key}: ${entry.value.join(', ')}')
-      .join('\n');
 }
 
 class CodexSessionPendingRequest {
@@ -564,11 +495,6 @@ Iterable<String> codexTurnArtifactIds(
         yield entry.id;
       }
     }
-    if (artifact case CodexTurnChangedFilesArtifact(:final entries)) {
-      for (final entry in entries) {
-        yield entry.id;
-      }
-    }
   }
 }
 
@@ -623,6 +549,48 @@ final class CodexTurnPlanArtifact extends CodexTurnArtifact {
   final bool isStreaming;
 }
 
+final class CodexTurnChangedFilesArtifact extends CodexTurnArtifact {
+  const CodexTurnChangedFilesArtifact({
+    required super.id,
+    required super.createdAt,
+    required this.title,
+    String? itemId,
+    List<CodexChangedFile>? files,
+    String? unifiedDiff,
+    this.entries = const <CodexChangedFilesEntry>[],
+    this.isStreaming = false,
+  }) : _itemId = itemId,
+       _files = files,
+       _unifiedDiff = unifiedDiff;
+
+  final String title;
+  final String? _itemId;
+  final List<CodexChangedFile>? _files;
+  final String? _unifiedDiff;
+  final List<CodexChangedFilesEntry> entries;
+  final bool isStreaming;
+
+  String? get itemId => _itemId ?? entries.lastOrNull?.itemId;
+
+  List<CodexChangedFile> get files {
+    final explicitFiles = _files;
+    if (explicitFiles != null) {
+      return explicitFiles;
+    }
+
+    return _mergedChangedFiles(entries);
+  }
+
+  String? get unifiedDiff {
+    final explicitUnifiedDiff = _unifiedDiff;
+    if (explicitUnifiedDiff != null) {
+      return explicitUnifiedDiff;
+    }
+
+    return _mergedUnifiedDiff(entries);
+  }
+}
+
 final class CodexChangedFilesEntry {
   const CodexChangedFilesEntry({
     required this.id,
@@ -656,33 +624,32 @@ final class CodexChangedFilesEntry {
   }
 }
 
-final class CodexTurnChangedFilesArtifact extends CodexTurnArtifact {
-  const CodexTurnChangedFilesArtifact({
-    required super.id,
-    required super.createdAt,
-    required this.title,
-    this.entries = const <CodexChangedFilesEntry>[],
-  });
+List<CodexChangedFile> _mergedChangedFiles(
+  Iterable<CodexChangedFilesEntry> entries,
+) {
+  final mergedByPath = <String, CodexChangedFile>{};
 
-  final String title;
-  final List<CodexChangedFilesEntry> entries;
-
-  List<CodexChangedFile> get files =>
-      entries.expand((entry) => entry.files).toList(growable: false);
-
-  String? get unifiedDiff {
-    final parts = entries
-        .map((entry) => entry.unifiedDiff?.trim())
-        .whereType<String>()
-        .where((value) => value.isNotEmpty)
-        .toList(growable: false);
-    if (parts.isEmpty) {
-      return null;
+  for (final entry in entries) {
+    for (final file in entry.files) {
+      mergedByPath[file.path] = file;
     }
-    return parts.join('\n');
   }
 
-  bool get isStreaming => entries.any((entry) => entry.isRunning);
+  return mergedByPath.values.toList(growable: false);
+}
+
+String? _mergedUnifiedDiff(Iterable<CodexChangedFilesEntry> entries) {
+  final parts = entries
+      .map((entry) => entry.unifiedDiff?.trim())
+      .whereType<String>()
+      .where((diff) => diff.isNotEmpty)
+      .toList(growable: false);
+
+  if (parts.isEmpty) {
+    return null;
+  }
+
+  return parts.join('\n');
 }
 
 final class CodexTurnBlockArtifact extends CodexTurnArtifact {
@@ -690,6 +657,26 @@ final class CodexTurnBlockArtifact extends CodexTurnArtifact {
     : super(id: block.id, createdAt: block.createdAt);
 
   final CodexUiBlock block;
+}
+
+final class CodexTurnDiffSnapshot {
+  const CodexTurnDiffSnapshot({
+    required this.turnId,
+    required this.createdAt,
+    required this.unifiedDiff,
+  });
+
+  final String turnId;
+  final DateTime createdAt;
+  final String unifiedDiff;
+
+  CodexTurnDiffSnapshot copyWith({DateTime? createdAt, String? unifiedDiff}) {
+    return CodexTurnDiffSnapshot(
+      turnId: turnId,
+      createdAt: createdAt ?? this.createdAt,
+      unifiedDiff: unifiedDiff ?? this.unifiedDiff,
+    );
+  }
 }
 
 class CodexActiveTurnState {
@@ -704,7 +691,11 @@ class CodexActiveTurnState {
     this.pendingApprovalRequests = const <String, CodexSessionPendingRequest>{},
     this.pendingUserInputRequests =
         const <String, CodexSessionPendingUserInputRequest>{},
+    this.turnDiffSnapshot,
     this.pendingThreadTokenUsageBlock,
+    this.latestUsageSummary,
+    this.hasWork = false,
+    this.hasReasoning = false,
   });
 
   final String turnId;
@@ -717,7 +708,11 @@ class CodexActiveTurnState {
   final Map<String, CodexSessionPendingRequest> pendingApprovalRequests;
   final Map<String, CodexSessionPendingUserInputRequest>
   pendingUserInputRequests;
+  final CodexTurnDiffSnapshot? turnDiffSnapshot;
   final CodexUsageBlock? pendingThreadTokenUsageBlock;
+  final String? latestUsageSummary;
+  final bool hasWork;
+  final bool hasReasoning;
 
   bool get hasBlockingRequests =>
       pendingApprovalRequests.isNotEmpty || pendingUserInputRequests.isNotEmpty;
@@ -732,8 +727,14 @@ class CodexActiveTurnState {
     Map<String, String>? itemArtifactIds,
     Map<String, CodexSessionPendingRequest>? pendingApprovalRequests,
     Map<String, CodexSessionPendingUserInputRequest>? pendingUserInputRequests,
+    CodexTurnDiffSnapshot? turnDiffSnapshot,
+    bool clearTurnDiffSnapshot = false,
     CodexUsageBlock? pendingThreadTokenUsageBlock,
     bool clearPendingThreadTokenUsageBlock = false,
+    String? latestUsageSummary,
+    bool clearLatestUsageSummary = false,
+    bool? hasWork,
+    bool? hasReasoning,
   }) {
     return CodexActiveTurnState(
       turnId: turnId ?? this.turnId,
@@ -747,9 +748,17 @@ class CodexActiveTurnState {
           pendingApprovalRequests ?? this.pendingApprovalRequests,
       pendingUserInputRequests:
           pendingUserInputRequests ?? this.pendingUserInputRequests,
+      turnDiffSnapshot: clearTurnDiffSnapshot
+          ? null
+          : (turnDiffSnapshot ?? this.turnDiffSnapshot),
       pendingThreadTokenUsageBlock: clearPendingThreadTokenUsageBlock
           ? null
           : (pendingThreadTokenUsageBlock ?? this.pendingThreadTokenUsageBlock),
+      latestUsageSummary: clearLatestUsageSummary
+          ? null
+          : (latestUsageSummary ?? this.latestUsageSummary),
+      hasWork: hasWork ?? this.hasWork,
+      hasReasoning: hasReasoning ?? this.hasReasoning,
     );
   }
 }

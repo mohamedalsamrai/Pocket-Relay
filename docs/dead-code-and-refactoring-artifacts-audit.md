@@ -25,6 +25,8 @@ Completed items:
 - removed the unused `TranscriptChangedFilesParser` dependency injection seam
 - removed the dead conditional branch in
   `_mergeResolvedRequestBlocks()`
+- removed the dead `ChatScreen` compatibility wrapper
+- removed the standalone fallback mode from `FlutterChatScreenRenderer`
 
 ### Group 2: Medium Cleanups
 
@@ -99,4 +101,117 @@ Scope:
 
 ## Remaining Findings
 
-No confirmed remaining findings from this audit as of 2026-03-15.
+Status: open as of 2026-03-15
+
+The following findings are still confirmed in the current tree.
+
+### 1. No-op transcript renderer fork in root policy
+
+Files:
+
+- `lib/src/features/chat/presentation/chat_root_region_policy.dart`
+- `lib/src/features/chat/presentation/chat_root_renderer_delegate.dart`
+- `lib/src/features/chat/presentation/chat_root_adapter.dart`
+- `test/chat_root_adapter_test.dart`
+
+Why it is residue:
+
+- `ChatRootRegionPolicy` and `ChatRootRegionRenderer` model both `flutter` and
+  `cupertino` transcript renderers
+- `ChatRootRendererDelegate.buildTranscriptRegion(...)` routes both enum values
+  to the same `FlutterChatTranscriptRegion`
+- `ChatRootAdapter.regionPolicy` exists largely to let tests override selection
+  around this seam
+
+Why it matters:
+
+- it presents a second transcript renderer path that does not exist
+- it adds policy surface and test scaffolding without adding real runtime
+  behavior
+
+### 2. Large duplicated settings renderer fork
+
+Files:
+
+- `lib/src/features/settings/presentation/connection_sheet.dart`
+- `lib/src/features/settings/presentation/cupertino_connection_sheet.dart`
+
+Why it is residue:
+
+- the Material and Cupertino settings renderers duplicate the same section
+  order, field iteration, auth-field loops, toggle iteration, footer actions,
+  keyboard-type mapping, auth icon mapping, and local `_Section` widget role
+- only control primitives and styling differ materially
+- recent drift already caused a real bug: the Cupertino path lacked its own
+  text-style host and inherited `MaterialApp`'s fallback error
+  `DefaultTextStyle`
+
+Why it matters:
+
+- behavior can diverge between renderers even when the shared
+  `ConnectionSettingsHost` contract is stable
+- the duplication obscures which parts are renderer-specific and which are
+  shared form structure
+
+### 3. Facade-only renderer and overlay vocabulary
+
+Files:
+
+- `lib/src/features/chat/presentation/chat_root_overlay_delegate.dart`
+- `lib/src/features/chat/presentation/chat_root_renderer_delegate.dart`
+- `lib/src/features/settings/presentation/connection_settings_renderer.dart`
+- `lib/src/features/chat/presentation/chat_root_region_policy.dart`
+- `lib/src/features/chat/presentation/chat_root_adapter.dart`
+
+Why it is residue:
+
+- there is one production `ChatRootOverlayDelegate` implementation and one
+  production `ChatRootRendererDelegate` implementation
+- `ConnectionSettingsRenderer` and `ChatTransientFeedbackRenderer` are thin
+  translation enums layered on top of `ChatRootRegionRenderer`
+- the adapter maps region policy into these extra enums before calling the
+  delegates
+
+Why it matters:
+
+- there are multiple renderer vocabularies for the same two runtime variants
+- this adds translation seams that are mostly facades today rather than true
+  independently-owned abstractions
+
+### 4. Real backwards-compat storage migration still in hot path
+
+File:
+
+- `lib/src/core/storage/codex_profile_store.dart`
+
+Why it is compatibility code:
+
+- profile load/save still carries legacy preference keys, legacy secure-storage
+  keys, and `SharedPreferences` to `SharedPreferencesAsync` migration logic
+- the implementation is converging rather than permanently dual-writing, but
+  the compatibility path still executes in the runtime storage layer
+
+Why it matters:
+
+- if the migration window is closed, this is now permanent compatibility
+  residue
+- if the migration window is still open, it should stay documented as active
+  backwards-compat code rather than being treated as “cleaned up”
+
+### 5. Legacy app-server request rejection branch
+
+File:
+
+- `lib/src/features/chat/application/chat_session_controller.dart`
+
+Why it is compatibility code:
+
+- `_handleUnsupportedHostRequest(...)` still carries a dedicated branch for the
+  legacy `item/fileRead/requestApproval` method
+
+Why it matters:
+
+- if the transport contract is fully cut over, this is leftover compatibility
+  behavior
+- if the transport still emits that method in the field, it is active
+  backwards-compat code and should stay categorized as such

@@ -1,4 +1,6 @@
 import 'package:pocket_relay/src/features/chat/application/transcript_policy_support.dart';
+import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
+import 'package:pocket_relay/src/features/chat/models/codex_request_display.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -22,7 +24,7 @@ class TranscriptRequestPolicy {
     final turnId = event.turnId ?? state.activeTurn?.turnId;
     final threadId = event.threadId ?? state.activeTurn?.threadId;
     final activeTurn = _freezeTailArtifact(
-      _support.ensureActiveTurn(
+      _ensureActiveTurn(
         state.activeTurn,
         turnId: turnId,
         threadId: threadId,
@@ -136,7 +138,7 @@ class TranscriptRequestPolicy {
     final turnId = event.turnId ?? state.activeTurn?.turnId;
     final threadId = event.threadId ?? state.activeTurn?.threadId;
     final activeTurn = _freezeTailArtifact(
-      _support.ensureActiveTurn(
+      _ensureActiveTurn(
         state.activeTurn,
         turnId: turnId,
         threadId: threadId,
@@ -337,13 +339,34 @@ class TranscriptRequestPolicy {
     );
   }
 
+  CodexActiveTurnState? _ensureActiveTurn(
+    CodexActiveTurnState? activeTurn, {
+    required String? turnId,
+    required String? threadId,
+    required DateTime createdAt,
+  }) {
+    if (activeTurn != null || turnId == null) {
+      return activeTurn;
+    }
+
+    return CodexActiveTurnState(
+      turnId: turnId,
+      threadId: threadId,
+      timer: CodexSessionTurnTimer(
+        turnId: turnId,
+        startedAt: createdAt,
+        activeSegmentStartedMonotonicAt: CodexMonotonicClock.now(),
+      ),
+    );
+  }
+
   CodexSessionState _stateWithResolvedTranscriptBlock(
     CodexSessionState state,
     CodexUiBlock block, {
     required String? turnId,
     required String? threadId,
   }) {
-    final activeTurn = _support.ensureActiveTurn(
+    final activeTurn = _ensureActiveTurn(
       state.activeTurn,
       turnId: turnId,
       threadId: threadId,
@@ -477,8 +500,14 @@ class TranscriptRequestPolicy {
         incoming.requestType == CodexCanonicalRequestType.unknown
             ? existing
             : incoming,
-      (CodexApprovalRequestBlock _, CodexUserInputRequestBlock incoming) =>
-        incoming,
+      (
+        CodexApprovalRequestBlock existing,
+        CodexUserInputRequestBlock incoming,
+      ) =>
+        _isRichUserInputResolution(incoming) ||
+                existing.requestType == CodexCanonicalRequestType.unknown
+            ? incoming
+            : incoming,
       _ => incomingBlock,
     };
   }

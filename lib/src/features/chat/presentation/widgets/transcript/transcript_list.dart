@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
-
-class TranscriptListController extends ChangeNotifier {
-  void requestFollow() {
-    notifyListeners();
-  }
-}
 
 class TranscriptList extends StatefulWidget {
   const TranscriptList({
     super.key,
-    required this.controller,
-    required this.isConfigured,
-    required this.transcriptBlocks,
+    required this.surface,
+    required this.followBehavior,
     required this.onConfigure,
-    this.pendingApprovalBlock,
-    this.pendingUserInputBlock,
+    required this.onAutoFollowEligibilityChanged,
+    this.emptyStateRenderer = ChatEmptyStateRenderer.flutter,
+    this.surfaceChangeToken,
+    this.onOpenChangedFileDiff,
     this.onApproveRequest,
     this.onDenyRequest,
     this.onSubmitUserInput,
   });
 
-  final TranscriptListController controller;
-  final bool isConfigured;
-  final List<CodexUiBlock> transcriptBlocks;
+  final ChatTranscriptSurfaceContract surface;
+  final ChatTranscriptFollowContract followBehavior;
   final VoidCallback onConfigure;
-  final CodexApprovalRequestBlock? pendingApprovalBlock;
-  final CodexUserInputRequestBlock? pendingUserInputBlock;
+  final ValueChanged<bool> onAutoFollowEligibilityChanged;
+  final ChatEmptyStateRenderer emptyStateRenderer;
+  final Object? surfaceChangeToken;
+  final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(String requestId)? onApproveRequest;
   final Future<void> Function(String requestId)? onDenyRequest;
   final Future<void> Function(
@@ -42,49 +42,58 @@ class TranscriptList extends StatefulWidget {
 }
 
 class _TranscriptListState extends State<TranscriptList> {
-  static const double _autoScrollResumeDistance = 72;
-
   final _scrollController = ScrollController();
-  bool _shouldFollowTranscript = true;
 
-  bool get _hasVisibleConversation =>
-      widget.transcriptBlocks.isNotEmpty ||
-      widget.pendingApprovalBlock != null ||
-      widget.pendingUserInputBlock != null;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_handleFollowRequest);
-  }
+  bool get _hasVisibleConversation => !widget.surface.showsEmptyState;
+  Object get _surfaceChangeToken => widget.surfaceChangeToken ?? widget.surface;
 
   @override
   void didUpdateWidget(covariant TranscriptList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_handleFollowRequest);
-      widget.controller.addListener(_handleFollowRequest);
+
+    final previousRequestId = oldWidget.followBehavior.request?.id;
+    final nextRequestId = widget.followBehavior.request?.id;
+    if (previousRequestId != nextRequestId && nextRequestId != null) {
+      _scrollToEnd();
+      return;
     }
 
-    if (_shouldFollowTranscript && _hasVisibleConversation) {
+    final previousSurfaceChangeToken =
+        oldWidget.surfaceChangeToken ?? oldWidget.surface;
+    if (_surfaceChangeToken != previousSurfaceChangeToken &&
+        widget.followBehavior.isAutoFollowEnabled &&
+        _hasVisibleConversation) {
       _scrollToEnd();
     }
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_handleFollowRequest);
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasVisibleConversation) {
-      return EmptyState(
-        isConfigured: widget.isConfigured,
-        onConfigure: widget.onConfigure,
-      );
+    return PendingUserInputFormScope(
+      activeRequestIds: widget.surface.activePendingUserInputRequestIds,
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final emptyState = widget.surface.emptyState;
+    if (emptyState != null) {
+      return switch (widget.emptyStateRenderer) {
+        ChatEmptyStateRenderer.flutter => EmptyState(
+          isConfigured: emptyState.isConfigured,
+          onConfigure: widget.onConfigure,
+        ),
+        ChatEmptyStateRenderer.cupertino => CupertinoEmptyState(
+          isConfigured: emptyState.isConfigured,
+          onConfigure: widget.onConfigure,
+        ),
+      };
     }
 
     return Column(
@@ -96,53 +105,50 @@ class _TranscriptListState extends State<TranscriptList> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
               itemBuilder: (context, index) {
-                final block = widget.transcriptBlocks[index];
+                final item = widget.surface.mainItems[index];
                 return ConversationEntryCard(
-                  key: ValueKey<String>('transcript_${block.id}'),
-                  block: block,
+                  key: ValueKey<String>('transcript_${item.id}'),
+                  item: item,
                   onApproveRequest: widget.onApproveRequest,
                   onDenyRequest: widget.onDenyRequest,
+                  onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
                   onSubmitUserInput: widget.onSubmitUserInput,
                 );
               },
               separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemCount: widget.transcriptBlocks.length,
+              itemCount: widget.surface.mainItems.length,
             ),
           ),
         ),
-        if (widget.pendingApprovalBlock != null ||
-            widget.pendingUserInputBlock != null)
+        if (widget.surface.pinnedItems.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
                 child: Column(
-                  children: [
-                    if (widget.pendingApprovalBlock != null)
-                      ConversationEntryCard(
-                        key: ValueKey<String>(
-                          'pending_${widget.pendingApprovalBlock!.id}',
-                        ),
-                        block: widget.pendingApprovalBlock!,
-                        onApproveRequest: widget.onApproveRequest,
-                        onDenyRequest: widget.onDenyRequest,
-                        onSubmitUserInput: widget.onSubmitUserInput,
-                      ),
-                    if (widget.pendingApprovalBlock != null &&
-                        widget.pendingUserInputBlock != null)
-                      const SizedBox(height: 8),
-                    if (widget.pendingUserInputBlock != null)
-                      ConversationEntryCard(
-                        key: ValueKey<String>(
-                          'pending_${widget.pendingUserInputBlock!.id}',
-                        ),
-                        block: widget.pendingUserInputBlock!,
-                        onApproveRequest: widget.onApproveRequest,
-                        onDenyRequest: widget.onDenyRequest,
-                        onSubmitUserInput: widget.onSubmitUserInput,
-                      ),
-                  ],
+                  children: widget.surface.pinnedItems.indexed
+                      .map((entry) {
+                        final index = entry.$1;
+                        final item = entry.$2;
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom:
+                                index == widget.surface.pinnedItems.length - 1
+                                ? 0
+                                : 8,
+                          ),
+                          child: ConversationEntryCard(
+                            key: ValueKey<String>('pinned_${item.id}'),
+                            item: item,
+                            onApproveRequest: widget.onApproveRequest,
+                            onDenyRequest: widget.onDenyRequest,
+                            onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
+                            onSubmitUserInput: widget.onSubmitUserInput,
+                          ),
+                        );
+                      })
+                      .toList(growable: false),
                 ),
               ),
             ),
@@ -151,14 +157,9 @@ class _TranscriptListState extends State<TranscriptList> {
     );
   }
 
-  void _handleFollowRequest() {
-    _shouldFollowTranscript = true;
-    _scrollToEnd();
-  }
-
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients || !_shouldFollowTranscript) {
+      if (!_scrollController.hasClients) {
         return;
       }
 
@@ -186,7 +187,9 @@ class _TranscriptListState extends State<TranscriptList> {
       return false;
     }
 
-    _shouldFollowTranscript = _isNearTranscriptBottom(notification.metrics);
+    widget.onAutoFollowEligibilityChanged(
+      _isNearTranscriptBottom(notification.metrics),
+    );
     return false;
   }
 
@@ -199,6 +202,6 @@ class _TranscriptListState extends State<TranscriptList> {
     }
 
     return activeMetrics.maxScrollExtent - activeMetrics.pixels <=
-        _autoScrollResumeDistance;
+        widget.followBehavior.resumeDistance;
   }
 }

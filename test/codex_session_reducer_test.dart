@@ -753,8 +753,13 @@ void main() {
     expect(state.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.pendingApprovalRequests.keys, contains('i:99'));
     expect(state.activeTurn?.status, CodexActiveTurnStatus.blocked);
-    final requestBlock = state.primaryPendingApprovalBlock!;
-    expect(requestBlock.title, 'File change approval');
+    final pendingRequest = state.pendingApprovalRequests['i:99']!;
+    expect(pendingRequest.requestId, 'i:99');
+    expect(
+      pendingRequest.requestType,
+      CodexCanonicalRequestType.fileChangeApproval,
+    );
+    expect(pendingRequest.detail, 'Write files');
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -771,7 +776,6 @@ void main() {
     expect(state.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.pendingApprovalRequests, isEmpty);
     expect(state.activeTurn?.status, CodexActiveTurnStatus.running);
-    expect(state.primaryPendingApprovalBlock, isNull);
     final resolvedBlock =
         state.transcriptBlocks.single as CodexApprovalRequestBlock;
     expect(resolvedBlock.title, 'File change approval resolved');
@@ -810,7 +814,10 @@ void main() {
       ),
     );
 
-    expect(state.primaryPendingApprovalBlock?.requestId, 'approval_1');
+    expect(
+      state.pendingApprovalRequests['approval_1']?.requestId,
+      'approval_1',
+    );
     final frozenBlock = state.transcriptBlocks.single as CodexTextBlock;
     expect(frozenBlock.body, 'Before request');
     expect(frozenBlock.isRunning, isFalse);
@@ -840,8 +847,9 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests.keys, contains('s:user-input-1'));
-    final inputBlock = state.primaryPendingUserInputBlock!;
-    expect(inputBlock.title, 'Input required');
+    final pendingRequest = state.pendingUserInputRequests['s:user-input-1']!;
+    expect(pendingRequest.requestId, 's:user-input-1');
+    expect(pendingRequest.questions.single.question, 'What is your name?');
 
     state = reducer.reduceRuntimeEvent(
       state,
@@ -858,7 +866,6 @@ void main() {
     );
 
     expect(state.pendingUserInputRequests, isEmpty);
-    expect(state.primaryPendingUserInputBlock, isNull);
     final submittedBlock =
         state.transcriptBlocks.single as CodexUserInputRequestBlock;
     expect(submittedBlock.title, 'Input submitted');
@@ -904,7 +911,10 @@ void main() {
       final frozenBeforeInput = state.transcriptBlocks.single as CodexTextBlock;
       expect(frozenBeforeInput.body, 'Before request');
       expect(frozenBeforeInput.isRunning, isFalse);
-      expect(state.primaryPendingUserInputBlock?.requestId, 's:user-input-1');
+      expect(
+        state.pendingUserInputRequests['s:user-input-1']?.requestId,
+        's:user-input-1',
+      );
 
       state = reducer.reduceRuntimeEvent(
         state,
@@ -1956,8 +1966,11 @@ void main() {
       );
 
       expect(state.transcriptBlocks, hasLength(1));
-      expect(state.primaryPendingApprovalBlock, isNotNull);
-      expect(state.primaryPendingApprovalBlock?.requestId, 'approval_1');
+      expect(state.pendingApprovalRequests, isNotEmpty);
+      expect(
+        state.pendingApprovalRequests['approval_1']?.requestId,
+        'approval_1',
+      );
 
       state = reducer.reduceRuntimeEvent(
         state,
@@ -1984,7 +1997,7 @@ void main() {
         ),
       );
 
-      expect(state.primaryPendingApprovalBlock, isNull);
+      expect(state.pendingApprovalRequests, isEmpty);
       expect(state.transcriptBlocks, hasLength(3));
       expect(
         (state.transcriptBlocks.first as CodexTextBlock).body,
@@ -2180,7 +2193,10 @@ void main() {
           state.transcriptBlocks.single as CodexChangedFilesBlock;
       expect(frozenBeforeApproval.files.single.path, 'README.md');
       expect(frozenBeforeApproval.isRunning, isFalse);
-      expect(state.primaryPendingApprovalBlock?.requestId, 'approval_1');
+      expect(
+        state.pendingApprovalRequests['approval_1']?.requestId,
+        'approval_1',
+      );
 
       state = reducer.reduceRuntimeEvent(
         state,

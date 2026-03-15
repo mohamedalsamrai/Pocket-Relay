@@ -44,7 +44,6 @@ class ChatSessionController extends ChangeNotifier {
   bool _isLoading = true;
   bool _didInitialize = false;
   bool _isDisposed = false;
-  String? _resumeThreadId;
   StreamSubscription<CodexAppServerEvent>? _appServerEventSubscription;
 
   Stream<String> get snackBarMessages => _snackBarMessagesController.stream;
@@ -54,10 +53,6 @@ class ChatSessionController extends ChangeNotifier {
   CodexSessionState get sessionState => _sessionState;
   bool get isLoading => _isLoading;
   List<CodexUiBlock> get transcriptBlocks => _sessionState.transcriptBlocks;
-  CodexApprovalRequestBlock? get pendingApprovalBlock =>
-      _sessionState.primaryPendingApprovalBlock;
-  CodexUserInputRequestBlock? get pendingUserInputBlock =>
-      _sessionState.primaryPendingUserInputBlock;
 
   Future<void> initialize() async {
     if (_didInitialize) {
@@ -96,7 +91,6 @@ class ChatSessionController extends ChangeNotifier {
 
     _profile = profile;
     _secrets = secrets;
-    _resumeThreadId = null;
     _applySessionState(_sessionReducer.detachThread(_sessionState));
   }
 
@@ -123,7 +117,6 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void startFreshConversation() {
-    _resumeThreadId = null;
     _applySessionState(
       _sessionReducer.startFreshThread(
         _sessionState,
@@ -133,7 +126,6 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void clearTranscript() {
-    _resumeThreadId = null;
     _applySessionState(_sessionReducer.clearTranscript(_sessionState));
   }
 
@@ -181,7 +173,6 @@ class ChatSessionController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    _resumeThreadId = null;
     _appServerEventSubscription?.cancel();
     unawaited(appServerClient.disconnect());
     unawaited(_snackBarMessagesController.close());
@@ -296,24 +287,9 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void _applyRuntimeEvent(CodexRuntimeEvent event) {
-    _syncRuntimeEventState(event);
     _applySessionState(
       _sessionReducer.reduceRuntimeEvent(_sessionState, event),
     );
-  }
-
-  void _syncRuntimeEventState(CodexRuntimeEvent event) {
-    switch (event) {
-      case CodexRuntimeThreadStartedEvent(:final providerThreadId):
-        _resumeThreadId = _profile.ephemeralSession ? null : providerThreadId;
-      case CodexRuntimeThreadStateChangedEvent(:final state)
-          when state == CodexRuntimeThreadState.closed:
-        _resumeThreadId = null;
-      case CodexRuntimeSessionExitedEvent():
-        _resumeThreadId = null;
-      default:
-        break;
-    }
   }
 
   Future<bool> _sendPromptWithAppServer(String prompt) async {
@@ -324,7 +300,18 @@ class ChatSessionController extends ChangeNotifier {
           connectionStatus: CodexRuntimeSessionState.running,
         ),
       );
-      await appServerClient.sendUserMessage(threadId: threadId, text: prompt);
+      final turn = await appServerClient.sendUserMessage(
+        threadId: threadId,
+        text: prompt,
+      );
+      _applyRuntimeEvent(
+        CodexRuntimeTurnStartedEvent(
+          createdAt: DateTime.now(),
+          threadId: turn.threadId,
+          turnId: turn.turnId,
+          rawMethod: 'turn/start(response)',
+        ),
+      );
       return true;
     } catch (error) {
       if (_sessionState.activeTurn == null &&
@@ -345,7 +332,9 @@ class ChatSessionController extends ChangeNotifier {
   Future<String> _ensureAppServerThread() async {
     await _ensureAppServerConnected();
 
-    final resumeThreadId = _profile.ephemeralSession ? null : _resumeThreadId;
+    final resumeThreadId = _profile.ephemeralSession
+        ? null
+        : _sessionState.threadId;
     if (resumeThreadId != null &&
         resumeThreadId.isNotEmpty &&
         appServerClient.threadId == resumeThreadId) {
@@ -355,7 +344,16 @@ class ChatSessionController extends ChangeNotifier {
     final session = await appServerClient.startSession(
       resumeThreadId: resumeThreadId,
     );
-    _resumeThreadId = _profile.ephemeralSession ? null : session.threadId;
+    _applyRuntimeEvent(
+      CodexRuntimeThreadStartedEvent(
+        createdAt: DateTime.now(),
+        threadId: session.threadId,
+        providerThreadId: session.threadId,
+        rawMethod: resumeThreadId == null
+            ? 'thread/start(response)'
+            : 'thread/resume(response)',
+      ),
+    );
     return session.threadId;
   }
 

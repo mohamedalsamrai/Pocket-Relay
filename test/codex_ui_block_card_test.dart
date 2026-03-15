@@ -4,16 +4,29 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_projector.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
+
+const _itemProjector = ChatTranscriptItemProjector();
+const _defaultFollowBehavior = ChatTranscriptFollowContract(
+  isAutoFollowEnabled: true,
+  resumeDistance: 72,
+);
 
 void main() {
   testWidgets('renders reasoning blocks with markdown text', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTextBlock(
             id: 'reasoning_1',
             kind: CodexUiBlockKind.reasoning,
@@ -35,7 +48,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         themeMode: ThemeMode.dark,
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTextBlock(
             id: 'reasoning_code_1',
             kind: CodexUiBlockKind.reasoning,
@@ -63,7 +76,7 @@ void main() {
         themeMode: ThemeMode.dark,
         child: Column(
           children: [
-            ConversationEntryCard(
+            _entryCard(
               block: CodexTextBlock(
                 id: 'reasoning_dark_1',
                 kind: CodexUiBlockKind.reasoning,
@@ -73,7 +86,7 @@ void main() {
               ),
             ),
             const SizedBox(height: 16),
-            ConversationEntryCard(
+            _entryCard(
               block: CodexChangedFilesBlock(
                 id: 'files_dark_1',
                 createdAt: DateTime(2026, 3, 14, 12),
@@ -107,7 +120,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTextBlock(
             id: 'assistant_1',
             kind: CodexUiBlockKind.assistantMessage,
@@ -136,7 +149,7 @@ void main() {
         _buildTestApp(
           child: Column(
             children: [
-              ConversationEntryCard(
+              _entryCard(
                 block: CodexUserMessageBlock(
                   id: 'user_local_1',
                   createdAt: DateTime(2026, 3, 14, 12),
@@ -145,7 +158,7 @@ void main() {
                 ),
               ),
               const SizedBox(height: 16),
-              ConversationEntryCard(
+              _entryCard(
                 block: CodexUserMessageBlock(
                   id: 'user_session_1',
                   createdAt: DateTime(2026, 3, 14, 12, 0, 1),
@@ -187,7 +200,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         themeMode: ThemeMode.dark,
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexUserMessageBlock(
             id: 'user_dark_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -244,7 +257,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexApprovalRequestBlock(
             id: 'request_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -276,7 +289,8 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        activeRequestIds: const <String>{'input_1'},
+        child: _entryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -310,12 +324,65 @@ void main() {
     });
   });
 
+  testWidgets(
+    'routes user-input option chips through the shared request draft state',
+    (tester) async {
+      Map<String, List<String>>? submittedAnswers;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          activeRequestIds: const <String>{'input_1'},
+          child: _entryCard(
+            block: CodexUserInputRequestBlock(
+              id: 'input_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              requestId: 'input_1',
+              requestType: CodexCanonicalRequestType.toolUserInput,
+              title: 'Input required',
+              body: 'Codex needs clarification.',
+              questions: const <CodexRuntimeUserInputQuestion>[
+                CodexRuntimeUserInputQuestion(
+                  id: 'q1',
+                  header: 'Project',
+                  question: 'Which project should I use?',
+                  options: <CodexRuntimeUserInputOption>[
+                    CodexRuntimeUserInputOption(
+                      label: 'Pocket Relay',
+                      description: 'Use the mobile app project.',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            onSubmitUserInput: (_, answers) async {
+              submittedAnswers = answers;
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Pocket Relay'));
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.controller?.text, 'Pocket Relay');
+
+      await tester.tap(find.text('Submit response'));
+      await tester.pump();
+
+      expect(submittedAnswers, <String, List<String>>{
+        'q1': <String>['Pocket Relay'],
+      });
+    },
+  );
+
   testWidgets('resyncs user-input fields when the backing request changes', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        activeRequestIds: const <String>{'input_1'},
+        child: _entryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -340,7 +407,8 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        activeRequestIds: const <String>{'input_2'},
+        child: _entryCard(
           block: CodexUserInputRequestBlock(
             id: 'input_2',
             createdAt: DateTime(2026, 3, 14, 12, 0, 5),
@@ -371,6 +439,153 @@ void main() {
   });
 
   testWidgets(
+    'preserves user-input drafts when a request moves within the transcript surface',
+    (tester) async {
+      final block = CodexUserInputRequestBlock(
+        id: 'input_1',
+        createdAt: DateTime(2026, 3, 14, 12),
+        requestId: 'input_1',
+        requestType: CodexCanonicalRequestType.toolUserInput,
+        title: 'Input required',
+        body: 'Codex needs clarification.',
+        questions: const <CodexRuntimeUserInputQuestion>[
+          CodexRuntimeUserInputQuestion(
+            id: 'q1',
+            header: 'Project',
+            question: 'Which project should I use?',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(mainItems: <CodexUiBlock>[block]),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'main',
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Pocket Relay');
+      await tester.pump();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(pinnedItems: <CodexUiBlock>[block]),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'pinned',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.controller?.text, 'Pocket Relay');
+    },
+  );
+
+  testWidgets(
+    'does not leak pending-user-input drafts when visibility promotes to the next request',
+    (tester) async {
+      final firstBlock = CodexUserInputRequestBlock(
+        id: 'input_1',
+        createdAt: DateTime(2026, 3, 14, 12),
+        requestId: 'input_1',
+        requestType: CodexCanonicalRequestType.toolUserInput,
+        title: 'Input required',
+        body: 'First request',
+        questions: const <CodexRuntimeUserInputQuestion>[
+          CodexRuntimeUserInputQuestion(
+            id: 'q1',
+            header: 'Project',
+            question: 'Which first project should I use?',
+          ),
+        ],
+      );
+      final secondBlock = CodexUserInputRequestBlock(
+        id: 'input_2',
+        createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+        requestId: 'input_2',
+        requestType: CodexCanonicalRequestType.toolUserInput,
+        title: 'Input required',
+        body: 'Second request',
+        questions: const <CodexRuntimeUserInputQuestion>[
+          CodexRuntimeUserInputQuestion(
+            id: 'q1',
+            header: 'Project',
+            question: 'Which second project should I use?',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(pinnedItems: <CodexUiBlock>[firstBlock]),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'first',
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Pocket Relay');
+      await tester.pump();
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(pinnedItems: <CodexUiBlock>[secondBlock]),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'second',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Which first project should I use?'), findsNothing);
+      expect(find.text('Which second project should I use?'), findsOneWidget);
+      final textField = tester.widget<TextField>(find.byType(TextField));
+      expect(textField.controller?.text, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'routes active pending user-input ids through the surface contract',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(
+              emptyState: const ChatEmptyStateContract(isConfigured: true),
+              activePendingUserInputRequestIds: <String>{'input_explicit'},
+            ),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+          ),
+        ),
+      );
+
+      final scope = tester
+          .widgetList<PendingUserInputFormScope>(
+            find.byType(PendingUserInputFormScope),
+          )
+          .last;
+      expect(scope.activeRequestIds, <String>{'input_explicit'});
+    },
+  );
+
+  testWidgets(
     'renders proposed plans with extracted title and collapse control',
     (tester) async {
       final markdownLines = <String>[
@@ -385,7 +600,7 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           child: SingleChildScrollView(
-            child: ConversationEntryCard(
+            child: _entryCard(
               block: CodexProposedPlanBlock(
                 id: 'plan_1',
                 createdAt: DateTime(2026, 3, 14, 12),
@@ -411,7 +626,6 @@ void main() {
   testWidgets(
     'keys transcript cards by block id so local state does not leak',
     (tester) async {
-      final controller = TranscriptListController();
       final markdownLines = <String>[
         '# Ship mobile widgets',
         '',
@@ -424,17 +638,20 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           child: TranscriptList(
-            controller: controller,
-            isConfigured: true,
-            transcriptBlocks: <CodexUiBlock>[
-              CodexProposedPlanBlock(
-                id: 'plan_1',
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Proposed plan',
-                markdown: markdownLines.join('\n'),
-              ),
-            ],
+            surface: _surfaceContract(
+              mainItems: <CodexUiBlock>[
+                CodexProposedPlanBlock(
+                  id: 'plan_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Proposed plan',
+                  markdown: markdownLines.join('\n'),
+                ),
+              ],
+            ),
+            followBehavior: _defaultFollowBehavior,
             onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'plan_1',
           ),
         ),
       );
@@ -446,17 +663,20 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           child: TranscriptList(
-            controller: controller,
-            isConfigured: true,
-            transcriptBlocks: <CodexUiBlock>[
-              CodexProposedPlanBlock(
-                id: 'plan_2',
-                createdAt: DateTime(2026, 3, 14, 12, 0, 5),
-                title: 'Proposed plan',
-                markdown: markdownLines.join('\n'),
-              ),
-            ],
+            surface: _surfaceContract(
+              mainItems: <CodexUiBlock>[
+                CodexProposedPlanBlock(
+                  id: 'plan_2',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 5),
+                  title: 'Proposed plan',
+                  markdown: markdownLines.join('\n'),
+                ),
+              ],
+            ),
+            followBehavior: _defaultFollowBehavior,
             onConfigure: () {},
+            onAutoFollowEligibilityChanged: (_) {},
+            surfaceChangeToken: 'plan_2',
           ),
         ),
       );
@@ -467,12 +687,82 @@ void main() {
     },
   );
 
+  testWidgets(
+    'routes follow eligibility and follow requests through the transcript contract',
+    (tester) async {
+      bool? isNearBottom;
+      final blocks = List<CodexUiBlock>.generate(
+        24,
+        (index) => CodexTextBlock(
+          id: 'assistant_$index',
+          kind: CodexUiBlockKind.assistantMessage,
+          createdAt: DateTime(2026, 3, 14, 12, 0, index),
+          title: 'Codex',
+          body: 'Assistant message $index',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(mainItems: blocks),
+            followBehavior: _defaultFollowBehavior,
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (value) {
+              isNearBottom = value;
+            },
+            surfaceChangeToken: 'initial',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollableState = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      scrollableState.position.jumpTo(scrollableState.position.maxScrollExtent);
+      await tester.pump();
+
+      await tester.drag(find.byType(ListView), const Offset(0, 320));
+      await tester.pumpAndSettle();
+
+      expect(isNearBottom, isFalse);
+      expect(
+        scrollableState.position.pixels,
+        lessThan(scrollableState.position.maxScrollExtent),
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: TranscriptList(
+            surface: _surfaceContract(mainItems: blocks),
+            followBehavior: _followBehavior(
+              requestId: 1,
+              source: ChatTranscriptFollowRequestSource.sendPrompt,
+            ),
+            onConfigure: () {},
+            onAutoFollowEligibilityChanged: (value) {
+              isNearBottom = value;
+            },
+            surfaceChangeToken: 'initial',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        scrollableState.position.pixels,
+        closeTo(scrollableState.position.maxScrollExtent, 1),
+      );
+    },
+  );
+
   testWidgets('renders compact work-log groups with normalized labels', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexWorkLogGroupBlock(
             id: 'worklog_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -509,7 +799,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexUsageBlock(
             id: 'usage_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -547,7 +837,7 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         _buildTestApp(
-          child: ConversationEntryCard(
+          child: _entryCard(
             block: CodexUsageBlock(
               id: 'usage_2',
               createdAt: DateTime(2026, 3, 14, 12),
@@ -578,7 +868,7 @@ void main() {
   testWidgets('renders turn completion as a compact separator', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTurnBoundaryBlock(
             id: 'turn_end_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -595,7 +885,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTurnBoundaryBlock(
             id: 'turn_end_2',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -613,7 +903,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexTurnBoundaryBlock(
             id: 'turn_end_usage_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -645,7 +935,7 @@ void main() {
           alignment: Alignment.topLeft,
           child: SizedBox(
             width: 1200,
-            child: ConversationEntryCard(
+            child: _entryCard(
               block: CodexTurnBoundaryBlock(
                 id: 'turn_end_flush_1',
                 createdAt: DateTime(2026, 3, 14, 12),
@@ -686,7 +976,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexChangedFilesBlock(
             id: 'diff_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -756,7 +1046,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexChangedFilesBlock(
             id: 'diff_unmatched_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -786,10 +1076,55 @@ void main() {
     expect(find.text('README.md'), findsOneWidget);
   });
 
+  testWidgets(
+    'routes changed-file diff opening through the callback boundary',
+    (tester) async {
+      ChatChangedFileDiffContract? openedDiff;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexChangedFilesBlock(
+              id: 'diff_callback_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Changed files',
+              files: const <CodexChangedFile>[
+                CodexChangedFile(
+                  path: 'lib/app.dart',
+                  additions: 1,
+                  deletions: 1,
+                ),
+              ],
+              unifiedDiff:
+                  'diff --git a/lib/app.dart b/lib/app.dart\n'
+                  '--- a/lib/app.dart\n'
+                  '+++ b/lib/app.dart\n'
+                  '@@ -1 +1 @@\n'
+                  '-old\n'
+                  '+new\n',
+            ),
+            onOpenChangedFileDiff: (diff) {
+              openedDiff = diff;
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('lib/app.dart'));
+      await tester.pump();
+
+      expect(openedDiff, isNotNull);
+      expect(openedDiff?.displayPathLabel, 'lib/app.dart');
+      expect(openedDiff?.stats.additions, 1);
+      expect(openedDiff?.stats.deletions, 1);
+      expect(find.text('+new'), findsNothing);
+    },
+  );
+
   testWidgets('matches renamed files by old-path aliases', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexChangedFilesBlock(
             id: 'diff_rename_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -830,7 +1165,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexChangedFilesBlock(
             id: 'diff_only_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -875,7 +1210,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildTestApp(
-        child: ConversationEntryCard(
+        child: _entryCard(
           block: CodexChangedFilesBlock(
             id: 'diff_large_1',
             createdAt: DateTime(2026, 3, 14, 12),
@@ -908,15 +1243,112 @@ void main() {
   });
 }
 
+ChatTranscriptSurfaceContract _surfaceContract({
+  bool isConfigured = true,
+  List<CodexUiBlock> mainItems = const <CodexUiBlock>[],
+  List<CodexUiBlock> pinnedItems = const <CodexUiBlock>[],
+  Set<String>? activePendingUserInputRequestIds,
+  ChatEmptyStateContract? emptyState,
+}) {
+  return ChatTranscriptSurfaceContract(
+    isConfigured: isConfigured,
+    mainItems: mainItems.map(_itemProjector.project).toList(growable: false),
+    pinnedItems: pinnedItems
+        .map(_itemProjector.project)
+        .toList(growable: false),
+    pendingRequestPlacement: ChatPendingRequestPlacementContract(
+      visibleApprovalRequest: null,
+      visibleUserInputRequest: null,
+    ),
+    activePendingUserInputRequestIds:
+        activePendingUserInputRequestIds ??
+        _activePendingUserInputRequestIdsForBlocks(
+          mainItems: mainItems,
+          pinnedItems: pinnedItems,
+        ),
+    emptyState: emptyState,
+  );
+}
+
+Set<String> _activePendingUserInputRequestIdsForBlocks({
+  required List<CodexUiBlock> mainItems,
+  required List<CodexUiBlock> pinnedItems,
+}) {
+  final activeRequestIds = <String>{};
+
+  for (final block in <CodexUiBlock>[...mainItems, ...pinnedItems]) {
+    if (block case final CodexUserInputRequestBlock userInputBlock
+        when !userInputBlock.isResolved) {
+      activeRequestIds.add(userInputBlock.requestId);
+    }
+  }
+
+  return activeRequestIds;
+}
+
+ChatTranscriptFollowContract _followBehavior({
+  bool isAutoFollowEnabled = true,
+  int? requestId,
+  ChatTranscriptFollowRequestSource source =
+      ChatTranscriptFollowRequestSource.sendPrompt,
+}) {
+  return ChatTranscriptFollowContract(
+    isAutoFollowEnabled: isAutoFollowEnabled,
+    resumeDistance: 72,
+    request: requestId == null
+        ? null
+        : ChatTranscriptFollowRequestContract(id: requestId, source: source),
+  );
+}
+
+Widget _entryCard({
+  Key? key,
+  required CodexUiBlock block,
+  Future<void> Function(String requestId)? onApproveRequest,
+  Future<void> Function(String requestId)? onDenyRequest,
+  void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff,
+  Future<void> Function(String requestId, Map<String, List<String>> answers)?
+  onSubmitUserInput,
+}) {
+  return Builder(
+    builder: (context) {
+      return ConversationEntryCard(
+        key: key,
+        item: _itemProjector.project(block),
+        onApproveRequest: onApproveRequest,
+        onDenyRequest: onDenyRequest,
+        onOpenChangedFileDiff:
+            onOpenChangedFileDiff ??
+            (diff) {
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => ChangedFileDiffSheet(diff: diff),
+              );
+            },
+        onSubmitUserInput: onSubmitUserInput,
+      );
+    },
+  );
+}
+
 Widget _buildTestApp({
   required Widget child,
   ThemeMode themeMode = ThemeMode.light,
+  Set<String> activeRequestIds = const <String>{},
 }) {
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     darkTheme: buildPocketTheme(Brightness.dark),
     themeMode: themeMode,
-    home: Scaffold(body: child),
+    home: Scaffold(
+      body: PendingUserInputFormScope(
+        activeRequestIds: activeRequestIds,
+        child: child,
+      ),
+    ),
   );
 }
 

@@ -28,7 +28,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Hello Codex');
+    final composerField = find.byType(TextField).first;
+    await tester.enterText(composerField, 'Hello Codex');
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -36,6 +37,7 @@ void main() {
     expect(appServerClient.startSessionCalls, 1);
     expect(appServerClient.sentMessages, <String>['Hello Codex']);
     expect(find.text('Hello Codex'), findsOneWidget);
+    expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -1234,6 +1236,72 @@ void main() {
   );
 
   testWidgets(
+    'promotes the next pending approval without broadening the pinned approval surface',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 'i:101',
+          method: 'item/fileChange/requestApproval',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'reason': 'Write the first file',
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 'i:102',
+          method: 'item/fileChange/requestApproval',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_2',
+            'reason': 'Write the second file',
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Write the first file'), findsOneWidget);
+      expect(find.text('Write the second file'), findsNothing);
+      expect(find.text('File change approval'), findsOneWidget);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'serverRequest/resolved',
+          params: <String, Object?>{'threadId': 'thread_123', 'requestId': 101},
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Write the first file'), findsNothing);
+      expect(find.text('Write the second file'), findsOneWidget);
+      expect(find.text('File change approval'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'shows the live turn timer above the composer without needing an assistant block',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
@@ -1363,6 +1431,189 @@ void main() {
         <String, List<String>>{
           'q1': <String>['Vince'],
         },
+      );
+      expect(appServerClient.elicitationResponses, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'promotes the next pending user-input request without leaking the prior draft',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:user-input-1',
+          method: 'item/tool/requestUserInput',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'questions': <Object>[
+              <String, Object?>{
+                'id': 'q1',
+                'header': 'Project',
+                'question': 'Which first project should I use?',
+              },
+            ],
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:user-input-2',
+          method: 'item/tool/requestUserInput',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_2',
+            'questions': <Object>[
+              <String, Object?>{
+                'id': 'q1',
+                'header': 'Project',
+                'question': 'Which second project should I use?',
+              },
+            ],
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Which first project should I use?'), findsOneWidget);
+      expect(find.text('Which second project should I use?'), findsNothing);
+
+      final textField = find.byType(TextField).first;
+      await tester.enterText(textField, 'Pocket Relay');
+      await tester.ensureVisible(find.text('Submit response'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Submit response'));
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.userInputResponses, hasLength(1));
+      expect(
+        appServerClient.userInputResponses.single.requestId,
+        's:user-input-1',
+      );
+      expect(
+        appServerClient.userInputResponses.single.answers,
+        <String, List<String>>{
+          'q1': <String>['Pocket Relay'],
+        },
+      );
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/tool/requestUserInput/answered',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'requestId': 'user-input-1',
+            'answers': <String, Object?>{
+              'q1': <String, Object?>{
+                'answers': <String>['Pocket Relay'],
+              },
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Which first project should I use?'), findsNothing);
+      expect(find.text('Which second project should I use?'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    'mcp elicitation requests are submitted through the elicitation response path',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerRequestEvent(
+          requestId: 's:elicitation-1',
+          method: 'mcpServer/elicitation/request',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'serverName': 'filesystem',
+            'message': 'Choose a directory',
+            'mode': 'form',
+            'requestedSchema': <String, Object?>{
+              'type': 'object',
+              'properties': <String, Object?>{
+                'path': <String, Object?>{'type': 'string'},
+              },
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('MCP input required'), findsOneWidget);
+      expect(find.text('Choose a directory'), findsOneWidget);
+
+      final responseField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField && widget.decoration?.labelText == 'Response',
+      );
+
+      await tester.enterText(responseField, '/workspace/mobile');
+      await tester.ensureVisible(find.text('Submit response'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Submit response'));
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.userInputResponses, isEmpty);
+      expect(appServerClient.elicitationResponses, hasLength(1));
+      expect(
+        appServerClient.elicitationResponses.single.requestId,
+        's:elicitation-1',
+      );
+      expect(
+        appServerClient.elicitationResponses.single.action,
+        CodexAppServerElicitationAction.accept,
+      );
+      expect(
+        appServerClient.elicitationResponses.single.content,
+        '/workspace/mobile',
       );
     },
   );
@@ -1710,6 +1961,73 @@ void main() {
       );
     },
   );
+
+  testWidgets('invalid prompt submission does not force transcript follow', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 24; index += 1) {
+      appServerClient.emit(
+        CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_$index',
+            'item': <String, Object?>{
+              'id': 'item_$index',
+              'type': 'agentMessage',
+              'status': 'completed',
+              'text': 'Assistant message $index',
+            },
+          },
+        ),
+      );
+    }
+
+    await tester.pumpAndSettle();
+
+    final scrollableState = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollableState.position.maxScrollExtent, greaterThan(0));
+
+    await tester.drag(find.byType(ListView), const Offset(0, 320));
+    await tester.pumpAndSettle();
+
+    final pixelsBeforeSubmit = scrollableState.position.pixels;
+    expect(
+      pixelsBeforeSubmit,
+      lessThan(scrollableState.position.maxScrollExtent),
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Needs credentials');
+    await tester.tap(find.byKey(const ValueKey('send')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This profile needs an SSH password.'), findsOneWidget);
+    expect(appServerClient.sentMessages, isEmpty);
+    expect(scrollableState.position.pixels, closeTo(pixelsBeforeSubmit, 1));
+    expect(
+      scrollableState.position.pixels,
+      lessThan(scrollableState.position.maxScrollExtent - 40),
+    );
+  });
 
   testWidgets('thread token usage is shown once when the turn completes', (
     tester,

@@ -1,21 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 
-class ChatComposer extends StatelessWidget {
+class ChatComposer extends StatefulWidget {
   const ChatComposer({
     super.key,
-    required this.controller,
-    required this.enabled,
-    required this.isBusy,
+    required this.contract,
+    required this.onChanged,
     required this.onSend,
     required this.onStop,
   });
 
-  final TextEditingController controller;
-  final bool enabled;
-  final bool isBusy;
+  final ChatComposerContract contract;
+  final ValueChanged<String> onChanged;
   final Future<void> Function() onSend;
   final Future<void> Function() onStop;
+
+  @override
+  State<ChatComposer> createState() => _ChatComposerState();
+}
+
+class _ChatComposerState extends State<ChatComposer> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.contract.draftText);
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text == widget.contract.draftText) {
+      return;
+    }
+
+    _controller.value = _controller.value.copyWith(
+      text: widget.contract.draftText,
+      selection: TextSelection.collapsed(
+        offset: widget.contract.draftText.length,
+      ),
+      composing: TextRange.empty,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,13 +73,14 @@ class ChatComposer extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
-              controller: controller,
-              enabled: enabled && !isBusy,
+              controller: _controller,
+              enabled: widget.contract.isTextInputEnabled,
               minLines: 1,
               maxLines: 6,
               textInputAction: TextInputAction.newline,
-              decoration: const InputDecoration(
-                hintText: 'Describe what you want Codex to do…',
+              onChanged: widget.onChanged,
+              decoration: InputDecoration(
+                hintText: widget.contract.placeholder,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -56,16 +91,21 @@ class ChatComposer extends StatelessWidget {
           const SizedBox(width: 10),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: isBusy
+            child:
+                widget.contract.primaryAction == ChatComposerPrimaryAction.stop
                 ? FilledButton.tonalIcon(
                     key: const ValueKey('stop'),
-                    onPressed: onStop,
+                    onPressed: widget.contract.isPrimaryActionEnabled
+                        ? widget.onStop
+                        : null,
                     icon: const Icon(Icons.stop_circle_outlined),
                     label: const Text('Stop'),
                   )
                 : IconButton.filled(
                     key: const ValueKey('send'),
-                    onPressed: enabled ? onSend : null,
+                    onPressed: widget.contract.isPrimaryActionEnabled
+                        ? widget.onSend
+                        : null,
                     icon: const Icon(Icons.send_rounded),
                   ),
           ),
