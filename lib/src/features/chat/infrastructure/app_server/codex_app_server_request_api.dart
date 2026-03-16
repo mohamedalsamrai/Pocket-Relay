@@ -61,9 +61,8 @@ class CodexAppServerRequestApi {
     }
 
     final payload = _requireObject(response, '$method response');
-    final thread = _requireObject(payload['thread'], '$method thread');
-    final threadId =
-        _asString(thread['id']) ?? _asString(payload['threadId']) ?? '';
+    final thread = _asThread(payload['thread'], fallbackThreadId: payload['threadId']);
+    final threadId = thread?.id ?? '';
 
     if (threadId.isEmpty) {
       throw CodexAppServerException(
@@ -78,9 +77,35 @@ class CodexAppServerRequestApi {
       cwd: _asString(payload['cwd']) ?? effectiveCwd,
       model: _asString(payload['model']) ?? '',
       modelProvider: _asString(payload['modelProvider']) ?? '',
+      thread: thread,
       approvalPolicy: payload['approvalPolicy'],
       sandbox: payload['sandbox'],
     );
+  }
+
+  Future<CodexAppServerThread> readThread(
+    CodexAppServerConnection connection, {
+    required String threadId,
+  }) async {
+    connection.requireConnected();
+
+    final effectiveThreadId = threadId.trim();
+    if (effectiveThreadId.isEmpty) {
+      throw const CodexAppServerException('Thread id cannot be empty.');
+    }
+
+    final response = await connection.sendRequest('thread/read', <String, Object?>{
+      'threadId': effectiveThreadId,
+      'includeTurns': false,
+    });
+    final payload = _requireObject(response, 'thread/read response');
+    final thread = _asThread(payload['thread'], fallbackThreadId: effectiveThreadId);
+    if (thread == null) {
+      throw const CodexAppServerException(
+        'thread/read response did not include a thread object.',
+      );
+    }
+    return thread;
   }
 
   Future<CodexAppServerTurn> sendUserMessage(
@@ -302,6 +327,35 @@ class CodexAppServerRequestApi {
 
   static String? _asString(Object? value) {
     return value is String ? value : null;
+  }
+
+  static CodexAppServerThread? _asThread(
+    Object? value, {
+    Object? fallbackThreadId,
+  }) {
+    final thread = _asObject(value);
+    final threadId =
+        _asString(thread?['id']) ?? _asString(fallbackThreadId) ?? '';
+    if (threadId.isEmpty) {
+      return null;
+    }
+
+    return CodexAppServerThread(
+      id: threadId,
+      name: _asString(thread?['name']),
+      sourceKind: _sourceKind(thread?['source']),
+      agentNickname: _asString(thread?['agentNickname']),
+      agentRole: _asString(thread?['agentRole']),
+    );
+  }
+
+  static String? _sourceKind(Object? raw) {
+    if (raw is String && raw.trim().isNotEmpty) {
+      return raw.trim();
+    }
+
+    final object = _asObject(raw);
+    return _asString(object?['kind']) ?? _asString(object?['type']);
   }
 
   static String _approvalPolicyFor(ConnectionProfile profile) {

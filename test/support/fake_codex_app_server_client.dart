@@ -109,6 +109,18 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       cwd: cwd ?? '/workspace',
       model: model ?? 'gpt-5.3-codex',
       modelProvider: 'openai',
+      thread: CodexAppServerThread(
+        id: _threadId!,
+        sourceKind: 'app-server',
+      ),
+    );
+  }
+
+  @override
+  Future<CodexAppServerThread> readThread({required String threadId}) async {
+    return CodexAppServerThread(
+      id: threadId,
+      sourceKind: 'app-server',
     );
   }
 
