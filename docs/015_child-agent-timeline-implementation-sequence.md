@@ -1,7 +1,7 @@
 # Child-Agent Timeline Implementation Sequence
 
 This document translates
-`docs/child-agent-timeline-architecture-plan.md` into a repo-specific
+`docs/014_child-agent-timeline-architecture-plan.md` into a repo-specific
 execution order.
 
 The goal is not to redesign the whole chat stack at once. The goal is to make
