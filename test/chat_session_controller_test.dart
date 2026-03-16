@@ -153,6 +153,105 @@ void main() {
   );
 
   test(
+    'sendPrompt reuses the live tracked thread when local thread ownership is missing',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..connectedThreadId = 'thread_live';
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      expect(await controller.sendPrompt('Continue the current work'), isTrue);
+
+      expect(appServerClient.startSessionCalls, 0);
+      expect(appServerClient.sentTurns, <({String threadId, String text})>[
+        (threadId: 'thread_live', text: 'Continue the current work'),
+      ]);
+      expect(controller.sessionState.effectiveRootThreadId, 'thread_live');
+      expect(
+        await snackBarMessage,
+        'Recovered the active conversation from the live session.',
+      );
+    },
+  );
+
+  test(
+    'sendPrompt surfaces a missing conversation explicitly instead of silently starting fresh',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      appServerClient.sendUserMessageError = const CodexAppServerException(
+        'turn/start failed: thread not found',
+      );
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendPrompt('Second prompt');
+
+      expect(sent, isFalse);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(
+        controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+          (block) => block.text,
+        ),
+        <String>['First prompt', 'Second prompt'],
+      );
+      expect(
+        await snackBarMessage,
+        'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
+        'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+      );
+    },
+  );
+
+  test(
     'startFreshConversation clears the response-owned resume thread',
     () async {
       final appServerClient = FakeCodexAppServerClient();
@@ -186,6 +285,45 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       controller.startFreshConversation();
+
+      expect(await controller.sendPrompt('Second prompt'), isTrue);
+      expect(appServerClient.startSessionCalls, 2);
+    },
+  );
+
+  test(
+    'clearTranscript prevents reusing a previously tracked live thread',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      controller.clearTranscript();
 
       expect(await controller.sendPrompt('Second prompt'), isTrue);
       expect(appServerClient.startSessionCalls, 2);

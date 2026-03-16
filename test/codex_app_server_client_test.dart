@@ -276,7 +276,7 @@ void main() {
   );
 
   test(
-    'startSession falls back to thread/start when thread/resume cannot find the thread',
+    'startSession surfaces thread/resume missing-thread failures without silently starting fresh',
     () async {
       late _FakeCodexAppServerProcess process;
       process = _FakeCodexAppServerProcess(
@@ -297,18 +297,6 @@ void main() {
                   'message': 'thread/resume failed: thread not found',
                 },
               });
-            case 'thread/start':
-              process.sendStdout(<String, Object?>{
-                'id': message['id'],
-                'result': <String, Object?>{
-                  'thread': <String, Object?>{'id': 'thread_fresh'},
-                  'cwd': '/workspace',
-                  'model': 'gpt-5.3-codex',
-                  'modelProvider': 'openai',
-                  'approvalPolicy': 'on-request',
-                  'sandbox': <String, Object?>{'type': 'workspace-write'},
-                },
-              });
           }
         },
       );
@@ -324,9 +312,16 @@ void main() {
         secrets: const ConnectionSecrets(password: 'secret'),
       );
 
-      final session = await client.startSession(resumeThreadId: 'thread_old');
-
-      expect(session.threadId, 'thread_fresh');
+      await expectLater(
+        client.startSession(resumeThreadId: 'thread_old'),
+        throwsA(
+          isA<CodexAppServerException>().having(
+            (error) => error.message,
+            'message',
+            contains('thread/resume failed: thread not found'),
+          ),
+        ),
+      );
       expect(
         process.writtenMessages
             .where((message) => message['method'] == 'thread/resume')
@@ -337,7 +332,7 @@ void main() {
         process.writtenMessages
             .where((message) => message['method'] == 'thread/start')
             .length,
-        1,
+        0,
       );
 
       await client.disconnect();

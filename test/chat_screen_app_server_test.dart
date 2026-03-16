@@ -135,6 +135,64 @@ void main() {
     expect(find.textContaining('Could not send the prompt'), findsOneWidget);
   });
 
+  testWidgets(
+    'surfaces a missing conversation explicitly instead of silently starting fresh',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final composerField = find.byType(TextField).first;
+      await tester.enterText(composerField, 'First prompt');
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      appServerClient.sendUserMessageError = const CodexAppServerException(
+        'turn/start failed: thread not found',
+      );
+
+      await tester.enterText(composerField, 'Second prompt');
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('First prompt'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(composerField).controller?.text,
+        'Second prompt',
+      );
+    },
+  );
+
   testWidgets('child agent output stays on its own timeline until selected', (
     tester,
   ) async {

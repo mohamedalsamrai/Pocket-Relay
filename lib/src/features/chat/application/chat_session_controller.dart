@@ -47,6 +47,8 @@ class ChatSessionController extends ChangeNotifier {
   bool _isDisposed = false;
   bool _isTrackingSshBootstrapFailures = false;
   bool _sawTrackedSshBootstrapFailure = false;
+  bool _suppressTrackedThreadReuse = false;
+  String? _resumeThreadId;
   final Set<String> _threadMetadataHydrationAttempts = <String>{};
   StreamSubscription<CodexAppServerEvent>? _appServerEventSubscription;
 
@@ -95,6 +97,7 @@ class ChatSessionController extends ChangeNotifier {
 
     _profile = profile;
     _secrets = secrets;
+    _clearContinuationThread();
     _applySessionState(_sessionReducer.detachThread(_sessionState));
   }
 
@@ -174,6 +177,7 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void startFreshConversation() {
+    _clearContinuationThread();
     _applySessionState(
       _sessionReducer.startFreshThread(
         _sessionState,
@@ -183,6 +187,7 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void clearTranscript() {
+    _clearContinuationThread();
     _applySessionState(_sessionReducer.clearTranscript(_sessionState));
   }
 
@@ -407,6 +412,7 @@ class ChatSessionController extends ChangeNotifier {
         threadId: threadId,
         text: prompt,
       );
+      _rememberContinuationThread(turn.threadId);
       _applyRuntimeEvent(
         CodexRuntimeTurnStartedEvent(
           createdAt: DateTime.now(),
@@ -417,6 +423,7 @@ class ChatSessionController extends ChangeNotifier {
       );
       return true;
     } catch (error) {
+      final failure = _sendFailurePresentation(error);
       if (_sessionState.activeTurn == null &&
           _sessionState.pendingLocalUserMessageBlockIds.isNotEmpty) {
         _applySessionState(
@@ -425,9 +432,10 @@ class ChatSessionController extends ChangeNotifier {
       }
       await Future<void>.microtask(() {});
       _reportAppServerFailure(
-        title: 'Send failed',
-        message: 'Could not send the prompt to the remote Codex session.',
+        title: failure.title,
+        message: failure.message,
         error: error,
+        runtimeErrorMessage: failure.runtimeErrorMessage,
         suppressRuntimeError: _sawTrackedSshBootstrapFailure,
       );
       return false;
@@ -440,16 +448,23 @@ class ChatSessionController extends ChangeNotifier {
   Future<String> _ensureAppServerThread() async {
     await _ensureAppServerConnected();
 
-    final resumeThreadId = _profile.ephemeralSession
-        ? null
-        : _sessionState.effectiveRootThreadId;
-    if (resumeThreadId != null && resumeThreadId.isNotEmpty) {
+    final resumeThreadId = _continuationThreadId();
+    if (resumeThreadId != null) {
+      _rememberContinuationThread(resumeThreadId);
       return resumeThreadId;
+    }
+
+    final trackedThreadId = _trackedThreadReuseCandidate();
+    if (trackedThreadId != null) {
+      _rememberContinuationThread(trackedThreadId);
+      _emitSnackBar('Recovered the active conversation from the live session.');
+      return trackedThreadId;
     }
 
     final session = await appServerClient.startSession(
       resumeThreadId: resumeThreadId,
     );
+    _rememberContinuationThread(session.threadId);
     _applyRuntimeEvent(
       CodexRuntimeThreadStartedEvent(
         createdAt: DateTime.now(),
@@ -671,6 +686,7 @@ class ChatSessionController extends ChangeNotifier {
     required String title,
     required String message,
     required Object error,
+    String? runtimeErrorMessage,
     bool suppressRuntimeError = false,
   }) {
     final now = DateTime.now();
@@ -686,13 +702,32 @@ class ChatSessionController extends ChangeNotifier {
       _applyRuntimeEvent(
         CodexRuntimeErrorEvent(
           createdAt: now,
-          message: '$title: $error',
+          message: runtimeErrorMessage ?? '$title: $error',
           errorClass: CodexRuntimeErrorClass.transportError,
           rawMethod: 'app-server/failure',
         ),
       );
     }
     _emitSnackBar(message);
+  }
+
+  ({String title, String message, String? runtimeErrorMessage})
+  _sendFailurePresentation(Object error) {
+    if (_isMissingConversationThreadError(error)) {
+      const message =
+          'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.';
+      return (
+        title: 'Conversation unavailable',
+        message: message,
+        runtimeErrorMessage: message,
+      );
+    }
+
+    return (
+      title: 'Send failed',
+      message: 'Could not send the prompt to the remote Codex session.',
+      runtimeErrorMessage: null,
+    );
   }
 
   bool _isSshBootstrapFailureRuntimeEvent(CodexRuntimeEvent event) {
@@ -710,6 +745,63 @@ class ChatSessionController extends ChangeNotifier {
       return;
     }
     _snackBarMessagesController.add(message);
+  }
+
+  String? _continuationThreadId() {
+    if (_profile.ephemeralSession) {
+      return null;
+    }
+
+    return _normalizedThreadId(_sessionState.effectiveRootThreadId) ??
+        _normalizedThreadId(_resumeThreadId);
+  }
+
+  String? _trackedThreadReuseCandidate() {
+    if (_profile.ephemeralSession ||
+        _suppressTrackedThreadReuse ||
+        _sessionState.hasMultipleTimelines) {
+      return null;
+    }
+
+    return _normalizedThreadId(appServerClient.threadId);
+  }
+
+  void _rememberContinuationThread(String? threadId) {
+    final normalizedThreadId = _normalizedThreadId(threadId);
+    if (normalizedThreadId == null) {
+      return;
+    }
+
+    _resumeThreadId = normalizedThreadId;
+    _suppressTrackedThreadReuse = false;
+  }
+
+  void _clearContinuationThread() {
+    _resumeThreadId = null;
+    _suppressTrackedThreadReuse = true;
+  }
+
+  String? _normalizedThreadId(String? value) {
+    final normalizedValue = value?.trim();
+    if (normalizedValue == null || normalizedValue.isEmpty) {
+      return null;
+    }
+    return normalizedValue;
+  }
+
+  bool _isMissingConversationThreadError(Object error) {
+    final normalizedMessage = error.toString().toLowerCase();
+    if (!normalizedMessage.contains('thread')) {
+      return false;
+    }
+
+    return const <String>[
+      'thread not found',
+      'missing thread',
+      'no such thread',
+      'unknown thread',
+      'does not exist',
+    ].any(normalizedMessage.contains);
   }
 
   static Map<String, dynamic>? _asObject(Object? value) {

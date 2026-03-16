@@ -43,22 +43,7 @@ class CodexAppServerRequestApi {
       ...?resumeThreadParam,
     };
 
-    Object? response;
-    try {
-      response = await connection.sendRequest(method, params);
-    } on CodexAppServerException catch (error) {
-      if (effectiveResumeThreadId == null ||
-          !_isRecoverableThreadResumeError(error)) {
-        rethrow;
-      }
-
-      method = 'thread/start';
-      params = <String, Object?>{
-        ...baseParams,
-        'ephemeral': profile.ephemeralSession,
-      };
-      response = await connection.sendRequest(method, params);
-    }
+    final response = await connection.sendRequest(method, params);
 
     final payload = _requireObject(response, '$method response');
     final thread = _asThread(
@@ -384,20 +369,5 @@ class CodexAppServerRequestApi {
         'fileSystem': requested['fileSystem'],
       if (requested['macos'] != null) 'macos': requested['macos'],
     };
-  }
-
-  static bool _isRecoverableThreadResumeError(Object error) {
-    final message = error.toString().toLowerCase();
-    if (!message.contains('thread/resume')) {
-      return false;
-    }
-
-    return const <String>[
-      'not found',
-      'missing thread',
-      'no such thread',
-      'unknown thread',
-      'does not exist',
-    ].any(message.contains);
   }
 }

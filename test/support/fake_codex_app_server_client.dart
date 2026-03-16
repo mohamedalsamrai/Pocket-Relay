@@ -20,6 +20,8 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   int startSessionCalls = 0;
   final List<String> readThreadCalls = <String>[];
   final List<String> sentMessages = <String>[];
+  final List<({String threadId, String text})> sentTurns =
+      <({String threadId, String text})>[];
   final List<({String? threadId, String? turnId})> abortTurnCalls =
       <({String? threadId, String? turnId})>[];
   final List<({String requestId, bool approved})> approvalDecisions =
@@ -62,6 +64,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? connectError;
   Object? startSessionError;
   Object? sendUserMessageError;
+  String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
   final Map<String, CodexAppServerThread> threadsById =
       <String, CodexAppServerThread>{};
@@ -95,6 +98,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     }
     connectCalls += 1;
     _isConnected = true;
+    _threadId = connectedThreadId;
     emit(const CodexAppServerConnectedEvent(userAgent: 'codex-cli/test'));
   }
 
@@ -141,6 +145,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       throw sendUserMessageError!;
     }
     sentMessages.add(text);
+    sentTurns.add((threadId: threadId, text: text));
     _threadId = threadId;
     _activeTurnId = 'turn_${sentMessages.length}';
     return CodexAppServerTurn(threadId: threadId, turnId: _activeTurnId!);
