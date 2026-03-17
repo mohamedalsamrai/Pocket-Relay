@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -23,8 +24,11 @@ class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
     super.key,
     required this.profileStore,
+    this.conversationHandoffStore =
+        const DiscardingCodexConversationHandoffStore(),
     required this.appServerClient,
     this.initialSavedProfile,
+    this.initialSavedConversationHandoff = const SavedConversationHandoff(),
     this.platformPolicy = const ChatRootPlatformPolicy.allFlutter(),
     this.regionPolicy,
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
@@ -32,8 +36,10 @@ class ChatRootAdapter extends StatefulWidget {
   });
 
   final CodexProfileStore profileStore;
+  final CodexConversationHandoffStore conversationHandoffStore;
   final CodexAppServerClient appServerClient;
   final SavedProfile? initialSavedProfile;
+  final SavedConversationHandoff initialSavedConversationHandoff;
   final ChatRootPlatformPolicy platformPolicy;
   final ChatRootRegionPolicy? regionPolicy;
   final ChatRootOverlayDelegate overlayDelegate;
@@ -63,8 +69,11 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
   void didUpdateWidget(covariant ChatRootAdapter oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profileStore == widget.profileStore &&
+        oldWidget.conversationHandoffStore == widget.conversationHandoffStore &&
         oldWidget.appServerClient == widget.appServerClient &&
-        oldWidget.initialSavedProfile == widget.initialSavedProfile) {
+        oldWidget.initialSavedProfile == widget.initialSavedProfile &&
+        oldWidget.initialSavedConversationHandoff ==
+            widget.initialSavedConversationHandoff) {
       return;
     }
 
@@ -161,8 +170,10 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
   ChatSessionController _buildSessionController() {
     return ChatSessionController(
       profileStore: widget.profileStore,
+      conversationHandoffStore: widget.conversationHandoffStore,
       appServerClient: widget.appServerClient,
       initialSavedProfile: widget.initialSavedProfile,
+      initialSavedConversationHandoff: widget.initialSavedConversationHandoff,
     );
   }
 

@@ -134,6 +134,35 @@ void main() {
       },
     );
 
+    test(
+      'renders explicit thread ids when the remote session changes conversation identity',
+      () {
+        final contract = presenter.present(
+          isLoading: false,
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+          sessionState: CodexSessionState.initial(),
+          conversationRecoveryState: const ChatConversationRecoveryState(
+            reason: ChatConversationRecoveryReason.unexpectedRemoteConversation,
+            expectedThreadId: 'thread_old',
+            actualThreadId: 'thread_new',
+          ),
+          composerDraft: const ChatComposerDraft(text: 'Keep draft'),
+          transcriptFollow: _defaultTranscriptFollowContract,
+        );
+
+        expect(
+          contract.conversationRecoveryNotice?.title,
+          'Conversation identity changed.',
+        );
+        expect(
+          contract.conversationRecoveryNotice?.message,
+          'Pocket Relay expected thread "thread_old", but the remote session returned "thread_new". Sending is blocked because that would attach your draft to a different conversation.',
+        );
+        expect(contract.composer.isPrimaryActionEnabled, isFalse);
+      },
+    );
+
     test('projects ordered timeline summaries for workspace mode', () {
       final sessionState = CodexSessionState.initial().copyWith(
         rootThreadId: 'thread_root',

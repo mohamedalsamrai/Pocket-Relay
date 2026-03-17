@@ -236,7 +236,7 @@ void main() {
               process.sendStdout(<String, Object?>{
                 'id': message['id'],
                 'result': <String, Object?>{
-                  'thread': <String, Object?>{'id': 'thread_resumed'},
+                  'thread': <String, Object?>{'id': 'thread_old'},
                   'cwd': '/workspace',
                   'model': 'gpt-5.3-codex',
                   'modelProvider': 'openai',
@@ -270,6 +270,68 @@ void main() {
         'sandbox': 'workspace-write',
         'threadId': 'thread_old',
       });
+
+      await client.disconnect();
+    },
+  );
+
+  test(
+    'startSession surfaces thread/resume mismatches instead of accepting a different thread id',
+    () async {
+      late _FakeCodexAppServerProcess process;
+      process = _FakeCodexAppServerProcess(
+        onClientMessage: (message) {
+          switch (message['method']) {
+            case 'initialize':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'userAgent': 'codex-app-server-test',
+                },
+              });
+            case 'thread/resume':
+              process.sendStdout(<String, Object?>{
+                'id': message['id'],
+                'result': <String, Object?>{
+                  'thread': <String, Object?>{'id': 'thread_other'},
+                  'cwd': '/workspace',
+                  'model': 'gpt-5.3-codex',
+                  'modelProvider': 'openai',
+                  'approvalPolicy': 'on-request',
+                  'sandbox': <String, Object?>{'type': 'workspace-write'},
+                },
+              });
+          }
+        },
+      );
+
+      final client = CodexAppServerClient(
+        processLauncher:
+            ({required profile, required secrets, required emitEvent}) async =>
+                process,
+      );
+
+      await client.connect(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      await expectLater(
+        client.startSession(resumeThreadId: 'thread_old'),
+        throwsA(
+          isA<CodexAppServerException>()
+              .having(
+                (error) => error.message,
+                'message',
+                'thread/resume returned a different thread id than requested.',
+              )
+              .having((error) => error.data, 'data', <String, Object?>{
+                'expectedThreadId': 'thread_old',
+                'actualThreadId': 'thread_other',
+              }),
+        ),
+      );
+      expect(client.threadId, isNull);
 
       await client.disconnect();
     },

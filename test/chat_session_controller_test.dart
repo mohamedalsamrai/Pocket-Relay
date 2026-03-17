@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -41,6 +42,48 @@ void main() {
     expect(messageBlock.text, 'Hello controller');
     expect(messageBlock.deliveryState, CodexUserMessageDeliveryState.sent);
   });
+
+  test(
+    'sendPrompt resumes the saved conversation handoff after controller restart',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      final handoffStore = MemoryCodexConversationHandoffStore(
+        initialValue: const SavedConversationHandoff(
+          resumeThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        conversationHandoffStore: handoffStore,
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+        initialSavedConversationHandoff: const SavedConversationHandoff(
+          resumeThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Continue after restart'), isTrue);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentTurns, <({String threadId, String text})>[
+        (threadId: 'thread_saved', text: 'Continue after restart'),
+      ]);
+      expect(
+        await handoffStore.load(),
+        const SavedConversationHandoff(resumeThreadId: 'thread_saved'),
+      );
+    },
+  );
 
   test('invalid prompt submission emits snackbar feedback', () async {
     final appServerClient = FakeCodexAppServerClient();
@@ -256,6 +299,64 @@ void main() {
       expect(
         controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
         'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+      );
+    },
+  );
+
+  test(
+    'sendPrompt surfaces an explicit recovery state when thread/resume returns a different thread id',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..startSessionError = const CodexAppServerException(
+          'thread/resume returned a different thread id than requested.',
+          data: <String, Object?>{
+            'expectedThreadId': 'thread_old',
+            'actualThreadId': 'thread_new',
+          },
+        );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        conversationHandoffStore: MemoryCodexConversationHandoffStore(
+          initialValue: const SavedConversationHandoff(
+            resumeThreadId: 'thread_old',
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+        initialSavedConversationHandoff: const SavedConversationHandoff(
+          resumeThreadId: 'thread_old',
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final sent = await controller.sendPrompt('Second prompt');
+
+      expect(sent, isFalse);
+      expect(
+        controller.conversationRecoveryState?.reason,
+        ChatConversationRecoveryReason.unexpectedRemoteConversation,
+      );
+      expect(
+        controller.conversationRecoveryState?.expectedThreadId,
+        'thread_old',
+      );
+      expect(
+        controller.conversationRecoveryState?.actualThreadId,
+        'thread_new',
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
+        'Pocket Relay expected remote conversation "thread_old", but the remote session returned "thread_new". Sending is blocked to avoid attaching your draft to a different conversation.',
       );
     },
   );

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -655,6 +656,7 @@ Widget _buildAdapterApp({
       const ChatRootPlatformPolicy.allFlutter(),
   ChatRootRegionPolicy? regionPolicy,
   CodexProfileStore? profileStore,
+  CodexConversationHandoffStore? conversationHandoffStore,
   SavedProfile? savedProfile,
   ThemeData? theme,
 }) {
@@ -665,6 +667,8 @@ Widget _buildAdapterApp({
       profileStore:
           profileStore ??
           MemoryCodexProfileStore(initialValue: resolvedSavedProfile),
+      conversationHandoffStore:
+          conversationHandoffStore ?? MemoryCodexConversationHandoffStore(),
       appServerClient: appServerClient,
       initialSavedProfile: resolvedSavedProfile,
       platformPolicy: platformPolicy,

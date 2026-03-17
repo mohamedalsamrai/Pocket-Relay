@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';
@@ -15,8 +16,12 @@ import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_a
 class ChatSessionController extends ChangeNotifier {
   ChatSessionController({
     required this.profileStore,
+    this.conversationHandoffStore =
+        const DiscardingCodexConversationHandoffStore(),
     required this.appServerClient,
     SavedProfile? initialSavedProfile,
+    SavedConversationHandoff initialSavedConversationHandoff =
+        const SavedConversationHandoff(),
     TranscriptReducer reducer = const TranscriptReducer(),
     CodexRuntimeEventMapper? runtimeEventMapper,
   }) : _sessionReducer = reducer,
@@ -27,12 +32,14 @@ class ChatSessionController extends ChangeNotifier {
       _secrets = initial.secrets;
       _isLoading = false;
     }
+    _resumeThreadId = initialSavedConversationHandoff.normalizedResumeThreadId;
     _appServerEventSubscription = appServerClient.events.listen(
       _handleAppServerEvent,
     );
   }
 
   final CodexProfileStore profileStore;
+  final CodexConversationHandoffStore conversationHandoffStore;
   final CodexAppServerClient appServerClient;
 
   final TranscriptReducer _sessionReducer;
@@ -332,13 +339,16 @@ class ChatSessionController extends ChangeNotifier {
     }
 
     _sessionState = nextState;
+    _schedulePersistConversationHandoff();
     notifyListeners();
   }
 
   void _setConversationRecovery(ChatConversationRecoveryState nextState) {
     final currentState = _conversationRecoveryState;
     if (currentState?.reason == nextState.reason &&
-        currentState?.alternateThreadId == nextState.alternateThreadId) {
+        currentState?.alternateThreadId == nextState.alternateThreadId &&
+        currentState?.expectedThreadId == nextState.expectedThreadId &&
+        currentState?.actualThreadId == nextState.actualThreadId) {
       return;
     }
 
@@ -494,7 +504,23 @@ class ChatSessionController extends ChangeNotifier {
       );
       return true;
     } catch (error) {
+      final unexpectedConversationThread = _unexpectedConversationThread(error);
       final isMissingConversation = _isMissingConversationThreadError(error);
+      if (unexpectedConversationThread case (
+        expectedThreadId: final expectedThreadId,
+        actualThreadId: final actualThreadId,
+      )) {
+        _setConversationRecovery(
+          ChatConversationRecoveryState(
+            reason: ChatConversationRecoveryReason.unexpectedRemoteConversation,
+            alternateThreadId: _alternateRecoveryThreadId(
+              preferredThreadId: actualThreadId,
+            ),
+            expectedThreadId: expectedThreadId,
+            actualThreadId: actualThreadId,
+          ),
+        );
+      }
       if (isMissingConversation) {
         _setConversationRecovery(
           ChatConversationRecoveryState(
@@ -519,7 +545,8 @@ class ChatSessionController extends ChangeNotifier {
         error: error,
         runtimeErrorMessage: failure.runtimeErrorMessage,
         suppressRuntimeError: _sawTrackedSshBootstrapFailure,
-        suppressSnackBar: isMissingConversation,
+        suppressSnackBar:
+            isMissingConversation || unexpectedConversationThread != null,
       );
       return false;
     } finally {
@@ -531,12 +558,13 @@ class ChatSessionController extends ChangeNotifier {
   Future<String> _ensureAppServerThread() async {
     await _ensureAppServerConnected();
 
-    final resumeThreadId = _continuationThreadId();
-    if (resumeThreadId != null) {
-      _rememberContinuationThread(resumeThreadId);
-      return resumeThreadId;
+    final activeThreadId = _activeConversationThreadId();
+    if (activeThreadId != null) {
+      _rememberContinuationThread(activeThreadId);
+      return activeThreadId;
     }
 
+    final resumeThreadId = _resumeConversationThreadId();
     final session = await appServerClient.startSession(
       resumeThreadId: resumeThreadId,
     );
@@ -792,6 +820,21 @@ class ChatSessionController extends ChangeNotifier {
 
   ({String title, String message, String? runtimeErrorMessage})
   _sendFailurePresentation(Object error) {
+    if (_unexpectedConversationThread(error) case (
+      expectedThreadId: final expectedThreadId,
+      actualThreadId: final actualThreadId,
+    )) {
+      final message =
+          'Pocket Relay expected remote conversation "$expectedThreadId", '
+          'but the remote session returned "$actualThreadId". Sending is '
+          'blocked to avoid attaching your draft to a different conversation.';
+      return (
+        title: 'Conversation changed',
+        message: message,
+        runtimeErrorMessage: message,
+      );
+    }
+
     if (_isMissingConversationThreadError(error)) {
       const message =
           'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.';
@@ -826,13 +869,20 @@ class ChatSessionController extends ChangeNotifier {
     _snackBarMessagesController.add(message);
   }
 
-  String? _continuationThreadId() {
+  String? _activeConversationThreadId() {
     if (_profile.ephemeralSession) {
       return null;
     }
 
-    return _normalizedThreadId(_sessionState.effectiveRootThreadId) ??
-        _normalizedThreadId(_resumeThreadId);
+    return _normalizedThreadId(_sessionState.effectiveRootThreadId);
+  }
+
+  String? _resumeConversationThreadId() {
+    if (_profile.ephemeralSession) {
+      return null;
+    }
+
+    return _normalizedThreadId(_resumeThreadId);
   }
 
   String? _trackedThreadReuseCandidate() {
@@ -846,7 +896,8 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   ChatConversationRecoveryState? _preflightConversationRecoveryState() {
-    if (_continuationThreadId() != null) {
+    if (_activeConversationThreadId() != null ||
+        _resumeConversationThreadId() != null) {
       return null;
     }
 
@@ -904,11 +955,13 @@ class ChatSessionController extends ChangeNotifier {
 
     _resumeThreadId = normalizedThreadId;
     _suppressTrackedThreadReuse = false;
+    _schedulePersistConversationHandoff();
   }
 
   void _clearContinuationThread() {
     _resumeThreadId = null;
     _suppressTrackedThreadReuse = true;
+    _schedulePersistConversationHandoff();
   }
 
   String? _normalizedThreadId(String? value) {
@@ -932,6 +985,48 @@ class ChatSessionController extends ChangeNotifier {
       'unknown thread',
       'does not exist',
     ].any(normalizedMessage.contains);
+  }
+
+  ({String expectedThreadId, String actualThreadId})?
+  _unexpectedConversationThread(Object error) {
+    if (error is! CodexAppServerException) {
+      return null;
+    }
+
+    final payload = _asObject(error.data);
+    final expectedThreadId = _normalizedThreadId(
+      _asString(payload?['expectedThreadId']),
+    );
+    final actualThreadId = _normalizedThreadId(
+      _asString(payload?['actualThreadId']),
+    );
+    if (expectedThreadId == null || actualThreadId == null) {
+      return null;
+    }
+
+    return (expectedThreadId: expectedThreadId, actualThreadId: actualThreadId);
+  }
+
+  void _schedulePersistConversationHandoff() {
+    if (_isDisposed) {
+      return;
+    }
+
+    final handoff = SavedConversationHandoff(
+      resumeThreadId:
+          _activeConversationThreadId() ?? _resumeConversationThreadId(),
+    );
+    unawaited(_persistConversationHandoff(handoff));
+  }
+
+  Future<void> _persistConversationHandoff(
+    SavedConversationHandoff handoff,
+  ) async {
+    try {
+      await conversationHandoffStore.save(handoff);
+    } catch (_) {
+      // Conversation handoff persistence must not break the active session.
+    }
   }
 
   static Map<String, dynamic>? _asObject(Object? value) {

@@ -46,15 +46,17 @@ class CodexAppServerRequestApi {
     final response = await connection.sendRequest(method, params);
 
     final payload = _requireObject(response, '$method response');
-    final thread = _asThread(
-      payload['thread'],
-      fallbackThreadId: payload['threadId'],
-    );
-    final threadId = thread?.id ?? '';
+    final thread = _requireThread(payload['thread'], '$method response');
+    final threadId = thread.id;
 
-    if (threadId.isEmpty) {
+    if (effectiveResumeThreadId != null &&
+        threadId != effectiveResumeThreadId) {
       throw CodexAppServerException(
-        '$method response did not include a thread id.',
+        'thread/resume returned a different thread id than requested.',
+        data: <String, Object?>{
+          'expectedThreadId': effectiveResumeThreadId,
+          'actualThreadId': threadId,
+        },
       );
     }
 
@@ -315,6 +317,14 @@ class CodexAppServerRequestApi {
 
   static String? _asString(Object? value) {
     return value is String ? value : null;
+  }
+
+  static CodexAppServerThread _requireThread(Object? value, String label) {
+    final thread = _asThread(value);
+    if (thread == null) {
+      throw CodexAppServerException('$label did not include a thread object.');
+    }
+    return thread;
   }
 
   static CodexAppServerThread? _asThread(

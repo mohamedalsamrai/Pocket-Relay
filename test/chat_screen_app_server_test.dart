@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 
@@ -211,6 +212,54 @@ void main() {
         'First prompt',
         'Second prompt',
       ]);
+    },
+  );
+
+  testWidgets(
+    'shows an explicit thread-mismatch recovery notice when resume returns a different conversation',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..startSessionError = const CodexAppServerException(
+          'thread/resume returned a different thread id than requested.',
+          data: <String, Object?>{
+            'expectedThreadId': 'thread_old',
+            'actualThreadId': 'thread_new',
+          },
+        );
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          conversationHandoffStore: MemoryCodexConversationHandoffStore(
+            initialValue: const SavedConversationHandoff(
+              resumeThreadId: 'thread_old',
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final composerField = find.byType(TextField).first;
+      await tester.enterText(composerField, 'Resume the old work');
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Conversation identity changed.'), findsOneWidget);
+      expect(find.textContaining('"thread_old"'), findsWidgets);
+      expect(find.textContaining('"thread_new"'), findsWidgets);
+      expect(
+        tester.widget<TextField>(composerField).controller?.text,
+        'Resume the old work',
+      );
+      expect(appServerClient.sentMessages, isEmpty);
     },
   );
 

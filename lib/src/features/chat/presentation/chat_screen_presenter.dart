@@ -186,6 +186,15 @@ class ChatScreenPresenter {
               'This transcript is no longer linked to the active remote conversation. Sending now would switch context without the earlier history. Your draft is preserved below.',
           actions: actions,
         ),
+      ChatConversationRecoveryReason.unexpectedRemoteConversation =>
+        ChatConversationRecoveryNoticeContract(
+          title: 'Conversation identity changed.',
+          message:
+              'Pocket Relay expected thread "${recoveryState.expectedThreadId ?? 'unknown'}", '
+              'but the remote session returned "${recoveryState.actualThreadId ?? 'unknown'}". '
+              'Sending is blocked because that would attach your draft to a different conversation.',
+          actions: actions,
+        ),
     };
   }
 }
