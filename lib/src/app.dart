@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
@@ -12,10 +13,16 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.da
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 
 class PocketRelayApp extends StatefulWidget {
-  const PocketRelayApp({super.key, this.profileStore, this.appServerClient});
+  const PocketRelayApp({
+    super.key,
+    this.profileStore,
+    this.appServerClient,
+    this.displayWakeLockController,
+  });
 
   final CodexProfileStore? profileStore;
   final CodexAppServerClient? appServerClient;
+  final DisplayWakeLockController? displayWakeLockController;
 
   @override
   State<PocketRelayApp> createState() => _PocketRelayAppState();
@@ -108,11 +115,16 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
       theme: buildPocketTheme(Brightness.light),
       darkTheme: buildPocketTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: _PocketRelayHome(
-        savedProfile: savedProfile,
-        profileStore: _profileStore,
-        appServerClient: _appServerClient,
-        platformPolicy: platformPolicy,
+      home: DisplayWakeLockHost(
+        displayWakeLockController:
+            widget.displayWakeLockController ??
+            const WakelockPlusDisplayWakeLockController(),
+        child: _PocketRelayHome(
+          savedProfile: savedProfile,
+          profileStore: _profileStore,
+          appServerClient: _appServerClient,
+          platformPolicy: platformPolicy,
+        ),
       ),
     );
   }
