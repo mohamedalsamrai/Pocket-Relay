@@ -15,6 +15,8 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_ch
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
+import 'support/fake_codex_app_server_client.dart';
+
 void main() {
   testWidgets(
     'enables the display wake lock for the top-level app shell',
@@ -161,6 +163,24 @@ void main() {
 
     expect(app.themeMode, ThemeMode.system);
   });
+
+  testWidgets(
+    'disposes the active lane when the top-level app shell unmounts',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        _buildCatalogApp(appServerClient: appServerClient),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(appServerClient.disconnectCalls, 1);
+    },
+  );
 
   testWidgets(
     'presents top-level menu actions through the shared popup menu by default on iOS',

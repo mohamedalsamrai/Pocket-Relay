@@ -16,6 +16,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_de
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_empty_state.dart';
@@ -733,6 +734,51 @@ void main() {
     );
     expect(secondClient.sentMessages, isEmpty);
   });
+
+  testWidgets(
+    'keeps lane runtime alive when the adapter unmounts and remounts with the same binding',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      final overlayDelegate = _FakeChatRootOverlayDelegate();
+      final laneBinding = _buildLaneBinding(
+        appServerClient: appServerClient,
+        savedProfile: _savedProfile(),
+      );
+      addTearDown(appServerClient.close);
+      addTearDown(laneBinding.dispose);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          laneBinding: laneBinding,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'Persistent draft');
+      await tester.pump();
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pump();
+
+      expect(appServerClient.disconnectCalls, 0);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          laneBinding: laneBinding,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+        'Persistent draft',
+      );
+    },
+  );
 }
 
 Widget _buildAdapterApp({
@@ -743,12 +789,12 @@ Widget _buildAdapterApp({
   PocketPlatformPolicy? platformPolicy,
   ChatRootRegionPolicy regionPolicy = const ChatRootRegionPolicy.allFlutter(),
   PocketPlatformBehavior? platformBehavior,
+  ConnectionLaneBinding? laneBinding,
   CodexProfileStore? profileStore,
   CodexConversationHandoffStore? conversationHandoffStore,
   SavedProfile? savedProfile,
   ThemeData? theme,
 }) {
-  final resolvedSavedProfile = savedProfile ?? _savedProfile();
   final resolvedPlatformPolicy =
       platformPolicy ??
       PocketPlatformPolicy(
@@ -757,18 +803,42 @@ Widget _buildAdapterApp({
       );
   return MaterialApp(
     theme: theme ?? buildPocketTheme(Brightness.light),
-    home: ChatRootAdapter(
-      profileStore:
-          profileStore ??
-          MemoryCodexProfileStore(initialValue: resolvedSavedProfile),
-      conversationHandoffStore:
-          conversationHandoffStore ?? MemoryCodexConversationHandoffStore(),
+    home: _ChatRootAdapterHarness(
+      laneBinding: laneBinding,
       appServerClient: appServerClient,
-      initialSavedProfile: resolvedSavedProfile,
+      profileStore: profileStore,
+      conversationHandoffStore: conversationHandoffStore,
+      savedProfile: savedProfile ?? _savedProfile(),
       platformPolicy: resolvedPlatformPolicy,
       overlayDelegate: overlayDelegate,
       rendererDelegate: rendererDelegate,
     ),
+  );
+}
+
+ConnectionLaneBinding _buildLaneBinding({
+  required FakeCodexAppServerClient appServerClient,
+  required SavedProfile savedProfile,
+  CodexProfileStore? profileStore,
+  CodexConversationHandoffStore? conversationHandoffStore,
+  PocketPlatformPolicy? platformPolicy,
+}) {
+  final resolvedPlatformPolicy =
+      platformPolicy ??
+      PocketPlatformPolicy(
+        behavior: PocketPlatformBehavior.resolve(),
+        regionPolicy: const ChatRootRegionPolicy.allFlutter(),
+      );
+  return ConnectionLaneBinding(
+    connectionId: 'conn_primary',
+    profileStore:
+        profileStore ?? MemoryCodexProfileStore(initialValue: savedProfile),
+    conversationHandoffStore:
+        conversationHandoffStore ?? MemoryCodexConversationHandoffStore(),
+    appServerClient: appServerClient,
+    initialSavedProfile: savedProfile,
+    supportsLocalConnectionMode:
+        resolvedPlatformPolicy.supportsLocalConnectionMode,
   );
 }
 
@@ -837,6 +907,99 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
   }) {
     transientFeedbackMessages.add(message);
     transientFeedbackRenderers.add(renderer);
+  }
+}
+
+class _ChatRootAdapterHarness extends StatefulWidget {
+  const _ChatRootAdapterHarness({
+    required this.appServerClient,
+    required this.savedProfile,
+    required this.platformPolicy,
+    required this.overlayDelegate,
+    required this.rendererDelegate,
+    this.laneBinding,
+    this.profileStore,
+    this.conversationHandoffStore,
+  });
+
+  final FakeCodexAppServerClient appServerClient;
+  final SavedProfile savedProfile;
+  final PocketPlatformPolicy platformPolicy;
+  final ChatRootOverlayDelegate overlayDelegate;
+  final ChatRootRendererDelegate rendererDelegate;
+  final ConnectionLaneBinding? laneBinding;
+  final CodexProfileStore? profileStore;
+  final CodexConversationHandoffStore? conversationHandoffStore;
+
+  bool get _usesExternalBinding => laneBinding != null;
+
+  @override
+  State<_ChatRootAdapterHarness> createState() =>
+      _ChatRootAdapterHarnessState();
+}
+
+class _ChatRootAdapterHarnessState extends State<_ChatRootAdapterHarness> {
+  ConnectionLaneBinding? _ownedLaneBinding;
+
+  @override
+  void initState() {
+    super.initState();
+    _rebindOwnedLaneBindingIfNeeded(force: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatRootAdapterHarness oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _rebindOwnedLaneBindingIfNeeded(
+      force:
+          oldWidget.laneBinding != widget.laneBinding ||
+          oldWidget.appServerClient != widget.appServerClient ||
+          oldWidget.profileStore != widget.profileStore ||
+          oldWidget.conversationHandoffStore !=
+              widget.conversationHandoffStore ||
+          oldWidget.savedProfile != widget.savedProfile ||
+          oldWidget.platformPolicy != widget.platformPolicy,
+    );
+  }
+
+  @override
+  void dispose() {
+    _ownedLaneBinding?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChatRootAdapter(
+      laneBinding: widget.laneBinding ?? _ownedLaneBinding!,
+      platformPolicy: widget.platformPolicy,
+      overlayDelegate: widget.overlayDelegate,
+      rendererDelegate: widget.rendererDelegate,
+    );
+  }
+
+  void _rebindOwnedLaneBindingIfNeeded({required bool force}) {
+    if (!force) {
+      return;
+    }
+
+    if (widget._usesExternalBinding) {
+      final previousLaneBinding = _ownedLaneBinding;
+      _ownedLaneBinding = null;
+      previousLaneBinding?.dispose();
+      return;
+    }
+
+    final nextLaneBinding = _buildLaneBinding(
+      appServerClient: widget.appServerClient,
+      profileStore: widget.profileStore,
+      conversationHandoffStore: widget.conversationHandoffStore,
+      savedProfile: widget.savedProfile,
+      platformPolicy: widget.platformPolicy,
+    );
+    final previousLaneBinding = _ownedLaneBinding;
+    _ownedLaneBinding = nextLaneBinding;
+    previousLaneBinding?.dispose();
   }
 }
 

@@ -3,12 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
-import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
@@ -17,29 +12,20 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.d
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_host.dart';
+import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
     super.key,
-    required this.profileStore,
-    this.conversationHandoffStore =
-        const DiscardingCodexConversationHandoffStore(),
-    required this.appServerClient,
-    this.initialSavedProfile,
-    this.initialSavedConversationHandoff = const SavedConversationHandoff(),
+    required this.laneBinding,
     required this.platformPolicy,
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
     this.rendererDelegate = const FlutterChatRootRendererDelegate(),
   });
 
-  final CodexProfileStore profileStore;
-  final CodexConversationHandoffStore conversationHandoffStore;
-  final CodexAppServerClient appServerClient;
-  final SavedProfile? initialSavedProfile;
-  final SavedConversationHandoff initialSavedConversationHandoff;
+  final ConnectionLaneBinding laneBinding;
   final PocketPlatformPolicy platformPolicy;
   final ChatRootOverlayDelegate overlayDelegate;
   final ChatRootRendererDelegate rendererDelegate;
@@ -49,60 +35,44 @@ class ChatRootAdapter extends StatefulWidget {
 }
 
 class _ChatRootAdapterState extends State<ChatRootAdapter> {
-  final _composerDraftHost = ChatComposerDraftHost();
-  final _transcriptFollowHost = ChatTranscriptFollowHost();
   final _effectMapper = const ChatScreenEffectMapper();
   final _screenPresenter = const ChatScreenPresenter();
-  late ChatSessionController _sessionController;
   StreamSubscription<ChatScreenEffect>? _screenEffectSubscription;
   ConnectionMode? _preferredEmptyStateConnectionMode;
 
   @override
   void initState() {
     super.initState();
-    _sessionController = _buildSessionController();
     _bindScreenEffects();
-    unawaited(_sessionController.initialize());
   }
 
   @override
   void didUpdateWidget(covariant ChatRootAdapter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profileStore == widget.profileStore &&
-        oldWidget.conversationHandoffStore == widget.conversationHandoffStore &&
-        oldWidget.appServerClient == widget.appServerClient &&
-        oldWidget.initialSavedProfile == widget.initialSavedProfile &&
-        oldWidget.initialSavedConversationHandoff ==
-            widget.initialSavedConversationHandoff) {
+    if (oldWidget.laneBinding == widget.laneBinding) {
       return;
     }
 
     _screenEffectSubscription?.cancel();
-    _sessionController.dispose();
-    _sessionController = _buildSessionController();
     _preferredEmptyStateConnectionMode = null;
-    _composerDraftHost.reset();
-    _transcriptFollowHost.reset();
     _bindScreenEffects();
-    unawaited(_sessionController.initialize());
   }
 
   @override
   void dispose() {
     _screenEffectSubscription?.cancel();
-    _sessionController.dispose();
-    _transcriptFollowHost.dispose();
-    _composerDraftHost.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final laneBinding = widget.laneBinding;
+
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[
-        _sessionController,
-        _composerDraftHost,
-        _transcriptFollowHost,
+        laneBinding.sessionController,
+        laneBinding.composerDraftHost,
+        laneBinding.transcriptFollowHost,
       ]),
       builder: (context, _) {
         final screen = _buildScreenContract();
@@ -116,6 +86,12 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
           onStopActiveTurn: _stopActiveTurn,
         );
       },
+    );
+  }
+
+  void _bindScreenEffects() {
+    _screenEffectSubscription = widget.laneBinding.screenEffects.listen(
+      _handleScreenEffect,
     );
   }
 
@@ -134,25 +110,28 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     ChatScreenContract screen,
     ChatRootRegionPolicy regionPolicy,
   ) {
+    final laneBinding = widget.laneBinding;
+    final sessionController = laneBinding.sessionController;
+
     return widget.rendererDelegate.buildTranscriptRegion(
       renderer: regionPolicy.rendererFor(ChatRootRegion.transcript),
       emptyStateRenderer: _emptyStateRendererFor(regionPolicy),
       screen: screen,
-      surfaceChangeToken: _sessionController.sessionState,
+      surfaceChangeToken: sessionController.sessionState,
       platformBehavior: widget.platformPolicy.behavior,
       onScreenAction: (action) => _handleScreenAction(action, screen),
-      onSelectTimeline: _sessionController.selectTimeline,
+      onSelectTimeline: sessionController.selectTimeline,
       onSelectConnectionMode: _selectConnectionMode,
       onAutoFollowEligibilityChanged: (isNearBottom) {
-        _transcriptFollowHost.updateAutoFollowEligibility(
+        laneBinding.transcriptFollowHost.updateAutoFollowEligibility(
           isNearBottom: isNearBottom,
         );
       },
-      onApproveRequest: _sessionController.approveRequest,
-      onDenyRequest: _sessionController.denyRequest,
+      onApproveRequest: sessionController.approveRequest,
+      onDenyRequest: sessionController.denyRequest,
       onOpenChangedFileDiff: _requestChangedFileDiff,
-      onSubmitUserInput: _sessionController.submitUserInput,
-      onSaveHostFingerprint: _sessionController.saveObservedHostFingerprint,
+      onSubmitUserInput: sessionController.submitUserInput,
+      onSaveHostFingerprint: sessionController.saveObservedHostFingerprint,
     );
   }
 
@@ -165,39 +144,24 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       platformBehavior: widget.platformPolicy.behavior,
       conversationRecoveryNotice: screen.conversationRecoveryNotice,
       composer: screen.composer,
-      onComposerDraftChanged: _composerDraftHost.updateText,
+      onComposerDraftChanged: widget.laneBinding.composerDraftHost.updateText,
       onSendPrompt: _sendPrompt,
       onConversationRecoveryAction: _handleConversationRecoveryAction,
     );
   }
 
-  ChatSessionController _buildSessionController() {
-    return ChatSessionController(
-      profileStore: widget.profileStore,
-      conversationHandoffStore: widget.conversationHandoffStore,
-      appServerClient: widget.appServerClient,
-      initialSavedProfile: widget.initialSavedProfile,
-      initialSavedConversationHandoff: widget.initialSavedConversationHandoff,
-      supportsLocalConnectionMode:
-          widget.platformPolicy.supportsLocalConnectionMode,
-    );
-  }
-
-  void _bindScreenEffects() {
-    _screenEffectSubscription = _sessionController.snackBarMessages
-        .map(_effectMapper.mapSnackBarMessage)
-        .listen(_handleScreenEffect);
-  }
-
   ChatScreenContract _buildScreenContract() {
+    final laneBinding = widget.laneBinding;
+    final sessionController = laneBinding.sessionController;
+
     return _screenPresenter.present(
-      isLoading: _sessionController.isLoading,
-      profile: _sessionController.profile,
-      secrets: _sessionController.secrets,
-      sessionState: _sessionController.sessionState,
-      conversationRecoveryState: _sessionController.conversationRecoveryState,
-      composerDraft: _composerDraftHost.draft,
-      transcriptFollow: _transcriptFollowHost.contract,
+      isLoading: sessionController.isLoading,
+      profile: sessionController.profile,
+      secrets: sessionController.secrets,
+      sessionState: sessionController.sessionState,
+      conversationRecoveryState: sessionController.conversationRecoveryState,
+      composerDraft: laneBinding.composerDraftHost.draft,
+      transcriptFollow: laneBinding.transcriptFollowHost.contract,
       preferredConnectionMode: _preferredEmptyStateConnectionMode,
     );
   }
@@ -209,7 +173,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       return;
     }
 
-    final controller = _sessionController;
+    final laneBinding = widget.laneBinding;
+    final controller = laneBinding.sessionController;
     final overlayDelegate = widget.overlayDelegate;
     final settingsRenderer = widget.platformPolicy.regionPolicy.rendererFor(
       ChatRootRegion.settingsOverlay,
@@ -233,7 +198,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     final result = await openSettingsResult;
 
     if (!mounted ||
-        controller != _sessionController ||
+        laneBinding != widget.laneBinding ||
         overlayDelegate != widget.overlayDelegate ||
         settingsRenderer !=
             widget.platformPolicy.regionPolicy.rendererFor(
@@ -246,7 +211,6 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     final connectionChanged =
         result.profile != controller.profile ||
         result.secrets != controller.secrets;
-
     if (!connectionChanged) {
       return;
     }
@@ -255,7 +219,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       profile: result.profile,
       secrets: result.secrets,
     );
-    if (mounted) {
+    if (mounted && laneBinding == widget.laneBinding) {
       setState(() {
         _preferredEmptyStateConnectionMode = null;
       });
@@ -298,36 +262,37 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
   }
 
   Future<void> _sendPrompt() async {
-    final controller = _sessionController;
-    final sent = await controller.sendPrompt(_composerDraftHost.draft.text);
-    if (!mounted || controller != _sessionController || !sent) {
+    final laneBinding = widget.laneBinding;
+    final controller = laneBinding.sessionController;
+    final sent = await controller.sendPrompt(
+      laneBinding.composerDraftHost.draft.text,
+    );
+    if (!mounted || laneBinding != widget.laneBinding || !sent) {
       return;
     }
 
-    if (sent) {
-      _transcriptFollowHost.requestFollow(
-        source: ChatTranscriptFollowRequestSource.sendPrompt,
-      );
-      _composerDraftHost.clear();
-    }
+    laneBinding.transcriptFollowHost.requestFollow(
+      source: ChatTranscriptFollowRequestSource.sendPrompt,
+    );
+    laneBinding.composerDraftHost.clear();
   }
 
   Future<void> _stopActiveTurn() async {
-    await _sessionController.stopActiveTurn();
+    await widget.laneBinding.sessionController.stopActiveTurn();
   }
 
   void _startFreshConversation() {
-    _transcriptFollowHost.requestFollow(
+    widget.laneBinding.transcriptFollowHost.requestFollow(
       source: ChatTranscriptFollowRequestSource.newThread,
     );
-    _sessionController.startFreshConversation();
+    widget.laneBinding.sessionController.startFreshConversation();
   }
 
   void _clearTranscript() {
-    _transcriptFollowHost.requestFollow(
+    widget.laneBinding.transcriptFollowHost.requestFollow(
       source: ChatTranscriptFollowRequestSource.clearTranscript,
     );
-    _sessionController.clearTranscript();
+    widget.laneBinding.sessionController.clearTranscript();
   }
 
   void _handleConversationRecoveryAction(
@@ -337,7 +302,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       case ChatConversationRecoveryActionId.startFreshConversation:
         _startFreshConversation();
       case ChatConversationRecoveryActionId.openAlternateSession:
-        _sessionController.openConversationRecoveryAlternateSession();
+        widget.laneBinding.sessionController
+            .openConversationRecoveryAlternateSession();
     }
   }
 
