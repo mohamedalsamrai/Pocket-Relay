@@ -1,0 +1,330 @@
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late SharedPreferencesAsyncPlatform? originalAsyncPlatform;
+
+  setUp(() {
+    originalAsyncPlatform = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
+  tearDown(() {
+    SharedPreferencesAsyncPlatform.instance = originalAsyncPlatform;
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
+  test(
+    'loadCatalog seeds a default saved connection when storage is empty',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        catalog.connectionsById['conn_seed'],
+        SavedConnectionSummary(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+        ),
+      );
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(
+        await preferences.getString('pocket_relay.connections.index'),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_seed'],
+        }),
+      );
+      expect(
+        await preferences.getString(
+          'pocket_relay.connection.conn_seed.profile',
+        ),
+        jsonEncode(ConnectionProfile.defaults().toJson()),
+      );
+      expect(secureStorage.data, isEmpty);
+    },
+  );
+
+  test(
+    'loadCatalog migrates legacy singleton profile data into a catalog entry',
+    () async {
+      final profile = ConnectionProfile.defaults().copyWith(
+        host: 'example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'codex_pocket.profile': jsonEncode(profile.toJson()),
+        'pocket_relay.preferences': jsonEncode(<String, Object>{
+          'themeMode': 'dark',
+        }),
+      });
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'codex_pocket.secret.password': 'secret',
+      });
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_migrated',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_migrated');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_migrated']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_migrated',
+          profile: profile,
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      expect(
+        await preferences.getString(
+          'pocket_relay.connection.conn_migrated.profile',
+        ),
+        jsonEncode(profile.toJson()),
+      );
+      expect(
+        secureStorage
+            .data['pocket_relay.connection.conn_migrated.secret.password'],
+        'secret',
+      );
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+      expect(
+        await preferences.getString('pocket_relay.connections.index'),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_migrated'],
+        }),
+      );
+    },
+  );
+
+  test(
+    'saveConnection appends a new saved connection to the catalog',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      await repository.loadCatalog();
+      await repository.saveConnection(
+        SavedConnection(
+          id: 'conn_second',
+          profile: ConnectionProfile.defaults().copyWith(
+            label: 'Second Box',
+            host: 'second.example.com',
+            username: 'vince',
+          ),
+          secrets: const ConnectionSecrets(
+            password: 'second-secret',
+            privateKeyPem: 'pem',
+          ),
+        ),
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_second');
+
+      expect(catalog.orderedConnectionIds, <String>[
+        'conn_seed',
+        'conn_second',
+      ]);
+      expect(connection.profile.label, 'Second Box');
+      expect(connection.profile.host, 'second.example.com');
+      expect(connection.secrets.password, 'second-secret');
+      expect(connection.secrets.privateKeyPem, 'pem');
+    },
+  );
+
+  test(
+    'loadCatalog rebuilds the index from namespaced profile keys when the index is missing',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.connection.conn_b.profile',
+        jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                label: 'Beta',
+                host: 'beta.example.com',
+                username: 'vince',
+              )
+              .toJson(),
+        ),
+      );
+      await preferences.setString(
+        'pocket_relay.connection.conn_a.profile',
+        jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                label: 'Alpha',
+                host: 'alpha.example.com',
+                username: 'vince',
+              )
+              .toJson(),
+        ),
+      );
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: _FakeFlutterSecureStorage(<String, String>{}),
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final catalog = await repository.loadCatalog();
+
+      expect(catalog.orderedConnectionIds, <String>['conn_a', 'conn_b']);
+      expect(
+        await preferences.getString('pocket_relay.connections.index'),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_a', 'conn_b'],
+        }),
+      );
+    },
+  );
+
+  test('deleteConnection removes only the targeted connection keys', () async {
+    final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+    final preferences = SharedPreferencesAsync();
+    final repository = SecureCodexConnectionRepository(
+      secureStorage: secureStorage,
+      preferences: preferences,
+      connectionIdGenerator: () => 'conn_seed',
+    );
+
+    await repository.loadCatalog();
+    await repository.saveConnection(
+      SavedConnection(
+        id: 'conn_second',
+        profile: ConnectionProfile.defaults().copyWith(
+          host: 'second.example.com',
+          username: 'vince',
+        ),
+        secrets: const ConnectionSecrets(password: 'second-secret'),
+      ),
+    );
+    secureStorage
+            .data['pocket_relay.connection.conn_second.secret.extra_token'] =
+        'cleanup-me';
+
+    await repository.deleteConnection('conn_second');
+
+    final catalog = await repository.loadCatalog();
+    final secureKeys = secureStorage.data.keys.toList(growable: false);
+
+    expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+    expect(
+      await preferences.getString(
+        'pocket_relay.connection.conn_second.profile',
+      ),
+      isNull,
+    );
+    expect(
+      secureKeys.where(
+        (key) => key.startsWith('pocket_relay.connection.conn_second.'),
+      ),
+      isEmpty,
+    );
+    expect(
+      await preferences.getString('pocket_relay.connection.conn_seed.profile'),
+      isNotNull,
+    );
+  });
+}
+
+class _FakeFlutterSecureStorage extends FlutterSecureStorage {
+  _FakeFlutterSecureStorage(this.data);
+
+  final Map<String, String> data;
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      data.remove(key);
+      return;
+    }
+    data[key] = value;
+  }
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return data[key];
+  }
+
+  @override
+  Future<Map<String, String>> readAll({
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    return Map<String, String>.from(data);
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    data.remove(key);
+  }
+}

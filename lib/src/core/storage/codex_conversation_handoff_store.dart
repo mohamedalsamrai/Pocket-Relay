@@ -1,7 +1,8 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences/util/legacy_to_async_migration_util.dart';
+
+import 'shared_preferences_async_migration.dart';
 
 class SavedConversationHandoff {
   const SavedConversationHandoff({this.resumeThreadId});
@@ -134,10 +135,7 @@ class SecureCodexConversationHandoffStore
   }
 
   Future<void> _migrateLegacyPreferencesIfNeeded() async {
-    final legacyPreferences = await SharedPreferences.getInstance();
-    await migrateLegacySharedPreferencesToSharedPreferencesAsyncIfNecessary(
-      legacySharedPreferencesInstance: legacyPreferences,
-      sharedPreferencesAsyncOptions: const SharedPreferencesOptions(),
+    await ensureSharedPreferencesAsyncReady(
       migrationCompletedKey: _preferencesMigrationKey,
     );
   }

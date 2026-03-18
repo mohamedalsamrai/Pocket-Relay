@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum AuthMode { password, privateKey }
 
 enum ConnectionMode { remote, local }
@@ -214,6 +216,135 @@ class SavedProfile {
       secrets: secrets ?? this.secrets,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SavedProfile &&
+        other.profile == profile &&
+        other.secrets == secrets;
+  }
+
+  @override
+  int get hashCode => Object.hash(profile, secrets);
+}
+
+class SavedConnectionSummary {
+  const SavedConnectionSummary({required this.id, required this.profile});
+
+  final String id;
+  final ConnectionProfile profile;
+
+  SavedConnectionSummary copyWith({String? id, ConnectionProfile? profile}) {
+    return SavedConnectionSummary(
+      id: id ?? this.id,
+      profile: profile ?? this.profile,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SavedConnectionSummary &&
+        other.id == id &&
+        other.profile == profile;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, profile);
+}
+
+class SavedConnection {
+  const SavedConnection({
+    required this.id,
+    required this.profile,
+    required this.secrets,
+  });
+
+  final String id;
+  final ConnectionProfile profile;
+  final ConnectionSecrets secrets;
+
+  SavedConnection copyWith({
+    String? id,
+    ConnectionProfile? profile,
+    ConnectionSecrets? secrets,
+  }) {
+    return SavedConnection(
+      id: id ?? this.id,
+      profile: profile ?? this.profile,
+      secrets: secrets ?? this.secrets,
+    );
+  }
+
+  SavedConnectionSummary toSummary() {
+    return SavedConnectionSummary(id: id, profile: profile);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SavedConnection &&
+        other.id == id &&
+        other.profile == profile &&
+        other.secrets == secrets;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, profile, secrets);
+}
+
+class ConnectionCatalogState {
+  const ConnectionCatalogState({
+    required this.orderedConnectionIds,
+    required this.connectionsById,
+  });
+
+  const ConnectionCatalogState.empty()
+    : orderedConnectionIds = const <String>[],
+      connectionsById = const <String, SavedConnectionSummary>{};
+
+  final List<String> orderedConnectionIds;
+  final Map<String, SavedConnectionSummary> connectionsById;
+
+  bool get isEmpty => orderedConnectionIds.isEmpty;
+  bool get isNotEmpty => orderedConnectionIds.isNotEmpty;
+  int get length => orderedConnectionIds.length;
+
+  SavedConnectionSummary? connectionForId(String connectionId) {
+    return connectionsById[connectionId];
+  }
+
+  List<SavedConnectionSummary> get orderedConnections {
+    return <SavedConnectionSummary>[
+      for (final connectionId in orderedConnectionIds)
+        if (connectionsById[connectionId] case final summary?) summary,
+    ];
+  }
+
+  ConnectionCatalogState copyWith({
+    List<String>? orderedConnectionIds,
+    Map<String, SavedConnectionSummary>? connectionsById,
+  }) {
+    return ConnectionCatalogState(
+      orderedConnectionIds: orderedConnectionIds ?? this.orderedConnectionIds,
+      connectionsById: connectionsById ?? this.connectionsById,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ConnectionCatalogState &&
+        listEquals(other.orderedConnectionIds, orderedConnectionIds) &&
+        mapEquals(other.connectionsById, connectionsById);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(orderedConnectionIds),
+    Object.hashAll(
+      connectionsById.entries.map<Object>(
+        (entry) => Object.hash(entry.key, entry.value),
+      ),
+    ),
+  );
 }
 
 AuthMode _authModeFromName(String? value, {required AuthMode fallback}) {

@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences/util/legacy_to_async_migration_util.dart';
+
+import 'shared_preferences_async_migration.dart';
 
 abstract class CodexProfileStore {
   Future<SavedProfile> load();
@@ -138,10 +139,7 @@ class SecureCodexProfileStore implements CodexProfileStore {
   }
 
   Future<void> _migrateLegacyPreferencesIfNeeded() async {
-    final legacyPreferences = await SharedPreferences.getInstance();
-    await migrateLegacySharedPreferencesToSharedPreferencesAsyncIfNecessary(
-      legacySharedPreferencesInstance: legacyPreferences,
-      sharedPreferencesAsyncOptions: const SharedPreferencesOptions(),
+    await ensureSharedPreferencesAsyncReady(
       migrationCompletedKey: _preferencesMigrationKey,
     );
   }
