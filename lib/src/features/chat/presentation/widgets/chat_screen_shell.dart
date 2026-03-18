@@ -32,12 +32,14 @@ class ChatScreenBody extends StatelessWidget {
     required this.transcriptRegion,
     required this.composerRegion,
     required this.loadingIndicator,
+    required this.onStopActiveTurn,
   });
 
   final ChatScreenContract screen;
   final Widget transcriptRegion;
   final Widget composerRegion;
   final Widget loadingIndicator;
+  final Future<void> Function() onStopActiveTurn;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +53,10 @@ class ChatScreenBody extends StatelessWidget {
         if (screen.turnIndicator case final turnIndicator?)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-            child: TurnElapsedFooter(turnTimer: turnIndicator.timer),
+            child: TurnElapsedFooter(
+              turnTimer: turnIndicator.timer,
+              onStop: onStopActiveTurn,
+            ),
           ),
         composerRegion,
       ],

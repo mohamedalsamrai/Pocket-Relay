@@ -58,9 +58,8 @@ void main() {
             ChatScreenActionId.clearTranscript,
           ],
         );
-        expect(contract.composer.isTextInputEnabled, isTrue);
         expect(contract.composer.draftText, isEmpty);
-        expect(contract.composer.primaryAction, ChatComposerPrimaryAction.send);
+        expect(contract.composer.isSendActionEnabled, isTrue);
         expect(contract.connectionSettings.initialProfile, same(profile));
         expect(contract.connectionSettings.initialSecrets, same(secrets));
         expect(
@@ -70,36 +69,36 @@ void main() {
       },
     );
 
-    test('derives stop action and turn indicator when the session is busy', () {
-      final activeTurn = CodexActiveTurnState(
-        turnId: 'turn_1',
-        timer: CodexSessionTurnTimer(
+    test(
+      'keeps the composer editable and surfaces turn status when the session is busy',
+      () {
+        final activeTurn = CodexActiveTurnState(
           turnId: 'turn_1',
-          startedAt: DateTime(2026, 3, 15, 12),
-        ),
-      );
-      final sessionState = CodexSessionState.initial().copyWith(
-        connectionStatus: CodexRuntimeSessionState.running,
-        activeTurn: activeTurn,
-      );
+          timer: CodexSessionTurnTimer(
+            turnId: 'turn_1',
+            startedAt: DateTime(2026, 3, 15, 12),
+          ),
+        );
+        final sessionState = CodexSessionState.initial().copyWith(
+          connectionStatus: CodexRuntimeSessionState.running,
+          activeTurn: activeTurn,
+        );
 
-      final contract = presenter.present(
-        isLoading: false,
-        profile: _configuredProfile(),
-        secrets: const ConnectionSecrets(password: 'secret'),
-        sessionState: sessionState,
-        conversationRecoveryState: null,
-        composerDraft: const ChatComposerDraft(text: 'Keep draft'),
-        transcriptFollow: _defaultTranscriptFollowContract,
-      );
+        final contract = presenter.present(
+          isLoading: false,
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+          sessionState: sessionState,
+          conversationRecoveryState: null,
+          composerDraft: const ChatComposerDraft(text: 'Keep draft'),
+          transcriptFollow: _defaultTranscriptFollowContract,
+        );
 
-      expect(contract.composer.draftText, 'Keep draft');
-      expect(contract.composer.isBusy, isTrue);
-      expect(contract.composer.isTextInputEnabled, isFalse);
-      expect(contract.composer.primaryAction, ChatComposerPrimaryAction.stop);
-      expect(contract.composer.isPrimaryActionEnabled, isTrue);
-      expect(contract.turnIndicator?.timer, same(activeTurn.timer));
-    });
+        expect(contract.composer.draftText, 'Keep draft');
+        expect(contract.composer.isSendActionEnabled, isFalse);
+        expect(contract.turnIndicator?.timer, same(activeTurn.timer));
+      },
+    );
 
     test(
       'disables send and exposes recovery actions when conversation recovery is active',
@@ -117,8 +116,7 @@ void main() {
         );
 
         expect(contract.composer.draftText, 'Keep draft');
-        expect(contract.composer.isTextInputEnabled, isTrue);
-        expect(contract.composer.isPrimaryActionEnabled, isFalse);
+        expect(contract.composer.isSendActionEnabled, isFalse);
         expect(
           contract.conversationRecoveryNotice?.title,
           "This conversation can't continue.",
@@ -159,7 +157,7 @@ void main() {
           contract.conversationRecoveryNotice?.message,
           'Pocket Relay expected thread "thread_old", but the remote session returned "thread_new". Sending is blocked because that would attach your draft to a different conversation.',
         );
-        expect(contract.composer.isPrimaryActionEnabled, isFalse);
+        expect(contract.composer.isSendActionEnabled, isFalse);
       },
     );
 
@@ -241,7 +239,7 @@ void main() {
           ConnectionMode.local,
         );
         expect(contract.transcriptSurface.isConfigured, isFalse);
-        expect(contract.composer.isTextInputEnabled, isFalse);
+        expect(contract.composer.isSendActionEnabled, isFalse);
       },
     );
   });

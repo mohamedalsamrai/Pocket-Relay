@@ -12,14 +12,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: 'Initial draft',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(draftText: 'Initial draft'),
       ),
     );
 
@@ -28,18 +21,7 @@ void main() {
       'Initial draft',
     );
 
-    await tester.pumpWidget(
-      _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
-      ),
-    );
+    await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
 
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller?.text,
@@ -54,14 +36,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onChanged: (value) {
           latestValue = value;
         },
@@ -79,14 +54,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.macOS,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -116,14 +84,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.macOS,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -157,14 +118,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.android,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -195,6 +149,40 @@ void main() {
       'Mobile draft\nSecond line',
     );
   });
+
+  testWidgets('keeps desktop focus and the send affordance stable while busy', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildComposerApp(
+        platform: TargetPlatform.macOS,
+        contract: _composerContract(draftText: 'Desktop draft'),
+      ),
+    );
+
+    final fieldFinder = find.byType(TextField);
+
+    await tester.tap(fieldFinder);
+    await tester.pump();
+
+    expect(_editableTextFocusNode(tester).hasFocus, isTrue);
+    expect(find.byKey(const ValueKey('send')), findsOneWidget);
+
+    await tester.pumpWidget(
+      _buildComposerApp(
+        platform: TargetPlatform.macOS,
+        contract: _composerContract(
+          draftText: 'Desktop draft',
+          isSendActionEnabled: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(_editableTextFocusNode(tester).hasFocus, isTrue);
+    expect(find.byKey(const ValueKey('send')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+  });
 }
 
 Widget _buildComposerApp({
@@ -202,7 +190,6 @@ Widget _buildComposerApp({
   TargetPlatform platform = TargetPlatform.android,
   ValueChanged<String>? onChanged,
   Future<void> Function()? onSend,
-  Future<void> Function()? onStop,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light).copyWith(platform: platform),
@@ -212,8 +199,22 @@ Widget _buildComposerApp({
         contract: contract,
         onChanged: onChanged ?? (_) {},
         onSend: onSend ?? () async {},
-        onStop: onStop ?? () async {},
       ),
     ),
   );
+}
+
+ChatComposerContract _composerContract({
+  String draftText = '',
+  bool isSendActionEnabled = true,
+}) {
+  return ChatComposerContract(
+    draftText: draftText,
+    isSendActionEnabled: isSendActionEnabled,
+    placeholder: 'Message Codex',
+  );
+}
+
+FocusNode _editableTextFocusNode(WidgetTester tester) {
+  return tester.widget<EditableText>(find.byType(EditableText)).focusNode;
 }

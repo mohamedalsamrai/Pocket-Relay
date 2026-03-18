@@ -7,10 +7,16 @@ import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
 class TurnElapsedFooter extends StatefulWidget {
-  const TurnElapsedFooter({super.key, required this.turnTimer, this.accent});
+  const TurnElapsedFooter({
+    super.key,
+    required this.turnTimer,
+    this.accent,
+    this.onStop,
+  });
 
   final CodexSessionTurnTimer turnTimer;
   final Color? accent;
+  final Future<void> Function()? onStop;
 
   @override
   State<TurnElapsedFooter> createState() => _TurnElapsedFooterState();
@@ -68,32 +74,62 @@ class _TurnElapsedFooterState extends State<TurnElapsedFooter> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: cards.tintedSurface(
-                accent,
-                lightAlpha: 0.08,
-                darkAlpha: 0.16,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: cards.tintedSurface(
+                    accent,
+                    lightAlpha: 0.08,
+                    darkAlpha: 0.16,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: cards.accentBorder(accent)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule_rounded, size: 13, color: accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$label ${formatElapsedDuration(elapsed)}',
+                      style: TextStyle(
+                        color: cards.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: cards.accentBorder(accent)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.schedule_rounded, size: 13, color: accent),
-                const SizedBox(width: 6),
-                Text(
-                  '$label ${formatElapsedDuration(elapsed)}',
-                  style: TextStyle(
-                    color: cards.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              if (widget.onStop case final onStop?)
+                OutlinedButton.icon(
+                  key: const ValueKey('stop_active_turn'),
+                  onPressed: () {
+                    unawaited(onStop());
+                  },
+                  icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                  label: const Text('Stop'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    side: BorderSide(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.3),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    shape: const StadiumBorder(),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ],
       ),

@@ -12,7 +12,6 @@ class CupertinoChatComposerRegion extends StatelessWidget {
     required this.composer,
     required this.onComposerDraftChanged,
     required this.onSendPrompt,
-    required this.onStopActiveTurn,
     required this.onConversationRecoveryAction,
   });
 
@@ -21,7 +20,6 @@ class CupertinoChatComposerRegion extends StatelessWidget {
   final ChatComposerContract composer;
   final ValueChanged<String> onComposerDraftChanged;
   final Future<void> Function() onSendPrompt;
-  final Future<void> Function() onStopActiveTurn;
   final ValueChanged<ChatConversationRecoveryActionId>
   onConversationRecoveryAction;
 
@@ -46,7 +44,6 @@ class CupertinoChatComposerRegion extends StatelessWidget {
               contract: composer,
               onChanged: onComposerDraftChanged,
               onSend: onSendPrompt,
-              onStop: onStopActiveTurn,
             ),
           ],
         ),
@@ -62,14 +59,12 @@ class CupertinoChatComposer extends StatelessWidget {
     required this.contract,
     required this.onChanged,
     required this.onSend,
-    required this.onStop,
   });
 
   final PocketPlatformBehavior platformBehavior;
   final ChatComposerContract contract;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSend;
-  final Future<void> Function() onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +73,6 @@ class CupertinoChatComposer extends StatelessWidget {
       contract: contract,
       onChanged: onChanged,
       onSend: onSend,
-      onStop: onStop,
       style: ChatComposerVisualStyle.cupertino,
     );
   }

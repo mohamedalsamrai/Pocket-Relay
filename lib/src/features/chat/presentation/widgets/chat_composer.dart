@@ -10,14 +10,12 @@ class ChatComposer extends StatelessWidget {
     required this.contract,
     required this.onChanged,
     required this.onSend,
-    required this.onStop,
   });
 
   final PocketPlatformBehavior platformBehavior;
   final ChatComposerContract contract;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSend;
-  final Future<void> Function() onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +24,6 @@ class ChatComposer extends StatelessWidget {
       contract: contract,
       onChanged: onChanged,
       onSend: onSend,
-      onStop: onStop,
       style: ChatComposerVisualStyle.material,
     );
   }

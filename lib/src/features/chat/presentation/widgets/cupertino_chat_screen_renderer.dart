@@ -11,12 +11,14 @@ class CupertinoChatScreenRenderer extends StatelessWidget {
     required this.appChrome,
     required this.transcriptRegion,
     required this.composerRegion,
+    required this.onStopActiveTurn,
   });
 
   final ChatScreenContract screen;
   final PreferredSizeWidget appChrome;
   final Widget transcriptRegion;
   final Widget composerRegion;
+  final Future<void> Function() onStopActiveTurn;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +33,7 @@ class CupertinoChatScreenRenderer extends StatelessWidget {
         transcriptRegion: transcriptRegion,
         composerRegion: composerRegion,
         loadingIndicator: const CupertinoActivityIndicator(),
+        onStopActiveTurn: onStopActiveTurn,
       ),
     );
 

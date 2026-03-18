@@ -82,13 +82,8 @@ class ChatScreenPresenter {
       transcriptFollow: transcriptFollow,
       composer: ChatComposerContract(
         draftText: composerDraft.text,
-        isTextInputEnabled: isConfigured && !isLoading && !isBusy,
-        isPrimaryActionEnabled: isBusy || canSend,
-        isBusy: isBusy,
+        isSendActionEnabled: canSend,
         placeholder: 'Message Codex',
-        primaryAction: isBusy
-            ? ChatComposerPrimaryAction.stop
-            : ChatComposerPrimaryAction.send,
       ),
       connectionSettings: ChatConnectionSettingsLaunchContract(
         initialProfile: connectionSettingsProfile,

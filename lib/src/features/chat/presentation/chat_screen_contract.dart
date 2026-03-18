@@ -114,24 +114,16 @@ class ChatTranscriptSurfaceContract {
   bool get showsEmptyState => emptyState != null;
 }
 
-enum ChatComposerPrimaryAction { send, stop }
-
 class ChatComposerContract {
   const ChatComposerContract({
     required this.draftText,
-    required this.isTextInputEnabled,
-    required this.isPrimaryActionEnabled,
-    required this.isBusy,
+    required this.isSendActionEnabled,
     required this.placeholder,
-    required this.primaryAction,
   });
 
   final String draftText;
-  final bool isTextInputEnabled;
-  final bool isPrimaryActionEnabled;
-  final bool isBusy;
+  final bool isSendActionEnabled;
   final String placeholder;
-  final ChatComposerPrimaryAction primaryAction;
 }
 
 class ChatTurnIndicatorContract {

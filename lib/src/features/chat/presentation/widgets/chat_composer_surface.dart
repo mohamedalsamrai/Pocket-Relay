@@ -17,7 +17,6 @@ class ChatComposerSurface extends StatefulWidget {
     required this.contract,
     required this.onChanged,
     required this.onSend,
-    required this.onStop,
     required this.style,
   });
 
@@ -25,7 +24,6 @@ class ChatComposerSurface extends StatefulWidget {
   final ChatComposerContract contract;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSend;
-  final Future<void> Function() onStop;
   final ChatComposerVisualStyle style;
 
   @override
@@ -102,7 +100,6 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
           context,
           TextField(
             controller: _controller,
-            enabled: widget.contract.isTextInputEnabled,
             minLines: 1,
             maxLines: 6,
             textInputAction: TextInputAction.newline,
@@ -116,23 +113,11 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
             ),
           ),
         ),
-        primaryAction:
-            widget.contract.primaryAction == ChatComposerPrimaryAction.stop
-            ? FilledButton.tonalIcon(
-                key: const ValueKey('stop'),
-                onPressed: widget.contract.isPrimaryActionEnabled
-                    ? widget.onStop
-                    : null,
-                icon: const Icon(Icons.stop_circle_outlined),
-                label: const Text('Stop'),
-              )
-            : IconButton.filled(
-                key: const ValueKey('send'),
-                onPressed: widget.contract.isPrimaryActionEnabled
-                    ? widget.onSend
-                    : null,
-                icon: const Icon(Icons.send_rounded),
-              ),
+        primaryAction: IconButton.filled(
+          key: const ValueKey('send'),
+          onPressed: widget.contract.isSendActionEnabled ? widget.onSend : null,
+          icon: const Icon(Icons.send_rounded),
+        ),
       ),
     );
   }
@@ -182,7 +167,6 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
                 context,
                 CupertinoTextField(
                   controller: _controller,
-                  enabled: widget.contract.isTextInputEnabled,
                   minLines: 1,
                   maxLines: 6,
                   textInputAction: TextInputAction.newline,
@@ -194,39 +178,18 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
                   decoration: const BoxDecoration(),
                 ),
               ),
-              primaryAction:
-                  widget.contract.primaryAction ==
-                      ChatComposerPrimaryAction.stop
-                  ? CupertinoButton.filled(
-                      key: const ValueKey('stop'),
-                      onPressed: widget.contract.isPrimaryActionEnabled
-                          ? widget.onStop
-                          : null,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(CupertinoIcons.stop_circle, size: 18),
-                          SizedBox(width: 6),
-                          Text('Stop'),
-                        ],
-                      ),
-                    )
-                  : CupertinoButton.filled(
-                      key: const ValueKey('send'),
-                      onPressed: widget.contract.isPrimaryActionEnabled
-                          ? widget.onSend
-                          : null,
-                      minimumSize: const Size(44, 44),
-                      padding: const EdgeInsets.all(10),
-                      child: const Icon(
-                        CupertinoIcons.arrow_up_circle_fill,
-                        size: 22,
-                      ),
-                    ),
+              primaryAction: CupertinoButton.filled(
+                key: const ValueKey('send'),
+                onPressed: widget.contract.isSendActionEnabled
+                    ? widget.onSend
+                    : null,
+                minimumSize: const Size(44, 44),
+                padding: const EdgeInsets.all(10),
+                child: const Icon(
+                  CupertinoIcons.arrow_up_circle_fill,
+                  size: 22,
+                ),
+              ),
               crossAxisAlignment: CrossAxisAlignment.center,
             ),
           ),
@@ -274,10 +237,6 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
         _DesktopInsertNewlineIntent:
             CallbackAction<_DesktopInsertNewlineIntent>(
               onInvoke: (_) {
-                if (!_canEditFromKeyboard) {
-                  return null;
-                }
-
                 _insertTextAtSelection('\n');
                 return null;
               },
@@ -298,12 +257,8 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   }
 
   bool get _canSubmitFromKeyboard {
-    return widget.contract.isTextInputEnabled &&
-        widget.contract.isPrimaryActionEnabled &&
-        widget.contract.primaryAction == ChatComposerPrimaryAction.send;
+    return widget.contract.isSendActionEnabled;
   }
-
-  bool get _canEditFromKeyboard => widget.contract.isTextInputEnabled;
 
   void _insertTextAtSelection(String insertedText) {
     final currentValue = _controller.value;

@@ -113,6 +113,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
           appChrome: _buildAppChrome(screen, regionPolicy),
           transcriptRegion: _buildTranscriptRegion(screen, regionPolicy),
           composerRegion: _buildComposerRegion(screen, regionPolicy),
+          onStopActiveTurn: _stopActiveTurn,
         );
       },
     );
@@ -166,7 +167,6 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       composer: screen.composer,
       onComposerDraftChanged: _composerDraftHost.updateText,
       onSendPrompt: _sendPrompt,
-      onStopActiveTurn: _stopActiveTurn,
       onConversationRecoveryAction: _handleConversationRecoveryAction,
     );
   }

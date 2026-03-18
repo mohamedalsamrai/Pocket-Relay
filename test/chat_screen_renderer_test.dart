@@ -22,6 +22,7 @@ void main() {
           appChrome: const _TestAppChrome(),
           transcriptRegion: const Center(child: Text('Transcript region')),
           composerRegion: const Text('Composer region'),
+          onStopActiveTurn: () async {},
         ),
       ),
     );
@@ -42,6 +43,7 @@ void main() {
             appChrome: const _TestCupertinoAppChrome(),
             transcriptRegion: const Center(child: Text('Transcript region')),
             composerRegion: const Text('Composer region'),
+            onStopActiveTurn: () async {},
           ),
         ),
       );
@@ -208,7 +210,6 @@ void main() {
             onSendPrompt: () async {
               sendCalls += 1;
             },
-            onStopActiveTurn: () async {},
             onConversationRecoveryAction: (_) {},
           ),
         ),
@@ -222,6 +223,42 @@ void main() {
     expect(draftValues, <String>['Plan phase 6']);
     expect(sendCalls, 1);
   });
+
+  testWidgets('renders stop beside the elapsed badge and forwards the action', (
+    tester,
+  ) async {
+    var stopCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: FlutterChatScreenRenderer(
+          screen: _screenContract(
+            turnIndicator: ChatTurnIndicatorContract(
+              timer: CodexSessionTurnTimer(
+                turnId: 'turn_1',
+                startedAt: DateTime(2026, 3, 18, 12),
+              ),
+            ),
+          ),
+          appChrome: const _TestAppChrome(),
+          transcriptRegion: const Center(child: Text('Transcript region')),
+          composerRegion: const Text('Composer region'),
+          onStopActiveTurn: () async {
+            stopCalls += 1;
+          },
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Elapsed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop_active_turn')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('stop_active_turn')));
+    await tester.pumpAndSettle();
+
+    expect(stopCalls, 1);
+  });
 }
 
 ChatScreenContract _screenContract({
@@ -229,6 +266,7 @@ ChatScreenContract _screenContract({
   ChatEmptyStateContract? emptyState,
   List<ChatTimelineSummaryContract> timelineSummaries =
       const <ChatTimelineSummaryContract>[],
+  ChatTurnIndicatorContract? turnIndicator,
 }) {
   return ChatScreenContract(
     isLoading: false,
@@ -268,16 +306,14 @@ ChatScreenContract _screenContract({
     ),
     composer: const ChatComposerContract(
       draftText: '',
-      isTextInputEnabled: true,
-      isPrimaryActionEnabled: true,
-      isBusy: false,
+      isSendActionEnabled: true,
       placeholder: 'Message Codex',
-      primaryAction: ChatComposerPrimaryAction.send,
     ),
     connectionSettings: ChatConnectionSettingsLaunchContract(
       initialProfile: ConnectionProfile.defaults(),
       initialSecrets: const ConnectionSecrets(),
     ),
+    turnIndicator: turnIndicator,
   );
 }
 

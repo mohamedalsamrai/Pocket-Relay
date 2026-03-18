@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
@@ -641,6 +642,7 @@ void main() {
           child: TranscriptList(
             surface: _surfaceContract(mainItems: <CodexUiBlock>[block]),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'main',
@@ -656,6 +658,7 @@ void main() {
           child: TranscriptList(
             surface: _surfaceContract(pinnedItems: <CodexUiBlock>[block]),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'pinned',
@@ -708,6 +711,7 @@ void main() {
           child: TranscriptList(
             surface: _surfaceContract(pinnedItems: <CodexUiBlock>[firstBlock]),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'first',
@@ -723,6 +727,7 @@ void main() {
           child: TranscriptList(
             surface: _surfaceContract(pinnedItems: <CodexUiBlock>[secondBlock]),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'second',
@@ -749,6 +754,7 @@ void main() {
               activePendingUserInputRequestIds: <String>{'input_explicit'},
             ),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
           ),
@@ -828,6 +834,7 @@ void main() {
               ],
             ),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'plan_1',
@@ -853,6 +860,7 @@ void main() {
               ],
             ),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
             surfaceChangeToken: 'plan_2',
@@ -886,6 +894,7 @@ void main() {
           child: TranscriptList(
             surface: _surfaceContract(mainItems: blocks),
             followBehavior: _defaultFollowBehavior,
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (value) {
               isNearBottom = value;
@@ -919,6 +928,7 @@ void main() {
               requestId: 1,
               source: ChatTranscriptFollowRequestSource.sendPrompt,
             ),
+            platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (value) {
               isNearBottom = value;

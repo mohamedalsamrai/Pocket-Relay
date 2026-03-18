@@ -18,12 +18,14 @@ class FlutterChatScreenRenderer extends StatelessWidget {
     required this.appChrome,
     required this.transcriptRegion,
     required this.composerRegion,
+    required this.onStopActiveTurn,
   });
 
   final ChatScreenContract screen;
   final PreferredSizeWidget appChrome;
   final Widget transcriptRegion;
   final Widget composerRegion;
+  final Future<void> Function() onStopActiveTurn;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class FlutterChatScreenRenderer extends StatelessWidget {
           transcriptRegion: transcriptRegion,
           composerRegion: composerRegion,
           loadingIndicator: const CircularProgressIndicator(),
+          onStopActiveTurn: onStopActiveTurn,
         ),
       ),
     );
@@ -371,7 +374,6 @@ class FlutterChatComposerRegion extends StatelessWidget {
     required this.composer,
     required this.onComposerDraftChanged,
     required this.onSendPrompt,
-    required this.onStopActiveTurn,
     required this.onConversationRecoveryAction,
   });
 
@@ -380,7 +382,6 @@ class FlutterChatComposerRegion extends StatelessWidget {
   final ChatComposerContract composer;
   final ValueChanged<String> onComposerDraftChanged;
   final Future<void> Function() onSendPrompt;
-  final Future<void> Function() onStopActiveTurn;
   final ValueChanged<ChatConversationRecoveryActionId>
   onConversationRecoveryAction;
 
@@ -405,7 +406,6 @@ class FlutterChatComposerRegion extends StatelessWidget {
               contract: composer,
               onChanged: onComposerDraftChanged,
               onSend: onSendPrompt,
-              onStop: onStopActiveTurn,
             ),
           ],
         ),

@@ -126,11 +126,8 @@ ChatScreenContract _screenContract() {
     ),
     composer: const ChatComposerContract(
       draftText: '',
-      isTextInputEnabled: true,
-      isPrimaryActionEnabled: true,
-      isBusy: false,
+      isSendActionEnabled: true,
       placeholder: 'Message Codex',
-      primaryAction: ChatComposerPrimaryAction.send,
     ),
     connectionSettings: ChatConnectionSettingsLaunchContract(
       initialProfile: ConnectionProfile.defaults(),

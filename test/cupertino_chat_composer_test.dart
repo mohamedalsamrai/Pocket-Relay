@@ -13,14 +13,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: 'Initial draft',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(draftText: 'Initial draft'),
       ),
     );
 
@@ -32,18 +25,7 @@ void main() {
       'Initial draft',
     );
 
-    await tester.pumpWidget(
-      _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
-      ),
-    );
+    await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
 
     expect(
       tester
@@ -60,14 +42,7 @@ void main() {
 
     await tester.pumpWidget(
       _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onChanged: (value) {
           latestValue = value;
         },
@@ -91,14 +66,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.macOS,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -128,14 +96,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.macOS,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -169,14 +130,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         platform: TargetPlatform.iOS,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
         onSend: () async {
           sendCalls += 1;
         },
@@ -208,40 +162,25 @@ void main() {
     );
   });
 
-  testWidgets('switches to stop action and forwards stop presses', (
-    tester,
-  ) async {
-    var stopCalls = 0;
+  testWidgets(
+    'keeps the send affordance stable while the active turn is running',
+    (tester) async {
+      await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
 
-    await tester.pumpWidget(
-      _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: false,
-          isPrimaryActionEnabled: true,
-          isBusy: true,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.stop,
+      expect(find.byKey(const ValueKey('send')), findsOneWidget);
+      expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+      await tester.pumpWidget(
+        _buildComposerApp(
+          contract: _composerContract(isSendActionEnabled: false),
         ),
-        onStop: () async {
-          stopCalls += 1;
-        },
-      ),
-    );
+      );
+      await tester.pump();
 
-    expect(find.byKey(const ValueKey('stop')), findsOneWidget);
-    expect(
-      tester
-          .widget<CupertinoTextField>(find.byType(CupertinoTextField))
-          .enabled,
-      isFalse,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('stop')));
-    await tester.pumpAndSettle();
-
-    expect(stopCalls, 1);
-  });
+      expect(find.byKey(const ValueKey('send')), findsOneWidget);
+      expect(find.byKey(const ValueKey('stop')), findsNothing);
+    },
+  );
 
   testWidgets('uses adaptive cupertino text colors in dark mode', (
     tester,
@@ -249,14 +188,7 @@ void main() {
     await tester.pumpWidget(
       _buildComposerApp(
         brightness: Brightness.dark,
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
+        contract: _composerContract(),
       ),
     );
 
@@ -294,18 +226,7 @@ void main() {
   testWidgets('uses a compact centered layout in cupertino mode', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      _buildComposerApp(
-        contract: const ChatComposerContract(
-          draftText: '',
-          isTextInputEnabled: true,
-          isPrimaryActionEnabled: true,
-          isBusy: false,
-          placeholder: 'Message Codex',
-          primaryAction: ChatComposerPrimaryAction.send,
-        ),
-      ),
-    );
+    await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
 
     final field = tester.widget<CupertinoTextField>(
       find.byType(CupertinoTextField),
@@ -325,7 +246,6 @@ Widget _buildComposerApp({
   TargetPlatform platform = TargetPlatform.iOS,
   ValueChanged<String>? onChanged,
   Future<void> Function()? onSend,
-  Future<void> Function()? onStop,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(brightness).copyWith(platform: platform),
@@ -337,8 +257,18 @@ Widget _buildComposerApp({
         contract: contract,
         onChanged: onChanged ?? (_) {},
         onSend: onSend ?? () async {},
-        onStop: onStop ?? () async {},
       ),
     ),
+  );
+}
+
+ChatComposerContract _composerContract({
+  String draftText = '',
+  bool isSendActionEnabled = true,
+}) {
+  return ChatComposerContract(
+    draftText: draftText,
+    isSendActionEnabled: isSendActionEnabled,
+    placeholder: 'Message Codex',
   );
 }

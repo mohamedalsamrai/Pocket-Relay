@@ -17,6 +17,7 @@ abstract interface class ChatRootRendererDelegate {
     required PreferredSizeWidget appChrome,
     required Widget transcriptRegion,
     required Widget composerRegion,
+    required Future<void> Function() onStopActiveTurn,
   });
 
   PreferredSizeWidget buildAppChrome({
@@ -50,7 +51,6 @@ abstract interface class ChatRootRendererDelegate {
     required ChatComposerContract composer,
     required ValueChanged<String> onComposerDraftChanged,
     required Future<void> Function() onSendPrompt,
-    required Future<void> Function() onStopActiveTurn,
     required ValueChanged<ChatConversationRecoveryActionId>
     onConversationRecoveryAction,
   });
@@ -66,6 +66,7 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     required PreferredSizeWidget appChrome,
     required Widget transcriptRegion,
     required Widget composerRegion,
+    required Future<void> Function() onStopActiveTurn,
   }) {
     return switch (renderer) {
       ChatRootScreenShellRenderer.flutter => FlutterChatScreenRenderer(
@@ -73,12 +74,14 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
         appChrome: appChrome,
         transcriptRegion: transcriptRegion,
         composerRegion: composerRegion,
+        onStopActiveTurn: onStopActiveTurn,
       ),
       ChatRootScreenShellRenderer.cupertino => CupertinoChatScreenRenderer(
         screen: screen,
         appChrome: appChrome,
         transcriptRegion: transcriptRegion,
         composerRegion: composerRegion,
+        onStopActiveTurn: onStopActiveTurn,
       ),
     };
   }
@@ -147,7 +150,6 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     required ChatComposerContract composer,
     required ValueChanged<String> onComposerDraftChanged,
     required Future<void> Function() onSendPrompt,
-    required Future<void> Function() onStopActiveTurn,
     required ValueChanged<ChatConversationRecoveryActionId>
     onConversationRecoveryAction,
   }) {
@@ -158,7 +160,6 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
         composer: composer,
         onComposerDraftChanged: onComposerDraftChanged,
         onSendPrompt: onSendPrompt,
-        onStopActiveTurn: onStopActiveTurn,
         onConversationRecoveryAction: onConversationRecoveryAction,
       ),
       ChatRootRegionRenderer.flutter => FlutterChatComposerRegion(
@@ -167,7 +168,6 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
         composer: composer,
         onComposerDraftChanged: onComposerDraftChanged,
         onSendPrompt: onSendPrompt,
-        onStopActiveTurn: onStopActiveTurn,
         onConversationRecoveryAction: onConversationRecoveryAction,
       ),
     };

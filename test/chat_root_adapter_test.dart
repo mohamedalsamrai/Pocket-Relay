@@ -851,6 +851,7 @@ class _FakeChatRootRendererDelegate implements ChatRootRendererDelegate {
     required PreferredSizeWidget appChrome,
     required Widget transcriptRegion,
     required Widget composerRegion,
+    required Future<void> Function() onStopActiveTurn,
   }) {
     screenShellRenderer = renderer;
     return Scaffold(
@@ -949,7 +950,6 @@ class _FakeChatRootRendererDelegate implements ChatRootRendererDelegate {
     required ChatComposerContract composer,
     required ValueChanged<String> onComposerDraftChanged,
     required Future<void> Function() onSendPrompt,
-    required Future<void> Function() onStopActiveTurn,
     required ValueChanged<ChatConversationRecoveryActionId>
     onConversationRecoveryAction,
   }) {
