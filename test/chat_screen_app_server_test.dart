@@ -1018,6 +1018,57 @@ void main() {
   });
 
   testWidgets(
+    'renders PowerShell-wrapped Get-Content commands as structured read work logs',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        PocketRelayApp(
+          profileStore: MemoryCodexProfileStore(
+            initialValue: SavedProfile(
+              profile: _configuredProfile(),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
+          ),
+          appServerClient: appServerClient,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'item_cmd_pwsh_1',
+              'type': 'commandExecution',
+              'status': 'completed',
+              'command':
+                  r'powershell.exe -NoLogo -NoProfile -Command "Get-Content -Path C:\repo\README.md -TotalCount 25"',
+              'result': <String, Object?>{
+                'output': 'Pocket Relay',
+                'exitCode': 0,
+              },
+            },
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Get-Content'), findsOneWidget);
+      expect(find.text('Reading first 25 lines'), findsOneWidget);
+      expect(find.text('README.md'), findsOneWidget);
+      expect(find.text(r'C:\repo\README.md'), findsOneWidget);
+      expect(find.textContaining('powershell.exe -NoLogo'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'keeps a single local user prompt when the app-server echoes it back',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();

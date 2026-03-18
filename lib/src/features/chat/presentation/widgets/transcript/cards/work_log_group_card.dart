@@ -92,8 +92,16 @@ class _WorkLogEntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (entry) {
-      final ChatReadCommandWorkLogEntryContract readEntry =>
-        _ReadCommandWorkLogEntryRow(entry: readEntry),
+      final ChatSedReadWorkLogEntryContract readEntry =>
+        _SedReadWorkLogEntryRow(entry: readEntry),
+      final ChatCatReadWorkLogEntryContract readEntry =>
+        _CatReadWorkLogEntryRow(entry: readEntry),
+      final ChatHeadReadWorkLogEntryContract readEntry =>
+        _HeadReadWorkLogEntryRow(entry: readEntry),
+      final ChatTailReadWorkLogEntryContract readEntry =>
+        _TailReadWorkLogEntryRow(entry: readEntry),
+      final ChatGetContentReadWorkLogEntryContract readEntry =>
+        _GetContentReadWorkLogEntryRow(entry: readEntry),
       final ChatGenericWorkLogEntryContract genericEntry =>
         _GenericWorkLogEntryRow(entry: genericEntry),
     };
@@ -172,16 +180,115 @@ class _GenericWorkLogEntryRow extends StatelessWidget {
   }
 }
 
-class _ReadCommandWorkLogEntryRow extends StatelessWidget {
-  const _ReadCommandWorkLogEntryRow({required this.entry});
+Widget? _readStatusBadge(
+  ThemeData theme,
+  ChatFileReadWorkLogEntryContract entry,
+) {
+  if (entry.isRunning) {
+    return TranscriptBadge(
+      label: 'running',
+      color: tealAccent(theme.brightness),
+    );
+  }
+  if (entry.exitCode != null && entry.exitCode != 0) {
+    return TranscriptBadge(
+      label: 'exit ${entry.exitCode}',
+      color: redAccent(theme.brightness),
+    );
+  }
+  return null;
+}
 
-  final ChatReadCommandWorkLogEntryContract entry;
+class _SedReadWorkLogEntryRow extends StatelessWidget {
+  const _SedReadWorkLogEntryRow({required this.entry});
+
+  final ChatSedReadWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReadCommandCardShell(
+      entry: entry,
+      accent: blueAccent(Theme.of(context).brightness),
+      icon: Icons.menu_book_outlined,
+    );
+  }
+}
+
+class _CatReadWorkLogEntryRow extends StatelessWidget {
+  const _CatReadWorkLogEntryRow({required this.entry});
+
+  final ChatCatReadWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReadCommandCardShell(
+      entry: entry,
+      accent: tealAccent(Theme.of(context).brightness),
+      icon: Icons.description_outlined,
+    );
+  }
+}
+
+class _HeadReadWorkLogEntryRow extends StatelessWidget {
+  const _HeadReadWorkLogEntryRow({required this.entry});
+
+  final ChatHeadReadWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReadCommandCardShell(
+      entry: entry,
+      accent: amberAccent(Theme.of(context).brightness),
+      icon: Icons.vertical_align_top,
+    );
+  }
+}
+
+class _TailReadWorkLogEntryRow extends StatelessWidget {
+  const _TailReadWorkLogEntryRow({required this.entry});
+
+  final ChatTailReadWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReadCommandCardShell(
+      entry: entry,
+      accent: pinkAccent(Theme.of(context).brightness),
+      icon: Icons.vertical_align_bottom,
+    );
+  }
+}
+
+class _GetContentReadWorkLogEntryRow extends StatelessWidget {
+  const _GetContentReadWorkLogEntryRow({required this.entry});
+
+  final ChatGetContentReadWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReadCommandCardShell(
+      entry: entry,
+      accent: violetAccent(Theme.of(context).brightness),
+      icon: Icons.subject_outlined,
+    );
+  }
+}
+
+class _ReadCommandCardShell extends StatelessWidget {
+  const _ReadCommandCardShell({
+    required this.entry,
+    required this.accent,
+    required this.icon,
+  });
+
+  final ChatFileReadWorkLogEntryContract entry;
+  final Color accent;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cards = ConversationCardPalette.of(context);
-    final accent = blueAccent(theme.brightness);
     final statusBadge = _readStatusBadge(theme, entry);
 
     return Container(
@@ -207,15 +314,54 @@ class _ReadCommandWorkLogEntryRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: Icon(Icons.menu_book_outlined, size: 16, color: accent),
+            child: Icon(icon, size: 16, color: accent),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cards.tintedSurface(
+                          accent,
+                          lightAlpha: 0.16,
+                          darkAlpha: 0.32,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: cards.accentBorder(
+                            accent,
+                            lightAlpha: 0.4,
+                            darkAlpha: 0.5,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        entry.commandLabel,
+                        style: TextStyle(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10.5,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                    if (statusBadge != null) statusBadge,
+                  ],
+                ),
+                const SizedBox(height: 7),
                 Text(
-                  entry.lineSummary,
+                  entry.summaryLabel,
                   style: TextStyle(
                     color: accent,
                     fontWeight: FontWeight.w800,
@@ -248,28 +394,8 @@ class _ReadCommandWorkLogEntryRow extends StatelessWidget {
               ],
             ),
           ),
-          if (statusBadge != null) ...[const SizedBox(width: 8), statusBadge],
         ],
       ),
     );
   }
-}
-
-Widget? _readStatusBadge(
-  ThemeData theme,
-  ChatReadCommandWorkLogEntryContract entry,
-) {
-  if (entry.isRunning) {
-    return TranscriptBadge(
-      label: 'running',
-      color: tealAccent(theme.brightness),
-    );
-  }
-  if (entry.exitCode != null && entry.exitCode != 0) {
-    return TranscriptBadge(
-      label: 'exit ${entry.exitCode}',
-      color: redAccent(theme.brightness),
-    );
-  }
-  return null;
 }

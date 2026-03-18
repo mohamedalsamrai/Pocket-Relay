@@ -1008,6 +1008,7 @@ void main() {
     );
 
     expect(find.text('Reading lines 1 to 120'), findsOneWidget);
+    expect(find.text('sed'), findsOneWidget);
     expect(find.text('work_log_group_card.dart'), findsOneWidget);
     expect(
       find.text(
@@ -1023,6 +1024,78 @@ void main() {
     );
     expect(find.text('exit 0'), findsNothing);
   });
+
+  testWidgets(
+    'renders cat, head, tail, and Get-Content reads as command-specific work-log rows',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexWorkLogGroupBlock(
+              id: 'worklog_reads',
+              createdAt: DateTime(2026, 3, 14, 12),
+              entries: <CodexWorkLogEntry>[
+                CodexWorkLogEntry(
+                  id: 'entry_cat',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'cat README.md',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_head',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'head -n 40 docs/019_codebase-handoff.md',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_tail',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 2),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'tail -20 logs/output.txt',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_get_content',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 3),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: r'Get-Content -Path C:\repo\README.md -TotalCount 25',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show 1 more'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('cat'), findsOneWidget);
+      expect(find.text('Reading full file'), findsNWidgets(1));
+      expect(find.text('README.md'), findsAtLeastNWidgets(2));
+
+      expect(find.text('head'), findsOneWidget);
+      expect(find.text('Reading first 40 lines'), findsOneWidget);
+      expect(find.text('019_codebase-handoff.md'), findsOneWidget);
+
+      expect(find.text('tail'), findsOneWidget);
+      expect(find.text('Reading last 20 lines'), findsOneWidget);
+      expect(find.text('output.txt'), findsOneWidget);
+
+      expect(find.text('Get-Content'), findsOneWidget);
+      expect(find.text('Reading first 25 lines'), findsOneWidget);
+      expect(find.text(r'C:\repo\README.md'), findsOneWidget);
+
+      expect(find.text('cat README.md'), findsNothing);
+      expect(
+        find.text('head -n 40 docs/019_codebase-handoff.md'),
+        findsNothing,
+      );
+      expect(find.text('tail -20 logs/output.txt'), findsNothing);
+      expect(
+        find.text(r'Get-Content -Path C:\repo\README.md -TotalCount 25'),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('renders thread token usage as a compact usage strip', (
     tester,

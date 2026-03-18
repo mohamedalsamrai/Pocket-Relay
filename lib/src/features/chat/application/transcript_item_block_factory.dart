@@ -45,7 +45,10 @@ class TranscriptItemBlockFactory {
 
     final match = _shellCommandWrapperPattern.firstMatch(trimmed);
     if (match == null) {
-      return trimmed;
+      final powerShellCommand = _unwrapPowerShellWrappedCommand(trimmed);
+      return powerShellCommand == null || powerShellCommand.isEmpty
+          ? trimmed
+          : powerShellCommand;
     }
 
     final normalized = _unwrapShellWrappedCommand(
@@ -105,5 +108,132 @@ class TranscriptItemBlockFactory {
     }
 
     return inner.replaceAll(r'\"', '"');
+  }
+
+  String? _unwrapPowerShellWrappedCommand(String value) {
+    final tokens = _tokenizeCommand(value);
+    if (tokens == null || tokens.length < 3) {
+      return null;
+    }
+
+    final commandName = _commandName(tokens.first);
+    if (commandName != 'pwsh' && commandName != 'powershell') {
+      return null;
+    }
+
+    for (var index = 1; index < tokens.length; index++) {
+      final token = tokens[index].toLowerCase();
+      if (token == '-command' || token == '-c') {
+        final commandTokens = tokens.sublist(index + 1);
+        if (commandTokens.isEmpty) {
+          return null;
+        }
+        return commandTokens.join(' ').trim();
+      }
+    }
+
+    return null;
+  }
+
+  List<String>? _tokenizeCommand(String commandText) {
+    final tokens = <String>[];
+    final buffer = StringBuffer();
+    String? quote;
+    var escaping = false;
+
+    void flushBuffer() {
+      if (buffer.isEmpty) {
+        return;
+      }
+      tokens.add(buffer.toString());
+      buffer.clear();
+    }
+
+    for (var index = 0; index < commandText.length; index++) {
+      final char = commandText[index];
+      if (escaping) {
+        buffer.write(char);
+        escaping = false;
+        continue;
+      }
+
+      if (quote == "'") {
+        if (char == "'") {
+          quote = null;
+        } else {
+          buffer.write(char);
+        }
+        continue;
+      }
+
+      if (quote == '"') {
+        if (char == '"') {
+          quote = null;
+        } else if (char == '\\') {
+          final next = index + 1 < commandText.length
+              ? commandText[index + 1]
+              : null;
+          if (next != null &&
+              (RegExp(r'\s').hasMatch(next) ||
+                  next == '"' ||
+                  next == "'" ||
+                  next == '\\')) {
+            escaping = true;
+            continue;
+          }
+          buffer.write(char);
+        } else {
+          buffer.write(char);
+        }
+        continue;
+      }
+
+      if (char == "'") {
+        quote = "'";
+        continue;
+      }
+      if (char == '"') {
+        quote = '"';
+        continue;
+      }
+      if (char == '\\') {
+        final next = index + 1 < commandText.length
+            ? commandText[index + 1]
+            : null;
+        if (next != null &&
+            (RegExp(r'\s').hasMatch(next) ||
+                next == '"' ||
+                next == "'" ||
+                next == '\\')) {
+          escaping = true;
+          continue;
+        }
+        buffer.write(char);
+        continue;
+      }
+      if (RegExp(r'\s').hasMatch(char)) {
+        flushBuffer();
+        continue;
+      }
+
+      buffer.write(char);
+    }
+
+    if (escaping || quote != null) {
+      return null;
+    }
+
+    flushBuffer();
+    return tokens.isEmpty ? null : tokens;
+  }
+
+  String _commandName(String executableToken) {
+    final normalizedToken = executableToken.replaceAll('\\', '/');
+    final segments = normalizedToken
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .toList(growable: false);
+    final fileName = segments.isEmpty ? executableToken : segments.last;
+    return fileName.toLowerCase().replaceFirst(RegExp(r'\.exe$'), '');
   }
 }

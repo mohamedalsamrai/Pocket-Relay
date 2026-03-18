@@ -1893,6 +1893,36 @@ void main() {
     expect(group.entries.single.title, "sed -n '1,40p' lib/main.dart");
   });
 
+  test('normalizes PowerShell-wrapped command titles in work-log entries', () {
+    final reducer = TranscriptReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.commandExecution,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_command_pwsh',
+        status: CodexRuntimeItemStatus.completed,
+        detail:
+            r'powershell.exe -NoLogo -NoProfile -Command "Get-Content -Path C:\repo\README.md -TotalCount 25"',
+        snapshot: const <String, Object?>{
+          'result': <String, Object?>{'output': 'Pocket Relay'},
+          'exitCode': 0,
+        },
+      ),
+    );
+
+    final group = state.transcriptBlocks.single as CodexWorkLogGroupBlock;
+    expect(
+      group.entries.single.title,
+      r'Get-Content -Path C:\repo\README.md -TotalCount 25',
+    );
+  });
+
   test(
     'starts a new work group when a resolved request interrupts work history',
     () {
