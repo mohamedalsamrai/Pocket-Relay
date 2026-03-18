@@ -83,6 +83,7 @@ class CodexWorkLogEntry {
     this.preview,
     this.isRunning = false,
     this.exitCode,
+    this.snapshot,
   });
 
   final String id;
@@ -93,6 +94,7 @@ class CodexWorkLogEntry {
   final String? preview;
   final bool isRunning;
   final int? exitCode;
+  final Map<String, dynamic>? snapshot;
 
   CodexWorkLogEntry copyWith({
     DateTime? createdAt,
@@ -102,6 +104,7 @@ class CodexWorkLogEntry {
     String? preview,
     bool? isRunning,
     int? exitCode,
+    Map<String, dynamic>? snapshot,
   }) {
     return CodexWorkLogEntry(
       id: id,
@@ -112,6 +115,7 @@ class CodexWorkLogEntry {
       preview: preview ?? this.preview,
       isRunning: isRunning ?? this.isRunning,
       exitCode: exitCode ?? this.exitCode,
+      snapshot: snapshot ?? this.snapshot,
     );
   }
 }

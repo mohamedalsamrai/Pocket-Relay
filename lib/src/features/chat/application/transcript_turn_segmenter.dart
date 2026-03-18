@@ -69,6 +69,7 @@ class TranscriptTurnArtifactBuilder {
       preview: _blockFactory.workLogPreview(item),
       isRunning: item.isRunning,
       exitCode: item.exitCode,
+      snapshot: item.snapshot,
     );
     var nextArtifacts = List<CodexTurnArtifact>.from(turn.artifacts);
     String artifactId;

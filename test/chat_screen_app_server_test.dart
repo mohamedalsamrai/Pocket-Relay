@@ -900,9 +900,9 @@ void main() {
       await tester.pumpAndSettle();
 
       final beforeWorkDy = tester.getTopLeft(find.text('Before work')).dy;
-      final workDy = tester.getTopLeft(
-        find.text('Checking worktree status'),
-      ).dy;
+      final workDy = tester
+          .getTopLeft(find.text('Checking worktree status'))
+          .dy;
       final afterWorkDy = tester.getTopLeft(find.text('After work')).dy;
 
       expect(find.text('Work log'), findsOneWidget);
@@ -1019,6 +1019,62 @@ void main() {
     expect(find.text('lib/main.dart'), findsOneWidget);
     expect(find.text("sed -n '1,40p' lib/main.dart"), findsNothing);
     expect(find.textContaining('/usr/bin/zsh -lc'), findsNothing);
+  });
+
+  testWidgets('renders MCP tool calls as structured work-log rows', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'item_mcp_1',
+            'type': 'mcpToolCall',
+            'status': 'completed',
+            'server': 'filesystem',
+            'tool': 'read_file',
+            'arguments': <String, Object?>{'path': 'README.md'},
+            'result': <String, Object?>{
+              'structuredContent': <String, Object?>{
+                'path': 'README.md',
+                'encoding': 'utf-8',
+              },
+            },
+            'durationMs': 42,
+          },
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('filesystem.read_file'), findsOneWidget);
+    expect(find.text('args: path: README.md'), findsOneWidget);
+    expect(
+      find.text('completed · path: README.md, encoding: utf-8 · 42 ms'),
+      findsOneWidget,
+    );
+    expect(find.text('MCP tool call'), findsNothing);
   });
 
   testWidgets(
@@ -1895,9 +1951,9 @@ void main() {
       expect(find.text('File change approval resolved'), findsOneWidget);
       expect(find.text('Search docs'), findsOneWidget);
 
-      final firstWorkDy = tester.getTopLeft(
-        find.text('Checking worktree status'),
-      ).dy;
+      final firstWorkDy = tester
+          .getTopLeft(find.text('Checking worktree status'))
+          .dy;
       final resolvedDy = tester
           .getTopLeft(find.text('File change approval resolved'))
           .dy;

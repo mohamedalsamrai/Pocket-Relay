@@ -17,22 +17,31 @@ class ChatWorkLogItemProjector {
 
   ChatWorkLogEntryContract _projectEntry(CodexWorkLogEntry entry) {
     final normalizedTitle = _normalizeCompactToolLabel(entry.title);
+    final mcpToolCall = entry.entryKind == CodexWorkLogEntryKind.mcpToolCall
+        ? _projectMcpToolCall(entry)
+        : null;
     final readCommand =
-        entry.entryKind == CodexWorkLogEntryKind.commandExecution
+        mcpToolCall == null &&
+            entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseReadCommand(normalizedTitle)
         : null;
     final gitCommand =
-        readCommand == null &&
+        mcpToolCall == null &&
+            readCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseGitCommand(normalizedTitle)
         : null;
     final searchCommand =
-        readCommand == null &&
+        mcpToolCall == null &&
+            readCommand == null &&
             gitCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseContentSearchCommand(normalizedTitle)
         : null;
 
+    if (mcpToolCall != null) {
+      return mcpToolCall;
+    }
     if (readCommand != null) {
       return _projectReadCommand(
         readCommand: readCommand,
@@ -63,6 +72,62 @@ class ChatWorkLogItemProjector {
       turnId: entry.turnId,
       isRunning: entry.isRunning,
       exitCode: entry.exitCode,
+    );
+  }
+
+  ChatMcpToolCallWorkLogEntryContract? _projectMcpToolCall(
+    CodexWorkLogEntry entry,
+  ) {
+    final snapshot = entry.snapshot;
+    if (snapshot == null) {
+      return null;
+    }
+
+    final serverName = _firstNonEmptyString(<Object?>[
+      snapshot['server'],
+      snapshot['serverName'],
+    ]);
+    final toolName = _firstNonEmptyString(<Object?>[
+      snapshot['tool'],
+      snapshot['toolName'],
+    ]);
+    if (serverName == null || toolName == null) {
+      return null;
+    }
+
+    final status = _mcpToolCallStatus(snapshot, isRunning: entry.isRunning);
+    final preview = _normalizedMcpPreview(entry.preview, toolName: toolName);
+    final errorMessage = _firstNonEmptyString(<Object?>[
+      _asObjectValue(snapshot['error'])?['message'],
+      snapshot['errorMessage'],
+    ]);
+    final argumentsSummary = _summarizeMcpValue(snapshot['arguments']);
+    final resultSummary = _mcpResultSummary(snapshot['result']) ?? preview;
+    final progressSummary = status == ChatMcpToolCallStatus.running
+        ? preview
+        : null;
+    final failureSummary = status == ChatMcpToolCallStatus.failed
+        ? (errorMessage ?? preview ?? resultSummary ?? argumentsSummary)
+        : null;
+    final completionSummary = status == ChatMcpToolCallStatus.completed
+        ? (resultSummary ?? argumentsSummary)
+        : null;
+
+    return ChatMcpToolCallWorkLogEntryContract(
+      id: entry.id,
+      serverName: serverName,
+      toolName: toolName,
+      status: status,
+      argumentsSummary: argumentsSummary,
+      progressSummary: progressSummary,
+      resultSummary: completionSummary,
+      errorSummary: failureSummary,
+      durationMs: _intValue(snapshot['durationMs'] ?? snapshot['duration_ms']),
+      rawArguments: snapshot['arguments'],
+      rawResult: snapshot['result'],
+      rawError: snapshot['error'],
+      turnId: entry.turnId,
+      isRunning: entry.isRunning,
     );
   }
 
@@ -124,7 +189,7 @@ class ChatWorkLogItemProjector {
           turnId: entry.turnId,
           isRunning: entry.isRunning,
           exitCode: entry.exitCode,
-      ),
+        ),
     };
   }
 
@@ -664,7 +729,17 @@ class ChatWorkLogItemProjector {
         '-C',
         '--context',
       },
-      booleanShortFlags: const <String>{'n', 'S', 'i', 'F', 'w', 'l', 'L', 'c', 'u'},
+      booleanShortFlags: const <String>{
+        'n',
+        'S',
+        'i',
+        'F',
+        'w',
+        'l',
+        'L',
+        'c',
+        'u',
+      },
       valueShortFlags: const <String>{'g', 't', 'T', 'm', 'A', 'B', 'C'},
     );
     return parsed == null
@@ -715,7 +790,20 @@ class ChatWorkLogItemProjector {
         '--exclude',
         '--exclude-dir',
       },
-      booleanShortFlags: const <String>{'n', 'r', 'R', 'i', 'F', 'w', 'l', 'L', 'c', 'h', 'H', 's'},
+      booleanShortFlags: const <String>{
+        'n',
+        'r',
+        'R',
+        'i',
+        'F',
+        'w',
+        'l',
+        'L',
+        'c',
+        'h',
+        'H',
+        's',
+      },
       valueShortFlags: const <String>{'m', 'A', 'B', 'C'},
     );
     return parsed == null
@@ -953,10 +1041,7 @@ class ChatWorkLogItemProjector {
         continue;
       }
       if (_isLongFlagWithInlineValue(token, allowedFlags: valueFlags) ||
-          _isCompactShortValueFlag(
-            token,
-            allowedFlags: valueShortFlags,
-          )) {
+          _isCompactShortValueFlag(token, allowedFlags: valueShortFlags)) {
         index++;
         continue;
       }
@@ -1244,10 +1329,7 @@ class ChatWorkLogItemProjector {
     );
     final primaryLabel = isStaged
         ? 'Staged changes'
-        : _formatCompactItemList(
-            targets,
-            emptyLabel: 'Working tree changes',
-          );
+        : _formatCompactItemList(targets, emptyLabel: 'Working tree changes');
     final secondaryLabel = _combineDetailLabels(<String?>[
       isStaged && targets.isNotEmpty
           ? _formatCompactItemList(targets, emptyLabel: '')
@@ -1291,7 +1373,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: 'log',
       summaryLabel: 'Reviewing commit history',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Current branch'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Current branch',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1350,7 +1435,10 @@ class ChatWorkLogItemProjector {
       summaryLabel: invocation.args.contains('--staged')
           ? 'Restoring staged changes'
           : 'Restoring tracked files',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Selected paths'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Selected paths',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1384,7 +1472,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: 'checkout',
       summaryLabel: 'Switching checkout target',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Requested target'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Requested target',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1400,7 +1491,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: 'switch',
       summaryLabel: 'Switching branch',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Requested branch'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Requested branch',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1413,7 +1507,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: 'rev-parse',
       summaryLabel: 'Resolving git reference',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Repository state'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Repository state',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1428,8 +1525,13 @@ class ChatWorkLogItemProjector {
     );
     return _ParsedGitCommand(
       subcommandLabel: 'branch',
-      summaryLabel: targets.isEmpty ? 'Inspecting branches' : 'Managing branches',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Current repository'),
+      summaryLabel: targets.isEmpty
+          ? 'Inspecting branches'
+          : 'Managing branches',
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Current repository',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1459,7 +1561,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: 'stash',
       summaryLabel: 'Managing stash',
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Current stash state'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Current stash state',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1473,7 +1578,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: invocation.subcommand ?? 'git',
       summaryLabel: summaryLabel,
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: 'Default remote'),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: 'Default remote',
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1488,7 +1596,10 @@ class ChatWorkLogItemProjector {
     return _ParsedGitCommand(
       subcommandLabel: invocation.subcommand ?? 'git',
       summaryLabel: summaryLabel,
-      primaryLabel: _formatCompactItemList(targets, emptyLabel: emptyPrimaryLabel),
+      primaryLabel: _formatCompactItemList(
+        targets,
+        emptyLabel: emptyPrimaryLabel,
+      ),
       secondaryLabel: repoScopeLabel,
     );
   }
@@ -1541,6 +1652,209 @@ String? _normalizedWorkLogPreview(String? preview, String normalizedTitle) {
     return null;
   }
   return value;
+}
+
+Map<String, dynamic>? _asObjectValue(Object? value) {
+  if (value is Map) {
+    return Map<String, dynamic>.from(value);
+  }
+  return null;
+}
+
+String? _firstNonEmptyString(List<Object?> candidates) {
+  for (final candidate in candidates) {
+    final value = _stringValue(candidate);
+    if (value != null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+String? _stringValue(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+int? _intValue(Object? value) {
+  return value is num ? value.toInt() : null;
+}
+
+ChatMcpToolCallStatus _mcpToolCallStatus(
+  Map<String, dynamic> snapshot, {
+  required bool isRunning,
+}) {
+  final normalizedStatus = _normalizeIdentifier(
+    _stringValue(snapshot['status']),
+  );
+  return switch (normalizedStatus) {
+    'failed' => ChatMcpToolCallStatus.failed,
+    'completed' => ChatMcpToolCallStatus.completed,
+    'inprogress' || 'in_progress' || 'running' => ChatMcpToolCallStatus.running,
+    _ =>
+      isRunning
+          ? ChatMcpToolCallStatus.running
+          : ChatMcpToolCallStatus.completed,
+  };
+}
+
+String? _normalizedMcpPreview(String? preview, {required String toolName}) {
+  final value = _compactSummaryText(preview);
+  if (value == null) {
+    return null;
+  }
+
+  final normalizedValue = _normalizeIdentifier(value);
+  if (normalizedValue == _normalizeIdentifier(toolName) ||
+      normalizedValue == _normalizeIdentifier('MCP tool call')) {
+    return null;
+  }
+  return value;
+}
+
+String? _mcpResultSummary(Object? rawResult) {
+  final result = _asObjectValue(rawResult);
+  if (result == null) {
+    return null;
+  }
+
+  final contentText = _contentBlockText(result['content']);
+  if (contentText != null) {
+    return contentText;
+  }
+
+  final structuredSummary = _summarizeMcpValue(
+    result['structuredContent'] ?? result['structured_content'],
+  );
+  if (structuredSummary != null) {
+    return structuredSummary;
+  }
+
+  final contentItems = result['content'];
+  if (contentItems is List && contentItems.isNotEmpty) {
+    return contentItems.length == 1
+        ? 'Returned 1 content block'
+        : 'Returned ${contentItems.length} content blocks';
+  }
+
+  return null;
+}
+
+String? _contentBlockText(Object? rawContent) {
+  if (rawContent is! List) {
+    return null;
+  }
+
+  for (final entry in rawContent) {
+    final object = _asObjectValue(entry);
+    final text = _compactSummaryText(
+      _firstNonEmptyString(<Object?>[
+        object?['text'],
+        _asObjectValue(object?['content'])?['text'],
+      ]),
+    );
+    if (text != null) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
+String? _summarizeMcpValue(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is String) {
+    return _compactSummaryText(value);
+  }
+  if (value is num || value is bool) {
+    return value.toString();
+  }
+  if (value is List) {
+    if (value.isEmpty) {
+      return null;
+    }
+    final scalarItems = value
+        .map<String?>((item) => _summarizeMcpScalar(item))
+        .whereType<String>()
+        .toList(growable: false);
+    if (scalarItems.isNotEmpty) {
+      return _formatCompactItemList(scalarItems, emptyLabel: '');
+    }
+    return value.length == 1 ? '1 item' : '${value.length} items';
+  }
+  if (value is Map) {
+    final object = Map<String, dynamic>.from(value);
+    if (object.isEmpty) {
+      return null;
+    }
+    final scalarEntries = <String>[];
+    var omittedCount = 0;
+    for (final entry in object.entries) {
+      final summarizedValue = _summarizeMcpScalar(entry.value);
+      if (summarizedValue == null) {
+        continue;
+      }
+      if (scalarEntries.length == 2) {
+        omittedCount++;
+        continue;
+      }
+      scalarEntries.add(
+        '${_humanizeFieldName(entry.key)}: $summarizedValue'.trim(),
+      );
+    }
+    if (scalarEntries.isNotEmpty) {
+      if (omittedCount > 0) {
+        return '${scalarEntries.join(', ')}, +$omittedCount more';
+      }
+      return scalarEntries.join(', ');
+    }
+    return object.length == 1 ? '1 parameter' : '${object.length} parameters';
+  }
+  return null;
+}
+
+String? _summarizeMcpScalar(Object? value) {
+  return switch (value) {
+    final String stringValue => _compactSummaryText(stringValue),
+    final num numberValue => numberValue.toString(),
+    final bool boolValue => boolValue.toString(),
+    _ => null,
+  };
+}
+
+String? _compactSummaryText(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  final firstLine = trimmed.split(RegExp(r'\r?\n')).first.trim();
+  if (firstLine.isEmpty) {
+    return null;
+  }
+  return firstLine.replaceAll(RegExp(r'\s+'), ' ');
+}
+
+String _humanizeFieldName(String value) {
+  return value
+      .replaceAllMapped(
+        RegExp(r'([a-z0-9])([A-Z])'),
+        (match) => '${match.group(1)} ${match.group(2)}',
+      )
+      .replaceAll(RegExp(r'[_-]+'), ' ')
+      .trim()
+      .toLowerCase();
+}
+
+String _normalizeIdentifier(String? value) {
+  if (value == null || value.isEmpty) {
+    return '';
+  }
+  return value.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '').toLowerCase();
 }
 
 bool _containsShellOperators(String commandText) {
@@ -1750,7 +2064,10 @@ bool _isSearchQuery(String? value) {
 
 bool _isSearchScopeTarget(String token) {
   final value = token.trim();
-  return value.isNotEmpty && value != '-' && value != '--' && !value.startsWith('-');
+  return value.isNotEmpty &&
+      value != '-' &&
+      value != '--' &&
+      !value.startsWith('-');
 }
 
 int? _parsePositiveInt(String value) {
@@ -1955,10 +2272,7 @@ String? _extractGitOptionValue(
   return null;
 }
 
-bool _matchesInlineLongOption(
-  String token, {
-  required Set<String> options,
-}) {
+bool _matchesInlineLongOption(String token, {required Set<String> options}) {
   if (!token.startsWith('--')) {
     return false;
   }
@@ -1970,10 +2284,7 @@ bool _matchesInlineLongOption(
   return false;
 }
 
-bool _matchesCompactShortOption(
-  String token, {
-  required Set<String> options,
-}) {
+bool _matchesCompactShortOption(String token, {required Set<String> options}) {
   if (!token.startsWith('-') || token.startsWith('--') || token.length <= 2) {
     return false;
   }
@@ -2113,10 +2424,7 @@ class _ParsedGitInvocation {
 }
 
 class _ParsedGitGrepSearch {
-  const _ParsedGitGrepSearch({
-    required this.query,
-    required this.scopeTargets,
-  });
+  const _ParsedGitGrepSearch({required this.query, required this.scopeTargets});
 
   final String query;
   final List<String> scopeTargets;

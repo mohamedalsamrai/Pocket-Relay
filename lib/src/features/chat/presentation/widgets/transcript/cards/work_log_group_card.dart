@@ -110,8 +110,11 @@ class _WorkLogEntryRow extends StatelessWidget {
         _SelectStringSearchWorkLogEntryRow(entry: searchEntry),
       final ChatFindStrSearchWorkLogEntryContract searchEntry =>
         _FindStrSearchWorkLogEntryRow(entry: searchEntry),
-      final ChatGitWorkLogEntryContract gitEntry =>
-        _GitWorkLogEntryRow(entry: gitEntry),
+      final ChatGitWorkLogEntryContract gitEntry => _GitWorkLogEntryRow(
+        entry: gitEntry,
+      ),
+      final ChatMcpToolCallWorkLogEntryContract mcpEntry =>
+        _McpToolCallWorkLogEntryRow(entry: mcpEntry),
       final ChatGenericWorkLogEntryContract genericEntry =>
         _GenericWorkLogEntryRow(entry: genericEntry),
     };
@@ -212,10 +215,7 @@ Widget? _searchStatusBadge(
   );
 }
 
-Widget? _gitStatusBadge(
-  ThemeData theme,
-  ChatGitWorkLogEntryContract entry,
-) {
+Widget? _gitStatusBadge(ThemeData theme, ChatGitWorkLogEntryContract entry) {
   return _specialCommandStatusBadge(
     theme: theme,
     isRunning: entry.isRunning,
@@ -318,6 +318,23 @@ class _GitWorkLogEntryRow extends StatelessWidget {
   }
 }
 
+class _McpToolCallWorkLogEntryRow extends StatelessWidget {
+  const _McpToolCallWorkLogEntryRow({required this.entry});
+
+  final ChatMcpToolCallWorkLogEntryContract entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _McpToolCallCardShell(
+      entry: entry,
+      accent: entry.status == ChatMcpToolCallStatus.failed
+          ? redAccent(Theme.of(context).brightness)
+          : amberAccent(Theme.of(context).brightness),
+      icon: Icons.extension_outlined,
+    );
+  }
+}
+
 class _SedReadWorkLogEntryRow extends StatelessWidget {
   const _SedReadWorkLogEntryRow({required this.entry});
 
@@ -393,6 +410,102 @@ class _GetContentReadWorkLogEntryRow extends StatelessWidget {
   }
 }
 
+class _McpToolCallCardShell extends StatelessWidget {
+  const _McpToolCallCardShell({
+    required this.entry,
+    required this.accent,
+    required this.icon,
+  });
+
+  final ChatMcpToolCallWorkLogEntryContract entry;
+  final Color accent;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = ConversationCardPalette.of(context);
+    final outcomeColor = entry.status == ChatMcpToolCallStatus.failed
+        ? accent
+        : cards.textSecondary;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+      decoration: BoxDecoration(
+        color: cards.tintedSurface(accent, lightAlpha: 0.1, darkAlpha: 0.2),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cards.accentBorder(accent)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: cards.tintedSurface(
+                accent,
+                lightAlpha: 0.16,
+                darkAlpha: 0.3,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 16, color: accent),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.identityLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: cards.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                    height: 1.15,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                if (entry.argumentsLabel != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    entry.argumentsLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cards.textSecondary,
+                      fontSize: 11.25,
+                      height: 1.25,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+                if (entry.outcomeLabel != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    entry.outcomeLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: outcomeColor,
+                      fontSize: 11.25,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SearchCommandCardShell extends StatelessWidget {
   const _SearchCommandCardShell({
     required this.entry,
@@ -455,10 +568,7 @@ class _SearchCommandCardShell extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text.rich(
-                  _buildSearchQuerySpan(
-                    entry: entry,
-                    cards: cards,
-                  ),
+                  _buildSearchQuerySpan(entry: entry, cards: cards),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
