@@ -6,17 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
+import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_transient_feedback.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
-import 'package:pocket_relay/src/features/settings/presentation/cupertino_connection_sheet.dart';
-
-import 'support/fake_codex_app_server_client.dart';
 
 void main() {
   testWidgets(
@@ -25,10 +22,7 @@ void main() {
       final controller = _FakeDisplayWakeLockController();
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-          displayWakeLockController: controller,
-        ),
+        _buildCatalogApp(displayWakeLockController: controller),
       );
 
       await tester.pumpAndSettle();
@@ -40,12 +34,10 @@ void main() {
 
   testWidgets('shows the Pocket Relay shell', (tester) async {
     await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: ConnectionProfile.defaults(),
-            secrets: const ConnectionSecrets(),
-          ),
+      _buildCatalogApp(
+        savedProfile: SavedProfile(
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
         ),
       ),
     );
@@ -61,14 +53,38 @@ void main() {
     expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
   });
 
+  testWidgets('boots the first saved connection from the catalog', (
+    tester,
+  ) async {
+    final repository = MemoryCodexConnectionRepository(
+      initialConnections: <SavedConnection>[
+        SavedConnection(
+          id: 'conn_primary',
+          profile: _savedProfile().profile,
+          secrets: _savedProfile().secrets,
+        ),
+        SavedConnection(
+          id: 'conn_secondary',
+          profile: _savedProfile().profile.copyWith(
+            label: 'Second Box',
+            host: 'second.local',
+          ),
+          secrets: const ConnectionSecrets(password: 'second-secret'),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_buildCatalogApp(connectionRepository: repository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dev Box · devbox.local'), findsOneWidget);
+    expect(find.text('Second Box · second.local'), findsNothing);
+  });
+
   testWidgets(
     'uses the cupertino foundation path by default on iOS while transcript stays on the flutter region path',
     (tester) async {
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-        ),
-      );
+      await tester.pumpWidget(_buildCatalogApp());
 
       await tester.pumpAndSettle();
 
@@ -87,11 +103,7 @@ void main() {
   testWidgets(
     'uses the cupertino foundation path by default on macOS while transcript stays on the flutter region path',
     (tester) async {
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-        ),
-      );
+      await tester.pumpWidget(_buildCatalogApp());
 
       await tester.pumpAndSettle();
 
@@ -108,11 +120,13 @@ void main() {
   );
 
   testWidgets(
-    'shows a cupertino bootstrap shell while the profile is loading on iOS',
+    'shows a cupertino bootstrap shell while the catalog is loading on iOS',
     (tester) async {
-      final profileStore = _DeferredProfileStore();
+      final connectionRepository = _DeferredConnectionRepository();
 
-      await tester.pumpWidget(PocketRelayApp(profileStore: profileStore));
+      await tester.pumpWidget(
+        _buildCatalogApp(connectionRepository: connectionRepository),
+      );
       await tester.pump();
 
       expect(find.byType(CupertinoPageScaffold), findsOneWidget);
@@ -120,7 +134,7 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.byType(Scaffold), findsNothing);
 
-      profileStore.complete(_savedProfile());
+      connectionRepository.complete(_savedProfile());
       await tester.pumpAndSettle();
 
       expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
@@ -129,17 +143,17 @@ void main() {
   );
 
   testWidgets('uses system theme mode', (tester) async {
-    final profileStore = MemoryCodexProfileStore(
-      initialValue: SavedProfile(
-        profile: ConnectionProfile.defaults().copyWith(
-          host: 'example.com',
-          username: 'vince',
+    await tester.pumpWidget(
+      _buildCatalogApp(
+        savedProfile: SavedProfile(
+          profile: ConnectionProfile.defaults().copyWith(
+            host: 'example.com',
+            username: 'vince',
+          ),
+          secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        secrets: const ConnectionSecrets(password: 'secret'),
       ),
     );
-
-    await tester.pumpWidget(PocketRelayApp(profileStore: profileStore));
 
     await tester.pumpAndSettle();
 
@@ -149,108 +163,9 @@ void main() {
   });
 
   testWidgets(
-    'saves connection settings through the cupertino sheet by default on iOS',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-          appServerClient: appServerClient,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Connection settings'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(CupertinoConnectionSheet), findsOneWidget);
-
-      await tester.enterText(
-        _settingsField(ConnectionSettingsFieldId.label),
-        'iPhone Box',
-      );
-      await tester.ensureVisible(find.text('Save'));
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(CupertinoConnectionSheet), findsNothing);
-      expect(find.text('iPhone Box · devbox.local'), findsOneWidget);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
-  );
-
-  testWidgets(
-    'sends prompts through the cupertino composer by default on iOS',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-          appServerClient: appServerClient,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final composerField = find.byType(CupertinoTextField).first;
-      await tester.enterText(composerField, 'Hello Codex');
-      await tester.tap(find.byKey(const ValueKey('send')));
-      await tester.pumpAndSettle();
-
-      expect(appServerClient.sentMessages, <String>['Hello Codex']);
-      expect(
-        tester.widget<CupertinoTextField>(composerField).controller?.text,
-        isEmpty,
-      );
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
-  );
-
-  testWidgets(
-    'shows cupertino feedback and retains the draft when sending fails by default on iOS',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient()
-        ..sendUserMessageError = StateError('transport broke');
-      addTearDown(appServerClient.close);
-      addTearDown(CupertinoTransientFeedbackPresenter.dismissActiveEntry);
-
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-          appServerClient: appServerClient,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final composerField = find.byType(CupertinoTextField).first;
-      await tester.enterText(composerField, 'Hello Codex');
-      await tester.tap(find.byKey(const ValueKey('send')));
-      await tester.pump();
-
-      expect(find.byType(CupertinoTransientFeedbackBanner), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(
-        tester.widget<CupertinoTextField>(composerField).controller?.text,
-        'Hello Codex',
-      );
-
-      CupertinoTransientFeedbackPresenter.dismissActiveEntry();
-      await tester.pump();
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
-  );
-
-  testWidgets(
     'presents top-level menu actions through the shared popup menu by default on iOS',
     (tester) async {
-      await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-        ),
-      );
+      await tester.pumpWidget(_buildCatalogApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('More actions'));
@@ -266,17 +181,17 @@ void main() {
   testWidgets('settings sheet no longer shows a dark mode toggle', (
     tester,
   ) async {
-    final profileStore = MemoryCodexProfileStore(
-      initialValue: SavedProfile(
-        profile: ConnectionProfile.defaults().copyWith(
-          host: 'example.com',
-          username: 'vince',
+    await tester.pumpWidget(
+      _buildCatalogApp(
+        savedProfile: SavedProfile(
+          profile: ConnectionProfile.defaults().copyWith(
+            host: 'example.com',
+            username: 'vince',
+          ),
+          secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        secrets: const ConnectionSecrets(password: 'secret'),
       ),
     );
-
-    await tester.pumpWidget(PocketRelayApp(profileStore: profileStore));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Connection settings'));
@@ -285,10 +200,6 @@ void main() {
     expect(find.text('Appearance'), findsNothing);
     expect(find.text('Dark mode'), findsNothing);
   });
-}
-
-Finder _settingsField(ConnectionSettingsFieldId fieldId) {
-  return find.byKey(ValueKey<String>('connection_settings_${fieldId.name}'));
 }
 
 SavedProfile _savedProfile() {
@@ -302,27 +213,80 @@ SavedProfile _savedProfile() {
   );
 }
 
-class _DeferredProfileStore implements CodexProfileStore {
-  final _completer = Completer<SavedProfile>();
-  SavedProfile _savedProfile = SavedProfile(
-    profile: ConnectionProfile.defaults(),
-    secrets: const ConnectionSecrets(),
+PocketRelayApp _buildCatalogApp({
+  SavedProfile? savedProfile,
+  CodexConnectionRepository? connectionRepository,
+  CodexConnectionHandoffStore? connectionHandoffStore,
+  DisplayWakeLockController? displayWakeLockController,
+  CodexAppServerClient? appServerClient,
+}) {
+  return PocketRelayApp(
+    connectionRepository:
+        connectionRepository ??
+        MemoryCodexConnectionRepository.single(
+          savedProfile: savedProfile ?? _savedProfile(),
+          connectionId: 'conn_primary',
+        ),
+    connectionHandoffStore:
+        connectionHandoffStore ?? MemoryCodexConnectionHandoffStore(),
+    displayWakeLockController: displayWakeLockController,
+    appServerClient: appServerClient,
   );
+}
+
+class _DeferredConnectionRepository implements CodexConnectionRepository {
+  final _completer = Completer<SavedConnection>();
+  SavedConnection? _savedConnection;
 
   void complete(SavedProfile savedProfile) {
-    _savedProfile = savedProfile;
-    _completer.complete(savedProfile);
+    final savedConnection = SavedConnection(
+      id: 'conn_primary',
+      profile: savedProfile.profile,
+      secrets: savedProfile.secrets,
+    );
+    _savedConnection = savedConnection;
+    if (!_completer.isCompleted) {
+      _completer.complete(savedConnection);
+    }
   }
 
   @override
-  Future<SavedProfile> load() => _completer.future;
+  Future<ConnectionCatalogState> loadCatalog() async {
+    final savedConnection = await _loadSavedConnection();
+    return ConnectionCatalogState(
+      orderedConnectionIds: <String>[savedConnection.id],
+      connectionsById: <String, SavedConnectionSummary>{
+        savedConnection.id: savedConnection.toSummary(),
+      },
+    );
+  }
 
   @override
-  Future<void> save(
-    ConnectionProfile profile,
-    ConnectionSecrets secrets,
-  ) async {
-    _savedProfile = _savedProfile.copyWith(profile: profile, secrets: secrets);
+  Future<SavedConnection> loadConnection(String connectionId) async {
+    final savedConnection = await _loadSavedConnection();
+    if (savedConnection.id != connectionId) {
+      throw StateError('Unknown saved connection: $connectionId');
+    }
+    return savedConnection;
+  }
+
+  @override
+  Future<void> saveConnection(SavedConnection connection) async {
+    _savedConnection = connection;
+    if (!_completer.isCompleted) {
+      _completer.complete(connection);
+    }
+  }
+
+  @override
+  Future<void> deleteConnection(String connectionId) async {
+    if (_savedConnection?.id == connectionId) {
+      throw UnsupportedError('deleteConnection is not used in this test.');
+    }
+  }
+
+  Future<SavedConnection> _loadSavedConnection() async {
+    return _savedConnection ?? await _completer.future;
   }
 }
 

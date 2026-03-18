@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
+import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
@@ -19,6 +22,8 @@ class PocketRelayApp extends StatefulWidget {
     super.key,
     this.profileStore,
     this.conversationHandoffStore,
+    this.connectionRepository,
+    this.connectionHandoffStore,
     this.appServerClient,
     this.displayWakeLockController,
     this.platformPolicy,
@@ -28,6 +33,8 @@ class PocketRelayApp extends StatefulWidget {
 
   final CodexProfileStore? profileStore;
   final CodexConversationHandoffStore? conversationHandoffStore;
+  final CodexConnectionRepository? connectionRepository;
+  final CodexConnectionHandoffStore? connectionHandoffStore;
   final CodexAppServerClient? appServerClient;
   final DisplayWakeLockController? displayWakeLockController;
   final PocketPlatformPolicy? platformPolicy;
@@ -40,12 +47,20 @@ class PocketRelayApp extends StatefulWidget {
 class _PocketRelayAppState extends State<PocketRelayApp> {
   CodexProfileStore? _ownedProfileStore;
   CodexConversationHandoffStore? _ownedConversationHandoffStore;
+  CodexConnectionRepository? _ownedConnectionRepository;
+  CodexConnectionHandoffStore? _ownedConnectionHandoffStore;
+  CodexConnectionRepository? _ownedConnectionHandoffStoreRepository;
   CodexAppServerClient? _ownedAppServerClient;
-  late CodexProfileStore _profileStore;
-  late CodexConversationHandoffStore _conversationHandoffStore;
   late CodexAppServerClient _appServerClient;
+  CodexConnectionRepository? _connectionRepository;
+  CodexConnectionHandoffStore? _connectionHandoffStore;
+  CodexProfileStore? _profileStore;
+  CodexConversationHandoffStore? _conversationHandoffStore;
   SavedProfile? _savedProfile;
   SavedConversationHandoff? _savedConversationHandoff;
+  String? _scopedConnectionId;
+  CodexConnectionRepository? _scopedConnectionRepository;
+  CodexConnectionHandoffStore? _scopedConnectionHandoffStore;
   int _bootstrapLoadGeneration = 0;
 
   @override
@@ -58,21 +73,23 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
   @override
   void didUpdateWidget(covariant PocketRelayApp oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.profileStore == widget.profileStore &&
-        oldWidget.conversationHandoffStore == widget.conversationHandoffStore &&
+    final bootstrapDependenciesChanged =
+        oldWidget.profileStore != widget.profileStore ||
+        oldWidget.conversationHandoffStore != widget.conversationHandoffStore ||
+        oldWidget.connectionRepository != widget.connectionRepository ||
+        oldWidget.connectionHandoffStore != widget.connectionHandoffStore;
+    if (!bootstrapDependenciesChanged &&
         oldWidget.appServerClient == widget.appServerClient) {
       return;
     }
 
     _bindDependencies();
-    if (oldWidget.profileStore == widget.profileStore &&
-        oldWidget.conversationHandoffStore == widget.conversationHandoffStore) {
+    if (!bootstrapDependenciesChanged) {
       return;
     }
 
     setState(() {
-      _savedProfile = null;
-      _savedConversationHandoff = null;
+      _resetBootstrapState();
     });
     _loadBootstrapState();
   }
@@ -87,14 +104,6 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
   }
 
   void _bindDependencies() {
-    _profileStore =
-        widget.profileStore ??
-        (_ownedProfileStore ??= SecureCodexProfileStore());
-    _conversationHandoffStore =
-        widget.conversationHandoffStore ??
-        (_ownedConversationHandoffStore ??=
-            SecureCodexConversationHandoffStore());
-
     if (widget.appServerClient case final injectedClient?) {
       final ownedClient = _ownedAppServerClient;
       _ownedAppServerClient = null;
@@ -106,27 +115,23 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
     }
 
     _appServerClient = _ownedAppServerClient ??= CodexAppServerClient();
+
+    if (_usesLegacyBootstrap) {
+      _bindLegacyBootstrapDependencies();
+      return;
+    }
+
+    _bindCatalogBootstrapDependencies();
   }
 
   Future<void> _loadBootstrapState() async {
     final loadGeneration = ++_bootstrapLoadGeneration;
-    final profileStore = _profileStore;
-    final conversationHandoffStore = _conversationHandoffStore;
-    final results = await Future.wait<dynamic>(<Future<dynamic>>[
-      profileStore.load(),
-      conversationHandoffStore.load(),
-    ]);
-    if (!mounted ||
-        loadGeneration != _bootstrapLoadGeneration ||
-        profileStore != _profileStore ||
-        conversationHandoffStore != _conversationHandoffStore) {
+    if (_usesLegacyBootstrap) {
+      await _loadLegacyBootstrapState(loadGeneration);
       return;
     }
 
-    setState(() {
-      _savedProfile = results[0] as SavedProfile;
-      _savedConversationHandoff = results[1] as SavedConversationHandoff;
-    });
+    await _loadCatalogBootstrapState(loadGeneration);
   }
 
   @override
@@ -161,6 +166,160 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
       ),
     );
   }
+
+  bool get _usesLegacyBootstrap {
+    return widget.profileStore != null ||
+        widget.conversationHandoffStore != null;
+  }
+
+  void _bindLegacyBootstrapDependencies() {
+    _connectionRepository = null;
+    _connectionHandoffStore = null;
+    _profileStore =
+        widget.profileStore ??
+        (_ownedProfileStore ??= SecureCodexProfileStore());
+    _conversationHandoffStore =
+        widget.conversationHandoffStore ??
+        (_ownedConversationHandoffStore ??=
+            SecureCodexConversationHandoffStore());
+  }
+
+  void _bindCatalogBootstrapDependencies() {
+    final connectionRepository =
+        widget.connectionRepository ??
+        (_ownedConnectionRepository ??= SecureCodexConnectionRepository());
+    _connectionRepository = connectionRepository;
+    _profileStore = null;
+    _conversationHandoffStore = null;
+
+    if (widget.connectionHandoffStore case final injectedHandoffStore?) {
+      _connectionHandoffStore = injectedHandoffStore;
+      return;
+    }
+
+    final ownedHandoffStore = _ownedConnectionHandoffStore;
+    if (ownedHandoffStore == null ||
+        _ownedConnectionHandoffStoreRepository != connectionRepository) {
+      _ownedConnectionHandoffStore = SecureCodexConnectionHandoffStore(
+        connectionRepository: connectionRepository,
+      );
+      _ownedConnectionHandoffStoreRepository = connectionRepository;
+    }
+    _connectionHandoffStore = _ownedConnectionHandoffStore;
+  }
+
+  Future<void> _loadLegacyBootstrapState(int loadGeneration) async {
+    final profileStore = _profileStore;
+    final conversationHandoffStore = _conversationHandoffStore;
+    if (profileStore == null || conversationHandoffStore == null) {
+      return;
+    }
+
+    final results = await Future.wait<dynamic>(<Future<dynamic>>[
+      profileStore.load(),
+      conversationHandoffStore.load(),
+    ]);
+    if (!mounted ||
+        loadGeneration != _bootstrapLoadGeneration ||
+        profileStore != _profileStore ||
+        conversationHandoffStore != _conversationHandoffStore) {
+      return;
+    }
+
+    setState(() {
+      _savedProfile = results[0] as SavedProfile;
+      _savedConversationHandoff = results[1] as SavedConversationHandoff;
+    });
+  }
+
+  Future<void> _loadCatalogBootstrapState(int loadGeneration) async {
+    final connectionRepository = _connectionRepository;
+    final connectionHandoffStore = _connectionHandoffStore;
+    if (connectionRepository == null || connectionHandoffStore == null) {
+      return;
+    }
+
+    final catalog = await connectionRepository.loadCatalog();
+    if (!mounted ||
+        loadGeneration != _bootstrapLoadGeneration ||
+        connectionRepository != _connectionRepository ||
+        connectionHandoffStore != _connectionHandoffStore) {
+      return;
+    }
+    if (catalog.isEmpty) {
+      throw StateError(
+        'PocketRelayApp requires at least one saved connection during catalog bootstrap.',
+      );
+    }
+
+    final selectedConnectionId = catalog.orderedConnectionIds.first;
+    final results = await Future.wait<dynamic>(<Future<dynamic>>[
+      connectionRepository.loadConnection(selectedConnectionId),
+      connectionHandoffStore.load(selectedConnectionId),
+    ]);
+    if (!mounted ||
+        loadGeneration != _bootstrapLoadGeneration ||
+        connectionRepository != _connectionRepository ||
+        connectionHandoffStore != _connectionHandoffStore) {
+      return;
+    }
+
+    _ensureScopedStores(
+      connectionId: selectedConnectionId,
+      connectionRepository: connectionRepository,
+      connectionHandoffStore: connectionHandoffStore,
+    );
+    final connection = results[0] as SavedConnection;
+    final handoff = results[1] as SavedConversationHandoff;
+
+    setState(() {
+      _savedProfile = SavedProfile(
+        profile: connection.profile,
+        secrets: connection.secrets,
+      );
+      _savedConversationHandoff = handoff;
+    });
+  }
+
+  void _ensureScopedStores({
+    required String connectionId,
+    required CodexConnectionRepository connectionRepository,
+    required CodexConnectionHandoffStore connectionHandoffStore,
+  }) {
+    final scopedProfileStore = _profileStore;
+    final scopedConversationHandoffStore = _conversationHandoffStore;
+    if (_scopedConnectionId == connectionId &&
+        _scopedConnectionRepository == connectionRepository &&
+        _scopedConnectionHandoffStore == connectionHandoffStore &&
+        scopedProfileStore != null &&
+        scopedConversationHandoffStore != null) {
+      return;
+    }
+
+    _scopedConnectionId = connectionId;
+    _scopedConnectionRepository = connectionRepository;
+    _scopedConnectionHandoffStore = connectionHandoffStore;
+    _profileStore = ConnectionScopedProfileStore(
+      connectionId: connectionId,
+      connectionRepository: connectionRepository,
+    );
+    _conversationHandoffStore = ConnectionScopedConversationHandoffStore(
+      connectionId: connectionId,
+      handoffStore: connectionHandoffStore,
+    );
+  }
+
+  void _resetBootstrapState() {
+    _savedProfile = null;
+    _savedConversationHandoff = null;
+    _scopedConnectionId = null;
+    _scopedConnectionRepository = null;
+    _scopedConnectionHandoffStore = null;
+    if (!_usesLegacyBootstrap) {
+      _profileStore = null;
+      _conversationHandoffStore = null;
+    }
+  }
 }
 
 class _PocketRelayHome extends StatelessWidget {
@@ -175,8 +334,8 @@ class _PocketRelayHome extends StatelessWidget {
 
   final SavedProfile? savedProfile;
   final SavedConversationHandoff? savedConversationHandoff;
-  final CodexProfileStore profileStore;
-  final CodexConversationHandoffStore conversationHandoffStore;
+  final CodexProfileStore? profileStore;
+  final CodexConversationHandoffStore? conversationHandoffStore;
   final CodexAppServerClient appServerClient;
   final PocketPlatformPolicy platformPolicy;
 
@@ -184,10 +343,15 @@ class _PocketRelayHome extends StatelessWidget {
   Widget build(BuildContext context) {
     final resolvedProfile = savedProfile;
     final resolvedConversationHandoff = savedConversationHandoff;
-    if (resolvedProfile != null && resolvedConversationHandoff != null) {
+    final resolvedProfileStore = profileStore;
+    final resolvedConversationHandoffStore = conversationHandoffStore;
+    if (resolvedProfile != null &&
+        resolvedConversationHandoff != null &&
+        resolvedProfileStore != null &&
+        resolvedConversationHandoffStore != null) {
       return ChatRootAdapter(
-        profileStore: profileStore,
-        conversationHandoffStore: conversationHandoffStore,
+        profileStore: resolvedProfileStore,
+        conversationHandoffStore: resolvedConversationHandoffStore,
         appServerClient: appServerClient,
         initialSavedProfile: resolvedProfile,
         initialSavedConversationHandoff: resolvedConversationHandoff,
