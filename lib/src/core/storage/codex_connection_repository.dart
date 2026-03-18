@@ -21,6 +21,70 @@ abstract interface class CodexConnectionRepository {
   Future<void> deleteConnection(String connectionId);
 }
 
+class MemoryCodexConnectionRepository implements CodexConnectionRepository {
+  MemoryCodexConnectionRepository({
+    Iterable<SavedConnection> initialConnections = const <SavedConnection>[],
+  }) : _connectionsById = <String, SavedConnection>{
+         for (final connection in initialConnections) connection.id: connection,
+       },
+       _orderedConnectionIds = <String>[
+         for (final connection in initialConnections) connection.id,
+       ];
+
+  factory MemoryCodexConnectionRepository.single({
+    required SavedProfile savedProfile,
+    String connectionId = 'conn_1',
+  }) {
+    return MemoryCodexConnectionRepository(
+      initialConnections: <SavedConnection>[
+        SavedConnection(
+          id: connectionId,
+          profile: savedProfile.profile,
+          secrets: savedProfile.secrets,
+        ),
+      ],
+    );
+  }
+
+  final Map<String, SavedConnection> _connectionsById;
+  final List<String> _orderedConnectionIds;
+
+  @override
+  Future<ConnectionCatalogState> loadCatalog() async {
+    return ConnectionCatalogState(
+      orderedConnectionIds: List<String>.from(_orderedConnectionIds),
+      connectionsById: <String, SavedConnectionSummary>{
+        for (final entry in _connectionsById.entries)
+          entry.key: entry.value.toSummary(),
+      },
+    );
+  }
+
+  @override
+  Future<SavedConnection> loadConnection(String connectionId) async {
+    final connection = _connectionsById[connectionId];
+    if (connection == null) {
+      throw StateError('Unknown saved connection: $connectionId');
+    }
+    return connection;
+  }
+
+  @override
+  Future<void> saveConnection(SavedConnection connection) async {
+    final exists = _connectionsById.containsKey(connection.id);
+    _connectionsById[connection.id] = connection;
+    if (!exists) {
+      _orderedConnectionIds.add(connection.id);
+    }
+  }
+
+  @override
+  Future<void> deleteConnection(String connectionId) async {
+    _connectionsById.remove(connectionId);
+    _orderedConnectionIds.remove(connectionId);
+  }
+}
+
 class SecureCodexConnectionRepository implements CodexConnectionRepository {
   static const _catalogIndexKey = 'pocket_relay.connections.index';
   static const _catalogSchemaVersion = 1;
