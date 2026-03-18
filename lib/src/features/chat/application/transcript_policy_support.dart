@@ -108,7 +108,9 @@ class TranscriptPolicySupport {
   }
 
   CodexSessionState appendBlock(CodexSessionState state, CodexUiBlock block) {
-    return state.copyWith(blocks: <CodexUiBlock>[...state.blocks, block]);
+    return state.copyWithProjectedTranscript(
+      blocks: <CodexUiBlock>[...state.blocks, block],
+    );
   }
 
   CodexStatusBlock statusEntry({

@@ -33,7 +33,7 @@ class TranscriptPolicy {
     );
 
     return _support.appendBlock(
-      state.copyWith(
+      state.copyWithProjectedTranscript(
         connectionStatus: CodexRuntimeSessionState.running,
         pendingLocalUserMessageBlockIds: <String>[
           ...state.pendingLocalUserMessageBlockIds,
@@ -49,7 +49,7 @@ class TranscriptPolicy {
     String? message,
     DateTime? createdAt,
   }) {
-    final cleared = state.copyWith(
+    final cleared = state.copyWithProjectedTranscript(
       clearThreadId: true,
       clearActiveTurn: true,
       clearPendingLocalUserMessageBlockIds: true,
@@ -73,7 +73,7 @@ class TranscriptPolicy {
   }
 
   CodexSessionState clearTranscript(CodexSessionState state) {
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       clearThreadId: true,
       clearActiveTurn: true,
       blocks: const <CodexUiBlock>[],
@@ -83,7 +83,7 @@ class TranscriptPolicy {
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       clearThreadId: true,
       clearActiveTurn: true,
       clearPendingLocalUserMessageBlockIds: true,
@@ -116,7 +116,7 @@ class TranscriptPolicy {
     final finalizedState = _support.appendBlock(
       _commitActiveTurn(
         _clearLocalUserMessageCorrelationState(
-          state.copyWith(clearActiveTurn: true),
+          state.copyWithProjectedTranscript(clearActiveTurn: true),
         ),
         activeTurn: finalizedTurn.$1,
       ),
@@ -126,7 +126,7 @@ class TranscriptPolicy {
         usage: finalizedTurn.$1?.pendingThreadTokenUsageBlock,
       ),
     );
-    return finalizedState.copyWith(
+    return finalizedState.copyWithProjectedTranscript(
       activeTurn: _support.startActiveTurn(
         turnId: turnId,
         threadId: threadId ?? state.threadId,
@@ -145,7 +145,10 @@ class TranscriptPolicy {
     );
     final nextState = _commitActiveTurn(
       _clearLocalUserMessageCorrelationState(
-        state.copyWith(clearThreadId: true, clearActiveTurn: true),
+        state.copyWithProjectedTranscript(
+          clearThreadId: true,
+          clearActiveTurn: true,
+        ),
       ),
       activeTurn: finalizedTurn.$1,
     );
@@ -175,7 +178,7 @@ class TranscriptPolicy {
         : completedTimer.elapsedAt(event.createdAt);
     final nextState = _commitActiveTurn(
       _clearLocalUserMessageCorrelationState(
-        state.copyWith(
+        state.copyWithProjectedTranscript(
           connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
               ? CodexRuntimeSessionState.error
               : CodexRuntimeSessionState.stopped,
@@ -216,7 +219,7 @@ class TranscriptPolicy {
     );
     final nextState = _commitActiveTurn(
       _clearLocalUserMessageCorrelationState(
-        state.copyWith(
+        state.copyWithProjectedTranscript(
           connectionStatus: CodexRuntimeSessionState.ready,
           clearActiveTurn: true,
         ),
@@ -248,7 +251,7 @@ class TranscriptPolicy {
     return _support.appendBlock(
       _commitActiveTurn(
         _clearLocalUserMessageCorrelationState(
-          state.copyWith(
+          state.copyWithProjectedTranscript(
             connectionStatus: CodexRuntimeSessionState.ready,
             clearActiveTurn: true,
           ),
@@ -469,7 +472,7 @@ class TranscriptPolicy {
 
     final nextBlocks = List<CodexUiBlock>.from(state.blocks);
     nextBlocks[blockIndex] = block.copyWith(isSaved: true);
-    return state.copyWith(blocks: nextBlocks);
+    return state.copyWithProjectedTranscript(blocks: nextBlocks);
   }
 
   CodexSessionState applyStatus(
@@ -489,7 +492,7 @@ class TranscriptPolicy {
         threadId: event.threadId,
         createdAt: event.createdAt,
       );
-      return state.copyWith(
+      return state.copyWithProjectedTranscript(
         activeTurn: activeTurn?.copyWith(
           pendingThreadTokenUsageBlock: usageBlock,
         ),
@@ -607,7 +610,9 @@ class TranscriptPolicy {
       return _upsertTopLevelTranscriptBlock(state, block);
     }
 
-    return state.copyWith(activeTurn: _upsertTurnBlock(activeTurn, block));
+    return state.copyWithProjectedTranscript(
+      activeTurn: _upsertTurnBlock(activeTurn, block),
+    );
   }
 
   CodexSessionState _stateWithAppendedTranscriptBlock(
@@ -626,7 +631,9 @@ class TranscriptPolicy {
       return _support.appendBlock(state, block);
     }
 
-    return state.copyWith(activeTurn: _appendTurnBlock(activeTurn, block));
+    return state.copyWithProjectedTranscript(
+      activeTurn: _appendTurnBlock(activeTurn, block),
+    );
   }
 
   CodexActiveTurnState _upsertTurnBlock(
@@ -672,7 +679,7 @@ class TranscriptPolicy {
 
     final nextBlocks = List<CodexUiBlock>.from(state.blocks);
     nextBlocks[existingIndex] = block;
-    return state.copyWith(blocks: nextBlocks);
+    return state.copyWithProjectedTranscript(blocks: nextBlocks);
   }
 
   String _sshUnpinnedHostKeyBlockId({required String host, required int port}) {
@@ -730,7 +737,7 @@ class TranscriptPolicy {
   CodexSessionState _clearLocalUserMessageCorrelationState(
     CodexSessionState state,
   ) {
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       clearPendingLocalUserMessageBlockIds: true,
       clearLocalUserMessageProviderBindings: true,
     );

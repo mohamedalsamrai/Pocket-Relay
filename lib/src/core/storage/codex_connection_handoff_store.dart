@@ -2,9 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'codex_connection_repository.dart';
-import 'codex_conversation_handoff_store.dart';
 import 'shared_preferences_async_migration.dart';
+import 'codex_conversation_handoff_store.dart';
 
 abstract interface class CodexConnectionHandoffStore {
   Future<SavedConversationHandoff> load(String connectionId);
@@ -19,15 +18,10 @@ class SecureCodexConnectionHandoffStore implements CodexConnectionHandoffStore {
   static const _handoffKeySuffix = '.conversation_handoff';
   static const _preferencesMigrationKey =
       'pocket_relay.connection_handoffs_async_migration_complete';
-  static const _legacyMigrationCompleteKey =
-      'pocket_relay.connection_handoffs_legacy_migration_complete';
 
-  SecureCodexConnectionHandoffStore({
-    required this.connectionRepository,
-    SharedPreferencesAsync? preferences,
-  }) : _preferences = preferences;
+  SecureCodexConnectionHandoffStore({SharedPreferencesAsync? preferences})
+    : _preferences = preferences;
 
-  final CodexConnectionRepository connectionRepository;
   SharedPreferencesAsync? _preferences;
   final MemoryCodexConnectionHandoffStore _fallbackStore =
       MemoryCodexConnectionHandoffStore();
@@ -42,10 +36,6 @@ class SecureCodexConnectionHandoffStore implements CodexConnectionHandoffStore {
     }
 
     await _ensurePreferencesReady();
-    await _ensureLegacyMigrationIfNeeded(
-      preferredConnectionId: normalizedConnectionId,
-    );
-
     final rawHandoff = await preferences.getString(
       _handoffKeyForConnection(normalizedConnectionId),
     );
@@ -101,77 +91,6 @@ class SecureCodexConnectionHandoffStore implements CodexConnectionHandoffStore {
     return _preferencesReady ??= ensureSharedPreferencesAsyncReady(
       migrationCompletedKey: _preferencesMigrationKey,
     );
-  }
-
-  Future<void> _ensureLegacyMigrationIfNeeded({
-    required String preferredConnectionId,
-  }) async {
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      return;
-    }
-
-    final didMigrate =
-        await preferences.getBool(_legacyMigrationCompleteKey) ?? false;
-    if (didMigrate) {
-      return;
-    }
-
-    final keyedConnectionIds = await _discoverKeyedConnectionIds(preferences);
-    if (keyedConnectionIds.isNotEmpty) {
-      await preferences.setBool(_legacyMigrationCompleteKey, true);
-      return;
-    }
-
-    final legacyStore = SecureCodexConversationHandoffStore(
-      preferences: preferences,
-    );
-    final legacyHandoff = await legacyStore.load();
-    if (legacyHandoff.normalizedResumeThreadId == null) {
-      await preferences.setBool(_legacyMigrationCompleteKey, true);
-      return;
-    }
-
-    final catalog = await connectionRepository.loadCatalog();
-    if (catalog.isEmpty) {
-      await preferences.setBool(_legacyMigrationCompleteKey, true);
-      return;
-    }
-
-    final targetConnectionId =
-        catalog.connectionForId(preferredConnectionId) != null
-        ? preferredConnectionId
-        : catalog.orderedConnectionIds.first;
-    await save(targetConnectionId, legacyHandoff);
-    await preferences.setBool(_legacyMigrationCompleteKey, true);
-  }
-
-  Future<List<String>> _discoverKeyedConnectionIds(
-    SharedPreferencesAsync preferences,
-  ) async {
-    final keys = await preferences.getKeys();
-    final connectionIds = <String>[];
-
-    for (final key in keys) {
-      if (!key.startsWith(_handoffKeyPrefix) ||
-          !key.endsWith(_handoffKeySuffix)) {
-        continue;
-      }
-
-      final connectionId = key.substring(
-        _handoffKeyPrefix.length,
-        key.length - _handoffKeySuffix.length,
-      );
-      final normalizedConnectionId = connectionId.trim();
-      if (normalizedConnectionId.isEmpty ||
-          connectionIds.contains(normalizedConnectionId)) {
-        continue;
-      }
-      connectionIds.add(normalizedConnectionId);
-    }
-
-    connectionIds.sort();
-    return connectionIds;
   }
 
   SharedPreferencesAsync? get _resolvedPreferences {

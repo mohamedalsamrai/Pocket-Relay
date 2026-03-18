@@ -44,7 +44,7 @@ class TranscriptRequestPolicy {
         detail: event.detail,
         args: event.args,
       );
-      final nextState = state.copyWith(
+      final nextState = state.copyWithProjectedTranscript(
         activeTurn: _activeTurnForPendingInput(
           activeTurn,
           requestId: requestId,
@@ -68,7 +68,7 @@ class TranscriptRequestPolicy {
       args: event.args,
     );
 
-    final nextState = state.copyWith(
+    final nextState = state.copyWithProjectedTranscript(
       activeTurn: _activeTurnForPendingApproval(
         activeTurn,
         requestId: requestId,
@@ -107,7 +107,7 @@ class TranscriptRequestPolicy {
       title: '${codexRequestTitle(event.requestType)} resolved',
       body: 'Codex received a response for this request.',
     );
-    final nextState = state.copyWith(
+    final nextState = state.copyWithProjectedTranscript(
       activeTurn: _activeTurnAfterRequestResolved(
         state.activeTurn,
         requestId: requestId,
@@ -159,7 +159,7 @@ class TranscriptRequestPolicy {
       args: event.rawPayload,
     );
 
-    final nextState = state.copyWith(
+    final nextState = state.copyWithProjectedTranscript(
       activeTurn: _activeTurnForPendingInput(
         activeTurn,
         requestId: requestId,
@@ -197,7 +197,7 @@ class TranscriptRequestPolicy {
       isResolved: true,
       answers: event.answers,
     );
-    final nextState = state.copyWith(
+    final nextState = state.copyWithProjectedTranscript(
       activeTurn: _activeTurnAfterUserInputResolved(
         state.activeTurn,
         requestId: requestId,
@@ -385,7 +385,9 @@ class TranscriptRequestPolicy {
       (artifact) => artifact.id == block.id,
     );
     if (existingIndex == -1) {
-      return state.copyWith(activeTurn: _appendTurnBlock(activeTurn, block));
+      return state.copyWithProjectedTranscript(
+        activeTurn: _appendTurnBlock(activeTurn, block),
+      );
     }
     if (existingIndex != activeTurn.artifacts.length - 1) {
       return state;
@@ -403,7 +405,7 @@ class TranscriptRequestPolicy {
       ),
     );
 
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       activeTurn: _replaceTailTurnBlock(activeTurn, nextBlock),
     );
   }

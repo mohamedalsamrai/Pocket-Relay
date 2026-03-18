@@ -73,18 +73,18 @@ void main() {
   );
 
   test(
-    'loadCatalog migrates legacy singleton profile data into a catalog entry',
+    'loadCatalog ignores legacy singleton profile data once the migration window is closed',
     () async {
-      final profile = ConnectionProfile.defaults().copyWith(
-        host: 'example.com',
-        username: 'vince',
-        workspaceDir: '/workspace/app',
-      );
       SharedPreferences.setMockInitialValues(<String, Object>{
-        'codex_pocket.profile': jsonEncode(profile.toJson()),
-        'pocket_relay.preferences': jsonEncode(<String, Object>{
-          'themeMode': 'dark',
-        }),
+        'codex_pocket.profile': jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                host: 'example.com',
+                username: 'vince',
+                workspaceDir: '/workspace/app',
+              )
+              .toJson(),
+        ),
       });
       final secureStorage = _FakeFlutterSecureStorage(<String, String>{
         'codex_pocket.secret.password': 'secret',
@@ -93,38 +93,37 @@ void main() {
       final repository = SecureCodexConnectionRepository(
         secureStorage: secureStorage,
         preferences: preferences,
-        connectionIdGenerator: () => 'conn_migrated',
+        connectionIdGenerator: () => 'conn_seed',
       );
 
       final catalog = await repository.loadCatalog();
-      final connection = await repository.loadConnection('conn_migrated');
+      final connection = await repository.loadConnection('conn_seed');
 
-      expect(catalog.orderedConnectionIds, <String>['conn_migrated']);
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
       expect(
         connection,
         SavedConnection(
-          id: 'conn_migrated',
-          profile: profile,
-          secrets: const ConnectionSecrets(password: 'secret'),
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
         ),
       );
       expect(
         await preferences.getString(
-          'pocket_relay.connection.conn_migrated.profile',
+          'pocket_relay.connection.conn_seed.profile',
         ),
-        jsonEncode(profile.toJson()),
+        jsonEncode(ConnectionProfile.defaults().toJson()),
       );
       expect(
-        secureStorage
-            .data['pocket_relay.connection.conn_migrated.secret.password'],
-        'secret',
+        secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
+        isNull,
       );
-      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+      expect(secureStorage.data['codex_pocket.secret.password'], 'secret');
       expect(
         await preferences.getString('pocket_relay.connections.index'),
         jsonEncode(<String, Object?>{
           'schemaVersion': 1,
-          'orderedConnectionIds': <String>['conn_migrated'],
+          'orderedConnectionIds': <String>['conn_seed'],
         }),
       );
     },

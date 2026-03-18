@@ -57,7 +57,6 @@ abstract class CodexConversationHandoffStore {
 class SecureCodexConversationHandoffStore
     implements CodexConversationHandoffStore {
   static const _handoffKey = 'pocket_relay.conversation_handoff';
-  static const _legacyHandoffKey = 'codex_pocket.conversation_handoff';
   static const _preferencesMigrationKey =
       'pocket_relay.conversation_handoff_async_migration_complete';
 
@@ -76,7 +75,7 @@ class SecureCodexConversationHandoffStore
     }
 
     await _ensurePreferencesReady();
-    final rawHandoff = await _readHandoff();
+    final rawHandoff = await _resolvedPreferences!.getString(_handoffKey);
     if (rawHandoff == null || rawHandoff.trim().isEmpty) {
       return const SavedConversationHandoff();
     }
@@ -98,33 +97,10 @@ class SecureCodexConversationHandoffStore
     final normalizedThreadId = handoff.normalizedResumeThreadId;
     if (normalizedThreadId == null) {
       await preferences.remove(_handoffKey);
-      await preferences.remove(_legacyHandoffKey);
       return;
     }
 
     await preferences.setString(_handoffKey, jsonEncode(handoff.toJson()));
-    await preferences.remove(_legacyHandoffKey);
-  }
-
-  Future<String?> _readHandoff() async {
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      return null;
-    }
-
-    final currentHandoff = await preferences.getString(_handoffKey);
-    if (currentHandoff != null) {
-      return currentHandoff;
-    }
-
-    final legacyHandoff = await preferences.getString(_legacyHandoffKey);
-    if (legacyHandoff == null) {
-      return null;
-    }
-
-    await preferences.setString(_handoffKey, legacyHandoff);
-    await preferences.remove(_legacyHandoffKey);
-    return legacyHandoff;
   }
 
   Future<void> _ensurePreferencesReady() {

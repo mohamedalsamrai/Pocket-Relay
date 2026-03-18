@@ -6,7 +6,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'codex_profile_store.dart';
 import 'shared_preferences_async_migration.dart';
 
 typedef ConnectionIdGenerator = String Function();
@@ -152,16 +151,20 @@ class SecureCodexConnectionRepository implements CodexConnectionRepository {
       return existingCatalog;
     }
 
-    final migratedConnection = await _migrateLegacySingletonConnection();
+    final seededConnection = SavedConnection(
+      id: _connectionIdGenerator(),
+      profile: ConnectionProfile.defaults(),
+      secrets: const ConnectionSecrets(),
+    );
     final nextCatalog = ConnectionCatalogState(
-      orderedConnectionIds: <String>[migratedConnection.id],
+      orderedConnectionIds: <String>[seededConnection.id],
       connectionsById: <String, SavedConnectionSummary>{
-        migratedConnection.id: migratedConnection.toSummary(),
+        seededConnection.id: seededConnection.toSummary(),
       },
     );
 
-    await _persistConnectionProfile(migratedConnection);
-    await _persistConnectionSecrets(migratedConnection);
+    await _persistConnectionProfile(seededConnection);
+    await _persistConnectionSecrets(seededConnection);
     await _persistCatalogIndex(nextCatalog.orderedConnectionIds);
     return nextCatalog;
   }
@@ -425,19 +428,6 @@ class SecureCodexConnectionRepository implements CodexConnectionRepository {
 
   Future<String> _readSecret(String key) async {
     return await _secureStorage.read(key: key) ?? '';
-  }
-
-  Future<SavedConnection> _migrateLegacySingletonConnection() async {
-    final legacyStore = SecureCodexProfileStore(
-      secureStorage: _secureStorage,
-      preferences: _preferences,
-    );
-    final savedProfile = await legacyStore.load();
-    return SavedConnection(
-      id: _connectionIdGenerator(),
-      profile: savedProfile.profile,
-      secrets: savedProfile.secrets,
-    );
   }
 
   Future<void> _deleteConnectionPreferences(String connectionId) async {

@@ -25,18 +25,18 @@ void main() {
   });
 
   test(
-    'load migrates legacy profile data into SharedPreferencesAsync',
+    'load ignores legacy singleton profile data once the migration window is closed',
     () async {
-      final profile = ConnectionProfile.defaults().copyWith(
-        host: 'example.com',
-        username: 'vince',
-        workspaceDir: '/workspace/app',
-      );
       SharedPreferences.setMockInitialValues(<String, Object>{
-        'codex_pocket.profile': jsonEncode(profile.toJson()),
-        'pocket_relay.preferences': jsonEncode(<String, Object>{
-          'themeMode': 'dark',
-        }),
+        'codex_pocket.profile': jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                host: 'example.com',
+                username: 'vince',
+                workspaceDir: '/workspace/app',
+              )
+              .toJson(),
+        ),
       });
       final secureStorage = _FakeFlutterSecureStorage(<String, String>{
         'codex_pocket.secret.password': 'secret',
@@ -49,27 +49,15 @@ void main() {
 
       final saved = await store.load();
 
-      expect(saved.profile.host, 'example.com');
-      expect(saved.profile.username, 'vince');
-      expect(saved.profile.workspaceDir, '/workspace/app');
-      expect(saved.secrets.password, 'secret');
-      expect(
-        await preferences.getString('pocket_relay.profile'),
-        jsonEncode(profile.toJson()),
-      );
-      expect(await preferences.getString('codex_pocket.profile'), isNull);
-      expect(await preferences.getString('pocket_relay.preferences'), isNull);
-      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
-      expect(secureStorage.data['codex_pocket.secret.password'], isNull);
+      expect(saved.profile, ConnectionProfile.defaults());
+      expect(saved.secrets, const ConnectionSecrets());
+      expect(await preferences.getString('pocket_relay.profile'), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
+      expect(secureStorage.data['codex_pocket.secret.password'], 'secret');
     },
   );
 
   test('save writes profile data to SharedPreferencesAsync', () async {
-    SharedPreferences.setMockInitialValues(<String, Object>{
-      'pocket_relay.preferences': jsonEncode(<String, Object>{
-        'themeMode': 'dark',
-      }),
-    });
     final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
     final preferences = SharedPreferencesAsync();
     final store = SecureCodexProfileStore(
@@ -92,7 +80,6 @@ void main() {
       await preferences.getString('pocket_relay.profile'),
       jsonEncode(profile.toJson()),
     );
-    expect(await preferences.getString('pocket_relay.preferences'), isNull);
     expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
     expect(secureStorage.data['pocket_relay.secret.private_key'], 'pem');
     expect(

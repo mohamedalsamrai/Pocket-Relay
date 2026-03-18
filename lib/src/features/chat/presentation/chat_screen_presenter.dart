@@ -117,8 +117,7 @@ class ChatScreenPresenter {
             status:
                 timeline?.lifecycleState ?? CodexAgentLifecycleState.unknown,
             isPrimary: entry.isPrimary,
-            isSelected:
-                sessionState.effectiveSelectedThreadId == entry.threadId,
+            isSelected: sessionState.currentThreadId == entry.threadId,
             isClosed: entry.isClosed,
             hasUnreadActivity: timeline?.hasUnreadActivity ?? false,
             hasPendingRequests: timeline?.hasPendingRequests ?? false,

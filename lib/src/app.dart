@@ -50,7 +50,6 @@ class PocketRelayApp extends StatefulWidget {
 class _PocketRelayAppState extends State<PocketRelayApp> {
   CodexConnectionRepository? _ownedConnectionRepository;
   CodexConnectionHandoffStore? _ownedConnectionHandoffStore;
-  CodexConnectionRepository? _ownedConnectionHandoffStoreRepository;
   late ConnectionWorkspaceController _workspaceController;
 
   @override
@@ -97,9 +96,7 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
     final connectionRepository =
         widget.connectionRepository ??
         (_ownedConnectionRepository ??= SecureCodexConnectionRepository());
-    final connectionHandoffStore = _resolveConnectionHandoffStore(
-      connectionRepository: connectionRepository,
-    );
+    final connectionHandoffStore = _resolveConnectionHandoffStore();
     final platformPolicy = _resolvedPlatformPolicy;
     var usedInjectedAppServerClient = false;
 
@@ -146,22 +143,12 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
     );
   }
 
-  CodexConnectionHandoffStore _resolveConnectionHandoffStore({
-    required CodexConnectionRepository connectionRepository,
-  }) {
+  CodexConnectionHandoffStore _resolveConnectionHandoffStore() {
     if (widget.connectionHandoffStore case final injectedHandoffStore?) {
       return injectedHandoffStore;
     }
 
-    final ownedHandoffStore = _ownedConnectionHandoffStore;
-    if (ownedHandoffStore == null ||
-        _ownedConnectionHandoffStoreRepository != connectionRepository) {
-      _ownedConnectionHandoffStore = SecureCodexConnectionHandoffStore(
-        connectionRepository: connectionRepository,
-      );
-      _ownedConnectionHandoffStoreRepository = connectionRepository;
-    }
-    return _ownedConnectionHandoffStore!;
+    return _ownedConnectionHandoffStore ??= SecureCodexConnectionHandoffStore();
   }
 
   @override

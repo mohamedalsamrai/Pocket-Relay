@@ -97,27 +97,6 @@ class ChatSessionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> applyConnectionSettings({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    if (profile == _profile && secrets == _secrets) {
-      return;
-    }
-
-    await profileStore.save(profile, secrets);
-    await appServerClient.disconnect();
-    if (_isDisposed) {
-      return;
-    }
-
-    _profile = profile;
-    _secrets = secrets;
-    _clearConversationRecovery();
-    _clearContinuationThread();
-    _applySessionState(_sessionReducer.detachThread(_sessionState));
-  }
-
   Future<void> saveObservedHostFingerprint(String blockId) async {
     final block = _findUnpinnedHostKeyBlock(blockId);
     if (block == null) {
@@ -179,9 +158,8 @@ class ChatSessionController extends ChangeNotifier {
       return false;
     }
 
-    final rootThreadId = _sessionState.effectiveRootThreadId;
-    if (rootThreadId != null &&
-        _sessionState.effectiveSelectedThreadId != rootThreadId) {
+    final rootThreadId = _sessionState.rootThreadId;
+    if (rootThreadId != null && _sessionState.currentThreadId != rootThreadId) {
       selectTimeline(rootThreadId);
     }
 
@@ -252,7 +230,7 @@ class ChatSessionController extends ChangeNotifier {
   void selectTimeline(String threadId) {
     final normalizedThreadId = threadId.trim();
     if (normalizedThreadId.isEmpty ||
-        _sessionState.effectiveSelectedThreadId == normalizedThreadId) {
+        _sessionState.currentThreadId == normalizedThreadId) {
       return;
     }
 
@@ -682,7 +660,7 @@ class ChatSessionController extends ChangeNotifier {
       }
     }
 
-    for (final timeline in _sessionState.effectiveTimelinesByThreadId.values) {
+    for (final timeline in _sessionState.timelinesByThreadId.values) {
       if (timeline.pendingApprovalRequests.containsKey(requestId) ||
           timeline.pendingUserInputRequests.containsKey(requestId)) {
         return timeline;
@@ -888,7 +866,7 @@ class ChatSessionController extends ChangeNotifier {
       return null;
     }
 
-    return _normalizedThreadId(_sessionState.effectiveRootThreadId);
+    return _normalizedThreadId(_sessionState.rootThreadId);
   }
 
   String? _resumeConversationThreadId() {
@@ -930,9 +908,7 @@ class ChatSessionController extends ChangeNotifier {
 
   String? _alternateRecoveryThreadId({String? preferredThreadId}) {
     final normalizedPreferred = _normalizedThreadId(preferredThreadId);
-    final currentRootThreadId = _normalizedThreadId(
-      _sessionState.effectiveRootThreadId,
-    );
+    final currentRootThreadId = _normalizedThreadId(_sessionState.rootThreadId);
     if (normalizedPreferred != null &&
         normalizedPreferred != currentRootThreadId &&
         _sessionState.timelineForThread(normalizedPreferred) != null) {

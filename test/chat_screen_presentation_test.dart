@@ -80,10 +80,9 @@ void main() {
             startedAt: DateTime(2026, 3, 15, 12),
           ),
         );
-        final sessionState = CodexSessionState.initial().copyWith(
-          connectionStatus: CodexRuntimeSessionState.running,
-          activeTurn: activeTurn,
-        );
+        final sessionState = CodexSessionState.initial()
+            .copyWith(connectionStatus: CodexRuntimeSessionState.running)
+            .copyWithProjectedTranscript(activeTurn: activeTurn);
 
         final contract = presenter.present(
           isLoading: false,
@@ -282,10 +281,11 @@ void main() {
                 ),
               },
         );
-        final sessionState = CodexSessionState.initial().copyWith(
-          activeTurn: activeTurn,
-          blocks: <CodexUiBlock>[transcriptBlock],
-        );
+        final sessionState = CodexSessionState.initial()
+            .copyWithProjectedTranscript(
+              activeTurn: activeTurn,
+              blocks: <CodexUiBlock>[transcriptBlock],
+            );
 
         final surface = projector.project(
           profile: _configuredProfile(),
@@ -359,9 +359,8 @@ void main() {
                 ),
               },
         );
-        final sessionState = CodexSessionState.initial().copyWith(
-          activeTurn: activeTurn,
-        );
+        final sessionState = CodexSessionState.initial()
+            .copyWithProjectedTranscript(activeTurn: activeTurn);
 
         final surface = projector.project(
           profile: _configuredProfile(),
@@ -427,32 +426,33 @@ void main() {
                 ),
               ),
         );
-        final sessionState = CodexSessionState.initial().copyWith(
-          activeTurn: CodexActiveTurnState(
-            turnId: 'turn_1',
-            timer: CodexSessionTurnTimer(
-              turnId: 'turn_1',
-              startedAt: DateTime(2026, 3, 15, 12),
-            ),
-            pendingApprovalRequests: <String, CodexSessionPendingRequest>{
-              'runtime_approval': CodexSessionPendingRequest(
-                requestId: 'runtime_approval',
-                requestType: CodexCanonicalRequestType.fileChangeApproval,
-                createdAt: DateTime(2026, 3, 15, 12, 0, 1),
-                detail: 'Runtime approval body',
-              ),
-            },
-            pendingUserInputRequests:
-                <String, CodexSessionPendingUserInputRequest>{
-                  'runtime_input': CodexSessionPendingUserInputRequest(
-                    requestId: 'runtime_input',
-                    requestType: CodexCanonicalRequestType.toolUserInput,
-                    createdAt: DateTime(2026, 3, 15, 12, 0, 2),
-                    detail: 'Runtime input body',
+        final sessionState = CodexSessionState.initial()
+            .copyWithProjectedTranscript(
+              activeTurn: CodexActiveTurnState(
+                turnId: 'turn_1',
+                timer: CodexSessionTurnTimer(
+                  turnId: 'turn_1',
+                  startedAt: DateTime(2026, 3, 15, 12),
+                ),
+                pendingApprovalRequests: <String, CodexSessionPendingRequest>{
+                  'runtime_approval': CodexSessionPendingRequest(
+                    requestId: 'runtime_approval',
+                    requestType: CodexCanonicalRequestType.fileChangeApproval,
+                    createdAt: DateTime(2026, 3, 15, 12, 0, 1),
+                    detail: 'Runtime approval body',
                   ),
                 },
-          ),
-        );
+                pendingUserInputRequests:
+                    <String, CodexSessionPendingUserInputRequest>{
+                      'runtime_input': CodexSessionPendingUserInputRequest(
+                        requestId: 'runtime_input',
+                        requestType: CodexCanonicalRequestType.toolUserInput,
+                        createdAt: DateTime(2026, 3, 15, 12, 0, 2),
+                        detail: 'Runtime input body',
+                      ),
+                    },
+              ),
+            );
 
         final surface = projector.project(
           profile: _configuredProfile(),

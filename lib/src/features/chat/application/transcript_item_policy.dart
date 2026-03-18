@@ -51,7 +51,7 @@ class TranscriptItemPolicy {
       return suppressedState;
     }
 
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       activeTurn: _nextActiveTurnForLifecycle(
         activeTurn,
         nextItem,
@@ -85,7 +85,7 @@ class TranscriptItemPolicy {
       existing: existing,
     );
 
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       activeTurn: _nextActiveTurnForContentDelta(activeTurn, updatedItem),
     );
   }
@@ -348,7 +348,7 @@ class TranscriptItemPolicy {
     List<String>? pendingLocalUserMessageBlockIds,
     Map<String, String>? localUserMessageProviderBindings,
   }) {
-    return state.copyWith(
+    return state.copyWithProjectedTranscript(
       activeTurn: _activeTurnAfterSuppressedLocalUserMessage(
         activeTurn,
         itemId: itemId,

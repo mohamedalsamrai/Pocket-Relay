@@ -18,11 +18,7 @@ class TranscriptReducer {
     required String text,
     DateTime? createdAt,
   }) {
-    if (!state.isWorkspaceMode) {
-      return _policy.addUserMessage(state, text: text, createdAt: createdAt);
-    }
-
-    final rootThreadId = state.effectiveRootThreadId;
+    final rootThreadId = state.rootThreadId;
     if (rootThreadId == null) {
       return _policy.addUserMessage(state, text: text, createdAt: createdAt);
     }
@@ -31,8 +27,11 @@ class TranscriptReducer {
       state,
       threadId: rootThreadId,
       event: null,
-      reducer: (legacyState) =>
-          _policy.addUserMessage(legacyState, text: text, createdAt: createdAt),
+      reducer: (projectedState) => _policy.addUserMessage(
+        projectedState,
+        text: text,
+        createdAt: createdAt,
+      ),
       lifecycleOverride: CodexAgentLifecycleState.running,
     );
   }
@@ -43,7 +42,7 @@ class TranscriptReducer {
     DateTime? createdAt,
   }) {
     final cleared = _policy.startFreshThread(
-      CodexSessionState(connectionStatus: state.connectionStatus),
+      CodexSessionState.transcript(connectionStatus: state.connectionStatus),
       message: message,
       createdAt: createdAt,
     );
@@ -52,26 +51,22 @@ class TranscriptReducer {
 
   CodexSessionState clearTranscript(CodexSessionState state) {
     return _policy.clearTranscript(
-      CodexSessionState(connectionStatus: state.connectionStatus),
+      CodexSessionState.transcript(connectionStatus: state.connectionStatus),
     );
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
     return _policy.detachThread(
-      CodexSessionState(connectionStatus: state.connectionStatus),
+      CodexSessionState.transcript(connectionStatus: state.connectionStatus),
     );
   }
 
   CodexSessionState clearLocalUserMessageCorrelationState(
     CodexSessionState state,
   ) {
-    if (!state.isWorkspaceMode) {
-      return _policy.clearLocalUserMessageCorrelationState(state);
-    }
-
-    final targetThreadId = state.effectiveRootThreadId;
+    final targetThreadId = state.rootThreadId;
     if (targetThreadId == null) {
-      return state;
+      return _policy.clearLocalUserMessageCorrelationState(state);
     }
     return _reduceTimelineState(
       state,
@@ -85,20 +80,16 @@ class TranscriptReducer {
     CodexSessionState state, {
     required String blockId,
   }) {
-    if (!state.isWorkspaceMode) {
+    final targetThreadId = state.currentThreadId;
+    if (state.rootThreadId == null || targetThreadId == null) {
       return _policy.markUnpinnedHostKeySaved(state, blockId: blockId);
-    }
-
-    final targetThreadId = state.effectiveSelectedThreadId;
-    if (targetThreadId == null) {
-      return state;
     }
     return _reduceTimelineState(
       state,
       threadId: targetThreadId,
       event: null,
-      reducer: (legacyState) =>
-          _policy.markUnpinnedHostKeySaved(legacyState, blockId: blockId),
+      reducer: (projectedState) =>
+          _policy.markUnpinnedHostKeySaved(projectedState, blockId: blockId),
     );
   }
 
@@ -106,10 +97,10 @@ class TranscriptReducer {
     CodexSessionState state,
     CodexRuntimeEvent event,
   ) {
-    if (!state.isWorkspaceMode) {
-      final nextState = _reduceLegacyRuntimeEvent(state, event);
+    if (state.rootThreadId == null) {
+      final nextState = _reduceSessionTranscriptRuntimeEvent(state, event);
       if (event is CodexRuntimeThreadStartedEvent) {
-        return _promoteLegacyStateToWorkspace(nextState, event);
+        return _promoteSessionTranscriptToWorkspace(nextState, event);
       }
       return nextState;
     }
@@ -117,7 +108,7 @@ class TranscriptReducer {
     return _reduceWorkspaceRuntimeEvent(state, event);
   }
 
-  CodexSessionState _reduceLegacyRuntimeEvent(
+  CodexSessionState _reduceSessionTranscriptRuntimeEvent(
     CodexSessionState state,
     CodexRuntimeEvent event,
   ) {
@@ -128,7 +119,9 @@ class TranscriptReducer {
       case CodexRuntimeSessionExitedEvent():
         return _policy.applySessionExited(normalizedState, event);
       case CodexRuntimeThreadStartedEvent():
-        return normalizedState.copyWith(threadId: event.providerThreadId);
+        return normalizedState.copyWithProjectedTranscript(
+          threadId: event.providerThreadId,
+        );
       case CodexRuntimeThreadStateChangedEvent():
         final isClosed = event.state == CodexRuntimeThreadState.closed;
         if (!isClosed) {
@@ -143,11 +136,12 @@ class TranscriptReducer {
           fallbackThreadId: normalizedState.threadId,
           createdAt: event.createdAt,
         );
-        return normalizedState.copyWith(
-          connectionStatus: CodexRuntimeSessionState.running,
-          threadId: event.threadId ?? normalizedState.threadId,
-          activeTurn: nextActiveTurn,
-        );
+        return normalizedState
+            .copyWith(connectionStatus: CodexRuntimeSessionState.running)
+            .copyWithProjectedTranscript(
+              threadId: event.threadId ?? normalizedState.threadId,
+              activeTurn: nextActiveTurn,
+            );
       case CodexRuntimeTurnCompletedEvent():
         return _policy.applyTurnCompleted(normalizedState, event);
       case CodexRuntimeTurnAbortedEvent():
@@ -243,7 +237,8 @@ class TranscriptReducer {
       nextState,
       threadId: targetThreadId,
       event: event,
-      reducer: (legacyState) => _reduceLegacyRuntimeEvent(legacyState, event),
+      reducer: (projectedState) =>
+          _reduceSessionTranscriptRuntimeEvent(projectedState, event),
       lifecycleOverride: _lifecycleOverrideForEvent(
         nextState.timelineForThread(targetThreadId),
         event,
@@ -257,7 +252,7 @@ class TranscriptReducer {
     CodexRuntimeSessionState nextStatus,
   ) {
     final nextTimelines = <String, CodexTimelineState>{};
-    for (final entry in state.effectiveTimelinesByThreadId.entries) {
+    for (final entry in state.timelinesByThreadId.entries) {
       nextTimelines[entry.key] = entry.value.copyWith(
         connectionStatus: nextStatus,
       );
@@ -278,7 +273,7 @@ class TranscriptReducer {
           : CodexRuntimeSessionState.stopped,
     );
 
-    final orderedThreadIds = nextState.effectiveTimelinesByThreadId.keys.toList(
+    final orderedThreadIds = nextState.timelinesByThreadId.keys.toList(
       growable: false,
     );
     for (final threadId in orderedThreadIds) {
@@ -286,7 +281,8 @@ class TranscriptReducer {
         nextState,
         threadId: threadId,
         event: event,
-        reducer: (legacyState) => _reduceLegacyRuntimeEvent(legacyState, event),
+        reducer: (projectedState) =>
+            _reduceSessionTranscriptRuntimeEvent(projectedState, event),
         lifecycleOverride: CodexAgentLifecycleState.closed,
       );
     }
@@ -361,7 +357,8 @@ class TranscriptReducer {
         state,
         threadId: threadId,
         event: event,
-        reducer: (legacyState) => _reduceLegacyRuntimeEvent(legacyState, event),
+        reducer: (projectedState) =>
+            _reduceSessionTranscriptRuntimeEvent(projectedState, event),
         lifecycleOverride: CodexAgentLifecycleState.closed,
       );
       final nextRegistry = <String, CodexThreadRegistryEntry>{
@@ -400,7 +397,8 @@ class TranscriptReducer {
     CodexSessionState state, {
     required String threadId,
     required CodexRuntimeEvent? event,
-    required CodexSessionState Function(CodexSessionState legacyState) reducer,
+    required CodexSessionState Function(CodexSessionState projectedState)
+    reducer,
     CodexAgentLifecycleState? lifecycleOverride,
   }) {
     final existingTimeline =
@@ -410,46 +408,61 @@ class TranscriptReducer {
           connectionStatus: state.connectionStatus,
           lifecycleState: CodexAgentLifecycleState.starting,
         );
-    final legacyState = existingTimeline.toLegacySessionState();
-    final reducedLegacyState = reducer(legacyState);
+    final projectedState = CodexSessionState.transcript(
+      connectionStatus: existingTimeline.connectionStatus,
+      threadId: existingTimeline.threadId,
+      activeTurn: existingTimeline.activeTurn,
+      blocks: existingTimeline.blocks,
+      pendingLocalUserMessageBlockIds:
+          existingTimeline.pendingLocalUserMessageBlockIds,
+      localUserMessageProviderBindings:
+          existingTimeline.localUserMessageProviderBindings,
+    );
+    final reducedProjectedState = reducer(projectedState);
     final nextTimelines = <String, CodexTimelineState>{
       ...state.timelinesByThreadId,
       threadId: existingTimeline.copyWith(
-        connectionStatus: reducedLegacyState.connectionStatus,
+        connectionStatus: reducedProjectedState.connectionStatus,
         lifecycleState:
             lifecycleOverride ??
-            _inferLifecycleState(existingTimeline, reducedLegacyState, event),
-        activeTurn: reducedLegacyState.activeTurn,
-        clearActiveTurn: reducedLegacyState.activeTurn == null,
-        blocks: reducedLegacyState.blocks,
+            _inferLifecycleState(
+              existingTimeline,
+              reducedProjectedState,
+              event,
+            ),
+        activeTurn: reducedProjectedState.activeTurn,
+        clearActiveTurn: reducedProjectedState.activeTurn == null,
+        blocks: reducedProjectedState.blocks,
         pendingLocalUserMessageBlockIds:
-            reducedLegacyState.pendingLocalUserMessageBlockIds,
+            reducedProjectedState.pendingLocalUserMessageBlockIds,
         localUserMessageProviderBindings:
-            reducedLegacyState.localUserMessageProviderBindings,
-        hasUnreadActivity: threadId == state.effectiveSelectedThreadId
-            ? false
-            : true,
+            reducedProjectedState.localUserMessageProviderBindings,
+        hasUnreadActivity: threadId == state.currentThreadId ? false : true,
       ),
     };
 
     return state.copyWith(
-      connectionStatus: reducedLegacyState.connectionStatus,
+      connectionStatus: reducedProjectedState.connectionStatus,
       timelinesByThreadId: nextTimelines,
       requestOwnerById: _rebuildRequestOwnerById(nextTimelines),
     );
   }
 
-  CodexSessionState _promoteLegacyStateToWorkspace(
+  CodexSessionState _promoteSessionTranscriptToWorkspace(
     CodexSessionState state,
     CodexRuntimeThreadStartedEvent event,
   ) {
     final rootThreadId = event.providerThreadId;
-    final rootTimeline = CodexTimelineState.fromLegacySessionState(
-      state,
+    final rootTimeline = CodexTimelineState(
       threadId: rootThreadId,
+      connectionStatus: state.connectionStatus,
       lifecycleState: state.activeTurn == null
           ? CodexAgentLifecycleState.idle
           : CodexAgentLifecycleState.running,
+      activeTurn: state.activeTurn?.copyWith(threadId: rootThreadId),
+      blocks: state.blocks,
+      pendingLocalUserMessageBlockIds: state.pendingLocalUserMessageBlockIds,
+      localUserMessageProviderBindings: state.localUserMessageProviderBindings,
     );
     final threadRegistry = <String, CodexThreadRegistryEntry>{
       rootThreadId: CodexThreadRegistryEntry(
@@ -592,7 +605,7 @@ class TranscriptReducer {
       }
     }
 
-    return state.effectiveRootThreadId ?? state.effectiveSelectedThreadId;
+    return state.rootThreadId ?? state.currentThreadId;
   }
 
   CodexAgentLifecycleState? _lifecycleOverrideForEvent(
@@ -629,7 +642,7 @@ class TranscriptReducer {
 
   CodexAgentLifecycleState _inferLifecycleState(
     CodexTimelineState existingTimeline,
-    CodexSessionState reducedLegacyState,
+    CodexSessionState reducedProjectedState,
     CodexRuntimeEvent? event,
   ) {
     final override = event == null
@@ -639,13 +652,13 @@ class TranscriptReducer {
       return override;
     }
 
-    if (reducedLegacyState.pendingUserInputRequests.isNotEmpty) {
+    if (reducedProjectedState.pendingUserInputRequests.isNotEmpty) {
       return CodexAgentLifecycleState.blockedOnInput;
     }
-    if (reducedLegacyState.pendingApprovalRequests.isNotEmpty) {
+    if (reducedProjectedState.pendingApprovalRequests.isNotEmpty) {
       return CodexAgentLifecycleState.blockedOnApproval;
     }
-    if (reducedLegacyState.activeTurn != null) {
+    if (reducedProjectedState.activeTurn != null) {
       return switch (existingTimeline.lifecycleState) {
         CodexAgentLifecycleState.waitingOnChild =>
           CodexAgentLifecycleState.waitingOnChild,
