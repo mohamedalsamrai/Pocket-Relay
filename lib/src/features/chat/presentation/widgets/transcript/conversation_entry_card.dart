@@ -58,7 +58,7 @@ class ConversationEntryCard extends StatelessWidget {
         block: proposedPlanItem.block,
       ),
       final ChatWorkLogGroupItemContract workLogGroupItem => WorkLogGroupCard(
-        block: workLogGroupItem.block,
+        item: workLogGroupItem,
       ),
       final ChatChangedFilesItemContract changedFilesItem => ChangedFilesCard(
         item: changedFilesItem,

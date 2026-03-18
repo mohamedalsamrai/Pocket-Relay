@@ -5,6 +5,11 @@ import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 class TranscriptItemBlockFactory {
   const TranscriptItemBlockFactory();
 
+  static final RegExp _shellCommandWrapperPattern = RegExp(
+    r'^(?:\S*\/)?(?:bash|zsh|sh)\s+-(?:lc|c)\s+',
+    caseSensitive: false,
+  );
+
   CodexUiBlockKind blockKindForItemType(CodexCanonicalItemType itemType) {
     return switch (itemType) {
       CodexCanonicalItemType.userMessage => CodexUiBlockKind.userMessage,
@@ -30,6 +35,23 @@ class TranscriptItemBlockFactory {
 
   String defaultItemTitle(CodexCanonicalItemType itemType) {
     return codexItemTitle(itemType);
+  }
+
+  String normalizeCommandExecutionTitle(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+
+    final match = _shellCommandWrapperPattern.firstMatch(trimmed);
+    if (match == null) {
+      return trimmed;
+    }
+
+    final normalized = _unwrapShellWrappedCommand(
+      trimmed.substring(match.end).trim(),
+    ).trim();
+    return normalized.isEmpty ? trimmed : normalized;
   }
 
   CodexWorkLogEntryKind workLogEntryKindFor(CodexCanonicalItemType itemType) {
@@ -65,5 +87,23 @@ class TranscriptItemBlockFactory {
     }
 
     return body.split(RegExp(r'\r?\n')).first.trim();
+  }
+
+  String _unwrapShellWrappedCommand(String value) {
+    if (value.length < 2) {
+      return value;
+    }
+
+    final quote = value[0];
+    if ((quote != "'" && quote != '"') || value[value.length - 1] != quote) {
+      return value;
+    }
+
+    final inner = value.substring(1, value.length - 1);
+    if (quote == "'") {
+      return inner.replaceAll("'\"'\"'", "'").replaceAll(r"'\''", "'");
+    }
+
+    return inner.replaceAll(r'\"', '"');
   }
 }

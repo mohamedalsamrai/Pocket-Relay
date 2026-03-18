@@ -1,6 +1,7 @@
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
 
 sealed class ChatTranscriptItemContract {
   const ChatTranscriptItemContract();
@@ -55,12 +56,16 @@ final class ChatProposedPlanItemContract extends ChatTranscriptItemContract {
 }
 
 final class ChatWorkLogGroupItemContract extends ChatTranscriptItemContract {
-  const ChatWorkLogGroupItemContract({required this.block});
-
-  final CodexWorkLogGroupBlock block;
+  const ChatWorkLogGroupItemContract({required this.id, required this.entries});
 
   @override
-  String get id => block.id;
+  final String id;
+
+  final List<ChatWorkLogEntryContract> entries;
+
+  bool get hasOnlyKnownEntries => entries.every(
+    (entry) => entry.entryKind != CodexWorkLogEntryKind.unknown,
+  );
 }
 
 final class ChatChangedFilesItemContract extends ChatTranscriptItemContract {

@@ -968,6 +968,55 @@ void main() {
     expect(find.text('Search docs'), findsOneWidget);
   });
 
+  testWidgets('strips shell-wrapper noise from command work-log titles', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(
+      PocketRelayApp(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'item_cmd_1',
+            'type': 'commandExecution',
+            'status': 'completed',
+            'command': '/usr/bin/zsh -lc "sed -n \'1,40p\' lib/main.dart"',
+            'result': <String, Object?>{
+              'output': 'class App {}',
+              'exitCode': 0,
+            },
+          },
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reading lines 1 to 40'), findsOneWidget);
+    expect(find.text('main.dart'), findsOneWidget);
+    expect(find.text('lib/main.dart'), findsOneWidget);
+    expect(find.text("sed -n '1,40p' lib/main.dart"), findsNothing);
+    expect(find.textContaining('/usr/bin/zsh -lc'), findsNothing);
+  });
+
   testWidgets(
     'keeps a single local user prompt when the app-server echoes it back',
     (tester) async {

@@ -983,6 +983,47 @@ void main() {
     expect(find.text('running'), findsOneWidget);
   });
 
+  testWidgets('renders simple sed reads as structured read work-log rows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexWorkLogGroupBlock(
+            id: 'worklog_sed',
+            createdAt: DateTime(2026, 3, 14, 12),
+            entries: <CodexWorkLogEntry>[
+              CodexWorkLogEntry(
+                id: 'entry_sed',
+                createdAt: DateTime(2026, 3, 14, 12),
+                entryKind: CodexWorkLogEntryKind.commandExecution,
+                title:
+                    "sed -n '1,120p' lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart",
+                exitCode: 0,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Reading lines 1 to 120'), findsOneWidget);
+    expect(find.text('work_log_group_card.dart'), findsOneWidget);
+    expect(
+      find.text(
+        'lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        "sed -n '1,120p' lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart",
+      ),
+      findsNothing,
+    );
+    expect(find.text('exit 0'), findsNothing);
+  });
+
   testWidgets('renders thread token usage as a compact usage strip', (
     tester,
   ) async {

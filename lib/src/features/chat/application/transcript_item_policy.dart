@@ -179,9 +179,10 @@ class TranscriptItemPolicy {
     String? existingTitle,
   ) {
     if (event.itemType == CodexCanonicalItemType.commandExecution) {
-      return event.detail?.trim().isNotEmpty == true
+      final rawTitle = event.detail?.trim().isNotEmpty == true
           ? event.detail!
           : (existingTitle ?? event.title ?? 'Command');
+      return _blockFactory.normalizeCommandExecutionTitle(rawTitle);
     }
     return existingTitle ??
         event.title ??

@@ -19,6 +19,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_foll
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_surface_projector.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
 
 const _defaultTranscriptFollowContract = ChatTranscriptFollowContract(
   isAutoFollowEnabled: true,
@@ -685,13 +686,60 @@ void main() {
 
       expect(item, isA<ChatWorkLogGroupItemContract>());
       final groupItem = item as ChatWorkLogGroupItemContract;
-      expect(groupItem.block, same(groupBlock));
-      expect(groupItem.block.entries, hasLength(1));
-      expect(groupItem.block.entries.single.title, 'Read docs');
-      expect(groupItem.block.entries.single.turnId, 'turn_1');
-      expect(groupItem.block.entries.single.preview, 'Found the CLI docs');
-      expect(groupItem.block.entries.single.isRunning, isTrue);
-      expect(groupItem.block.entries.single.exitCode, 0);
+      expect(groupItem.id, groupBlock.id);
+      expect(groupItem.entries, hasLength(1));
+      expect(groupItem.entries.single, isA<ChatGenericWorkLogEntryContract>());
+      final entry = groupItem.entries.single as ChatGenericWorkLogEntryContract;
+      expect(entry.title, 'Read docs');
+      expect(entry.turnId, 'turn_1');
+      expect(entry.preview, 'Found the CLI docs');
+      expect(entry.isRunning, isTrue);
+      expect(entry.exitCode, 0);
+    });
+
+    test('projects simple sed read commands into read work-log entries', () {
+      final groupBlock = CodexWorkLogGroupBlock(
+        id: 'worklog_sed',
+        createdAt: DateTime(2026, 3, 15, 12),
+        entries: <CodexWorkLogEntry>[
+          CodexWorkLogEntry(
+            id: 'entry_sed',
+            createdAt: DateTime(2026, 3, 15, 12),
+            entryKind: CodexWorkLogEntryKind.commandExecution,
+            title: "sed -n '1,120p' lib/src/app.dart",
+          ),
+        ],
+      );
+
+      final item =
+          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+      final entry = item.entries.single as ChatReadCommandWorkLogEntryContract;
+
+      expect(entry.lineStart, 1);
+      expect(entry.lineEnd, 120);
+      expect(entry.fileName, 'app.dart');
+      expect(entry.filePath, 'lib/src/app.dart');
+      expect(entry.lineSummary, 'Reading lines 1 to 120');
+    });
+
+    test('keeps chained sed commands as generic work-log entries', () {
+      final groupBlock = CodexWorkLogGroupBlock(
+        id: 'worklog_sed_chain',
+        createdAt: DateTime(2026, 3, 15, 12),
+        entries: <CodexWorkLogEntry>[
+          CodexWorkLogEntry(
+            id: 'entry_sed_chain',
+            createdAt: DateTime(2026, 3, 15, 12),
+            entryKind: CodexWorkLogEntryKind.commandExecution,
+            title: "sed -n '1,120p' lib/src/app.dart && rg Pocket Relay",
+          ),
+        ],
+      );
+
+      final item =
+          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+
+      expect(item.entries.single, isA<ChatGenericWorkLogEntryContract>());
     });
 
     test(

@@ -1867,6 +1867,32 @@ void main() {
     expect(group.entries.last.entryKind, CodexWorkLogEntryKind.webSearch);
   });
 
+  test('normalizes shell-wrapped command titles in work-log entries', () {
+    final reducer = TranscriptReducer();
+    var state = CodexSessionState.initial();
+    final now = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      CodexRuntimeItemCompletedEvent(
+        createdAt: now,
+        itemType: CodexCanonicalItemType.commandExecution,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_command',
+        status: CodexRuntimeItemStatus.completed,
+        detail: '/usr/bin/zsh -lc "sed -n \'1,40p\' lib/main.dart"',
+        snapshot: const <String, Object?>{
+          'result': <String, Object?>{'output': 'class App {}'},
+          'exitCode': 0,
+        },
+      ),
+    );
+
+    final group = state.transcriptBlocks.single as CodexWorkLogGroupBlock;
+    expect(group.entries.single.title, "sed -n '1,40p' lib/main.dart");
+  });
+
   test(
     'starts a new work group when a resolved request interrupts work history',
     () {

@@ -3,17 +3,22 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_i
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_item_projector.dart';
 
 class ChatTranscriptItemProjector {
   const ChatTranscriptItemProjector({
     ChatChangedFilesItemProjector changedFilesItemProjector =
         const ChatChangedFilesItemProjector(),
     ChatRequestProjector requestProjector = const ChatRequestProjector(),
+    ChatWorkLogItemProjector workLogItemProjector =
+        const ChatWorkLogItemProjector(),
   }) : _changedFilesItemProjector = changedFilesItemProjector,
-       _requestProjector = requestProjector;
+       _requestProjector = requestProjector,
+       _workLogItemProjector = workLogItemProjector;
 
   final ChatChangedFilesItemProjector _changedFilesItemProjector;
   final ChatRequestProjector _requestProjector;
+  final ChatWorkLogItemProjector _workLogItemProjector;
 
   ChatTranscriptItemContract project(CodexUiBlock block) {
     return switch (block) {
@@ -32,7 +37,7 @@ class ChatTranscriptItemProjector {
       final CodexProposedPlanBlock proposedPlanBlock =>
         ChatProposedPlanItemContract(block: proposedPlanBlock),
       final CodexWorkLogGroupBlock workLogGroupBlock =>
-        ChatWorkLogGroupItemContract(block: workLogGroupBlock),
+        _workLogItemProjector.project(workLogGroupBlock),
       final CodexChangedFilesBlock changedFilesBlock =>
         _changedFilesItemProjector.project(changedFilesBlock),
       final CodexApprovalRequestBlock approvalBlock =>
