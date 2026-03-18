@@ -32,8 +32,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Connections'), findsOneWidget);
-    expect(find.text('Live'), findsOneWidget);
-    expect(find.text('Dormant'), findsOneWidget);
+    expect(find.text('Open lanes'), findsOneWidget);
+    expect(find.text('Saved'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('desktop_live_conn_primary')),
       findsOneWidget,
@@ -176,7 +176,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No saved connections yet.'), findsOneWidget);
-    expect(find.text('Return to lane'), findsNothing);
+    expect(find.text('Return to open lane'), findsNothing);
     expect(find.byKey(const ValueKey('add_connection')), findsOneWidget);
   });
 
@@ -211,7 +211,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
-      expect(find.text('Saved changes'), findsOneWidget);
+      expect(find.text('Reconnect needed'), findsOneWidget);
       expect(find.text('Saved settings are pending'), findsOneWidget);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },

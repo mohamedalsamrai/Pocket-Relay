@@ -101,7 +101,7 @@ void main() {
                   onScreenAction: laneActions.add,
                   supplementalMenuActions: <ChatChromeMenuAction>[
                     ChatChromeMenuAction(
-                      label: 'Dormant connections',
+                      label: 'Saved connections',
                       onSelected: () {
                         openedDormantConnections = true;
                       },
@@ -116,7 +116,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('cupertino_menu_actions')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Dormant connections'));
+      await tester.tap(find.text('Saved connections'));
       await tester.pumpAndSettle();
 
       expect(openedDormantConnections, isTrue);

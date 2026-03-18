@@ -9,6 +9,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.da
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 
 import 'connection_workspace_settings_renderer.dart';
@@ -73,20 +74,20 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
   }) {
     return <ChatChromeMenuAction>[
       ChatChromeMenuAction(
-        label: 'Dormant connections',
+        label: ConnectionWorkspaceCopy.savedConnectionsMenuLabel,
         onSelected: widget.workspaceController.showDormantRoster,
       ),
       if (requiresReconnect)
         ChatChromeMenuAction(
           label: _isApplyingSavedSettings
-              ? 'Applying saved settings…'
-              : 'Apply saved settings',
+              ? ConnectionWorkspaceCopy.reconnectMenuProgress
+              : ConnectionWorkspaceCopy.reconnectMenuAction,
           onSelected: () {
             unawaited(_applySavedSettings());
           },
         ),
       ChatChromeMenuAction(
-        label: 'Close lane',
+        label: ConnectionWorkspaceCopy.closeLaneAction,
         onSelected: () => widget.workspaceController.terminateConnection(
           widget.laneBinding.connectionId,
         ),
@@ -264,14 +265,14 @@ class _SavedSettingsNotice extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Saved settings are pending',
+                    ConnectionWorkspaceCopy.reconnectNoticeTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Apply the saved connection settings to reconnect this lane.',
+                    ConnectionWorkspaceCopy.reconnectNoticeBody,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -287,7 +288,11 @@ class _SavedSettingsNotice extends StatelessWidget {
                   : () {
                       unawaited(onApply());
                     },
-              child: Text(isApplying ? 'Applying…' : 'Apply'),
+              child: Text(
+                isApplying
+                    ? ConnectionWorkspaceCopy.reconnectProgress
+                    : ConnectionWorkspaceCopy.reconnectAction,
+              ),
             ),
           ],
         ),

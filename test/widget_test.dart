@@ -238,7 +238,7 @@ void main() {
       expect(find.byType(CupertinoActionSheet), findsNothing);
       expect(find.text('New thread'), findsOneWidget);
       expect(find.text('Clear transcript'), findsOneWidget);
-      expect(find.text('Dormant connections'), findsOneWidget);
+      expect(find.text('Saved connections'), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );

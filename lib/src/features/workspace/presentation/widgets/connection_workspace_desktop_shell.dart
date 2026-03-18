@@ -3,6 +3,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_dormant_roster_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
@@ -51,21 +52,21 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(14, 18, 14, 24),
                       children: [
                         Text(
-                          'Connections',
+                          ConnectionWorkspaceCopy.workspaceTitle,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Live lanes stay active while dormant connections wait in the roster.',
+                          ConnectionWorkspaceCopy.desktopSidebarDescription,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 22),
                         _SidebarSectionTitle(
-                          title: 'Live',
+                          title: ConnectionWorkspaceCopy.openLanesSectionTitle,
                           trailingCount: state.liveConnectionIds.length,
                         ),
                         const SizedBox(height: 10),
@@ -113,7 +114,7 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                         }),
                         const SizedBox(height: 22),
                         _SidebarSectionTitle(
-                          title: 'Dormant',
+                          title: ConnectionWorkspaceCopy.savedSectionTitle,
                           trailingCount: state.dormantConnectionIds.length,
                         ),
                         const SizedBox(height: 10),
@@ -159,14 +160,15 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                 )) {
                   (true, _) => ConnectionWorkspaceDormantRosterContent(
                     workspaceController: workspaceController,
-                    description:
-                        'Choose another saved connection from the roster or return to a live lane from the sidebar.',
+                    description: ConnectionWorkspaceCopy
+                        .desktopSavedConnectionsDescription,
                     platformBehavior: platformPolicy.behavior,
                     settingsRenderer: connectionSettingsRendererFor(
                       platformPolicy,
                     ),
                     settingsOverlayDelegate: settingsOverlayDelegate,
                     useSafeArea: true,
+                    visualStyle: ConnectionWorkspaceRosterStyle.material,
                   ),
                   (false, final laneBinding?) =>
                     ConnectionWorkspaceLiveLaneSurface(
@@ -325,7 +327,7 @@ class _SidebarConnectionRow extends StatelessWidget {
                               vertical: 4,
                             ),
                             child: Text(
-                              'Saved changes',
+                              ConnectionWorkspaceCopy.reconnectBadge,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.w700,
@@ -340,7 +342,7 @@ class _SidebarConnectionRow extends StatelessWidget {
               ),
             ),
             Tooltip(
-              message: 'Close lane',
+              message: ConnectionWorkspaceCopy.closeLaneAction,
               child: IconButton(
                 key: ValueKey<String>('desktop_close_lane_$connectionId'),
                 visualDensity: VisualDensity.compact,
@@ -397,7 +399,7 @@ class _DormantRosterSidebarRow extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Dormant connections',
+                    ConnectionWorkspaceCopy.savedConnectionsTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),

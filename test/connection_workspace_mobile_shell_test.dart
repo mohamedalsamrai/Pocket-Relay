@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -37,7 +38,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Dormant connections'), findsWidgets);
+    expect(find.text('Saved connections'), findsWidgets);
     expect(
       find.byKey(const ValueKey('dormant_connection_conn_secondary')),
       findsOneWidget,
@@ -60,7 +61,7 @@ void main() {
 
     await tester.tap(find.byTooltip('More actions'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Dormant connections'));
+    await tester.tap(find.text('Saved connections'));
     await tester.pumpAndSettle();
 
     expect(controller.state.isShowingDormantRoster, isTrue);
@@ -88,6 +89,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(clientsById['conn_primary']?.disconnectCalls, 0);
+  });
+
+  testWidgets('iPhone saved connections page uses Cupertino primitives', (
+    tester,
+  ) async {
+    final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+    final controller = _buildWorkspaceController(clientsById: clientsById);
+    addTearDown(() async {
+      controller.dispose();
+      await _closeClients(clientsById);
+    });
+
+    await controller.initialize();
+    await tester.pumpWidget(
+      _buildShell(controller, platform: TargetPlatform.iOS),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('workspace_page_view')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved connections'), findsWidgets);
+    expect(find.byType(CupertinoScrollbar), findsOneWidget);
+    expect(find.byType(CupertinoListSection), findsWidgets);
+    expect(
+      find.widgetWithText(CupertinoButton, 'Add connection'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(CupertinoButton, 'Open lane'), findsWidgets);
   });
 
   testWidgets('instantiating from the roster opens a new live lane', (
@@ -193,7 +226,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No saved connections yet.'), findsOneWidget);
-      expect(find.text('Return to lane'), findsNothing);
+      expect(find.text('Return to open lane'), findsNothing);
       expect(find.byKey(const ValueKey('add_connection')), findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('add_connection')));
@@ -537,14 +570,13 @@ void main() {
 Widget _buildShell(
   ConnectionWorkspaceController controller, {
   ConnectionSettingsOverlayDelegate? settingsOverlayDelegate,
+  TargetPlatform platform = TargetPlatform.android,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     home: ConnectionWorkspaceMobileShell(
       workspaceController: controller,
-      platformPolicy: PocketPlatformPolicy.resolve(
-        platform: TargetPlatform.android,
-      ),
+      platformPolicy: PocketPlatformPolicy.resolve(platform: platform),
       settingsOverlayDelegate:
           settingsOverlayDelegate ?? FakeConnectionSettingsOverlayDelegate(),
     ),

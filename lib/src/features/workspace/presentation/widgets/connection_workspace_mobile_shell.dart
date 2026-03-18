@@ -7,6 +7,7 @@ import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_dormant_roster_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
@@ -213,11 +214,16 @@ class _ConnectionWorkspaceDormantRosterPageState
   Widget build(BuildContext context) {
     final content = ConnectionWorkspaceDormantRosterContent(
       workspaceController: widget.workspaceController,
-      description:
-          'Swipe back to a live lane or open another saved connection.',
+      description: ConnectionWorkspaceCopy.mobileSavedConnectionsDescription,
       platformBehavior: widget.platformPolicy.behavior,
       settingsRenderer: connectionSettingsRendererFor(widget.platformPolicy),
       settingsOverlayDelegate: widget.settingsOverlayDelegate,
+      visualStyle: switch (widget.platformPolicy.regionPolicy.screenShell) {
+        ChatRootScreenShellRenderer.flutter =>
+          ConnectionWorkspaceRosterStyle.material,
+        ChatRootScreenShellRenderer.cupertino =>
+          ConnectionWorkspaceRosterStyle.cupertino,
+      },
     );
 
     return switch (widget.platformPolicy.regionPolicy.screenShell) {
@@ -229,7 +235,7 @@ class _ConnectionWorkspaceDormantRosterPageState
             transitionBetweenRoutes: false,
             automaticallyImplyLeading: false,
             automaticBackgroundVisibility: false,
-            middle: Text('Dormant connections'),
+            middle: Text(ConnectionWorkspaceCopy.savedConnectionsTitle),
           ),
           child: content,
         ),
