@@ -17,6 +17,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.da
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 class PocketRelayApp extends StatefulWidget {
@@ -206,6 +207,13 @@ class _PocketRelayHome extends StatelessWidget {
 
         if (platformPolicy.behavior.isMobileExperience) {
           return ConnectionWorkspaceMobileShell(
+            workspaceController: workspaceController,
+            platformPolicy: platformPolicy,
+          );
+        }
+
+        if (platformPolicy.behavior.isDesktopExperience) {
+          return ConnectionWorkspaceDesktopShell(
             workspaceController: workspaceController,
             platformPolicy: platformPolicy,
           );

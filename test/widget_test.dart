@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_ch
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 import 'support/fake_codex_app_server_client.dart';
@@ -93,6 +94,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      expect(find.byType(ConnectionWorkspaceMobileShell), findsOneWidget);
       expect(find.byType(ChatRootAdapter), findsOneWidget);
       expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
       expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
@@ -112,6 +114,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      expect(find.byType(ConnectionWorkspaceDesktopShell), findsOneWidget);
       expect(find.byType(ChatRootAdapter), findsOneWidget);
       expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
       expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
