@@ -20,8 +20,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_pol
 class PocketRelayApp extends StatefulWidget {
   const PocketRelayApp({
     super.key,
-    this.profileStore,
-    this.conversationHandoffStore,
     this.connectionRepository,
     this.connectionHandoffStore,
     this.appServerClient,
@@ -31,8 +29,6 @@ class PocketRelayApp extends StatefulWidget {
         const ChatRootPlatformPolicy.cupertinoFoundation(),
   });
 
-  final CodexProfileStore? profileStore;
-  final CodexConversationHandoffStore? conversationHandoffStore;
   final CodexConnectionRepository? connectionRepository;
   final CodexConnectionHandoffStore? connectionHandoffStore;
   final CodexAppServerClient? appServerClient;
@@ -45,8 +41,6 @@ class PocketRelayApp extends StatefulWidget {
 }
 
 class _PocketRelayAppState extends State<PocketRelayApp> {
-  CodexProfileStore? _ownedProfileStore;
-  CodexConversationHandoffStore? _ownedConversationHandoffStore;
   CodexConnectionRepository? _ownedConnectionRepository;
   CodexConnectionHandoffStore? _ownedConnectionHandoffStore;
   CodexConnectionRepository? _ownedConnectionHandoffStoreRepository;
@@ -74,8 +68,6 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
   void didUpdateWidget(covariant PocketRelayApp oldWidget) {
     super.didUpdateWidget(oldWidget);
     final bootstrapDependenciesChanged =
-        oldWidget.profileStore != widget.profileStore ||
-        oldWidget.conversationHandoffStore != widget.conversationHandoffStore ||
         oldWidget.connectionRepository != widget.connectionRepository ||
         oldWidget.connectionHandoffStore != widget.connectionHandoffStore;
     if (!bootstrapDependenciesChanged &&
@@ -115,21 +107,11 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
       _appServerClient = _ownedAppServerClient ??= CodexAppServerClient();
     }
 
-    if (_usesLegacyBootstrap) {
-      _bindLegacyBootstrapDependencies();
-      return;
-    }
-
     _bindCatalogBootstrapDependencies();
   }
 
   Future<void> _loadBootstrapState() async {
     final loadGeneration = ++_bootstrapLoadGeneration;
-    if (_usesLegacyBootstrap) {
-      await _loadLegacyBootstrapState(loadGeneration);
-      return;
-    }
-
     await _loadCatalogBootstrapState(loadGeneration);
   }
 
@@ -162,25 +144,8 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
           appServerClient: _appServerClient,
           platformPolicy: platformPolicy,
         ),
-      ),
+        ),
     );
-  }
-
-  bool get _usesLegacyBootstrap {
-    return widget.profileStore != null ||
-        widget.conversationHandoffStore != null;
-  }
-
-  void _bindLegacyBootstrapDependencies() {
-    _connectionRepository = null;
-    _connectionHandoffStore = null;
-    _profileStore =
-        widget.profileStore ??
-        (_ownedProfileStore ??= SecureCodexProfileStore());
-    _conversationHandoffStore =
-        widget.conversationHandoffStore ??
-        (_ownedConversationHandoffStore ??=
-            SecureCodexConversationHandoffStore());
   }
 
   void _bindCatalogBootstrapDependencies() {
@@ -205,30 +170,6 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
       _ownedConnectionHandoffStoreRepository = connectionRepository;
     }
     _connectionHandoffStore = _ownedConnectionHandoffStore;
-  }
-
-  Future<void> _loadLegacyBootstrapState(int loadGeneration) async {
-    final profileStore = _profileStore;
-    final conversationHandoffStore = _conversationHandoffStore;
-    if (profileStore == null || conversationHandoffStore == null) {
-      return;
-    }
-
-    final results = await Future.wait<dynamic>(<Future<dynamic>>[
-      profileStore.load(),
-      conversationHandoffStore.load(),
-    ]);
-    if (!mounted ||
-        loadGeneration != _bootstrapLoadGeneration ||
-        profileStore != _profileStore ||
-        conversationHandoffStore != _conversationHandoffStore) {
-      return;
-    }
-
-    setState(() {
-      _savedProfile = results[0] as SavedProfile;
-      _savedConversationHandoff = results[1] as SavedConversationHandoff;
-    });
   }
 
   Future<void> _loadCatalogBootstrapState(int loadGeneration) async {
@@ -314,10 +255,8 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
     _scopedConnectionId = null;
     _scopedConnectionRepository = null;
     _scopedConnectionHandoffStore = null;
-    if (!_usesLegacyBootstrap) {
-      _profileStore = null;
-      _conversationHandoffStore = null;
-    }
+    _profileStore = null;
+    _conversationHandoffStore = null;
   }
 }
 
