@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_ch
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 import 'support/fake_codex_app_server_client.dart';
 
@@ -48,6 +49,8 @@ void main() {
 
     expect(find.text('Pocket Relay'), findsOneWidget);
     expect(find.text('Configure remote'), findsWidgets);
+    expect(find.byType(ConnectionWorkspaceMobileShell), findsOneWidget);
+    expect(find.byKey(const ValueKey('workspace_page_view')), findsOneWidget);
     expect(find.byType(ChatRootAdapter), findsOneWidget);
     expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
     expect(find.byType(FlutterChatAppChrome), findsOneWidget);
@@ -194,6 +197,7 @@ void main() {
       expect(find.byType(CupertinoActionSheet), findsNothing);
       expect(find.text('New thread'), findsOneWidget);
       expect(find.text('Clear transcript'), findsOneWidget);
+      expect(find.text('Dormant connections'), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );

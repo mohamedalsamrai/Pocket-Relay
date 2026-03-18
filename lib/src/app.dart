@@ -17,6 +17,7 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.da
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 class PocketRelayApp extends StatefulWidget {
   const PocketRelayApp({
@@ -196,6 +197,20 @@ class _PocketRelayHome extends StatelessWidget {
     return AnimatedBuilder(
       animation: workspaceController,
       builder: (context, _) {
+        final workspaceState = workspaceController.state;
+        if (workspaceState.isLoading) {
+          return _PocketRelayBootstrapShell(
+            screenShell: platformPolicy.regionPolicy.screenShell,
+          );
+        }
+
+        if (platformPolicy.behavior.isMobileExperience) {
+          return ConnectionWorkspaceMobileShell(
+            workspaceController: workspaceController,
+            platformPolicy: platformPolicy,
+          );
+        }
+
         final selectedLaneBinding = workspaceController.selectedLaneBinding;
         if (selectedLaneBinding != null) {
           return ChatRootAdapter(
