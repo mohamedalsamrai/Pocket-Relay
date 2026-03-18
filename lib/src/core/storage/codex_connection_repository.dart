@@ -16,6 +16,11 @@ abstract interface class CodexConnectionRepository {
 
   Future<SavedConnection> loadConnection(String connectionId);
 
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  });
+
   Future<void> saveConnection(SavedConnection connection);
 
   Future<void> deleteConnection(String connectionId);
@@ -24,12 +29,15 @@ abstract interface class CodexConnectionRepository {
 class MemoryCodexConnectionRepository implements CodexConnectionRepository {
   MemoryCodexConnectionRepository({
     Iterable<SavedConnection> initialConnections = const <SavedConnection>[],
+    ConnectionIdGenerator? connectionIdGenerator,
   }) : _connectionsById = <String, SavedConnection>{
          for (final connection in initialConnections) connection.id: connection,
        },
        _orderedConnectionIds = <String>[
          for (final connection in initialConnections) connection.id,
-       ];
+       ],
+       _connectionIdGenerator =
+           connectionIdGenerator ?? _defaultMemoryConnectionIdGenerator();
 
   factory MemoryCodexConnectionRepository.single({
     required SavedProfile savedProfile,
@@ -48,6 +56,7 @@ class MemoryCodexConnectionRepository implements CodexConnectionRepository {
 
   final Map<String, SavedConnection> _connectionsById;
   final List<String> _orderedConnectionIds;
+  final ConnectionIdGenerator _connectionIdGenerator;
 
   @override
   Future<ConnectionCatalogState> loadCatalog() async {
@@ -66,6 +75,24 @@ class MemoryCodexConnectionRepository implements CodexConnectionRepository {
     if (connection == null) {
       throw StateError('Unknown saved connection: $connectionId');
     }
+    return connection;
+  }
+
+  @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    late SavedConnection connection;
+    do {
+      connection = SavedConnection(
+        id: _connectionIdGenerator(),
+        profile: profile,
+        secrets: secrets,
+      );
+    } while (_connectionsById.containsKey(connection.id));
+
+    await saveConnection(connection);
     return connection;
   }
 
@@ -153,6 +180,26 @@ class SecureCodexConnectionRepository implements CodexConnectionRepository {
       profile: summary.profile,
       secrets: await _readSecrets(normalizedConnectionId),
     );
+  }
+
+  @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    final catalog = await loadCatalog();
+
+    late SavedConnection connection;
+    do {
+      connection = SavedConnection(
+        id: _connectionIdGenerator(),
+        profile: profile,
+        secrets: secrets,
+      );
+    } while (catalog.connectionForId(connection.id) != null);
+
+    await saveConnection(connection);
+    return connection;
   }
 
   @override
@@ -464,4 +511,9 @@ String generateConnectionId() {
     buffer.write(random.nextInt(256).toRadixString(16).padLeft(2, '0'));
   }
   return buffer.toString();
+}
+
+ConnectionIdGenerator _defaultMemoryConnectionIdGenerator() {
+  var nextId = 1;
+  return () => 'conn_memory_${nextId++}';
 }

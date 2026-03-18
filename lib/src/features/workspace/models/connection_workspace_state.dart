@@ -10,6 +10,7 @@ class ConnectionWorkspaceState {
     required this.liveConnectionIds,
     required this.selectedConnectionId,
     required this.viewport,
+    required this.reconnectRequiredConnectionIds,
   });
 
   const ConnectionWorkspaceState.initial()
@@ -17,13 +18,15 @@ class ConnectionWorkspaceState {
       catalog = const ConnectionCatalogState.empty(),
       liveConnectionIds = const <String>[],
       selectedConnectionId = null,
-      viewport = ConnectionWorkspaceViewport.liveLane;
+      viewport = ConnectionWorkspaceViewport.liveLane,
+      reconnectRequiredConnectionIds = const <String>{};
 
   final bool isLoading;
   final ConnectionCatalogState catalog;
   final List<String> liveConnectionIds;
   final String? selectedConnectionId;
   final ConnectionWorkspaceViewport viewport;
+  final Set<String> reconnectRequiredConnectionIds;
 
   List<String> get dormantConnectionIds {
     return <String>[
@@ -36,7 +39,12 @@ class ConnectionWorkspaceState {
     return liveConnectionIds.contains(connectionId);
   }
 
-  bool get isShowingLiveLane => viewport == ConnectionWorkspaceViewport.liveLane;
+  bool requiresReconnect(String connectionId) {
+    return reconnectRequiredConnectionIds.contains(connectionId);
+  }
+
+  bool get isShowingLiveLane =>
+      viewport == ConnectionWorkspaceViewport.liveLane;
 
   bool get isShowingDormantRoster =>
       viewport == ConnectionWorkspaceViewport.dormantRoster;
@@ -47,6 +55,7 @@ class ConnectionWorkspaceState {
     List<String>? liveConnectionIds,
     String? selectedConnectionId,
     ConnectionWorkspaceViewport? viewport,
+    Set<String>? reconnectRequiredConnectionIds,
     bool clearSelectedConnectionId = false,
   }) {
     return ConnectionWorkspaceState(
@@ -57,6 +66,8 @@ class ConnectionWorkspaceState {
           ? null
           : (selectedConnectionId ?? this.selectedConnectionId),
       viewport: viewport ?? this.viewport,
+      reconnectRequiredConnectionIds:
+          reconnectRequiredConnectionIds ?? this.reconnectRequiredConnectionIds,
     );
   }
 
@@ -67,7 +78,11 @@ class ConnectionWorkspaceState {
         other.catalog == catalog &&
         listEquals(other.liveConnectionIds, liveConnectionIds) &&
         other.selectedConnectionId == selectedConnectionId &&
-        other.viewport == viewport;
+        other.viewport == viewport &&
+        setEquals(
+          other.reconnectRequiredConnectionIds,
+          reconnectRequiredConnectionIds,
+        );
   }
 
   @override
@@ -77,5 +92,6 @@ class ConnectionWorkspaceState {
     Object.hashAll(liveConnectionIds),
     selectedConnectionId,
     viewport,
+    Object.hashAllUnordered(reconnectRequiredConnectionIds),
   );
 }

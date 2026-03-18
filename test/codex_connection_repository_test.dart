@@ -171,6 +171,36 @@ void main() {
     },
   );
 
+  test('createConnection persists a generated saved connection', () async {
+    final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+    final preferences = SharedPreferencesAsync();
+    var nextId = 0;
+    final repository = SecureCodexConnectionRepository(
+      secureStorage: secureStorage,
+      preferences: preferences,
+      connectionIdGenerator: () =>
+          <String>['conn_seed', 'conn_created'][nextId++],
+    );
+
+    await repository.loadCatalog();
+    final createdConnection = await repository.createConnection(
+      profile: ConnectionProfile.defaults().copyWith(
+        label: 'Created Box',
+        host: 'created.example.com',
+        username: 'vince',
+      ),
+      secrets: const ConnectionSecrets(password: 'created-secret'),
+    );
+
+    final catalog = await repository.loadCatalog();
+    final persistedConnection = await repository.loadConnection('conn_created');
+
+    expect(createdConnection.id, 'conn_created');
+    expect(catalog.orderedConnectionIds, <String>['conn_seed', 'conn_created']);
+    expect(persistedConnection.profile.label, 'Created Box');
+    expect(persistedConnection.secrets.password, 'created-secret');
+  });
+
   test(
     'loadCatalog rebuilds the index from namespaced profile keys when the index is missing',
     () async {

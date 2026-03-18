@@ -50,20 +50,189 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     return _initializationFuture ??= _initializeOnce();
   }
 
-  Future<void> instantiateConnection(String connectionId) async {
-    final normalizedConnectionId = connectionId.trim();
-    if (normalizedConnectionId.isEmpty) {
-      throw ArgumentError.value(
-        connectionId,
-        'connectionId',
-        'Connection id must not be empty.',
+  Future<String> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    await initialize();
+    final connection = await _connectionRepository.createConnection(
+      profile: profile,
+      secrets: secrets,
+    );
+    final nextCatalog = await _connectionRepository.loadCatalog();
+    if (_isDisposed) {
+      return connection.id;
+    }
+
+    _applyState(
+      _state.copyWith(
+        isLoading: false,
+        catalog: nextCatalog,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: nextCatalog,
+          liveConnectionIds: _state.liveConnectionIds,
+          reconnectRequiredConnectionIds: _state.reconnectRequiredConnectionIds,
+        ),
+      ),
+    );
+    return connection.id;
+  }
+
+  Future<void> saveDormantConnection({
+    required String connectionId,
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    final normalizedConnectionId = _normalizeConnectionId(connectionId);
+    await initialize();
+    _requireKnownConnectionId(normalizedConnectionId);
+    if (_state.isConnectionLive(normalizedConnectionId)) {
+      throw StateError(
+        'Cannot save dormant connection settings for a live lane: '
+        '$normalizedConnectionId',
       );
     }
 
-    await initialize();
-    if (_state.catalog.connectionForId(normalizedConnectionId) == null) {
-      throw StateError('Unknown saved connection: $normalizedConnectionId');
+    await _connectionRepository.saveConnection(
+      SavedConnection(
+        id: normalizedConnectionId,
+        profile: profile,
+        secrets: secrets,
+      ),
+    );
+
+    final nextCatalog = await _connectionRepository.loadCatalog();
+    if (_isDisposed) {
+      return;
     }
+
+    _applyState(
+      _state.copyWith(
+        isLoading: false,
+        catalog: nextCatalog,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: nextCatalog,
+          liveConnectionIds: _state.liveConnectionIds,
+          reconnectRequiredConnectionIds: _state.reconnectRequiredConnectionIds,
+        ),
+      ),
+    );
+  }
+
+  Future<void> saveLiveConnectionEdits({
+    required String connectionId,
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    final normalizedConnectionId = _normalizeConnectionId(connectionId);
+    await initialize();
+    _requireKnownConnectionId(normalizedConnectionId);
+    if (!_state.isConnectionLive(normalizedConnectionId)) {
+      throw StateError(
+        'Cannot stage live connection edits for a dormant connection: '
+        '$normalizedConnectionId',
+      );
+    }
+
+    await _connectionRepository.saveConnection(
+      SavedConnection(
+        id: normalizedConnectionId,
+        profile: profile,
+        secrets: secrets,
+      ),
+    );
+
+    final nextCatalog = await _connectionRepository.loadCatalog();
+    if (_isDisposed) {
+      return;
+    }
+
+    _applyState(
+      _state.copyWith(
+        isLoading: false,
+        catalog: nextCatalog,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: nextCatalog,
+          liveConnectionIds: _state.liveConnectionIds,
+          reconnectRequiredConnectionIds: <String>{
+            ..._state.reconnectRequiredConnectionIds,
+            normalizedConnectionId,
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> reconnectConnection(String connectionId) async {
+    final normalizedConnectionId = _normalizeConnectionId(connectionId);
+    await initialize();
+    if (!_state.isConnectionLive(normalizedConnectionId) ||
+        !_state.requiresReconnect(normalizedConnectionId)) {
+      return;
+    }
+
+    final previousBinding = _liveBindingsByConnectionId[normalizedConnectionId];
+    if (previousBinding == null) {
+      return;
+    }
+
+    final nextBinding = await _loadLaneBinding(normalizedConnectionId);
+    if (_isDisposed) {
+      nextBinding.dispose();
+      return;
+    }
+
+    _liveBindingsByConnectionId[normalizedConnectionId] = nextBinding;
+    previousBinding.dispose();
+    _applyState(
+      _state.copyWith(
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: _state.catalog,
+          liveConnectionIds: _state.liveConnectionIds,
+          reconnectRequiredConnectionIds: <String>{
+            for (final connectionId in _state.reconnectRequiredConnectionIds)
+              if (connectionId != normalizedConnectionId) connectionId,
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> deleteDormantConnection(String connectionId) async {
+    final normalizedConnectionId = _normalizeConnectionId(connectionId);
+    await initialize();
+    _requireKnownConnectionId(normalizedConnectionId);
+    if (_state.isConnectionLive(normalizedConnectionId)) {
+      throw StateError(
+        'Cannot delete a live connection. Close the lane first: '
+        '$normalizedConnectionId',
+      );
+    }
+
+    await _connectionHandoffStore.delete(normalizedConnectionId);
+    await _connectionRepository.deleteConnection(normalizedConnectionId);
+    final nextCatalog = await _connectionRepository.loadCatalog();
+    if (_isDisposed) {
+      return;
+    }
+
+    _applyState(
+      _state.copyWith(
+        isLoading: false,
+        catalog: nextCatalog,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: nextCatalog,
+          liveConnectionIds: _state.liveConnectionIds,
+          reconnectRequiredConnectionIds: _state.reconnectRequiredConnectionIds,
+        ),
+      ),
+    );
+  }
+
+  Future<void> instantiateConnection(String connectionId) async {
+    final normalizedConnectionId = _normalizeConnectionId(connectionId);
+    await initialize();
+    _requireKnownConnectionId(normalizedConnectionId);
 
     if (_state.isConnectionLive(normalizedConnectionId)) {
       selectConnection(normalizedConnectionId);
@@ -86,6 +255,11 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         liveConnectionIds: nextLiveConnectionIds,
         selectedConnectionId: normalizedConnectionId,
         viewport: ConnectionWorkspaceViewport.liveLane,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: _state.catalog,
+          liveConnectionIds: nextLiveConnectionIds,
+          reconnectRequiredConnectionIds: _state.reconnectRequiredConnectionIds,
+        ),
       ),
     );
   }
@@ -151,6 +325,11 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         selectedConnectionId: nextSelectedConnectionId,
         viewport: nextViewport,
         clearSelectedConnectionId: nextSelectedConnectionId == null,
+        reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
+          catalog: _state.catalog,
+          liveConnectionIds: nextLiveConnectionIds,
+          reconnectRequiredConnectionIds: _state.reconnectRequiredConnectionIds,
+        ),
       ),
     );
   }
@@ -193,6 +372,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         liveConnectionIds: <String>[firstConnectionId],
         selectedConnectionId: firstConnectionId,
         viewport: ConnectionWorkspaceViewport.liveLane,
+        reconnectRequiredConnectionIds: const <String>{},
       ),
     );
   }
@@ -253,5 +433,37 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
     _state = nextState;
     notifyListeners();
+  }
+
+  String _normalizeConnectionId(String connectionId) {
+    final normalizedConnectionId = connectionId.trim();
+    if (normalizedConnectionId.isEmpty) {
+      throw ArgumentError.value(
+        connectionId,
+        'connectionId',
+        'Connection id must not be empty.',
+      );
+    }
+    return normalizedConnectionId;
+  }
+
+  void _requireKnownConnectionId(String connectionId) {
+    if (_state.catalog.connectionForId(connectionId) == null) {
+      throw StateError('Unknown saved connection: $connectionId');
+    }
+  }
+
+  Set<String> _sanitizeReconnectRequiredConnectionIds({
+    required ConnectionCatalogState catalog,
+    required List<String> liveConnectionIds,
+    required Set<String> reconnectRequiredConnectionIds,
+  }) {
+    final liveConnectionIdSet = liveConnectionIds.toSet();
+    return <String>{
+      for (final connectionId in reconnectRequiredConnectionIds)
+        if (catalog.connectionForId(connectionId) != null &&
+            liveConnectionIdSet.contains(connectionId))
+          connectionId,
+    };
   }
 }

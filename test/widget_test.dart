@@ -298,6 +298,20 @@ class _DeferredConnectionRepository implements CodexConnectionRepository {
   }
 
   @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    final connection = SavedConnection(
+      id: 'conn_created',
+      profile: profile,
+      secrets: secrets,
+    );
+    await saveConnection(connection);
+    return connection;
+  }
+
+  @override
   Future<void> saveConnection(SavedConnection connection) async {
     _savedConnection = connection;
     if (!_completer.isCompleted) {

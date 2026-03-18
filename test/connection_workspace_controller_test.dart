@@ -172,36 +172,263 @@ void main() {
       expect(controller.state.selectedConnectionId, 'conn_primary');
     },
   );
+
+  test('createConnection appends a new dormant saved connection', () async {
+    final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+    final repository = MemoryCodexConnectionRepository(
+      initialConnections: <SavedConnection>[
+        SavedConnection(
+          id: 'conn_primary',
+          profile: _profile('Primary Box', 'primary.local'),
+          secrets: const ConnectionSecrets(password: 'secret-1'),
+        ),
+        SavedConnection(
+          id: 'conn_secondary',
+          profile: _profile('Secondary Box', 'secondary.local'),
+          secrets: const ConnectionSecrets(password: 'secret-2'),
+        ),
+      ],
+      connectionIdGenerator: () => 'conn_created',
+    );
+    final controller = _buildWorkspaceController(
+      clientsById: clientsById,
+      repository: repository,
+    );
+    addTearDown(() async {
+      controller.dispose();
+      await _closeClients(clientsById);
+    });
+
+    await controller.initialize();
+
+    final createdConnectionId = await controller.createConnection(
+      profile: _profile('Third Box', 'third.local'),
+      secrets: const ConnectionSecrets(password: 'secret-3'),
+    );
+
+    expect(createdConnectionId, 'conn_created');
+    expect(controller.state.catalog.orderedConnectionIds, <String>[
+      'conn_primary',
+      'conn_secondary',
+      'conn_created',
+    ]);
+    expect(controller.state.liveConnectionIds, <String>['conn_primary']);
+    expect(controller.state.dormantConnectionIds, <String>[
+      'conn_secondary',
+      'conn_created',
+    ]);
+    expect(controller.bindingForConnectionId('conn_created'), isNull);
+  });
+
+  test(
+    'saveDormantConnection updates the saved definition immediately',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      await controller.saveDormantConnection(
+        connectionId: 'conn_secondary',
+        profile: _profile('Secondary Renamed', 'secondary.changed'),
+        secrets: const ConnectionSecrets(password: 'new-secret'),
+      );
+
+      final updatedConnection = controller.state.catalog.connectionForId(
+        'conn_secondary',
+      );
+      expect(updatedConnection?.profile.label, 'Secondary Renamed');
+      expect(updatedConnection?.profile.host, 'secondary.changed');
+      expect(controller.bindingForConnectionId('conn_secondary'), isNull);
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+      expect(clientsById['conn_secondary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'saveLiveConnectionEdits stages reconnect-required state without disconnecting the lane',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary');
+
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(controller.state.reconnectRequiredConnectionIds, <String>{
+        'conn_primary',
+      });
+      expect(
+        controller.state.catalog.connectionForId('conn_primary')?.profile.host,
+        'primary.changed',
+      );
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(firstBinding),
+      );
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+      expect(clientsById['conn_secondary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'reconnectConnection replaces the targeted live binding and clears reconnect-required state',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+      final handoffStore = MemoryCodexConnectionHandoffStore();
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+        'conn_secondary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        connectionHandoffStore: handoffStore,
+        laneBindingFactory:
+            ({required connectionId, required connection, required handoff}) {
+              final appServerClient = FakeCodexAppServerClient();
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                conversationHandoffStore:
+                    ConnectionScopedConversationHandoffStore(
+                      connectionId: connectionId,
+                      handoffStore: handoffStore,
+                    ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                initialSavedConversationHandoff: handoff,
+                ownsAppServerClient: false,
+              );
+            },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary');
+
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+      await controller.reconnectConnection('conn_primary');
+
+      final nextBinding = controller.bindingForConnectionId('conn_primary');
+      expect(nextBinding, isNotNull);
+      expect(nextBinding, isNot(same(firstBinding)));
+      expect(nextBinding?.sessionController.profile.host, 'primary.changed');
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
+      expect(clientsByConnectionId['conn_primary']!.last.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'deleteDormantConnection removes the saved definition and handoff',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final handoffStore = MemoryCodexConnectionHandoffStore(
+        initialValues: <String, SavedConversationHandoff>{
+          'conn_secondary': const SavedConversationHandoff(
+            resumeThreadId: 'thread_saved',
+          ),
+        },
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        handoffStore: handoffStore,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.deleteDormantConnection('conn_secondary');
+
+      expect(controller.state.catalog.orderedConnectionIds, <String>[
+        'conn_primary',
+      ]);
+      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(
+        await handoffStore.load('conn_secondary'),
+        const SavedConversationHandoff(),
+      );
+    },
+  );
 }
 
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
+  MemoryCodexConnectionRepository? repository,
+  MemoryCodexConnectionHandoffStore? handoffStore,
 }) {
-  final repository = MemoryCodexConnectionRepository(
-    initialConnections: <SavedConnection>[
-      SavedConnection(
-        id: 'conn_primary',
-        profile: _profile('Primary Box', 'primary.local'),
-        secrets: const ConnectionSecrets(password: 'secret-1'),
-      ),
-      SavedConnection(
-        id: 'conn_secondary',
-        profile: _profile('Secondary Box', 'secondary.local'),
-        secrets: const ConnectionSecrets(password: 'secret-2'),
-      ),
-    ],
-  );
-  final handoffStore = MemoryCodexConnectionHandoffStore(
-    initialValues: <String, SavedConversationHandoff>{
-      'conn_secondary': const SavedConversationHandoff(
-        resumeThreadId: 'thread_saved',
-      ),
-    },
-  );
+  final resolvedRepository =
+      repository ??
+      MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+  final resolvedHandoffStore =
+      handoffStore ??
+      MemoryCodexConnectionHandoffStore(
+        initialValues: <String, SavedConversationHandoff>{
+          'conn_secondary': const SavedConversationHandoff(
+            resumeThreadId: 'thread_saved',
+          ),
+        },
+      );
 
   return ConnectionWorkspaceController(
-    connectionRepository: repository,
-    connectionHandoffStore: handoffStore,
+    connectionRepository: resolvedRepository,
+    connectionHandoffStore: resolvedHandoffStore,
     laneBindingFactory:
         ({required connectionId, required connection, required handoff}) {
           final appServerClient = clientsById[connectionId]!;
@@ -209,11 +436,11 @@ ConnectionWorkspaceController _buildWorkspaceController({
             connectionId: connectionId,
             profileStore: ConnectionScopedProfileStore(
               connectionId: connectionId,
-              connectionRepository: repository,
+              connectionRepository: resolvedRepository,
             ),
             conversationHandoffStore: ConnectionScopedConversationHandoffStore(
               connectionId: connectionId,
-              handoffStore: handoffStore,
+              handoffStore: resolvedHandoffStore,
             ),
             appServerClient: appServerClient,
             initialSavedProfile: SavedProfile(
@@ -250,5 +477,15 @@ Future<void> _closeClients(
 ) async {
   for (final client in clientsById.values) {
     await client.close();
+  }
+}
+
+Future<void> _closeClientLists(
+  Map<String, List<FakeCodexAppServerClient>> clientsByConnectionId,
+) async {
+  for (final clients in clientsByConnectionId.values) {
+    for (final client in clients) {
+      await client.close();
+    }
   }
 }
