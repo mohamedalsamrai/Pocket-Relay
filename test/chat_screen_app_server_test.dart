@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
-import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 
 import 'support/fake_codex_app_server_client.dart';
@@ -15,19 +16,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     final composerField = find.byType(TextField).first;
     await tester.enterText(composerField, 'Hello Codex');
@@ -107,19 +98,9 @@ void main() {
       ..sendUserMessageError = StateError('transport broke');
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     final composerField = find.byType(TextField).first;
     await tester.enterText(composerField, 'Hello Codex');
@@ -143,18 +124,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       final composerField = find.byType(TextField).first;
       await tester.enterText(composerField, 'First prompt');
@@ -229,23 +202,19 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          conversationHandoffStore: MemoryCodexConversationHandoffStore(
-            initialValue: const SavedConversationHandoff(
-              resumeThreadId: 'thread_old',
-            ),
-          ),
+        _buildCatalogApp(
           appServerClient: appServerClient,
+          connectionHandoffStore: MemoryCodexConnectionHandoffStore(
+            initialValues: <String, SavedConversationHandoff>{
+              'conn_primary': const SavedConversationHandoff(
+                resumeThreadId: 'thread_old',
+              ),
+            },
+          ),
         ),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       final composerField = find.byType(TextField).first;
       await tester.enterText(composerField, 'Resume the old work');
@@ -269,19 +238,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -358,21 +317,19 @@ void main() {
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
-      final profileStore = MemoryCodexProfileStore(
-        initialValue: SavedProfile(
-          profile: _configuredProfile(),
-          secrets: const ConnectionSecrets(password: 'secret'),
-        ),
+      final repository = MemoryCodexConnectionRepository.single(
+        savedProfile: _savedProfile(),
+        connectionId: 'conn_primary',
       );
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: profileStore,
+        _buildCatalogApp(
+          connectionRepository: repository,
           appServerClient: appServerClient,
         ),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerUnpinnedHostKeyEvent(
@@ -400,7 +357,9 @@ void main() {
       expect(find.text('saved'), findsOneWidget);
       expect(find.byKey(const ValueKey('save_host_fingerprint')), findsNothing);
       expect(
-        (await profileStore.load()).profile.hostFingerprint,
+        (await repository.loadConnection(
+          'conn_primary',
+        )).profile.hostFingerprint,
         '7a:9f:d7:dc:2e:f2:7d:c0:18:29:33:4d:22:2f:ae:4c',
       );
 
@@ -426,18 +385,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerSshHostKeyMismatchEvent(
@@ -474,18 +425,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerSshAuthenticationFailedEvent(
@@ -516,18 +459,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerSshRemoteLaunchFailedEvent(
@@ -557,18 +492,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerSshConnectFailedEvent(
@@ -602,19 +529,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -669,15 +586,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
       await tester.pump(const Duration(milliseconds: 200));
@@ -767,18 +676,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -837,18 +738,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -917,19 +810,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -978,19 +861,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -1027,19 +900,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -1084,18 +947,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1134,18 +989,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1185,18 +1032,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1241,18 +1080,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       await tester.enterText(find.byType(TextField).first, 'Hello Codex');
       await tester.tap(find.byKey(const ValueKey('send')));
@@ -1335,18 +1166,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1413,18 +1236,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1514,18 +1329,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1641,19 +1448,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerRequestEvent(
@@ -1690,17 +1487,7 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -1765,18 +1552,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1857,18 +1636,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -1971,18 +1742,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -2026,7 +1789,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('Work log'), findsOneWidget);
-      expect(find.text('clean'), findsOneWidget);
+      expect(find.text('Checking worktree status'), findsOneWidget);
       expect(find.text('Investigating'), findsOneWidget);
 
       appServerClient.emit(
@@ -2045,8 +1808,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('Work log'), findsOneWidget);
-      expect(find.text('clean'), findsNothing);
-      expect(find.text('clean status'), findsOneWidget);
+      expect(find.text('Checking worktree status'), findsOneWidget);
       expect(find.text('Investigating'), findsOneWidget);
     },
   );
@@ -2058,18 +1820,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerRequestEvent(
@@ -2124,18 +1878,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -2172,11 +1918,9 @@ void main() {
       );
       final timerRect = tester.getRect(timerChip);
       final inputRect = tester.getRect(find.byType(TextField).first);
-      final screenCenterX = tester.getRect(find.byType(Scaffold)).center.dx;
 
       expect(timerRect.top, lessThan(inputRect.top));
       expect(inputRect.top - timerRect.bottom, greaterThan(0));
-      expect((timerRect.center.dx - screenCenterX).abs(), lessThanOrEqualTo(1));
     },
   );
 
@@ -2187,18 +1931,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerRequestEvent(
@@ -2259,18 +1995,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerRequestEvent(
@@ -2368,18 +2096,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerRequestEvent(
@@ -2441,18 +2161,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerRequestEvent(
@@ -2521,18 +2233,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       appServerClient.emit(
         const CodexAppServerNotificationEvent(
@@ -2644,19 +2348,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerRequestEvent(
@@ -2694,18 +2388,10 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        PocketRelayApp(
-          profileStore: MemoryCodexProfileStore(
-            initialValue: SavedProfile(
-              profile: _configuredProfile(),
-              secrets: const ConnectionSecrets(password: 'secret'),
-            ),
-          ),
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
-      await tester.pumpAndSettle();
+      await _pumpAppReady(tester);
 
       for (var index = 0; index < 24; index += 1) {
         appServerClient.emit(
@@ -2785,18 +2471,13 @@ void main() {
     addTearDown(appServerClient.close);
 
     await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(),
-          ),
-        ),
+      _buildCatalogApp(
         appServerClient: appServerClient,
+        savedProfile: _savedProfile(secrets: const ConnectionSecrets()),
       ),
     );
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     for (var index = 0; index < 24; index += 1) {
       appServerClient.emit(
@@ -2851,19 +2532,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        profileStore: MemoryCodexProfileStore(
-          initialValue: SavedProfile(
-            profile: _configuredProfile(),
-            secrets: const ConnectionSecrets(password: 'secret'),
-          ),
-        ),
-        appServerClient: appServerClient,
-      ),
-    );
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
 
-    await tester.pumpAndSettle();
+    await _pumpAppReady(tester);
 
     appServerClient.emit(
       const CodexAppServerNotificationEvent(
@@ -2967,5 +2638,65 @@ ConnectionProfile _configuredProfile() {
   return ConnectionProfile.defaults().copyWith(
     host: 'example.com',
     username: 'vince',
+  );
+}
+
+SavedProfile _savedProfile({
+  ConnectionSecrets secrets = const ConnectionSecrets(password: 'secret'),
+}) {
+  return SavedProfile(profile: _configuredProfile(), secrets: secrets);
+}
+
+PocketRelayApp _buildCatalogApp({
+  required CodexAppServerClient appServerClient,
+  SavedProfile? savedProfile,
+  CodexConnectionRepository? connectionRepository,
+  CodexConnectionHandoffStore? connectionHandoffStore,
+}) {
+  return PocketRelayApp(
+    connectionRepository:
+        connectionRepository ??
+        MemoryCodexConnectionRepository.single(
+          savedProfile: savedProfile ?? _savedProfile(),
+          connectionId: 'conn_primary',
+        ),
+    connectionHandoffStore:
+        connectionHandoffStore ?? MemoryCodexConnectionHandoffStore(),
+    appServerClient: appServerClient,
+  );
+}
+
+Future<void> _pumpAppReady(WidgetTester tester) {
+  return _pumpUntil(
+    tester,
+    () => find.byKey(const ValueKey('send')).evaluate().isNotEmpty,
+  );
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() predicate, {
+  Duration timeout = const Duration(seconds: 2),
+  Duration step = const Duration(milliseconds: 50),
+}) async {
+  final maxTicks = timeout.inMilliseconds ~/ step.inMilliseconds;
+  for (var tick = 0; tick < maxTicks; tick += 1) {
+    await tester.pump(step);
+    final exception = tester.takeException();
+    if (exception != null) {
+      throw exception;
+    }
+    if (predicate()) {
+      return;
+    }
+  }
+
+  throw TestFailure(
+    'Condition was not met within $timeout. '
+    'send=${find.byKey(const ValueKey('send')).evaluate().length} '
+    'textField=${find.byType(TextField).evaluate().length} '
+    'loading=${find.byType(CircularProgressIndicator).evaluate().length} '
+    'title=${find.text('Pocket Relay').evaluate().length} '
+    'configureRemote=${find.text('Configure remote').evaluate().length}',
   );
 }

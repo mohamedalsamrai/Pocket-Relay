@@ -111,10 +111,9 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
         unawaited(ownedClient.dispose());
       }
       _appServerClient = injectedClient;
-      return;
+    } else {
+      _appServerClient = _ownedAppServerClient ??= CodexAppServerClient();
     }
-
-    _appServerClient = _ownedAppServerClient ??= CodexAppServerClient();
 
     if (_usesLegacyBootstrap) {
       _bindLegacyBootstrapDependencies();

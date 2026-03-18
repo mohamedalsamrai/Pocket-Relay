@@ -64,6 +64,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? connectError;
   Object? startSessionError;
   Object? sendUserMessageError;
+  int disconnectCalls = 0;
   String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
   final Map<String, CodexAppServerThread> threadsById =
@@ -213,6 +214,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
 
   @override
   Future<void> disconnect() async {
+    disconnectCalls += 1;
     if (!_isConnected) {
       return;
     }

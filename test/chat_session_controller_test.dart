@@ -790,6 +790,109 @@ void main() {
   );
 
   test(
+    'applyConnectionSettings saves, disconnects, and clears lane-local continuation state',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+      final initialSavedProfile = SavedProfile(
+        profile: _configuredProfile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+      final profileStore = _RecordingProfileStore(
+        initialValue: initialSavedProfile,
+      );
+      final handoffStore = MemoryCodexConversationHandoffStore(
+        initialValue: const SavedConversationHandoff(
+          resumeThreadId: 'thread_saved',
+        ),
+      );
+      final controller = ChatSessionController(
+        profileStore: profileStore,
+        conversationHandoffStore: handoffStore,
+        appServerClient: appServerClient,
+        initialSavedProfile: initialSavedProfile,
+        initialSavedConversationHandoff: const SavedConversationHandoff(
+          resumeThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Hello controller'), isTrue);
+
+      final updatedProfile = _configuredProfile().copyWith(
+        label: 'Renamed Box',
+        host: 'changed.example.com',
+      );
+      const updatedSecrets = ConnectionSecrets(password: 'changed-secret');
+
+      await controller.applyConnectionSettings(
+        profile: updatedProfile,
+        secrets: updatedSecrets,
+      );
+
+      expect(profileStore.saveCalls, 1);
+      expect(
+        profileStore.savedProfile,
+        const SavedProfile(
+          profile: ConnectionProfile(
+            label: 'Renamed Box',
+            host: 'changed.example.com',
+            port: 22,
+            username: 'vince',
+            workspaceDir: '/home/vince/Projects',
+            codexPath: 'codex',
+            authMode: AuthMode.password,
+            hostFingerprint: '',
+            dangerouslyBypassSandbox: false,
+            ephemeralSession: false,
+            connectionMode: ConnectionMode.remote,
+          ),
+          secrets: updatedSecrets,
+        ),
+      );
+      expect(appServerClient.disconnectCalls, 1);
+      expect(appServerClient.isConnected, isFalse);
+      expect(controller.profile, updatedProfile);
+      expect(controller.secrets, updatedSecrets);
+      expect(controller.transcriptBlocks, isEmpty);
+      expect(await handoffStore.load(), const SavedConversationHandoff());
+    },
+  );
+
+  test(
+    'applyConnectionSettings is a no-op when the settings are unchanged',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+      final initialSavedProfile = SavedProfile(
+        profile: _configuredProfile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+      final profileStore = _RecordingProfileStore(
+        initialValue: initialSavedProfile,
+      );
+      final controller = ChatSessionController(
+        profileStore: profileStore,
+        appServerClient: appServerClient,
+        initialSavedProfile: initialSavedProfile,
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Hello controller'), isTrue);
+
+      await controller.applyConnectionSettings(
+        profile: initialSavedProfile.profile,
+        secrets: initialSavedProfile.secrets,
+      );
+
+      expect(profileStore.saveCalls, 0);
+      expect(appServerClient.disconnectCalls, 0);
+      expect(appServerClient.isConnected, isTrue);
+      expect(controller.transcriptBlocks, isNotEmpty);
+    },
+  );
+
+  test(
     'sendPrompt suppresses duplicate generic transcript errors when SSH bootstrap already surfaced a typed failure',
     () async {
       final appServerClient = FakeCodexAppServerClient()
@@ -843,4 +946,26 @@ ConnectionProfile _configuredProfile() {
     host: 'example.com',
     username: 'vince',
   );
+}
+
+class _RecordingProfileStore implements CodexProfileStore {
+  _RecordingProfileStore({required SavedProfile initialValue})
+    : _savedProfile = initialValue;
+
+  SavedProfile _savedProfile;
+  int saveCalls = 0;
+
+  SavedProfile get savedProfile => _savedProfile;
+
+  @override
+  Future<SavedProfile> load() async => _savedProfile;
+
+  @override
+  Future<void> save(
+    ConnectionProfile profile,
+    ConnectionSecrets secrets,
+  ) async {
+    saveCalls += 1;
+    _savedProfile = SavedProfile(profile: profile, secrets: secrets);
+  }
 }
