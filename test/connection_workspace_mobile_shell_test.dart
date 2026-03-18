@@ -212,6 +212,130 @@ void main() {
   );
 
   testWidgets(
+    'saving live settings stages reconnect-required state without disconnecting the lane',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate(
+        results: <ConnectionSettingsSubmitPayload?>[
+          ConnectionSettingsSubmitPayload(
+            profile: _profile('Primary Renamed', 'primary.changed'),
+            secrets: const ConnectionSecrets(password: 'updated-secret'),
+          ),
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+      expect(find.text('Saved settings are pending'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('apply_saved_settings')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'live settings reopen with the staged saved definition while reconnect is pending',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate(
+        results: <ConnectionSettingsSubmitPayload?>[
+          ConnectionSettingsSubmitPayload(
+            profile: _profile('Primary Renamed', 'primary.changed'),
+            secrets: const ConnectionSecrets(password: 'updated-secret'),
+          ),
+          null,
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+
+      expect(settingsOverlayDelegate.launchedSettings, hasLength(2));
+      expect(
+        settingsOverlayDelegate.launchedSettings.last.$1.host,
+        'primary.changed',
+      );
+      expect(
+        settingsOverlayDelegate.launchedSettings.last.$2,
+        const ConnectionSecrets(password: 'updated-secret'),
+      );
+    },
+  );
+
+  testWidgets(
+    'applying saved settings reconnects the lane and clears reconnect-required state',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate(
+        results: <ConnectionSettingsSubmitPayload?>[
+          ConnectionSettingsSubmitPayload(
+            profile: _profile('Primary Renamed', 'primary.changed'),
+            secrets: const ConnectionSecrets(password: 'updated-secret'),
+          ),
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('apply_saved_settings')));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(clientsById['conn_primary']?.disconnectCalls, 1);
+      expect(find.text('Saved settings are pending'), findsNothing);
+      expect(find.text('Primary Renamed · primary.changed'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'closing the selected live lane keeps the remaining live lane active',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');

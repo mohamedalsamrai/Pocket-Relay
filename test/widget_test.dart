@@ -14,10 +14,13 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_ch
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
+import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 import 'support/fake_codex_app_server_client.dart';
+import 'support/fake_connection_settings_overlay_delegate.dart';
 
 void main() {
   testWidgets(
@@ -165,6 +168,26 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
+  testWidgets(
+    'routes live settings through the cupertino workspace settings renderer on iOS',
+    (tester) async {
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate();
+
+      await tester.pumpWidget(
+        _buildCatalogApp(settingsOverlayDelegate: settingsOverlayDelegate),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+
+      expect(settingsOverlayDelegate.renderers, <ConnectionSettingsRenderer>[
+        ConnectionSettingsRenderer.cupertino,
+      ]);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets('uses system theme mode', (tester) async {
     await tester.pumpWidget(
       _buildCatalogApp(
@@ -261,6 +284,7 @@ PocketRelayApp _buildCatalogApp({
   CodexConnectionHandoffStore? connectionHandoffStore,
   DisplayWakeLockController? displayWakeLockController,
   CodexAppServerClient? appServerClient,
+  ConnectionSettingsOverlayDelegate? settingsOverlayDelegate,
 }) {
   return PocketRelayApp(
     connectionRepository:
@@ -273,6 +297,9 @@ PocketRelayApp _buildCatalogApp({
         connectionHandoffStore ?? MemoryCodexConnectionHandoffStore(),
     displayWakeLockController: displayWakeLockController,
     appServerClient: appServerClient,
+    settingsOverlayDelegate:
+        settingsOverlayDelegate ??
+        const ModalConnectionSettingsOverlayDelegate(),
   );
 }
 

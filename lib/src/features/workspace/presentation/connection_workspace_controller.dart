@@ -150,6 +150,16 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     );
 
     final nextCatalog = await _connectionRepository.loadCatalog();
+    final liveBinding = _liveBindingsByConnectionId[normalizedConnectionId];
+    final shouldRequireReconnect =
+        liveBinding == null ||
+        liveBinding.sessionController.profile != profile ||
+        liveBinding.sessionController.secrets != secrets;
+    final nextReconnectRequiredConnectionIds = <String>{
+      for (final connectionId in _state.reconnectRequiredConnectionIds)
+        if (connectionId != normalizedConnectionId) connectionId,
+      if (shouldRequireReconnect) normalizedConnectionId,
+    };
     if (_isDisposed) {
       return;
     }
@@ -161,10 +171,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
           catalog: nextCatalog,
           liveConnectionIds: _state.liveConnectionIds,
-          reconnectRequiredConnectionIds: <String>{
-            ..._state.reconnectRequiredConnectionIds,
-            normalizedConnectionId,
-          },
+          reconnectRequiredConnectionIds: nextReconnectRequiredConnectionIds,
         ),
       ),
     );

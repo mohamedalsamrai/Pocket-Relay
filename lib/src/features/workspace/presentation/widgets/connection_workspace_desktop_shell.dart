@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_dormant_roster_content.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
+
+import 'connection_workspace_settings_renderer.dart';
 
 class ConnectionWorkspaceDesktopShell extends StatelessWidget {
   const ConnectionWorkspaceDesktopShell({
@@ -73,6 +72,13 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                         ...state.liveConnectionIds.indexed.map((entry) {
                           final index = entry.$1;
                           final connectionId = entry.$2;
+                          final laneBinding = workspaceController
+                              .bindingForConnectionId(connectionId);
+                          final liveProfile =
+                              laneBinding?.sessionController.profile;
+                          if (liveProfile == null) {
+                            return const SizedBox.shrink();
+                          }
                           final summary = state.catalog.connectionForId(
                             connectionId,
                           );
@@ -89,8 +95,11 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                             ),
                             child: _SidebarConnectionRow(
                               connectionId: connectionId,
-                              title: summary.profile.label,
-                              subtitle: _connectionSubtitle(summary.profile),
+                              title: liveProfile.label,
+                              subtitle: _connectionSubtitle(liveProfile),
+                              requiresReconnect: state.requiresReconnect(
+                                connectionId,
+                              ),
                               isSelected:
                                   state.isShowingLiveLane &&
                                   state.selectedConnectionId == connectionId,
@@ -153,18 +162,19 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
                     description:
                         'Choose another saved connection from the roster or return to a live lane from the sidebar.',
                     platformBehavior: platformPolicy.behavior,
-                    settingsRenderer: _settingsRendererFor(platformPolicy),
+                    settingsRenderer: connectionSettingsRendererFor(
+                      platformPolicy,
+                    ),
                     settingsOverlayDelegate: settingsOverlayDelegate,
                     useSafeArea: true,
                   ),
-                  (false, final laneBinding?) => ChatRootAdapter(
-                    laneBinding: laneBinding,
-                    platformPolicy: platformPolicy,
-                    supplementalMenuActions: _supplementalMenuActions(
+                  (false, final laneBinding?) =>
+                    ConnectionWorkspaceLiveLaneSurface(
                       workspaceController: workspaceController,
-                      connectionId: laneBinding.connectionId,
+                      laneBinding: laneBinding,
+                      platformPolicy: platformPolicy,
+                      settingsOverlayDelegate: settingsOverlayDelegate,
                     ),
-                  ),
                   _ => const SizedBox.shrink(),
                 },
               ),
@@ -181,34 +191,6 @@ class ConnectionWorkspaceDesktopShell extends StatelessWidget {
       ConnectionMode.local => 'local Codex · ${profile.workspaceDir}',
     };
   }
-
-  List<ChatChromeMenuAction> _supplementalMenuActions({
-    required ConnectionWorkspaceController workspaceController,
-    required String connectionId,
-  }) {
-    return <ChatChromeMenuAction>[
-      ChatChromeMenuAction(
-        label: 'Dormant connections',
-        onSelected: workspaceController.showDormantRoster,
-      ),
-      ChatChromeMenuAction(
-        label: 'Close lane',
-        onSelected: () => workspaceController.terminateConnection(connectionId),
-        isDestructive: true,
-      ),
-    ];
-  }
-}
-
-ConnectionSettingsRenderer _settingsRendererFor(
-  PocketPlatformPolicy platformPolicy,
-) {
-  return switch (platformPolicy.regionPolicy.rendererFor(
-    ChatRootRegion.settingsOverlay,
-  )) {
-    ChatRootRegionRenderer.flutter => ConnectionSettingsRenderer.material,
-    ChatRootRegionRenderer.cupertino => ConnectionSettingsRenderer.cupertino,
-  };
 }
 
 class _SidebarSectionTitle extends StatelessWidget {
@@ -262,6 +244,7 @@ class _SidebarConnectionRow extends StatelessWidget {
     required this.connectionId,
     required this.title,
     required this.subtitle,
+    required this.requiresReconnect,
     required this.isSelected,
     required this.onTap,
     required this.onClose,
@@ -270,6 +253,7 @@ class _SidebarConnectionRow extends StatelessWidget {
   final String connectionId;
   final String title;
   final String subtitle;
+  final bool requiresReconnect;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onClose;
@@ -321,6 +305,35 @@ class _SidebarConnectionRow extends StatelessWidget {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (requiresReconnect) ...[
+                        const SizedBox(height: 8),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: theme.colorScheme.primary.withValues(
+                                alpha: 0.28,
+                              ),
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            child: Text(
+                              'Saved changes',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

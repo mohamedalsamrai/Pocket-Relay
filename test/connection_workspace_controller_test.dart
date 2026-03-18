@@ -310,6 +310,39 @@ void main() {
   );
 
   test(
+    'saveLiveConnectionEdits clears reconnect-required state when the saved definition matches the running lane again',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Box', 'primary.local'),
+        secrets: const ConnectionSecrets(password: 'secret-1'),
+      );
+
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(controller.state.reconnectRequiredConnectionIds, isEmpty);
+      expect(
+        controller.state.catalog.connectionForId('conn_primary')?.profile.host,
+        'primary.local',
+      );
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
     'reconnectConnection replaces the targeted live binding and clears reconnect-required state',
     () async {
       final repository = MemoryCodexConnectionRepository(

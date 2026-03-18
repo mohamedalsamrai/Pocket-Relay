@@ -180,6 +180,43 @@ void main() {
     expect(find.byKey(const ValueKey('add_connection')), findsOneWidget);
   });
 
+  testWidgets(
+    'desktop live rows show a saved-changes badge when reconnect is pending',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate(
+        results: <ConnectionSettingsSubmitPayload?>[
+          ConnectionSettingsSubmitPayload(
+            profile: _profile('Primary Renamed', 'primary.changed'),
+            secrets: const ConnectionSecrets(password: 'updated-secret'),
+          ),
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pumpAndSettle();
+
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(find.text('Saved changes'), findsOneWidget);
+      expect(find.text('Saved settings are pending'), findsOneWidget);
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
   testWidgets('desktop dormant roster can add a saved connection', (
     tester,
   ) async {

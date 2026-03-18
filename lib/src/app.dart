@@ -13,11 +13,12 @@ import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
 class PocketRelayApp extends StatefulWidget {
@@ -28,6 +29,8 @@ class PocketRelayApp extends StatefulWidget {
     this.appServerClient,
     this.displayWakeLockController,
     this.platformPolicy,
+    this.settingsOverlayDelegate =
+        const ModalConnectionSettingsOverlayDelegate(),
     this.chatRootPlatformPolicy =
         const ChatRootPlatformPolicy.cupertinoFoundation(),
   });
@@ -37,6 +40,7 @@ class PocketRelayApp extends StatefulWidget {
   final CodexAppServerClient? appServerClient;
   final DisplayWakeLockController? displayWakeLockController;
   final PocketPlatformPolicy? platformPolicy;
+  final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
   final ChatRootPlatformPolicy chatRootPlatformPolicy;
 
   @override
@@ -178,6 +182,7 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
         child: _PocketRelayHome(
           workspaceController: _workspaceController,
           platformPolicy: platformPolicy,
+          settingsOverlayDelegate: widget.settingsOverlayDelegate,
         ),
       ),
     );
@@ -188,10 +193,12 @@ class _PocketRelayHome extends StatelessWidget {
   const _PocketRelayHome({
     required this.workspaceController,
     required this.platformPolicy,
+    required this.settingsOverlayDelegate,
   });
 
   final ConnectionWorkspaceController workspaceController;
   final PocketPlatformPolicy platformPolicy;
+  final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +216,7 @@ class _PocketRelayHome extends StatelessWidget {
           return ConnectionWorkspaceMobileShell(
             workspaceController: workspaceController,
             platformPolicy: platformPolicy,
+            settingsOverlayDelegate: settingsOverlayDelegate,
           );
         }
 
@@ -216,14 +224,17 @@ class _PocketRelayHome extends StatelessWidget {
           return ConnectionWorkspaceDesktopShell(
             workspaceController: workspaceController,
             platformPolicy: platformPolicy,
+            settingsOverlayDelegate: settingsOverlayDelegate,
           );
         }
 
         final selectedLaneBinding = workspaceController.selectedLaneBinding;
         if (selectedLaneBinding != null) {
-          return ChatRootAdapter(
+          return ConnectionWorkspaceLiveLaneSurface(
+            workspaceController: workspaceController,
             laneBinding: selectedLaneBinding,
             platformPolicy: platformPolicy,
+            settingsOverlayDelegate: settingsOverlayDelegate,
           );
         }
 

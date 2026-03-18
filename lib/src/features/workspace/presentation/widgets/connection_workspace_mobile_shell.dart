@@ -4,14 +4,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_dormant_roster_content.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
+
+import 'connection_workspace_settings_renderer.dart';
 
 class ConnectionWorkspaceMobileShell extends StatefulWidget {
   const ConnectionWorkspaceMobileShell({
@@ -104,26 +104,12 @@ class _ConnectionWorkspaceMobileShellState
       return const SizedBox.shrink();
     }
 
-    return ChatRootAdapter(
+    return ConnectionWorkspaceLiveLaneSurface(
+      workspaceController: widget.workspaceController,
       laneBinding: laneBinding,
       platformPolicy: widget.platformPolicy,
-      supplementalMenuActions: _supplementalMenuActionsFor(connectionId),
+      settingsOverlayDelegate: widget.settingsOverlayDelegate,
     );
-  }
-
-  List<ChatChromeMenuAction> _supplementalMenuActionsFor(String connectionId) {
-    return <ChatChromeMenuAction>[
-      ChatChromeMenuAction(
-        label: 'Dormant connections',
-        onSelected: widget.workspaceController.showDormantRoster,
-      ),
-      ChatChromeMenuAction(
-        label: 'Close lane',
-        onSelected: () =>
-            widget.workspaceController.terminateConnection(connectionId),
-        isDestructive: true,
-      ),
-    ];
   }
 
   void _handlePageChanged(
@@ -230,7 +216,7 @@ class _ConnectionWorkspaceDormantRosterPageState
       description:
           'Swipe back to a live lane or open another saved connection.',
       platformBehavior: widget.platformPolicy.behavior,
-      settingsRenderer: _settingsRendererFor(widget.platformPolicy),
+      settingsRenderer: connectionSettingsRendererFor(widget.platformPolicy),
       settingsOverlayDelegate: widget.settingsOverlayDelegate,
     );
 
@@ -250,15 +236,4 @@ class _ConnectionWorkspaceDormantRosterPageState
       ),
     };
   }
-}
-
-ConnectionSettingsRenderer _settingsRendererFor(
-  PocketPlatformPolicy platformPolicy,
-) {
-  return switch (platformPolicy.regionPolicy.rendererFor(
-    ChatRootRegion.settingsOverlay,
-  )) {
-    ChatRootRegionRenderer.flutter => ConnectionSettingsRenderer.material,
-    ChatRootRegionRenderer.cupertino => ConnectionSettingsRenderer.cupertino,
-  };
 }

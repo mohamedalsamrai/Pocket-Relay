@@ -27,31 +27,25 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
-import 'package:pocket_relay/src/features/settings/presentation/cupertino_connection_sheet.dart';
 
 import 'support/fake_codex_app_server_client.dart';
 
 void main() {
-  testWidgets('routes connection settings through the overlay delegate', (
+  testWidgets('forwards connection settings requests through the callback', (
     tester,
   ) async {
     final appServerClient = FakeCodexAppServerClient();
-    final overlayDelegate = _FakeChatRootOverlayDelegate(
-      connectionSettingsResult: ConnectionSettingsSubmitPayload(
-        profile: _configuredProfile().copyWith(
-          label: 'Renamed Box',
-          host: 'changed.example.com',
-        ),
-        secrets: const ConnectionSecrets(password: 'changed-secret'),
-      ),
-    );
+    final requestedSettings = <ChatConnectionSettingsLaunchContract>[];
+    final overlayDelegate = _FakeChatRootOverlayDelegate();
     addTearDown(appServerClient.close);
 
     await tester.pumpWidget(
       _buildAdapterApp(
         appServerClient: appServerClient,
         overlayDelegate: overlayDelegate,
+        onConnectionSettingsRequested: (payload) async {
+          requestedSettings.add(payload);
+        },
       ),
     );
     await tester.pumpAndSettle();
@@ -59,18 +53,21 @@ void main() {
     await tester.tap(find.byTooltip('Connection settings'));
     await tester.pumpAndSettle();
 
-    expect(overlayDelegate.connectionSettingsPayloads, hasLength(1));
+    expect(requestedSettings, hasLength(1));
+    expect(requestedSettings.single.initialProfile, _configuredProfile());
     expect(
-      overlayDelegate.connectionSettingsRenderers,
-      <ConnectionSettingsRenderer>[ConnectionSettingsRenderer.material],
+      requestedSettings.single.initialSecrets,
+      const ConnectionSecrets(password: 'secret'),
     );
-    expect(find.text('Renamed Box · changed.example.com'), findsOneWidget);
+    expect(find.text('Dev Box · devbox.local'), findsOneWidget);
+    expect(appServerClient.disconnectCalls, 0);
   });
 
   testWidgets(
-    'routes connection settings through the cupertino settings overlay path for the iOS foundation policy',
+    'forwards connection settings requests through the callback for the iOS foundation policy',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
+      final requestedSettings = <ChatConnectionSettingsLaunchContract>[];
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
@@ -78,6 +75,9 @@ void main() {
           appServerClient: appServerClient,
           overlayDelegate: const FlutterChatRootOverlayDelegate(),
           regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
+          onConnectionSettingsRequested: (payload) async {
+            requestedSettings.add(payload);
+          },
         ),
       );
       await tester.pumpAndSettle();
@@ -85,8 +85,8 @@ void main() {
       await tester.tap(find.byTooltip('Connection settings'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoConnectionSheet), findsOneWidget);
-      expect(find.byType(ConnectionSheet), findsNothing);
+      expect(requestedSettings, hasLength(1));
+      expect(appServerClient.disconnectCalls, 0);
     },
   );
 
@@ -257,6 +257,8 @@ void main() {
       addTearDown(tester.view.reset);
 
       final appServerClient = FakeCodexAppServerClient();
+      final requestedConnectionSettings =
+          <ChatConnectionSettingsLaunchContract>[];
       final overlayDelegate = _FakeChatRootOverlayDelegate();
       addTearDown(appServerClient.close);
 
@@ -264,6 +266,9 @@ void main() {
         _buildAdapterApp(
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
+          onConnectionSettingsRequested: (payload) async {
+            requestedConnectionSettings.add(payload);
+          },
           savedProfile: SavedProfile(
             profile: ConnectionProfile.defaults(),
             secrets: const ConnectionSecrets(),
@@ -283,13 +288,9 @@ void main() {
       await tester.tap(configureButton);
       await tester.pumpAndSettle();
 
-      expect(overlayDelegate.connectionSettingsPayloads, hasLength(1));
+      expect(requestedConnectionSettings, hasLength(1));
       expect(
-        overlayDelegate
-            .connectionSettingsPayloads
-            .single
-            .initialProfile
-            .connectionMode,
+        requestedConnectionSettings.single.initialProfile.connectionMode,
         ConnectionMode.local,
       );
     },
@@ -382,6 +383,8 @@ void main() {
     'supports an injected renderer path while adapter callbacks still own behavior',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
+      final requestedConnectionSettings =
+          <ChatConnectionSettingsLaunchContract>[];
       final overlayDelegate = _FakeChatRootOverlayDelegate();
       final rendererDelegate = _FakeChatRootRendererDelegate();
       addTearDown(appServerClient.close);
@@ -391,6 +394,9 @@ void main() {
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
           rendererDelegate: rendererDelegate,
+          onConnectionSettingsRequested: (payload) async {
+            requestedConnectionSettings.add(payload);
+          },
         ),
       );
       await tester.pumpAndSettle();
@@ -406,7 +412,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('fake_settings')));
       await tester.pumpAndSettle();
 
-      expect(overlayDelegate.connectionSettingsPayloads, hasLength(1));
+      expect(requestedConnectionSettings, hasLength(1));
 
       await tester.tap(find.byKey(const ValueKey('fake_diff')));
       await tester.pump();
@@ -577,115 +583,6 @@ void main() {
     expect(find.text('Fresh Box · fresh.example.com'), findsOneWidget);
   });
 
-  testWidgets(
-    'ignores stale connection-settings results after the adapter rebinds',
-    (tester) async {
-      final firstClient = FakeCodexAppServerClient();
-      final secondClient = FakeCodexAppServerClient();
-      final pendingResult = Completer<ConnectionSettingsSubmitPayload?>();
-      final overlayDelegate = _FakeChatRootOverlayDelegate(
-        connectionSettingsResultFuture: pendingResult.future,
-      );
-      addTearDown(firstClient.close);
-      addTearDown(secondClient.close);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: firstClient,
-          overlayDelegate: overlayDelegate,
-          savedProfile: _savedProfile(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Connection settings'));
-      await tester.pump();
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: secondClient,
-          overlayDelegate: overlayDelegate,
-          savedProfile: _savedProfile(
-            profile: _configuredProfile().copyWith(
-              label: 'Fresh Box',
-              host: 'fresh.example.com',
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      pendingResult.complete(
-        ConnectionSettingsSubmitPayload(
-          profile: _configuredProfile().copyWith(
-            label: 'Stale Box',
-            host: 'stale.example.com',
-          ),
-          secrets: const ConnectionSecrets(password: 'stale-secret'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Fresh Box · fresh.example.com'), findsOneWidget);
-      expect(find.text('Stale Box · stale.example.com'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'ignores stale connection-settings results after the overlay delegate changes',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      final profileStore = MemoryCodexProfileStore(
-        initialValue: _savedProfile(),
-      );
-      final savedProfile = _savedProfile();
-      final pendingResult = Completer<ConnectionSettingsSubmitPayload?>();
-      final firstOverlayDelegate = _FakeChatRootOverlayDelegate(
-        connectionSettingsResultFuture: pendingResult.future,
-      );
-      final secondOverlayDelegate = _FakeChatRootOverlayDelegate();
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          profileStore: profileStore,
-          overlayDelegate: firstOverlayDelegate,
-          savedProfile: savedProfile,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Connection settings'));
-      await tester.pump();
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          profileStore: profileStore,
-          overlayDelegate: secondOverlayDelegate,
-          savedProfile: savedProfile,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      pendingResult.complete(
-        ConnectionSettingsSubmitPayload(
-          profile: _configuredProfile().copyWith(
-            label: 'Stale Box',
-            host: 'stale.example.com',
-          ),
-          secrets: const ConnectionSecrets(password: 'stale-secret'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Dev Box · devbox.local'), findsOneWidget);
-      expect(find.text('Stale Box · stale.example.com'), findsNothing);
-      expect(secondOverlayDelegate.connectionSettingsPayloads, isEmpty);
-    },
-  );
-
   testWidgets('ignores stale send completions after the adapter rebinds', (
     tester,
   ) async {
@@ -785,6 +682,8 @@ void main() {
 Widget _buildAdapterApp({
   required FakeCodexAppServerClient appServerClient,
   required ChatRootOverlayDelegate overlayDelegate,
+  Future<void> Function(ChatConnectionSettingsLaunchContract payload)?
+  onConnectionSettingsRequested,
   ChatRootRendererDelegate rendererDelegate =
       const FlutterChatRootRendererDelegate(),
   PocketPlatformPolicy? platformPolicy,
@@ -812,6 +711,8 @@ Widget _buildAdapterApp({
       savedProfile: savedProfile ?? _savedProfile(),
       platformPolicy: resolvedPlatformPolicy,
       overlayDelegate: overlayDelegate,
+      onConnectionSettingsRequested:
+          onConnectionSettingsRequested ?? (_) async {},
       rendererDelegate: rendererDelegate,
     ),
   );
@@ -862,14 +763,7 @@ SavedProfile _savedProfile({
 }
 
 class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
-  _FakeChatRootOverlayDelegate({
-    this.connectionSettingsResult,
-    this.connectionSettingsResultFuture,
-  });
-
-  final ConnectionSettingsSubmitPayload? connectionSettingsResult;
-  final Future<ConnectionSettingsSubmitPayload?>?
-  connectionSettingsResultFuture;
+  _FakeChatRootOverlayDelegate();
   final List<ChatConnectionSettingsLaunchContract> connectionSettingsPayloads =
       <ChatConnectionSettingsLaunchContract>[];
   final List<ConnectionSettingsRenderer> connectionSettingsRenderers =
@@ -889,7 +783,7 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
   }) async {
     connectionSettingsPayloads.add(connectionSettings);
     connectionSettingsRenderers.add(renderer);
-    return connectionSettingsResultFuture ?? connectionSettingsResult;
+    return null;
   }
 
   @override
@@ -917,6 +811,7 @@ class _ChatRootAdapterHarness extends StatefulWidget {
     required this.savedProfile,
     required this.platformPolicy,
     required this.overlayDelegate,
+    required this.onConnectionSettingsRequested,
     required this.rendererDelegate,
     this.laneBinding,
     this.profileStore,
@@ -927,6 +822,8 @@ class _ChatRootAdapterHarness extends StatefulWidget {
   final SavedProfile savedProfile;
   final PocketPlatformPolicy platformPolicy;
   final ChatRootOverlayDelegate overlayDelegate;
+  final Future<void> Function(ChatConnectionSettingsLaunchContract payload)
+  onConnectionSettingsRequested;
   final ChatRootRendererDelegate rendererDelegate;
   final ConnectionLaneBinding? laneBinding;
   final CodexProfileStore? profileStore;
@@ -974,6 +871,7 @@ class _ChatRootAdapterHarnessState extends State<_ChatRootAdapterHarness> {
     return ChatRootAdapter(
       laneBinding: widget.laneBinding ?? _ownedLaneBinding!,
       platformPolicy: widget.platformPolicy,
+      onConnectionSettingsRequested: widget.onConnectionSettingsRequested,
       overlayDelegate: widget.overlayDelegate,
       rendererDelegate: widget.rendererDelegate,
     );

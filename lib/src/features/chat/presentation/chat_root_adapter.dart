@@ -15,13 +15,13 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presente
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
     super.key,
     required this.laneBinding,
     required this.platformPolicy,
+    required this.onConnectionSettingsRequested,
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
     this.rendererDelegate = const FlutterChatRootRendererDelegate(),
     this.supplementalMenuActions = const <ChatChromeMenuAction>[],
@@ -29,6 +29,8 @@ class ChatRootAdapter extends StatefulWidget {
 
   final ConnectionLaneBinding laneBinding;
   final PocketPlatformPolicy platformPolicy;
+  final Future<void> Function(ChatConnectionSettingsLaunchContract payload)
+  onConnectionSettingsRequested;
   final ChatRootOverlayDelegate overlayDelegate;
   final ChatRootRendererDelegate rendererDelegate;
   final List<ChatChromeMenuAction> supplementalMenuActions;
@@ -170,64 +172,10 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  Future<void> _openConnectionSettings(
+  Future<void> _requestConnectionSettings(
     ChatConnectionSettingsLaunchContract connectionSettings,
   ) async {
-    if (!mounted) {
-      return;
-    }
-
-    final laneBinding = widget.laneBinding;
-    final controller = laneBinding.sessionController;
-    final overlayDelegate = widget.overlayDelegate;
-    final settingsRenderer = widget.platformPolicy.regionPolicy.rendererFor(
-      ChatRootRegion.settingsOverlay,
-    );
-
-    final openSettingsResult = switch (settingsRenderer) {
-      ChatRootRegionRenderer.cupertino =>
-        overlayDelegate.openConnectionSettings(
-          context: context,
-          connectionSettings: connectionSettings,
-          platformBehavior: widget.platformPolicy.behavior,
-          renderer: ConnectionSettingsRenderer.cupertino,
-        ),
-      ChatRootRegionRenderer.flutter => overlayDelegate.openConnectionSettings(
-        context: context,
-        connectionSettings: connectionSettings,
-        platformBehavior: widget.platformPolicy.behavior,
-        renderer: ConnectionSettingsRenderer.material,
-      ),
-    };
-    final result = await openSettingsResult;
-
-    if (!mounted ||
-        laneBinding != widget.laneBinding ||
-        overlayDelegate != widget.overlayDelegate ||
-        settingsRenderer !=
-            widget.platformPolicy.regionPolicy.rendererFor(
-              ChatRootRegion.settingsOverlay,
-            ) ||
-        result == null) {
-      return;
-    }
-
-    final connectionChanged =
-        result.profile != controller.profile ||
-        result.secrets != controller.secrets;
-    if (!connectionChanged) {
-      return;
-    }
-
-    await controller.applyConnectionSettings(
-      profile: result.profile,
-      secrets: result.secrets,
-    );
-    if (mounted && laneBinding == widget.laneBinding) {
-      setState(() {
-        _preferredEmptyStateConnectionMode = null;
-      });
-    }
+    await widget.onConnectionSettingsRequested(connectionSettings);
   }
 
   Future<void> _openChangedFileDiff(ChatChangedFileDiffContract diff) async {
@@ -326,7 +274,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       case ChatShowSnackBarEffect(:final message):
         _showTransientFeedback(message);
       case ChatOpenConnectionSettingsEffect(:final payload):
-        unawaited(_openConnectionSettings(payload));
+        unawaited(_requestConnectionSettings(payload));
       case ChatOpenChangedFileDiffEffect(:final payload):
         unawaited(_openChangedFileDiff(payload));
     }
