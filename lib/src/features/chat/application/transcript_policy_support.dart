@@ -132,8 +132,7 @@ class TranscriptPolicySupport {
   bool isTranscriptStatusSignal(CodexRuntimeStatusEvent event) {
     return switch (event.rawMethod) {
       'account/chatgptAuthTokens/refresh' ||
-      'item/tool/call' ||
-      'item/fileRead/requestApproval' => true,
+      'item/tool/call' => true,
       _ => false,
     };
   }

@@ -390,8 +390,7 @@ class ChatSessionController extends ChangeNotifier {
 
   bool _isUnsupportedHostRequest(String method) {
     return method == 'account/chatgptAuthTokens/refresh' ||
-        method == 'item/tool/call' ||
-        method == 'item/fileRead/requestApproval';
+        method == 'item/tool/call';
   }
 
   Future<void> _handleUnsupportedHostRequest(
@@ -411,10 +410,6 @@ class ChatSessionController extends ChangeNotifier {
       'item/tool/call' => (
         'Dynamic tool unsupported',
         'Pocket Relay does not implement the experimental host-side tool "$toolName", so the request was rejected.',
-      ),
-      'item/fileRead/requestApproval' => (
-        'File read approval unsupported',
-        'Pocket Relay received a legacy file-read approval request that this client does not implement, so the request was rejected.',
       ),
       _ => (
         'Request unsupported',

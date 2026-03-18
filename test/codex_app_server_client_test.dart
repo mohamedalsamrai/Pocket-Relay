@@ -705,20 +705,20 @@ void main() {
     });
 
     process.sendStdout(<String, Object?>{
-      'id': 'legacy-read-1',
-      'method': 'item/fileRead/requestApproval',
-      'params': <String, Object?>{'reason': 'Read file'},
+      'id': 'tool-2',
+      'method': 'item/tool/call',
+      'params': <String, Object?>{'tool': 'experimental-host-tool'},
     });
     await Future<void>.delayed(Duration.zero);
 
     await client.rejectServerRequest(
-      requestId: 's:legacy-read-1',
+      requestId: 's:tool-2',
       message: 'Unsupported request.',
       code: -32601,
     );
 
     expect(process.writtenMessages.last, <String, Object?>{
-      'id': 'legacy-read-1',
+      'id': 'tool-2',
       'error': <String, Object?>{
         'code': -32601,
         'message': 'Unsupported request.',
