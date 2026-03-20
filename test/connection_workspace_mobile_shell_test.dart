@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -224,7 +223,7 @@ void main() {
     expect(clientsById['conn_primary']?.disconnectCalls, 0);
   });
 
-  testWidgets('iPhone saved connections page uses Cupertino primitives', (
+  testWidgets('iPhone saved connections page uses material primitives', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -247,26 +246,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Saved connections'), findsWidgets);
-    expect(find.byType(CupertinoScrollbar), findsOneWidget);
-    expect(find.byType(CupertinoListSection), findsWidgets);
-    expect(
-      find.widgetWithText(CupertinoButton, 'Add connection'),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(CupertinoButton, 'Open lane'), findsWidgets);
-
-    final navBarBottom = tester
-        .getBottomLeft(
-          find.ancestor(
-            of: find.text('Saved connections').first,
-            matching: find.byType(CupertinoNavigationBar),
-          ),
-        )
-        .dy;
-    final addConnectionTop = tester
-        .getTopLeft(find.byKey(const ValueKey('add_connection')))
-        .dy;
-    expect(addConnectionTop, greaterThanOrEqualTo(navBarBottom));
+    expect(find.byType(Scaffold), findsWidgets);
+    expect(find.widgetWithText(FilledButton, 'Add connection'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Open lane'), findsWidgets);
+    expect(find.widgetWithText(OutlinedButton, 'Edit'), findsWidgets);
   });
 
   testWidgets('instantiating from the roster opens a new live lane', (

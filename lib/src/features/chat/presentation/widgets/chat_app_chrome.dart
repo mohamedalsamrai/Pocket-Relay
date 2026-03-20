@@ -1,42 +1,22 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 
-enum ChatAppChromeStyle { material, cupertino }
-
 class ChatAppChromeTitle extends StatelessWidget {
-  const ChatAppChromeTitle({
-    super.key,
-    required this.header,
-    required this.style,
-  });
+  const ChatAppChromeTitle({super.key, required this.header});
 
   final ChatHeaderContract header;
-  final ChatAppChromeStyle style;
 
   @override
   Widget build(BuildContext context) {
-    return switch (style) {
-      ChatAppChromeStyle.material => _MaterialChatAppChromeTitle(
-        header: header,
-      ),
-      ChatAppChromeStyle.cupertino => _CupertinoChatAppChromeTitle(
-        header: header,
-      ),
-    };
+    return _MaterialChatAppChromeTitle(header: header);
   }
 }
 
 class ChatOverflowMenuButton extends StatelessWidget {
-  const ChatOverflowMenuButton({
-    super.key,
-    required this.actions,
-    required this.style,
-  });
+  const ChatOverflowMenuButton({super.key, required this.actions});
 
   final List<ChatChromeMenuAction> actions;
-  final ChatAppChromeStyle style;
 
   @override
   Widget build(BuildContext context) {
@@ -73,14 +53,9 @@ class ChatOverflowMenuButton extends StatelessWidget {
               .toList(growable: false);
         },
         child: SizedBox(
-          width: style == ChatAppChromeStyle.cupertino ? 28 : 40,
-          height: style == ChatAppChromeStyle.cupertino ? 28 : 40,
-          child: Center(
-            child: Icon(
-              chatOverflowIcon(style),
-              size: style == ChatAppChromeStyle.cupertino ? 22 : 24,
-            ),
-          ),
+          width: 40,
+          height: 40,
+          child: const Center(child: Icon(Icons.more_horiz, size: 24)),
         ),
       ),
     );
@@ -106,23 +81,10 @@ List<ChatChromeMenuAction> buildChatChromeMenuActions({
   ];
 }
 
-IconData chatActionIcon(
-  ChatScreenActionContract action, {
-  required ChatAppChromeStyle style,
-}) {
-  return switch ((style, action.icon)) {
-    (ChatAppChromeStyle.material, ChatScreenActionIcon.settings) => Icons.tune,
-    (ChatAppChromeStyle.cupertino, ChatScreenActionIcon.settings) =>
-      CupertinoIcons.slider_horizontal_3,
-    (ChatAppChromeStyle.material, null) => Icons.more_horiz,
-    (ChatAppChromeStyle.cupertino, null) => CupertinoIcons.circle,
-  };
-}
-
-IconData chatOverflowIcon(ChatAppChromeStyle style) {
-  return switch (style) {
-    ChatAppChromeStyle.material => Icons.more_horiz,
-    ChatAppChromeStyle.cupertino => CupertinoIcons.ellipsis_circle,
+IconData chatActionIcon(ChatScreenActionContract action) {
+  return switch (action.icon) {
+    ChatScreenActionIcon.settings => Icons.tune,
+    null => Icons.more_horiz,
   };
 }
 
@@ -145,45 +107,6 @@ class _MaterialChatAppChromeTitle extends StatelessWidget {
             fontSize: 13,
             color: theme.colorScheme.onSurfaceVariant,
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CupertinoChatAppChromeTitle extends StatelessWidget {
-  const _CupertinoChatAppChromeTitle({required this.header});
-
-  final ChatHeaderContract header;
-
-  @override
-  Widget build(BuildContext context) {
-    final titleTextStyle = CupertinoTheme.of(
-      context,
-    ).textTheme.navTitleTextStyle;
-    final subtitleTextStyle = CupertinoTheme.of(context).textTheme.textStyle
-        .copyWith(
-          fontSize: 11,
-          color: CupertinoDynamicColor.resolve(
-            CupertinoColors.secondaryLabel,
-            context,
-          ),
-        );
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          header.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: titleTextStyle,
-        ),
-        Text(
-          header.subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: subtitleTextStyle,
         ),
       ],
     );

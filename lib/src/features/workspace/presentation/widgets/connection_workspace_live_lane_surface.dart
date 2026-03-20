@@ -14,7 +14,6 @@ import 'package:pocket_relay/src/features/workspace/presentation/connection_work
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 
 import 'connection_workspace_conversation_history_sheet.dart';
-import 'connection_workspace_settings_renderer.dart';
 
 class ConnectionWorkspaceLiveLaneSurface extends StatefulWidget {
   const ConnectionWorkspaceLiveLaneSurface({
@@ -157,7 +156,6 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         initialProfile: initialSettings.$1,
         initialSecrets: initialSettings.$2,
         platformBehavior: platformPolicy.behavior,
-        renderer: connectionSettingsRendererFor(platformPolicy),
       );
       if (!_matchesLiveRequestContext(
             workspaceController: workspaceController,

@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -10,7 +9,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_act
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
 void main() {
@@ -32,33 +30,6 @@ void main() {
     expect(find.text('Transcript region'), findsOneWidget);
     expect(find.text('Composer region'), findsOneWidget);
   });
-
-  testWidgets(
-    'cupertino renderer installs obstructing chrome as the native navigation bar',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildPocketTheme(Brightness.light),
-          home: CupertinoChatScreenRenderer(
-            screen: _screenContract(),
-            appChrome: const _TestCupertinoAppChrome(),
-            transcriptRegion: const Center(child: Text('Transcript region')),
-            composerRegion: const Text('Composer region'),
-            onStopActiveTurn: () async {},
-          ),
-        ),
-      );
-
-      final scaffold = tester.widget<CupertinoPageScaffold>(
-        find.byType(CupertinoPageScaffold),
-      );
-
-      expect(scaffold.navigationBar, isA<_TestCupertinoAppChrome>());
-      expect(find.text('Injected cupertino chrome'), findsOneWidget);
-      expect(find.text('Transcript region'), findsOneWidget);
-      expect(find.text('Composer region'), findsOneWidget);
-    },
-  );
 
   testWidgets('forwards toolbar and menu actions through app chrome', (
     tester,
@@ -366,23 +337,5 @@ class _TestAppChrome extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(title: const Text('Injected chrome'));
-  }
-}
-
-class _TestCupertinoAppChrome extends StatelessWidget
-    implements ObstructingPreferredSizeWidget {
-  const _TestCupertinoAppChrome();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(44);
-
-  @override
-  bool shouldFullyObstruct(BuildContext context) => true;
-
-  @override
-  Widget build(BuildContext context) {
-    return const CupertinoNavigationBar(
-      middle: Text('Injected cupertino chrome'),
-    );
   }
 }

@@ -71,25 +71,17 @@ class FlutterChatAppChrome extends StatelessWidget
 
     return AppBar(
       titleSpacing: 18,
-      title: ChatAppChromeTitle(
-        header: screen.header,
-        style: ChatAppChromeStyle.material,
-      ),
+      title: ChatAppChromeTitle(header: screen.header),
       actions: [
         ...screen.toolbarActions.map(
           (action) => IconButton(
             tooltip: action.tooltip,
             onPressed: () => onScreenAction(action.id),
-            icon: Icon(
-              chatActionIcon(action, style: ChatAppChromeStyle.material),
-            ),
+            icon: Icon(chatActionIcon(action)),
           ),
         ),
         if (menuActions.isNotEmpty) ...[
-          ChatOverflowMenuButton(
-            actions: menuActions,
-            style: ChatAppChromeStyle.material,
-          ),
+          ChatOverflowMenuButton(actions: menuActions),
           const SizedBox(width: 8),
         ],
       ],
@@ -106,7 +98,6 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
     required this.onSelectTimeline,
     required this.onSelectConnectionMode,
     required this.onAutoFollowEligibilityChanged,
-    this.emptyStateRenderer = ChatEmptyStateRenderer.flutter,
     this.surfaceChangeToken,
     this.onOpenChangedFileDiff,
     this.onApproveRequest,
@@ -121,7 +112,6 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
   final ValueChanged<String> onSelectTimeline;
   final ValueChanged<ConnectionMode> onSelectConnectionMode;
   final ValueChanged<bool> onAutoFollowEligibilityChanged;
-  final ChatEmptyStateRenderer emptyStateRenderer;
   final Object? surfaceChangeToken;
   final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(String requestId)? onApproveRequest;
@@ -145,7 +135,6 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
       },
       onSelectConnectionMode: onSelectConnectionMode,
       onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged,
-      emptyStateRenderer: emptyStateRenderer,
       onApproveRequest: onApproveRequest,
       onDenyRequest: onDenyRequest,
       onOpenChangedFileDiff: onOpenChangedFileDiff,

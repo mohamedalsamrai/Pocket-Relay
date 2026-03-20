@@ -198,6 +198,7 @@ class _UserInputRequestCardState extends State<UserInputRequestCard> {
                 ],
                 const SizedBox(height: 8),
                 TextField(
+                  key: ValueKey<String>('pending_user_input_${field.id}'),
                   controller: controller,
                   obscureText: field.isSecret,
                   readOnly: field.isReadOnly,

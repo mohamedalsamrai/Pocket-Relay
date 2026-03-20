@@ -8,6 +8,7 @@ class PocketPlatformBehavior {
     required this.supportsLocalConnectionMode,
     required this.supportsWakeLock,
     required this.usesDesktopKeyboardSubmit,
+    required this.supportsCollapsibleDesktopSidebar,
   });
 
   factory PocketPlatformBehavior.resolve({
@@ -34,6 +35,8 @@ class PocketPlatformBehavior {
             _ => false,
           },
       usesDesktopKeyboardSubmit: isDesktopExperience,
+      supportsCollapsibleDesktopSidebar:
+          !isWeb && resolvedPlatform == TargetPlatform.macOS,
     );
   }
 
@@ -41,6 +44,7 @@ class PocketPlatformBehavior {
   final bool supportsLocalConnectionMode;
   final bool supportsWakeLock;
   final bool usesDesktopKeyboardSubmit;
+  final bool supportsCollapsibleDesktopSidebar;
 
   bool get isDesktopExperience =>
       experience == PocketPlatformExperience.desktop;

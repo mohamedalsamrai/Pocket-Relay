@@ -20,8 +20,9 @@ void main() {
 
     await _pumpAppReady(tester);
 
-    final composerField = find.byType(TextField).first;
+    final composerField = find.byKey(const ValueKey('composer_input'));
     await tester.enterText(composerField, 'Hello Codex');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -102,8 +103,9 @@ void main() {
 
     await _pumpAppReady(tester);
 
-    final composerField = find.byType(TextField).first;
+    final composerField = find.byKey(const ValueKey('composer_input'));
     await tester.enterText(composerField, 'Hello Codex');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -129,8 +131,9 @@ void main() {
 
       await _pumpAppReady(tester);
 
-      final composerField = find.byType(TextField).first;
+      final composerField = find.byKey(const ValueKey('composer_input'));
       await tester.enterText(composerField, 'First prompt');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
@@ -150,6 +153,7 @@ void main() {
       );
 
       await tester.enterText(composerField, 'Second prompt');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
@@ -216,8 +220,9 @@ void main() {
 
       await _pumpAppReady(tester);
 
-      final composerField = find.byType(TextField).first;
+      final composerField = find.byKey(const ValueKey('composer_input'));
       await tester.enterText(composerField, 'Resume the old work');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
@@ -1085,7 +1090,11 @@ void main() {
 
       await _pumpAppReady(tester);
 
-      await tester.enterText(find.byType(TextField).first, 'Hello Codex');
+      await tester.enterText(
+        find.byKey(const ValueKey('composer_input')),
+        'Hello Codex',
+      );
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
@@ -1917,7 +1926,9 @@ void main() {
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       );
       final timerRect = tester.getRect(timerChip);
-      final inputRect = tester.getRect(find.byType(TextField).first);
+      final inputRect = tester.getRect(
+        find.byKey(const ValueKey('composer_input')),
+      );
 
       expect(timerRect.top, lessThan(inputRect.top));
       expect(inputRect.top - timerRect.bottom, greaterThan(0));
@@ -2042,8 +2053,11 @@ void main() {
       expect(find.text('Which first project should I use?'), findsOneWidget);
       expect(find.text('Which second project should I use?'), findsNothing);
 
-      final textField = find.byType(TextField).first;
+      final textField = find.byKey(
+        const ValueKey<String>('pending_user_input_q1'),
+      );
       await tester.enterText(textField, 'Pocket Relay');
+      await tester.pump();
       await tester.ensureVisible(find.text('Submit response'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Submit response'));
@@ -2083,7 +2097,12 @@ void main() {
       expect(find.text('Which first project should I use?'), findsNothing);
       expect(find.text('Which second project should I use?'), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('pending_user_input_q1')),
+            )
+            .controller
+            ?.text,
         isEmpty,
       );
     },
@@ -2513,7 +2532,11 @@ void main() {
       lessThan(scrollableState.position.maxScrollExtent),
     );
 
-    await tester.enterText(find.byType(TextField).first, 'Needs credentials');
+    await tester.enterText(
+      find.byKey(const ValueKey('composer_input')),
+      'Needs credentials',
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -2638,6 +2661,7 @@ ConnectionProfile _configuredProfile() {
   return ConnectionProfile.defaults().copyWith(
     host: 'example.com',
     username: 'vince',
+    workspaceDir: '/workspace/project',
   );
 }
 

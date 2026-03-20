@@ -1,10 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
@@ -12,8 +9,6 @@ import 'package:pocket_relay/src/features/workspace/presentation/connection_work
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_dormant_roster_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
-
-import 'connection_workspace_settings_renderer.dart';
 
 class ConnectionWorkspaceMobileShell extends StatefulWidget {
   const ConnectionWorkspaceMobileShell({
@@ -217,42 +212,13 @@ class _ConnectionWorkspaceDormantRosterPageState
     extends State<_ConnectionWorkspaceDormantRosterPage> {
   @override
   Widget build(BuildContext context) {
-    const navigationBar = CupertinoNavigationBar(
-      transitionBetweenRoutes: false,
-      automaticallyImplyLeading: false,
-      automaticBackgroundVisibility: false,
-      middle: Text(ConnectionWorkspaceCopy.savedConnectionsTitle),
-    );
     final content = ConnectionWorkspaceDormantRosterContent(
       workspaceController: widget.workspaceController,
       description: ConnectionWorkspaceCopy.mobileSavedConnectionsDescription,
       platformBehavior: widget.platformPolicy.behavior,
-      settingsRenderer: connectionSettingsRendererFor(widget.platformPolicy),
       settingsOverlayDelegate: widget.settingsOverlayDelegate,
-      visualStyle: switch (widget.platformPolicy.regionPolicy.screenShell) {
-        ChatRootScreenShellRenderer.flutter =>
-          ConnectionWorkspaceRosterStyle.material,
-        ChatRootScreenShellRenderer.cupertino =>
-          ConnectionWorkspaceRosterStyle.cupertino,
-      },
     );
 
-    return switch (widget.platformPolicy.regionPolicy.screenShell) {
-      ChatRootScreenShellRenderer.flutter => Scaffold(body: content),
-      ChatRootScreenShellRenderer.cupertino => CupertinoTheme(
-        data: buildPocketCupertinoTheme(Theme.of(context)),
-        child: CupertinoPageScaffold(
-          navigationBar: navigationBar,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top:
-                  MediaQuery.viewPaddingOf(context).top +
-                  navigationBar.preferredSize.height,
-            ),
-            child: content,
-          ),
-        ),
-      ),
-    };
+    return Scaffold(body: content);
   }
 }

@@ -5,7 +5,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_c
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
 
@@ -18,7 +17,6 @@ class TranscriptList extends StatefulWidget {
     required this.onConfigure,
     this.onSelectConnectionMode,
     required this.onAutoFollowEligibilityChanged,
-    this.emptyStateRenderer = ChatEmptyStateRenderer.flutter,
     this.surfaceChangeToken,
     this.onOpenChangedFileDiff,
     this.onApproveRequest,
@@ -33,7 +31,6 @@ class TranscriptList extends StatefulWidget {
   final VoidCallback onConfigure;
   final ValueChanged<ConnectionMode>? onSelectConnectionMode;
   final ValueChanged<bool> onAutoFollowEligibilityChanged;
-  final ChatEmptyStateRenderer emptyStateRenderer;
   final Object? surfaceChangeToken;
   final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final Future<void> Function(String requestId)? onApproveRequest;
@@ -92,22 +89,13 @@ class _TranscriptListState extends State<TranscriptList> {
   Widget _buildContent(BuildContext context) {
     final emptyState = widget.surface.emptyState;
     if (emptyState != null) {
-      return switch (widget.emptyStateRenderer) {
-        ChatEmptyStateRenderer.flutter => EmptyState(
-          isConfigured: emptyState.isConfigured,
-          connectionMode: emptyState.connectionMode,
-          platformBehavior: widget.platformBehavior,
-          onConfigure: widget.onConfigure,
-          onSelectConnectionMode: widget.onSelectConnectionMode,
-        ),
-        ChatEmptyStateRenderer.cupertino => CupertinoEmptyState(
-          isConfigured: emptyState.isConfigured,
-          connectionMode: emptyState.connectionMode,
-          platformBehavior: widget.platformBehavior,
-          onConfigure: widget.onConfigure,
-          onSelectConnectionMode: widget.onSelectConnectionMode,
-        ),
-      };
+      return EmptyState(
+        isConfigured: emptyState.isConfigured,
+        connectionMode: emptyState.connectionMode,
+        platformBehavior: widget.platformBehavior,
+        onConfigure: widget.onConfigure,
+        onSelectConnectionMode: widget.onSelectConnectionMode,
+      );
     }
 
     return Column(

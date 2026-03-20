@@ -3,8 +3,6 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_empty_state_body.dart';
 
-enum ChatEmptyStateRenderer { flutter, cupertino }
-
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
@@ -29,7 +27,6 @@ class EmptyState extends StatelessWidget {
       platformBehavior: platformBehavior,
       onConfigure: onConfigure,
       onSelectConnectionMode: onSelectConnectionMode,
-      style: ChatEmptyStateVisualStyle.material,
     );
   }
 }

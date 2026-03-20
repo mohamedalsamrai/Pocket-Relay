@@ -17,7 +17,6 @@ class ConnectionSheet extends StatelessWidget {
     return ConnectionSettingsSheetSurface(
       viewModel: viewModel,
       actions: actions,
-      style: ConnectionSettingsSheetStyle.material,
     );
   }
 }

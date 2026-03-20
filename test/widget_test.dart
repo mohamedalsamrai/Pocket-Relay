@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app.dart';
@@ -10,12 +9,8 @@ import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dar
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
@@ -106,7 +101,7 @@ void main() {
   });
 
   testWidgets(
-    'uses the cupertino foundation path by default on iOS while transcript stays on the flutter region path',
+    'uses the material renderer path by default on iOS',
     (tester) async {
       await tester.pumpWidget(_buildCatalogApp());
 
@@ -114,19 +109,16 @@ void main() {
 
       expect(find.byType(ConnectionWorkspaceMobileShell), findsOneWidget);
       expect(find.byType(ChatRootAdapter), findsOneWidget);
-      expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
-      expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
-      expect(find.byType(CupertinoChatComposerRegion), findsOneWidget);
+      expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
+      expect(find.byType(FlutterChatAppChrome), findsOneWidget);
       expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
-      expect(find.byType(FlutterChatScreenRenderer), findsNothing);
-      expect(find.byType(FlutterChatAppChrome), findsNothing);
-      expect(find.byType(FlutterChatComposerRegion), findsNothing);
+      expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
   testWidgets(
-    'uses the cupertino foundation path by default on macOS while transcript stays on the flutter region path',
+    'uses the material renderer path by default on macOS',
     (tester) async {
       await tester.pumpWidget(_buildCatalogApp());
 
@@ -134,19 +126,16 @@ void main() {
 
       expect(find.byType(ConnectionWorkspaceDesktopShell), findsOneWidget);
       expect(find.byType(ChatRootAdapter), findsOneWidget);
-      expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
-      expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
-      expect(find.byType(CupertinoChatComposerRegion), findsOneWidget);
+      expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
+      expect(find.byType(FlutterChatAppChrome), findsOneWidget);
       expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
-      expect(find.byType(FlutterChatScreenRenderer), findsNothing);
-      expect(find.byType(FlutterChatAppChrome), findsNothing);
-      expect(find.byType(FlutterChatComposerRegion), findsNothing);
+      expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
   testWidgets(
-    'shows a cupertino bootstrap shell while the catalog is loading on iOS',
+    'shows the material bootstrap shell while the catalog is loading on iOS',
     (tester) async {
       final connectionRepository = _DeferredConnectionRepository();
 
@@ -155,10 +144,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(CupertinoPageScaffold), findsOneWidget);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.byType(Scaffold), findsNothing);
+      expect(find.byType(Scaffold), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Pocket Relay'), findsOneWidget);
       expect(
         find.text('Remote Codex, ready before the first lane opens.'),
@@ -169,13 +156,13 @@ void main() {
       connectionRepository.complete(_savedProfile());
       await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
+      expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
   testWidgets(
-    'routes live settings through the cupertino workspace settings renderer on iOS',
+    'routes live settings through the material workspace settings renderer on iOS',
     (tester) async {
       final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate();
 
@@ -187,9 +174,7 @@ void main() {
       await tester.tap(find.byTooltip('Connection settings'));
       await tester.pumpAndSettle();
 
-      expect(settingsOverlayDelegate.renderers, <ConnectionSettingsRenderer>[
-        ConnectionSettingsRenderer.cupertino,
-      ]);
+      expect(settingsOverlayDelegate.launchedSettings, hasLength(1));
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
@@ -241,7 +226,6 @@ void main() {
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoActionSheet), findsNothing);
       expect(find.text('New thread'), findsOneWidget);
       expect(find.text('Clear transcript'), findsOneWidget);
       expect(find.text('Saved connections'), findsOneWidget);

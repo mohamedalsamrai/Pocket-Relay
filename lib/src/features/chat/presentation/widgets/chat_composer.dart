@@ -24,7 +24,6 @@ class ChatComposer extends StatelessWidget {
       contract: contract,
       onChanged: onChanged,
       onSend: onSend,
-      style: ChatComposerVisualStyle.material,
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
@@ -10,7 +9,6 @@ import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dar
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
-import 'package:pocket_relay/src/core/theme/pocket_cupertino_theme.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
@@ -33,8 +31,7 @@ class PocketRelayApp extends StatefulWidget {
     this.platformPolicy,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
-    this.chatRootPlatformPolicy =
-        const ChatRootPlatformPolicy.cupertinoFoundation(),
+    this.chatRootPlatformPolicy = const ChatRootPlatformPolicy.allFlutter(),
   });
 
   final CodexConnectionRepository? connectionRepository;
@@ -214,9 +211,7 @@ class _PocketRelayHome extends StatelessWidget {
       builder: (context, _) {
         final workspaceState = workspaceController.state;
         if (workspaceState.isLoading) {
-          return _PocketRelayBootstrapShell(
-            screenShell: platformPolicy.regionPolicy.screenShell,
-          );
+          return const _PocketRelayBootstrapShell();
         }
 
         if (platformPolicy.behavior.isMobileExperience) {
@@ -248,25 +243,18 @@ class _PocketRelayHome extends StatelessWidget {
           );
         }
 
-        return _PocketRelayBootstrapShell(
-          screenShell: platformPolicy.regionPolicy.screenShell,
-        );
+        return const _PocketRelayBootstrapShell();
       },
     );
   }
 }
 
 class _PocketRelayBootstrapShell extends StatelessWidget {
-  const _PocketRelayBootstrapShell({required this.screenShell});
-
-  final ChatRootScreenShellRenderer screenShell;
+  const _PocketRelayBootstrapShell();
 
   @override
   Widget build(BuildContext context) {
-    return switch (screenShell) {
-      ChatRootScreenShellRenderer.flutter => const _FlutterBootstrapShell(),
-      ChatRootScreenShellRenderer.cupertino => const _CupertinoBootstrapShell(),
-    };
+    return const _FlutterBootstrapShell();
   }
 }
 
@@ -279,28 +267,6 @@ class _FlutterBootstrapShell extends StatelessWidget {
       body: _BootstrapBackground(
         child: _BootstrapSplash(
           progressIndicator: const CircularProgressIndicator(strokeWidth: 2.8),
-        ),
-      ),
-    );
-  }
-}
-
-class _CupertinoBootstrapShell extends StatelessWidget {
-  const _CupertinoBootstrapShell();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.pocketPalette;
-
-    return CupertinoTheme(
-      data: buildPocketCupertinoTheme(Theme.of(context)),
-      child: CupertinoPageScaffold(
-        backgroundColor: palette.backgroundTop,
-        child: _BootstrapBackground(
-          child: _BootstrapSplash(
-            progressIndicator: const CupertinoActivityIndicator(radius: 12),
-            useCupertinoText: true,
-          ),
         ),
       ),
     );
@@ -330,39 +296,22 @@ class _BootstrapBackground extends StatelessWidget {
 }
 
 class _BootstrapSplash extends StatelessWidget {
-  const _BootstrapSplash({
-    required this.progressIndicator,
-    this.useCupertinoText = false,
-  });
+  const _BootstrapSplash({required this.progressIndicator});
 
   final Widget progressIndicator;
-  final bool useCupertinoText;
 
   @override
   Widget build(BuildContext context) {
     final materialTheme = Theme.of(context);
-    final cupertinoTheme = useCupertinoText ? CupertinoTheme.of(context) : null;
-    final titleStyle = useCupertinoText && cupertinoTheme != null
-        ? cupertinoTheme.textTheme.navLargeTitleTextStyle.copyWith(
-            fontSize: 33,
-            fontWeight: FontWeight.w700,
-            color: CupertinoColors.white,
-          )
-        : materialTheme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.8,
-          );
-    final bodyStyle = useCupertinoText && cupertinoTheme != null
-        ? cupertinoTheme.textTheme.textStyle.copyWith(
-            fontSize: 15,
-            height: 1.45,
-            color: CupertinoColors.systemGrey2,
-          )
-        : materialTheme.textTheme.bodyLarge?.copyWith(
-            height: 1.45,
-            color: materialTheme.colorScheme.onSurface.withValues(alpha: 0.68),
-          );
+    final titleStyle = materialTheme.textTheme.headlineLarge?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: Colors.white,
+      letterSpacing: -0.8,
+    );
+    final bodyStyle = materialTheme.textTheme.bodyLarge?.copyWith(
+      height: 1.45,
+      color: materialTheme.colorScheme.onSurface.withValues(alpha: 0.68),
+    );
 
     return SafeArea(
       child: Center(
