@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'codex_conversation_handoff_store.dart';
 import 'shared_preferences_async_migration.dart';
 
 class SavedResumableConversation {
@@ -317,9 +316,7 @@ class SecureCodexConnectionConversationHistoryStore
         : _decodeLegacyHistory(rawHistory);
     final selectedThreadId = rawHandoff == null || rawHandoff.trim().isEmpty
         ? null
-        : SavedConversationHandoff.fromJson(
-            jsonDecode(rawHandoff) as Map<String, dynamic>,
-          ).normalizedResumeThreadId;
+        : _decodeLegacySelectedThreadId(rawHandoff);
 
     final alreadyPresent = selectedThreadId == null
         ? true
@@ -358,6 +355,19 @@ class SecureCodexConnectionConversationHistoryStore
         )
         .where((entry) => entry.normalizedThreadId.isNotEmpty)
         .toList(growable: false);
+  }
+
+  String? _decodeLegacySelectedThreadId(String rawHandoff) {
+    final payload = jsonDecode(rawHandoff);
+    if (payload is! Map) {
+      return null;
+    }
+    final selectedThreadId = payload['resumeThreadId'];
+    if (selectedThreadId is! String) {
+      return null;
+    }
+    final normalizedThreadId = selectedThreadId.trim();
+    return normalizedThreadId.isEmpty ? null : normalizedThreadId;
   }
 
   Future<void> _ensurePreferencesReady() {
