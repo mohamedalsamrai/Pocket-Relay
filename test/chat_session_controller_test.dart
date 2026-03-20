@@ -50,9 +50,9 @@ void main() {
     'sendPrompt resumes the saved conversation handoff after controller restart',
     () async {
       final appServerClient = FakeCodexAppServerClient();
-      final handoffStore = MemoryCodexConversationHandoffStore(
-        initialValue: const SavedConversationHandoff(
-          resumeThreadId: 'thread_saved',
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(appServerClient.close);
@@ -64,7 +64,7 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
-        conversationHandoffStore: handoffStore,
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
@@ -98,8 +98,8 @@ void main() {
         'thread_saved',
       );
       expect(
-        await handoffStore.load(),
-        const SavedConversationHandoff(resumeThreadId: 'thread_saved'),
+        (await conversationStateStore.loadState()).normalizedSelectedThreadId,
+        'thread_saved',
       );
     },
   );
@@ -953,10 +953,15 @@ class _RecordingConversationHistoryStore
   _RecordingConversationHistoryStore({
     List<SavedResumableConversation> initialValue =
         const <SavedResumableConversation>[],
-  }) : saved = List<SavedResumableConversation>.from(initialValue),
-       state = SavedConnectionConversationState(
-         conversations: List<SavedResumableConversation>.from(initialValue),
-       );
+    SavedConnectionConversationState? initialState,
+  }) : saved = List<SavedResumableConversation>.from(
+         initialState?.conversations ?? initialValue,
+       ),
+       state =
+           initialState ??
+           SavedConnectionConversationState(
+             conversations: List<SavedResumableConversation>.from(initialValue),
+           );
 
   List<SavedResumableConversation> saved;
   SavedConnectionConversationState state;

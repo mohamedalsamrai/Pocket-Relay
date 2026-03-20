@@ -1031,7 +1031,6 @@ class ChatSessionController extends ChangeNotifier {
           clearSelectedThreadId: handoff.normalizedResumeThreadId == null,
         ),
       );
-      await conversationHandoffStore.save(handoff);
     } catch (_) {
       // Conversation handoff persistence must not break the active session.
     }
