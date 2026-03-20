@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
-import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -70,8 +69,8 @@ void main() {
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        initialSavedConversationHandoff: const SavedConversationHandoff(
-          resumeThreadId: 'thread_saved',
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -467,18 +466,13 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
-        conversationHandoffStore: MemoryCodexConversationHandoffStore(
-          initialValue: const SavedConversationHandoff(
-            resumeThreadId: 'thread_old',
-          ),
-        ),
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        initialSavedConversationHandoff: const SavedConversationHandoff(
-          resumeThreadId: 'thread_old',
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_old',
         ),
       );
       addTearDown(controller.dispose);

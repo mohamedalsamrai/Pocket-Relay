@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
-import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 
 import '../models/connection_workspace_state.dart';
@@ -11,7 +10,7 @@ typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
       required String connectionId,
       required SavedConnection connection,
-      required SavedConversationHandoff handoff,
+      required SavedConnectionConversationState conversationState,
     });
 
 class ConnectionWorkspaceController extends ChangeNotifier {
@@ -484,9 +483,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     return _laneBindingFactory(
       connectionId: connectionId,
       connection: results[0] as SavedConnection,
-      handoff: SavedConversationHandoff(
-        resumeThreadId: conversationState.normalizedSelectedThreadId,
-      ),
+      conversationState: conversationState,
     );
   }
 

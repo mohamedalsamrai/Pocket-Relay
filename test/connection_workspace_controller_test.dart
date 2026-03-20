@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
-import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
@@ -360,7 +358,6 @@ void main() {
           ),
         ],
       );
-      final handoffStore = MemoryCodexConnectionHandoffStore();
       final conversationStateStore =
           MemoryCodexConnectionConversationHistoryStore();
       final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
@@ -371,7 +368,11 @@ void main() {
         connectionRepository: repository,
         connectionConversationStateStore: conversationStateStore,
         laneBindingFactory:
-            ({required connectionId, required connection, required handoff}) {
+            ({
+              required connectionId,
+              required connection,
+              required conversationState,
+            }) {
               final appServerClient = FakeCodexAppServerClient();
               clientsByConnectionId[connectionId]!.add(appServerClient);
               return ConnectionLaneBinding(
@@ -380,17 +381,12 @@ void main() {
                   connectionId: connectionId,
                   connectionRepository: repository,
                 ),
-                conversationHandoffStore:
-                    ConnectionScopedConversationHandoffStore(
-                      connectionId: connectionId,
-                      handoffStore: handoffStore,
-                    ),
                 appServerClient: appServerClient,
                 initialSavedProfile: SavedProfile(
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialSavedConversationHandoff: handoff,
+                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -425,17 +421,8 @@ void main() {
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final historyStore = MemoryCodexConnectionConversationHistoryStore();
-      final handoffStore = MemoryCodexConnectionHandoffStore(
-        initialValues: <String, SavedConversationHandoff>{
-          'conn_secondary': const SavedConversationHandoff(
-            resumeThreadId: 'thread_saved',
-          ),
-        },
-        conversationStateStore: historyStore,
-      );
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
-        handoffStore: handoffStore,
         historyStore: historyStore,
       );
       addTearDown(() async {
@@ -474,7 +461,6 @@ void main() {
           ),
         ],
       );
-      final handoffStore = MemoryCodexConnectionHandoffStore();
       final historyStore = MemoryCodexConnectionConversationHistoryStore();
       final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
         'conn_primary': <FakeCodexAppServerClient>[],
@@ -484,7 +470,11 @@ void main() {
         connectionRepository: repository,
         connectionConversationStateStore: historyStore,
         laneBindingFactory:
-            ({required connectionId, required connection, required handoff}) {
+            ({
+              required connectionId,
+              required connection,
+              required conversationState,
+            }) {
               final appServerClient = FakeCodexAppServerClient();
               clientsByConnectionId[connectionId]!.add(appServerClient);
               return ConnectionLaneBinding(
@@ -493,11 +483,6 @@ void main() {
                   connectionId: connectionId,
                   connectionRepository: repository,
                 ),
-                conversationHandoffStore:
-                    ConnectionScopedConversationHandoffStore(
-                      connectionId: connectionId,
-                      handoffStore: handoffStore,
-                    ),
                 conversationHistoryStore:
                     ConnectionScopedConversationHistoryStore(
                       connectionId: connectionId,
@@ -512,7 +497,7 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialSavedConversationHandoff: handoff,
+                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -590,7 +575,6 @@ void main() {
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   MemoryCodexConnectionRepository? repository,
-  MemoryCodexConnectionHandoffStore? handoffStore,
   MemoryCodexConnectionConversationHistoryStore? historyStore,
 }) {
   final resolvedRepository =
@@ -609,24 +593,25 @@ ConnectionWorkspaceController _buildWorkspaceController({
           ),
         ],
       );
-  final resolvedHistoryStore =
-      historyStore ?? MemoryCodexConnectionConversationHistoryStore();
-  final resolvedHandoffStore =
-      handoffStore ??
-      MemoryCodexConnectionHandoffStore(
-        initialValues: <String, SavedConversationHandoff>{
-          'conn_secondary': const SavedConversationHandoff(
-            resumeThreadId: 'thread_saved',
+  final seededHistoryStore =
+      historyStore ??
+      MemoryCodexConnectionConversationHistoryStore(
+        initialStates: <String, SavedConnectionConversationState>{
+          'conn_secondary': const SavedConnectionConversationState(
+            selectedThreadId: 'thread_saved',
           ),
         },
-        conversationStateStore: resolvedHistoryStore,
       );
 
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
-    connectionConversationStateStore: resolvedHistoryStore,
+    connectionConversationStateStore: seededHistoryStore,
     laneBindingFactory:
-        ({required connectionId, required connection, required handoff}) {
+        ({
+          required connectionId,
+          required connection,
+          required conversationState,
+        }) {
           final appServerClient = clientsById[connectionId]!;
           return ConnectionLaneBinding(
             connectionId: connectionId,
@@ -634,24 +619,20 @@ ConnectionWorkspaceController _buildWorkspaceController({
               connectionId: connectionId,
               connectionRepository: resolvedRepository,
             ),
-            conversationHandoffStore: ConnectionScopedConversationHandoffStore(
-              connectionId: connectionId,
-              handoffStore: resolvedHandoffStore,
-            ),
             conversationHistoryStore: ConnectionScopedConversationHistoryStore(
               connectionId: connectionId,
-              historyStore: resolvedHistoryStore,
+              historyStore: seededHistoryStore,
             ),
             conversationStateStore: ConnectionScopedConversationStateStore(
               connectionId: connectionId,
-              conversationStateStore: resolvedHistoryStore,
+              conversationStateStore: seededHistoryStore,
             ),
             appServerClient: appServerClient,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,
               secrets: connection.secrets,
             ),
-            initialSavedConversationHandoff: handoff,
+            initialConversationState: conversationState,
             ownsAppServerClient: false,
           );
         },

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/core/storage/codex_conversation_handoff_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
@@ -691,7 +691,7 @@ Widget _buildAdapterApp({
   PocketPlatformBehavior? platformBehavior,
   ConnectionLaneBinding? laneBinding,
   CodexProfileStore? profileStore,
-  CodexConversationHandoffStore? conversationHandoffStore,
+  CodexConversationStateStore? conversationStateStore,
   SavedProfile? savedProfile,
   ThemeData? theme,
 }) {
@@ -707,7 +707,7 @@ Widget _buildAdapterApp({
       laneBinding: laneBinding,
       appServerClient: appServerClient,
       profileStore: profileStore,
-      conversationHandoffStore: conversationHandoffStore,
+      conversationStateStore: conversationStateStore,
       savedProfile: savedProfile ?? _savedProfile(),
       platformPolicy: resolvedPlatformPolicy,
       overlayDelegate: overlayDelegate,
@@ -722,7 +722,7 @@ ConnectionLaneBinding _buildLaneBinding({
   required FakeCodexAppServerClient appServerClient,
   required SavedProfile savedProfile,
   CodexProfileStore? profileStore,
-  CodexConversationHandoffStore? conversationHandoffStore,
+  CodexConversationStateStore? conversationStateStore,
   PocketPlatformPolicy? platformPolicy,
 }) {
   final resolvedPlatformPolicy =
@@ -735,8 +735,8 @@ ConnectionLaneBinding _buildLaneBinding({
     connectionId: 'conn_primary',
     profileStore:
         profileStore ?? MemoryCodexProfileStore(initialValue: savedProfile),
-    conversationHandoffStore:
-        conversationHandoffStore ?? MemoryCodexConversationHandoffStore(),
+    conversationStateStore:
+        conversationStateStore ?? const DiscardingCodexConversationStateStore(),
     appServerClient: appServerClient,
     initialSavedProfile: savedProfile,
     supportsLocalConnectionMode:
@@ -749,6 +749,7 @@ ConnectionProfile _configuredProfile() {
     label: 'Dev Box',
     host: 'devbox.local',
     username: 'vince',
+    workspaceDir: '/workspace',
   );
 }
 
@@ -815,7 +816,7 @@ class _ChatRootAdapterHarness extends StatefulWidget {
     required this.rendererDelegate,
     this.laneBinding,
     this.profileStore,
-    this.conversationHandoffStore,
+    this.conversationStateStore,
   });
 
   final FakeCodexAppServerClient appServerClient;
@@ -827,7 +828,7 @@ class _ChatRootAdapterHarness extends StatefulWidget {
   final ChatRootRendererDelegate rendererDelegate;
   final ConnectionLaneBinding? laneBinding;
   final CodexProfileStore? profileStore;
-  final CodexConversationHandoffStore? conversationHandoffStore;
+  final CodexConversationStateStore? conversationStateStore;
 
   bool get _usesExternalBinding => laneBinding != null;
 
@@ -853,8 +854,7 @@ class _ChatRootAdapterHarnessState extends State<_ChatRootAdapterHarness> {
           oldWidget.laneBinding != widget.laneBinding ||
           oldWidget.appServerClient != widget.appServerClient ||
           oldWidget.profileStore != widget.profileStore ||
-          oldWidget.conversationHandoffStore !=
-              widget.conversationHandoffStore ||
+          oldWidget.conversationStateStore != widget.conversationStateStore ||
           oldWidget.savedProfile != widget.savedProfile ||
           oldWidget.platformPolicy != widget.platformPolicy,
     );
@@ -892,7 +892,7 @@ class _ChatRootAdapterHarnessState extends State<_ChatRootAdapterHarness> {
     final nextLaneBinding = _buildLaneBinding(
       appServerClient: widget.appServerClient,
       profileStore: widget.profileStore,
-      conversationHandoffStore: widget.conversationHandoffStore,
+      conversationStateStore: widget.conversationStateStore,
       savedProfile: widget.savedProfile,
       platformPolicy: widget.platformPolicy,
     );
