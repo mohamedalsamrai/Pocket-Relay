@@ -644,6 +644,10 @@ ConnectionWorkspaceController _buildWorkspaceController({
               connectionId: connectionId,
               historyStore: resolvedHistoryStore,
             ),
+            conversationStateStore: ConnectionScopedConversationStateStore(
+              connectionId: connectionId,
+              conversationStateStore: resolvedHistoryStore,
+            ),
             appServerClient: appServerClient,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,

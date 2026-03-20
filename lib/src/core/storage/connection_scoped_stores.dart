@@ -82,6 +82,28 @@ class ConnectionScopedConversationHistoryStore
   }
 }
 
+class ConnectionScopedConversationStateStore
+    implements CodexConversationStateStore {
+  ConnectionScopedConversationStateStore({
+    required String connectionId,
+    required CodexConnectionConversationStateStore conversationStateStore,
+  }) : _connectionId = _normalizeConnectionId(connectionId),
+       _conversationStateStore = conversationStateStore;
+
+  final String _connectionId;
+  final CodexConnectionConversationStateStore _conversationStateStore;
+
+  @override
+  Future<SavedConnectionConversationState> loadState() {
+    return _conversationStateStore.loadState(_connectionId);
+  }
+
+  @override
+  Future<void> saveState(SavedConnectionConversationState state) {
+    return _conversationStateStore.saveState(_connectionId, state);
+  }
+}
+
 String _normalizeConnectionId(String connectionId) {
   final normalizedConnectionId = connectionId.trim();
   if (normalizedConnectionId.isEmpty) {

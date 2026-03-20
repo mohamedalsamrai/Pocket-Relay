@@ -140,6 +140,12 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
                     connectionId: connectionId,
                     historyStore: conversationHistoryStore,
                   ),
+              conversationStateStore: ConnectionScopedConversationStateStore(
+                connectionId: connectionId,
+                conversationStateStore:
+                    conversationHistoryStore
+                        as CodexConnectionConversationStateStore,
+              ),
               appServerClient: usingInjectedClient
                   ? injectedAppServerClient
                   : CodexAppServerClient(),

@@ -498,6 +498,10 @@ void main() {
                       connectionId: connectionId,
                       historyStore: historyStore,
                     ),
+                conversationStateStore: ConnectionScopedConversationStateStore(
+                  connectionId: connectionId,
+                  conversationStateStore: historyStore,
+                ),
                 appServerClient: appServerClient,
                 initialSavedProfile: SavedProfile(
                   profile: connection.profile,
@@ -629,6 +633,10 @@ ConnectionWorkspaceController _buildWorkspaceController({
             conversationHistoryStore: ConnectionScopedConversationHistoryStore(
               connectionId: connectionId,
               historyStore: resolvedHistoryStore,
+            ),
+            conversationStateStore: ConnectionScopedConversationStateStore(
+              connectionId: connectionId,
+              conversationStateStore: resolvedHistoryStore,
             ),
             appServerClient: appServerClient,
             initialSavedProfile: SavedProfile(

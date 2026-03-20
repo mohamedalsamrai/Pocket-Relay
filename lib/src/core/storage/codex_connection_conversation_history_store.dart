@@ -139,6 +139,12 @@ abstract interface class CodexConversationHistoryStore {
   Future<void> save(List<SavedResumableConversation> conversations);
 }
 
+abstract interface class CodexConversationStateStore {
+  Future<SavedConnectionConversationState> loadState();
+
+  Future<void> saveState(SavedConnectionConversationState state);
+}
+
 abstract interface class CodexConnectionConversationHistoryStore {
   Future<List<SavedResumableConversation>> load(String connectionId);
 
@@ -501,4 +507,17 @@ class DiscardingCodexConversationHistoryStore
 
   @override
   Future<void> save(List<SavedResumableConversation> conversations) async {}
+}
+
+class DiscardingCodexConversationStateStore
+    implements CodexConversationStateStore {
+  const DiscardingCodexConversationStateStore();
+
+  @override
+  Future<SavedConnectionConversationState> loadState() async {
+    return const SavedConnectionConversationState();
+  }
+
+  @override
+  Future<void> saveState(SavedConnectionConversationState state) async {}
 }
