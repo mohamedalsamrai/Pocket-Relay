@@ -58,6 +58,19 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
           title: contract.codexSection.title,
           child: _buildFieldColumn(context, contract.codexSection.fields),
         ),
+        const SizedBox(height: 14),
+        _buildSection(
+          context,
+          title: contract.modelSection.title,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFieldColumn(context, contract.modelSection.fields),
+              const SizedBox(height: 14),
+              _buildReasoningEffortPicker(context, contract.modelSection),
+            ],
+          ),
+        ),
         if (contract.authenticationSection case final authSection?) ...[
           const SizedBox(height: 14),
           _buildSection(
@@ -486,6 +499,132 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     };
   }
 
+  Widget _buildReasoningEffortPicker(
+    BuildContext context,
+    ConnectionSettingsModelSectionContract section,
+  ) {
+    return switch (style) {
+      ConnectionSettingsSheetStyle.material =>
+        DropdownButtonFormField<CodexReasoningEffort?>(
+          key: const ValueKey<String>('connection_settings_reasoning_effort'),
+          value: section.selectedReasoningEffort,
+          decoration: const InputDecoration(
+            labelText: 'Reasoning effort',
+            helperText: 'Applied to new sessions and each new turn.',
+          ),
+          items: section.reasoningEffortOptions
+              .map(
+                (option) => DropdownMenuItem<CodexReasoningEffort?>(
+                  value: option.effort,
+                  child: Text(option.label),
+                ),
+              )
+              .toList(growable: false),
+          onChanged: actions.onReasoningEffortChanged,
+        ),
+      ConnectionSettingsSheetStyle.cupertino => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Reasoning effort',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _cupertinoSecondaryLabelColor(context),
+            ),
+          ),
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: _cupertinoFieldColor(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _cupertinoSeparatorColor(
+                  context,
+                ).withValues(alpha: 0.14),
+              ),
+            ),
+            child: CupertinoButton(
+              key: const ValueKey<String>(
+                'connection_settings_reasoning_effort_button',
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              alignment: Alignment.centerLeft,
+              onPressed: () async {
+                final nextEffort = await showCupertinoModalPopup<String>(
+                  context: context,
+                  builder: (popupContext) {
+                    return CupertinoActionSheet(
+                      title: const Text('Reasoning effort'),
+                      message: const Text(
+                        'Applied to new sessions and each new turn.',
+                      ),
+                      actions: section.reasoningEffortOptions
+                          .map(
+                            (option) => CupertinoActionSheetAction(
+                              key: ValueKey<String>(
+                                'connection_settings_reasoning_effort_${option.effort?.name ?? 'default'}',
+                              ),
+                              onPressed: () {
+                                Navigator.of(
+                                  popupContext,
+                                ).pop(option.effort?.name ?? '__default__');
+                              },
+                              child: Text(option.label),
+                            ),
+                          )
+                          .toList(growable: false),
+                      cancelButton: CupertinoActionSheetAction(
+                        onPressed: () {
+                          Navigator.of(popupContext).pop();
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                    );
+                  },
+                );
+                if (nextEffort == null) {
+                  return;
+                }
+                actions.onReasoningEffortChanged(
+                  nextEffort == '__default__'
+                      ? null
+                      : codexReasoningEffortFromWireValue(nextEffort),
+                );
+              },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _reasoningEffortLabel(
+                        section.reasoningEffortOptions,
+                        section.selectedReasoningEffort,
+                      ),
+                      style: TextStyle(color: _cupertinoLabelColor(context)),
+                    ),
+                  ),
+                  Icon(
+                    CupertinoIcons.chevron_down,
+                    size: 16,
+                    color: _cupertinoSecondaryLabelColor(context),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Applied to new sessions and each new turn.',
+            style: TextStyle(
+              fontSize: 12,
+              color: _cupertinoSecondaryLabelColor(context),
+            ),
+          ),
+        ],
+      ),
+    };
+  }
+
   Widget _buildToggle(
     BuildContext context,
     ConnectionSettingsToggleContract toggle,
@@ -692,5 +831,17 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
       CupertinoColors.secondaryLabel,
       context,
     );
+  }
+
+  String _reasoningEffortLabel(
+    List<ConnectionSettingsReasoningEffortOptionContract> options,
+    CodexReasoningEffort? effort,
+  ) {
+    for (final option in options) {
+      if (option.effort == effort) {
+        return option.label;
+      }
+    }
+    return 'Default';
   }
 }

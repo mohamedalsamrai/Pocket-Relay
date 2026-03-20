@@ -34,6 +34,8 @@ void main() {
     expect(sent, isTrue);
     expect(appServerClient.connectCalls, 1);
     expect(appServerClient.startSessionCalls, 1);
+    expect(appServerClient.startSessionRequests.single.model, isNull);
+    expect(appServerClient.startSessionRequests.single.reasoningEffort, isNull);
     expect(appServerClient.sentMessages, <String>['Hello controller']);
     expect(controller.transcriptBlocks.length, 1);
     expect(controller.transcriptBlocks.first, isA<CodexUserMessageBlock>());
@@ -75,12 +77,67 @@ void main() {
 
       expect(await controller.sendPrompt('Continue after restart'), isTrue);
       expect(appServerClient.startSessionCalls, 1);
-      expect(appServerClient.sentTurns, <({String threadId, String text})>[
-        (threadId: 'thread_saved', text: 'Continue after restart'),
+      expect(appServerClient.sentTurns, <
+        ({
+          String threadId,
+          String text,
+          String? model,
+          CodexReasoningEffort? effort,
+        })
+      >[
+        (
+          threadId: 'thread_saved',
+          text: 'Continue after restart',
+          model: null,
+          effort: null,
+        ),
       ]);
+      expect(
+        appServerClient.startSessionRequests.single.resumeThreadId,
+        'thread_saved',
+      );
       expect(
         await handoffStore.load(),
         const SavedConversationHandoff(resumeThreadId: 'thread_saved'),
+      );
+    },
+  );
+
+  test(
+    'sendPrompt forwards profile model and reasoning effort overrides',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final configuredProfile = _configuredProfile().copyWith(
+        model: 'gpt-5.4',
+        reasoningEffort: CodexReasoningEffort.high,
+      );
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile,
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile,
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Use the configured model'), isTrue);
+      expect(appServerClient.startSessionRequests.single.model, 'gpt-5.4');
+      expect(
+        appServerClient.startSessionRequests.single.reasoningEffort,
+        CodexReasoningEffort.high,
+      );
+      expect(appServerClient.sentTurns.single.model, 'gpt-5.4');
+      expect(
+        appServerClient.sentTurns.single.effort,
+        CodexReasoningEffort.high,
       );
     },
   );
@@ -842,5 +899,6 @@ ConnectionProfile _configuredProfile() {
   return ConnectionProfile.defaults().copyWith(
     host: 'example.com',
     username: 'vince',
+    workspaceDir: '/workspace',
   );
 }

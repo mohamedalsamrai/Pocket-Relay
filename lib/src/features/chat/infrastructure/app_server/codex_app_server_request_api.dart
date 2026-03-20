@@ -10,6 +10,7 @@ class CodexAppServerRequestApi {
     CodexAppServerConnection connection, {
     String? cwd,
     String? model,
+    CodexReasoningEffort? reasoningEffort,
     String? resumeThreadId,
   }) async {
     final profile = connection.requireProfile();
@@ -30,6 +31,7 @@ class CodexAppServerRequestApi {
       'approvalPolicy': _approvalPolicyFor(profile),
       'sandbox': _sandboxFor(profile),
       if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+      if (reasoningEffort != null) 'reasoning_effort': reasoningEffort.name,
     };
     var method = effectiveResumeThreadId != null
         ? 'thread/resume'
@@ -106,6 +108,7 @@ class CodexAppServerRequestApi {
     required String threadId,
     required String text,
     String? model,
+    CodexReasoningEffort? effort,
   }) async {
     connection.requireConnected();
 
@@ -128,6 +131,7 @@ class CodexAppServerRequestApi {
         },
       ],
       if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+      if (effort != null) 'effort': effort.name,
     };
 
     final response = await connection.sendRequest('turn/start', params);

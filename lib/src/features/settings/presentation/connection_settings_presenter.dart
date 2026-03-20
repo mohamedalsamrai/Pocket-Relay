@@ -20,6 +20,9 @@ class ConnectionSettingsPresenter {
     );
     final shouldShowValidationErrors =
         formState.showValidationErrors && hasChanges;
+    final modelHelperText = draft.model.trim().isEmpty
+        ? 'Leave blank to use the Codex or workspace default.'
+        : 'Sent to Codex when the session starts and when each turn starts.';
 
     final hasHostError = isRemote && draft.host.trim().isEmpty;
     final port = int.tryParse(draft.port.trim());
@@ -218,6 +221,57 @@ class ConnectionSettingsPresenter {
           ),
         ],
       ),
+      modelSection: ConnectionSettingsModelSectionContract(
+        title: 'Model defaults',
+        fields: <ConnectionSettingsTextFieldContract>[
+          ConnectionSettingsTextFieldContract(
+            id: ConnectionSettingsFieldId.model,
+            label: 'Model override (optional)',
+            value: draft.model,
+            hintText: 'gpt-5.4 or gpt-5.4-mini',
+            helperText: modelHelperText,
+          ),
+        ],
+        selectedReasoningEffort: draft.reasoningEffort,
+        reasoningEffortOptions:
+            const <ConnectionSettingsReasoningEffortOptionContract>[
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: null,
+                label: 'Default',
+                description: 'Use the model or workspace default effort.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.none,
+                label: 'None',
+                description: 'Disable extra reasoning where supported.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.minimal,
+                label: 'Minimal',
+                description: 'Use the lightest reasoning pass.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.low,
+                label: 'Low',
+                description: 'Favor speed over deeper planning.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.medium,
+                label: 'Medium',
+                description: 'Balanced default for general work.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.high,
+                label: 'High',
+                description: 'Spend more reasoning on harder tasks.',
+              ),
+              ConnectionSettingsReasoningEffortOptionContract(
+                effort: CodexReasoningEffort.xhigh,
+                label: 'XHigh',
+                description: 'Maximum reasoning depth when supported.',
+              ),
+            ],
+      ),
       runModeSection: ConnectionSettingsRunModeSectionContract(
         title: 'Run mode',
         toggles: <ConnectionSettingsToggleContract>[
@@ -252,6 +306,8 @@ class ConnectionSettingsPresenter {
                   username: draft.username.trim(),
                   workspaceDir: draft.workspaceDir.trim(),
                   codexPath: draft.codexPath.trim(),
+                  model: draft.model.trim(),
+                  reasoningEffort: draft.reasoningEffort,
                   authMode: draft.authMode,
                   hostFingerprint: draft.hostFingerprint.trim(),
                   dangerouslyBypassSandbox: draft.dangerouslyBypassSandbox,
@@ -279,6 +335,8 @@ class ConnectionSettingsPresenter {
         draft.username.trim() != initialProfile.username ||
         draft.workspaceDir.trim() != initialProfile.workspaceDir ||
         draft.codexPath.trim() != initialProfile.codexPath ||
+        draft.model.trim() != initialProfile.model ||
+        draft.reasoningEffort != initialProfile.reasoningEffort ||
         draft.hostFingerprint.trim() != initialProfile.hostFingerprint ||
         draft.password != initialSecrets.password ||
         draft.privateKeyPem != initialSecrets.privateKeyPem ||

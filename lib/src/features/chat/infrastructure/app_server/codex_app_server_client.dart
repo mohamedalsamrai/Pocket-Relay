@@ -48,6 +48,7 @@ class CodexAppServerClient {
   Future<CodexAppServerSession> startSession({
     String? cwd,
     String? model,
+    CodexReasoningEffort? reasoningEffort,
     String? resumeThreadId,
   }) async {
     _ensureNotDisposed();
@@ -55,6 +56,7 @@ class CodexAppServerClient {
       _connection,
       cwd: cwd,
       model: model,
+      reasoningEffort: reasoningEffort,
       resumeThreadId: resumeThreadId,
     );
   }
@@ -68,6 +70,7 @@ class CodexAppServerClient {
     required String threadId,
     required String text,
     String? model,
+    CodexReasoningEffort? effort,
   }) async {
     _ensureNotDisposed();
     return _requestApi.sendUserMessage(
@@ -75,6 +78,7 @@ class CodexAppServerClient {
       threadId: threadId,
       text: text,
       model: model,
+      effort: effort,
     );
   }
 

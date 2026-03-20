@@ -4,6 +4,23 @@ enum AuthMode { password, privateKey }
 
 enum ConnectionMode { remote, local }
 
+enum CodexReasoningEffort { none, minimal, low, medium, high, xhigh }
+
+CodexReasoningEffort? codexReasoningEffortFromWireValue(String? value) {
+  final normalized = value?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  for (final effort in CodexReasoningEffort.values) {
+    if (effort.name == normalized) {
+      return effort;
+    }
+  }
+
+  return null;
+}
+
 class ConnectionProfile {
   static const legacyWorkspaceDirPlaceholders = <String>{
     '/home/vince/Projects',
@@ -23,6 +40,8 @@ class ConnectionProfile {
     required this.hostFingerprint,
     required this.dangerouslyBypassSandbox,
     required this.ephemeralSession,
+    this.model = '',
+    this.reasoningEffort,
     this.connectionMode = ConnectionMode.remote,
   });
 
@@ -36,6 +55,8 @@ class ConnectionProfile {
   final String hostFingerprint;
   final bool dangerouslyBypassSandbox;
   final bool ephemeralSession;
+  final String model;
+  final CodexReasoningEffort? reasoningEffort;
   final ConnectionMode connectionMode;
 
   factory ConnectionProfile.defaults() {
@@ -50,6 +71,8 @@ class ConnectionProfile {
       hostFingerprint: '',
       dangerouslyBypassSandbox: false,
       ephemeralSession: false,
+      model: '',
+      reasoningEffort: null,
       connectionMode: ConnectionMode.remote,
     );
   }
@@ -78,6 +101,8 @@ class ConnectionProfile {
     String? hostFingerprint,
     bool? dangerouslyBypassSandbox,
     bool? ephemeralSession,
+    String? model,
+    Object? reasoningEffort = _sentinel,
     ConnectionMode? connectionMode,
   }) {
     return ConnectionProfile(
@@ -92,6 +117,10 @@ class ConnectionProfile {
       dangerouslyBypassSandbox:
           dangerouslyBypassSandbox ?? this.dangerouslyBypassSandbox,
       ephemeralSession: ephemeralSession ?? this.ephemeralSession,
+      model: model ?? this.model,
+      reasoningEffort: identical(reasoningEffort, _sentinel)
+          ? this.reasoningEffort
+          : reasoningEffort as CodexReasoningEffort?,
       connectionMode: connectionMode ?? this.connectionMode,
     );
   }
@@ -114,6 +143,10 @@ class ConnectionProfile {
       dangerouslyBypassSandbox:
           json['dangerouslyBypassSandbox'] as bool? ?? false,
       ephemeralSession: json['ephemeralSession'] as bool? ?? false,
+      model: json['model'] as String? ?? '',
+      reasoningEffort: codexReasoningEffortFromWireValue(
+        json['reasoningEffort'] as String?,
+      ),
       connectionMode: _connectionModeFromName(
         json['connectionMode'] as String?,
         fallback: defaults.connectionMode,
@@ -133,6 +166,8 @@ class ConnectionProfile {
       'hostFingerprint': hostFingerprint,
       'dangerouslyBypassSandbox': dangerouslyBypassSandbox,
       'ephemeralSession': ephemeralSession,
+      'model': model,
+      'reasoningEffort': reasoningEffort?.name,
       'connectionMode': connectionMode.name,
     };
   }
@@ -150,6 +185,8 @@ class ConnectionProfile {
         other.hostFingerprint == hostFingerprint &&
         other.dangerouslyBypassSandbox == dangerouslyBypassSandbox &&
         other.ephemeralSession == ephemeralSession &&
+        other.model == model &&
+        other.reasoningEffort == reasoningEffort &&
         other.connectionMode == connectionMode;
   }
 
@@ -165,9 +202,13 @@ class ConnectionProfile {
     hostFingerprint,
     dangerouslyBypassSandbox,
     ephemeralSession,
+    model,
+    reasoningEffort,
     connectionMode,
   );
 }
+
+const Object _sentinel = Object();
 
 class ConnectionSecrets {
   const ConnectionSecrets({

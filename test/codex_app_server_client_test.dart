@@ -179,10 +179,15 @@ void main() {
       secrets: const ConnectionSecrets(password: 'secret'),
     );
 
-    final session = await client.startSession();
+    final session = await client.startSession(
+      model: 'gpt-5.4',
+      reasoningEffort: CodexReasoningEffort.high,
+    );
     final turn = await client.sendUserMessage(
       threadId: session.threadId,
       text: 'hello from phone',
+      model: 'gpt-5.4',
+      effort: CodexReasoningEffort.low,
     );
 
     expect(session.threadId, 'thread_123');
@@ -202,6 +207,8 @@ void main() {
       'cwd': '/workspace',
       'approvalPolicy': 'on-request',
       'sandbox': 'workspace-write',
+      'model': 'gpt-5.4',
+      'reasoning_effort': 'high',
       'ephemeral': false,
     });
     expect(turnStartRequest['params'], <String, Object?>{
@@ -213,6 +220,8 @@ void main() {
           'text_elements': <Object>[],
         },
       ],
+      'model': 'gpt-5.4',
+      'effort': 'low',
     });
 
     await client.disconnect();

@@ -479,6 +479,8 @@ class ChatSessionController extends ChangeNotifier {
       final turn = await appServerClient.sendUserMessage(
         threadId: threadId,
         text: prompt,
+        model: _selectedModelOverride(),
+        effort: _profile.reasoningEffort,
       );
       _rememberContinuationThread(turn.threadId);
       _applyRuntimeEvent(
@@ -553,6 +555,8 @@ class ChatSessionController extends ChangeNotifier {
 
     final resumeThreadId = _resumeConversationThreadId();
     final session = await appServerClient.startSession(
+      model: _selectedModelOverride(),
+      reasoningEffort: _profile.reasoningEffort,
       resumeThreadId: resumeThreadId,
     );
     _rememberContinuationThread(session.threadId);
@@ -579,6 +583,11 @@ class ChatSessionController extends ChangeNotifier {
     }
 
     await appServerClient.connect(profile: _profile, secrets: _secrets);
+  }
+
+  String? _selectedModelOverride() {
+    final model = _profile.model.trim();
+    return model.isEmpty ? null : model;
   }
 
   Future<void> _stopAppServerTurn() async {

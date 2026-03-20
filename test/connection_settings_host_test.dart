@@ -160,6 +160,23 @@ void main() {
       await tester.enterText(_materialTextField('Profile label'), '  ');
       await tester.enterText(_materialTextField('Host'), '  ios.example.com  ');
       await tester.enterText(_materialTextField('Port'), '2222');
+      await tester.enterText(
+        _materialTextField('Model override (optional)'),
+        '  gpt-5.4-mini  ',
+      );
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort'),
+        ),
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('High').last);
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Save'));
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
@@ -178,7 +195,23 @@ void main() {
         '  ios.example.com  ',
       );
       await tester.enterText(_cupertinoTextField('Port'), '2222');
+      await tester.enterText(
+        _cupertinoTextField('Model override (optional)'),
+        '  gpt-5.4-mini  ',
+      );
       await tester.ensureVisible(find.text('Save'));
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort_button'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort_high'),
+        ),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
@@ -187,9 +220,19 @@ void main() {
       expect(materialPayload!.profile.label, 'Developer Box');
       expect(materialPayload!.profile.host, 'ios.example.com');
       expect(materialPayload!.profile.port, 2222);
+      expect(materialPayload!.profile.model, 'gpt-5.4-mini');
+      expect(
+        materialPayload!.profile.reasoningEffort,
+        CodexReasoningEffort.high,
+      );
       expect(cupertinoPayload!.profile.label, materialPayload!.profile.label);
       expect(cupertinoPayload!.profile.host, materialPayload!.profile.host);
       expect(cupertinoPayload!.profile.port, materialPayload!.profile.port);
+      expect(cupertinoPayload!.profile.model, materialPayload!.profile.model);
+      expect(
+        cupertinoPayload!.profile.reasoningEffort,
+        materialPayload!.profile.reasoningEffort,
+      );
       expect(
         cupertinoPayload!.secrets.password,
         materialPayload!.secrets.password,
@@ -278,6 +321,7 @@ ConnectionSettingsFieldId _fieldIdForLabel(String label) {
     'Username' => ConnectionSettingsFieldId.username,
     'Workspace directory' => ConnectionSettingsFieldId.workspaceDir,
     'Codex launch command' => ConnectionSettingsFieldId.codexPath,
+    'Model override (optional)' => ConnectionSettingsFieldId.model,
     'Host fingerprint (optional)' => ConnectionSettingsFieldId.hostFingerprint,
     'SSH password' => ConnectionSettingsFieldId.password,
     'Private key PEM' => ConnectionSettingsFieldId.privateKeyPem,

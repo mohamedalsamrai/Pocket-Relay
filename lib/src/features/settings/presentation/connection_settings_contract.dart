@@ -7,6 +7,7 @@ enum ConnectionSettingsFieldId {
   username,
   workspaceDir,
   codexPath,
+  model,
   hostFingerprint,
   password,
   privateKeyPem,
@@ -117,6 +118,33 @@ class ConnectionSettingsSectionContract {
   final List<ConnectionSettingsTextFieldContract> fields;
 }
 
+class ConnectionSettingsReasoningEffortOptionContract {
+  const ConnectionSettingsReasoningEffortOptionContract({
+    required this.effort,
+    required this.label,
+    required this.description,
+  });
+
+  final CodexReasoningEffort? effort;
+  final String label;
+  final String description;
+}
+
+class ConnectionSettingsModelSectionContract {
+  const ConnectionSettingsModelSectionContract({
+    required this.title,
+    required this.fields,
+    required this.selectedReasoningEffort,
+    required this.reasoningEffortOptions,
+  });
+
+  final String title;
+  final List<ConnectionSettingsTextFieldContract> fields;
+  final CodexReasoningEffort? selectedReasoningEffort;
+  final List<ConnectionSettingsReasoningEffortOptionContract>
+  reasoningEffortOptions;
+}
+
 class ConnectionSettingsToggleContract {
   const ConnectionSettingsToggleContract({
     required this.id,
@@ -173,6 +201,7 @@ class ConnectionSettingsContract {
     required this.description,
     required this.profileSection,
     required this.codexSection,
+    required this.modelSection,
     required this.runModeSection,
     required this.saveAction,
     this.connectionModeSection,
@@ -184,6 +213,7 @@ class ConnectionSettingsContract {
   final String description;
   final ConnectionSettingsSectionContract profileSection;
   final ConnectionSettingsSectionContract codexSection;
+  final ConnectionSettingsModelSectionContract modelSection;
   final ConnectionSettingsConnectionModeSectionContract? connectionModeSection;
   final ConnectionSettingsSectionContract? remoteConnectionSection;
   final ConnectionSettingsAuthenticationSectionContract? authenticationSection;

@@ -10,6 +10,8 @@ class ConnectionSettingsDraft {
     required this.username,
     required this.workspaceDir,
     required this.codexPath,
+    required this.model,
+    required this.reasoningEffort,
     required this.hostFingerprint,
     required this.password,
     required this.privateKeyPem,
@@ -31,6 +33,8 @@ class ConnectionSettingsDraft {
       username: profile.username,
       workspaceDir: profile.workspaceDir,
       codexPath: profile.codexPath,
+      model: profile.model,
+      reasoningEffort: profile.reasoningEffort,
       hostFingerprint: profile.hostFingerprint,
       password: secrets.password,
       privateKeyPem: secrets.privateKeyPem,
@@ -48,6 +52,8 @@ class ConnectionSettingsDraft {
   final String username;
   final String workspaceDir;
   final String codexPath;
+  final String model;
+  final CodexReasoningEffort? reasoningEffort;
   final String hostFingerprint;
   final String password;
   final String privateKeyPem;
@@ -64,6 +70,8 @@ class ConnectionSettingsDraft {
     String? username,
     String? workspaceDir,
     String? codexPath,
+    String? model,
+    Object? reasoningEffort = _draftSentinel,
     String? hostFingerprint,
     String? password,
     String? privateKeyPem,
@@ -80,6 +88,10 @@ class ConnectionSettingsDraft {
       username: username ?? this.username,
       workspaceDir: workspaceDir ?? this.workspaceDir,
       codexPath: codexPath ?? this.codexPath,
+      model: model ?? this.model,
+      reasoningEffort: identical(reasoningEffort, _draftSentinel)
+          ? this.reasoningEffort
+          : reasoningEffort as CodexReasoningEffort?,
       hostFingerprint: hostFingerprint ?? this.hostFingerprint,
       password: password ?? this.password,
       privateKeyPem: privateKeyPem ?? this.privateKeyPem,
@@ -99,6 +111,7 @@ class ConnectionSettingsDraft {
       ConnectionSettingsFieldId.username => username,
       ConnectionSettingsFieldId.workspaceDir => workspaceDir,
       ConnectionSettingsFieldId.codexPath => codexPath,
+      ConnectionSettingsFieldId.model => model,
       ConnectionSettingsFieldId.hostFingerprint => hostFingerprint,
       ConnectionSettingsFieldId.password => password,
       ConnectionSettingsFieldId.privateKeyPem => privateKeyPem,
@@ -123,6 +136,7 @@ class ConnectionSettingsDraft {
       ConnectionSettingsFieldId.username => copyWith(username: value),
       ConnectionSettingsFieldId.workspaceDir => copyWith(workspaceDir: value),
       ConnectionSettingsFieldId.codexPath => copyWith(codexPath: value),
+      ConnectionSettingsFieldId.model => copyWith(model: value),
       ConnectionSettingsFieldId.hostFingerprint => copyWith(
         hostFingerprint: value,
       ),
@@ -148,6 +162,8 @@ class ConnectionSettingsDraft {
     };
   }
 }
+
+const Object _draftSentinel = Object();
 
 class ConnectionSettingsFormState {
   const ConnectionSettingsFormState({

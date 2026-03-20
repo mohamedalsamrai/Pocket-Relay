@@ -129,6 +129,7 @@ void main() {
       expect(contract.remoteConnectionSection, isNull);
       expect(contract.authenticationSection, isNull);
       expect(contract.codexSection.title, 'Local Codex');
+      expect(contract.modelSection.selectedReasoningEffort, isNull);
       expect(payload, isNotNull);
       expect(payload!.profile.connectionMode, ConnectionMode.local);
       expect(payload.profile.workspaceDir, '/workspace/local');
@@ -171,6 +172,44 @@ void main() {
         expect(payload.profile.codexPath, 'codex-mcp');
         expect(payload.profile.dangerouslyBypassSandbox, isTrue);
         expect(payload.secrets.password, 'secret');
+      },
+    );
+
+    test(
+      'includes model and reasoning effort in the normalized save payload',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState =
+            ConnectionSettingsFormState.initial(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(
+              draft:
+                  ConnectionSettingsDraft.fromConnection(
+                    profile: initialProfile,
+                    secrets: initialSecrets,
+                  ).copyWith(
+                    model: '  gpt-5.4  ',
+                    reasoningEffort: CodexReasoningEffort.high,
+                  ),
+              showValidationErrors: true,
+            );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+        );
+        final payload = contract.saveAction.submitPayload;
+
+        expect(
+          contract.modelSection.selectedReasoningEffort,
+          CodexReasoningEffort.high,
+        );
+        expect(payload, isNotNull);
+        expect(payload!.profile.model, 'gpt-5.4');
+        expect(payload.profile.reasoningEffort, CodexReasoningEffort.high);
       },
     );
   });

@@ -18,10 +18,42 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
 
   int connectCalls = 0;
   int startSessionCalls = 0;
+  final List<
+    ({
+      String? cwd,
+      String? model,
+      CodexReasoningEffort? reasoningEffort,
+      String? resumeThreadId,
+    })
+  >
+  startSessionRequests =
+      <
+        ({
+          String? cwd,
+          String? model,
+          CodexReasoningEffort? reasoningEffort,
+          String? resumeThreadId,
+        })
+      >[];
   final List<String> readThreadCalls = <String>[];
   final List<String> sentMessages = <String>[];
-  final List<({String threadId, String text})> sentTurns =
-      <({String threadId, String text})>[];
+  final List<
+    ({
+      String threadId,
+      String text,
+      String? model,
+      CodexReasoningEffort? effort,
+    })
+  >
+  sentTurns =
+      <
+        ({
+          String threadId,
+          String text,
+          String? model,
+          CodexReasoningEffort? effort,
+        })
+      >[];
   final List<({String? threadId, String? turnId})> abortTurnCalls =
       <({String? threadId, String? turnId})>[];
   final List<({String requestId, bool approved})> approvalDecisions =
@@ -107,12 +139,19 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Future<CodexAppServerSession> startSession({
     String? cwd,
     String? model,
+    CodexReasoningEffort? reasoningEffort,
     String? resumeThreadId,
   }) async {
     if (startSessionError != null) {
       throw startSessionError!;
     }
     startSessionCalls += 1;
+    startSessionRequests.add((
+      cwd: cwd,
+      model: model,
+      reasoningEffort: reasoningEffort,
+      resumeThreadId: resumeThreadId,
+    ));
     _threadId = resumeThreadId ?? 'thread_123';
     return CodexAppServerSession(
       threadId: _threadId!,
@@ -138,6 +177,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     required String threadId,
     required String text,
     String? model,
+    CodexReasoningEffort? effort,
   }) async {
     if (sendUserMessageGate case final gate? when !gate.isCompleted) {
       await gate.future;
@@ -146,7 +186,12 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       throw sendUserMessageError!;
     }
     sentMessages.add(text);
-    sentTurns.add((threadId: threadId, text: text));
+    sentTurns.add((
+      threadId: threadId,
+      text: text,
+      model: model,
+      effort: effort,
+    ));
     _threadId = threadId;
     _activeTurnId = 'turn_${sentMessages.length}';
     return CodexAppServerTurn(threadId: threadId, turnId: _activeTurnId!);

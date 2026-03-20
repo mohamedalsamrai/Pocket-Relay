@@ -74,6 +74,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         onFieldChanged: _updateField,
         onConnectionModeChanged: _updateConnectionMode,
         onAuthModeChanged: _updateAuthMode,
+        onReasoningEffortChanged: _updateReasoningEffort,
         onToggleChanged: _updateToggle,
         onCancel: widget.onCancel,
         onSave: _save,
@@ -125,6 +126,14 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
     });
   }
 
+  void _updateReasoningEffort(CodexReasoningEffort? reasoningEffort) {
+    setState(() {
+      _formState = _formState.copyWith(
+        draft: _formState.draft.copyWith(reasoningEffort: reasoningEffort),
+      );
+    });
+  }
+
   void _save() {
     final nextState = _formState.revealValidationErrors();
     final contract = _buildContract(nextState);
@@ -168,6 +177,7 @@ class ConnectionSettingsHostActions {
     required this.onFieldChanged,
     required this.onConnectionModeChanged,
     required this.onAuthModeChanged,
+    required this.onReasoningEffortChanged,
     required this.onToggleChanged,
     required this.onCancel,
     required this.onSave,
@@ -177,6 +187,7 @@ class ConnectionSettingsHostActions {
   onFieldChanged;
   final ValueChanged<ConnectionMode> onConnectionModeChanged;
   final ValueChanged<AuthMode> onAuthModeChanged;
+  final ValueChanged<CodexReasoningEffort?> onReasoningEffortChanged;
   final void Function(ConnectionSettingsToggleId toggleId, bool value)
   onToggleChanged;
   final VoidCallback onCancel;
