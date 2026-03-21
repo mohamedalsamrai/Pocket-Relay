@@ -3,6 +3,13 @@ import 'package:pocket_relay/src/app.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
+import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
+import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
+import 'package:pocket_relay/src/core/ui/primitives/pocket_meta_card.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_composer.dart';
@@ -25,6 +32,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 import 'package:pocket_relay/widgetbook/support/fake_codex_app_server_client.dart';
@@ -80,6 +88,148 @@ Widget _storyFill({required Widget child, double? maxWidth}) {
 
 List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
   return <WidgetbookNode>[
+    WidgetbookCategory(
+      name: 'Core UI',
+      children: <WidgetbookNode>[
+        WidgetbookComponent(
+          name: 'Panel Surface',
+          useCases: <WidgetbookUseCase>[
+            WidgetbookUseCase(
+              name: 'Default',
+              builder: (context) {
+                final theme = Theme.of(context);
+                final palette = theme.extension<PocketPalette>()!;
+                return _storyCard(
+                  child: PocketPanelSurface(
+                    padding: const EdgeInsets.all(PocketSpacing.md),
+                    radius: PocketRadii.lg,
+                    backgroundColor: palette.surface,
+                    borderColor: palette.surfaceBorder,
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: palette.shadowColor.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Shared panel surface',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: PocketSpacing.xs),
+                        Text(
+                          'This container is reused for settings and support surfaces that need a consistent panel shell.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        WidgetbookComponent(
+          name: 'Transcript Frame',
+          useCases: <WidgetbookUseCase>[
+            WidgetbookUseCase(
+              name: 'Default',
+              builder: (context) {
+                final theme = Theme.of(context);
+                final cards = ConversationCardPalette.of(context);
+                final accent = blueAccent(theme.brightness);
+                return _storyCard(
+                  child: PocketTranscriptFrame(
+                    backgroundColor: cards.tintedSurface(accent),
+                    borderColor: cards.accentBorder(accent),
+                    shadowColor: cards.shadow,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Transcript frame primitive',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: PocketSpacing.xs),
+                        Text(
+                          'Transcript cards use this shared shell for width, radius, border, and elevation behavior.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cards.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        WidgetbookComponent(
+          name: 'Badges',
+          useCases: <WidgetbookUseCase>[
+            WidgetbookUseCase(
+              name: 'Variants',
+              builder: (context) {
+                final theme = Theme.of(context);
+                return _storyCard(
+                  child: Wrap(
+                    spacing: PocketSpacing.sm,
+                    runSpacing: PocketSpacing.sm,
+                    children: [
+                      PocketTintBadge(
+                        label: 'Pending',
+                        color: amberAccent(theme.brightness),
+                      ),
+                      PocketSolidBadge(
+                        label: 'Running',
+                        color: blueAccent(theme.brightness),
+                      ),
+                      const InlinePulseChip(label: 'Streaming'),
+                      StateChip(
+                        label: 'Saved',
+                        color: tealAccent(theme.brightness),
+                      ),
+                      TranscriptBadge(
+                        label: 'Approved',
+                        color: tealAccent(theme.brightness),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        WidgetbookComponent(
+          name: 'Meta Card',
+          useCases: <WidgetbookUseCase>[
+            WidgetbookUseCase(
+              name: 'Default',
+              builder: (context) => _storyCard(
+                child: PocketMetaCard(
+                  title: 'Session attached',
+                  body:
+                      'Pocket Relay resumed the existing Codex conversation without losing transcript context.',
+                  accent: tealAccent(Theme.of(context).brightness),
+                  icon: Icons.link_rounded,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
     WidgetbookCategory(
       name: 'Chat',
       children: <WidgetbookNode>[
@@ -245,10 +395,30 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               name: 'Changed Files',
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
-                  name: 'Completed',
+                  name: 'Mixed',
                   builder: (_) => _storyCard(
                     child: ChangedFilesCard(
                       item: WidgetbookFixtures.changedFilesItem(),
+                    ),
+                  ),
+                ),
+                WidgetbookUseCase(
+                  name: 'Created',
+                  builder: (_) => _storyCard(
+                    child: ChangedFilesCard(
+                      item: WidgetbookFixtures.changedFilesItem(
+                        variant: 'created',
+                      ),
+                    ),
+                  ),
+                ),
+                WidgetbookUseCase(
+                  name: 'Deleted',
+                  builder: (_) => _storyCard(
+                    child: ChangedFilesCard(
+                      item: WidgetbookFixtures.changedFilesItem(
+                        variant: 'deleted',
+                      ),
                     ),
                   ),
                 ),
