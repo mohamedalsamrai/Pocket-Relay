@@ -8,7 +8,10 @@ part 'chat_work_log_item_projector_parser_git.dart';
 part 'chat_work_log_item_projector_parser_read.dart';
 part 'chat_work_log_item_projector_parser_search.dart';
 part 'chat_work_log_item_projector_parser_shell.dart';
-part 'chat_work_log_item_projector_support.dart';
+part 'chat_work_log_item_projector_support_generic.dart';
+part 'chat_work_log_item_projector_support_git.dart';
+part 'chat_work_log_item_projector_support_mcp.dart';
+part 'chat_work_log_item_projector_support_shell.dart';
 
 class ChatWorkLogItemProjector {
   const ChatWorkLogItemProjector();
