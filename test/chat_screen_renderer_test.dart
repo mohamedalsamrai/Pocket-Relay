@@ -230,6 +230,7 @@ void main() {
     );
 
     await tester.enterText(find.byType(TextField), 'Plan phase 6');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 

@@ -167,7 +167,6 @@ class ChatSessionController extends ChangeNotifier {
   Future<bool> sendPrompt(String prompt) async {
     final normalizedPrompt = prompt.trim();
     if (normalizedPrompt.isEmpty ||
-        _sessionState.isBusy ||
         _conversationRecoveryState != null ||
         _historicalConversationRestoreState != null) {
       return false;

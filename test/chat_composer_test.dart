@@ -184,6 +184,27 @@ void main() {
     expect(find.byKey(const ValueKey('stop')), findsNothing);
   });
 
+  testWidgets(
+    'does not locally re-enable send when the screen contract disallows sending',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildComposerApp(
+          contract: _composerContract(isSendActionEnabled: false),
+        ),
+      );
+
+      final fieldFinder = find.byType(TextField);
+      await tester.enterText(fieldFinder, 'Typed while blocked');
+      await tester.pump();
+
+      final sendButton = tester.widget<IconButton>(
+        find.byKey(const ValueKey('send')),
+      );
+
+      expect(sendButton.onPressed, isNull);
+    },
+  );
+
   testWidgets('uses a compact chat-style input shell', (tester) async {
     await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
 

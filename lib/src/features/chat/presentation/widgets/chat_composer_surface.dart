@@ -189,11 +189,8 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   }
 
   bool get _isSendActionEnabled {
-    if (widget.contract.draftText == _controller.text) {
-      return widget.contract.isSendActionEnabled;
-    }
-
-    return _controller.text.trim().isNotEmpty;
+    return widget.contract.isSendActionEnabled &&
+        _controller.text.trim().isNotEmpty;
   }
 
   void _handleChanged(String value) {

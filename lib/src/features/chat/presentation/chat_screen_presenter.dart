@@ -32,7 +32,6 @@ class ChatScreenPresenter {
   }) {
     final isConfigured = profile.isReady;
     final hasWorkspaceScope = profile.workspaceDir.trim().isNotEmpty;
-    final isBusy = sessionState.isBusy;
     final timelineSummaries = _timelineSummaries(sessionState);
     final conversationRecoveryNotice = _conversationRecoveryNotice(
       conversationRecoveryState,
@@ -45,7 +44,6 @@ class ChatScreenPresenter {
     final canSend =
         isConfigured &&
         !isLoading &&
-        !isBusy &&
         conversationRecoveryNotice == null &&
         historicalConversationRestoreNotice == null;
     final header = _headerProjector.project(

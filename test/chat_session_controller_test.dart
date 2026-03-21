@@ -50,6 +50,37 @@ void main() {
     expect(messageBlock.deliveryState, CodexUserMessageDeliveryState.sent);
   });
 
+  test('sendPrompt allows steering while a turn is already running', () async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    final controller = ChatSessionController(
+      profileStore: MemoryCodexProfileStore(
+        initialValue: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      ),
+      appServerClient: appServerClient,
+      initialSavedProfile: SavedProfile(
+        profile: _configuredProfile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    expect(await controller.sendPrompt('First prompt'), isTrue);
+
+    final sentWhileRunning = await controller.sendPrompt('Steer the agent');
+
+    expect(sentWhileRunning, isTrue);
+    expect(appServerClient.startSessionCalls, 1);
+    expect(appServerClient.sentMessages, <String>[
+      'First prompt',
+      'Steer the agent',
+    ]);
+  });
+
   test(
     'sendPrompt resumes the saved conversation handoff after controller restart',
     () async {

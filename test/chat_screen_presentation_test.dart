@@ -99,7 +99,7 @@ void main() {
     });
 
     test(
-      'keeps the composer editable and surfaces turn status when the session is busy',
+      'keeps send enabled and surfaces turn status when the session is busy',
       () {
         final activeTurn = CodexActiveTurnState(
           turnId: 'turn_1',
@@ -123,7 +123,7 @@ void main() {
         );
 
         expect(contract.composer.draftText, 'Keep draft');
-        expect(contract.composer.isSendActionEnabled, isFalse);
+        expect(contract.composer.isSendActionEnabled, isTrue);
         expect(contract.turnIndicator?.timer, same(activeTurn.timer));
       },
     );
