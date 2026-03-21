@@ -33,21 +33,29 @@ class ChatChangedFilesItemProjector {
               file: file,
               patch: patch,
             );
+            final operationLabel = _operationLabel(operationKind);
+            final presentation = ChatChangedFilePresentationContract.fromPaths(
+              path: file.path,
+              movePath: file.movePath,
+              isBinary: patch?.isBinary ?? false,
+            );
+
             return ChatChangedFileRowContract(
               id: rowId,
-              displayPathLabel: _displayPathLabel(file),
+              file: presentation,
               operationKind: operationKind,
-              operationLabel: _operationLabel(operationKind),
+              operationLabel: operationLabel,
               stats: ChatChangedFileStatsContract(
                 additions: stats.additions,
                 deletions: stats.deletions,
               ),
-              actionLabel: patch == null ? 'No patch' : 'View diff',
               diff: patch == null
                   ? null
                   : ChatChangedFileDiffContract(
                       id: rowId,
-                      displayPathLabel: _displayPathLabel(file),
+                      file: presentation,
+                      operationKind: operationKind,
+                      operationLabel: operationLabel,
                       stats: ChatChangedFileStatsContract(
                         additions: stats.additions,
                         deletions: stats.deletions,
@@ -58,6 +66,8 @@ class ChatChangedFilesItemProjector {
                             (line) => ChatChangedFileDiffLineContract(
                               text: line.text,
                               kind: _mapLineKind(line.kind),
+                              oldLineNumber: line.oldLineNumber,
+                              newLineNumber: line.newLineNumber,
                             ),
                           )
                           .toList(growable: false),
@@ -88,8 +98,13 @@ ChatChangedFileOperationKind _resolveOperationKind({
       return ChatChangedFileOperationKind.created;
     case 'deleted file':
       return ChatChangedFileOperationKind.deleted;
-    default:
-      break;
+    case 'renamed':
+      return ChatChangedFileOperationKind.renamed;
+  }
+
+  final movePath = file.movePath?.trim();
+  if (movePath != null && movePath.isNotEmpty && movePath != file.path) {
+    return ChatChangedFileOperationKind.renamed;
   }
 
   return ChatChangedFileOperationKind.modified;
@@ -99,6 +114,7 @@ String _operationLabel(ChatChangedFileOperationKind kind) {
   return switch (kind) {
     ChatChangedFileOperationKind.created => 'Created',
     ChatChangedFileOperationKind.modified => 'Edited',
+    ChatChangedFileOperationKind.renamed => 'Renamed',
     ChatChangedFileOperationKind.deleted => 'Deleted',
   };
 }
@@ -228,16 +244,19 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
 
   final lines = trimmed.split(RegExp(r'\r?\n'));
   final patches = <_ParsedDiffPatch>[];
-  final currentLines = <String>[];
+  final currentLines = <_DiffLine>[];
   String? diffPath;
   String? newPath;
   String? oldPath;
   String? renameToPath;
   String? renameFromPath;
+  int? oldLineCursor;
+  int? newLineCursor;
   var additions = 0;
   var deletions = 0;
   var isNewFile = false;
   var isDeletedFile = false;
+  var isBinary = false;
 
   void resetState() {
     currentLines.clear();
@@ -246,10 +265,13 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
     oldPath = null;
     renameToPath = null;
     renameFromPath = null;
+    oldLineCursor = null;
+    newLineCursor = null;
     additions = 0;
     deletions = 0;
     isNewFile = false;
     isDeletedFile = false;
+    isBinary = false;
   }
 
   void commitPatch() {
@@ -289,12 +311,11 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
         statusLabel: statusLabel,
         additions: additions,
         deletions: deletions,
+        isBinary: isBinary,
         matchedPaths: matchedPaths,
         renameFromPath: renameFromPath,
         renameToPath: renameToPath,
-        lines: currentLines
-            .map((line) => _DiffLine(text: line, kind: _classifyDiffLine(line)))
-            .toList(growable: false),
+        lines: List<_DiffLine>.unmodifiable(currentLines),
       ),
     );
   }
@@ -302,12 +323,14 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
   resetState();
 
   for (final line in lines) {
+    final isOldPathHeader = _isOldDiffPathHeaderLine(line);
+    final isNewPathHeader = _isNewDiffPathHeaderLine(line);
     if (line.startsWith('diff --git ')) {
       commitPatch();
       resetState();
       final match = RegExp(r'^diff --git a/(.+?) b/(.+)$').firstMatch(line);
       diffPath = _normalizeDiffPath(match?.group(2));
-    } else if (line.startsWith('--- ') &&
+    } else if (isOldPathHeader &&
         currentLines.isNotEmpty &&
         (oldPath != null ||
             newPath != null ||
@@ -316,8 +339,6 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
       commitPatch();
       resetState();
     }
-
-    currentLines.add(line);
 
     if (line.startsWith('new file mode ')) {
       isNewFile = true;
@@ -329,19 +350,85 @@ List<_ParsedDiffPatch> _parseUnifiedDiff(String? unifiedDiff) {
       );
     } else if (line.startsWith('rename to ')) {
       renameToPath = _normalizeDiffPath(line.substring('rename to '.length));
-    } else if (line.startsWith('--- ')) {
+    } else if (isOldPathHeader) {
       oldPath = _normalizeDiffPath(line.substring(4).trim());
-    } else if (line.startsWith('+++ ')) {
+    } else if (isNewPathHeader) {
       newPath = _normalizeDiffPath(line.substring(4).trim());
-    } else if (line.startsWith('+') && !line.startsWith('+++')) {
+    }
+    if (line.startsWith('Binary files ') ||
+        line.startsWith('GIT binary patch')) {
+      isBinary = true;
+    }
+
+    final kind = _classifyDiffLine(line, isBinary: isBinary);
+    if (kind == _DiffLineKind.hunk) {
+      final range = _parseHunkRange(line);
+      if (range != null) {
+        oldLineCursor = range.oldStart;
+        newLineCursor = range.newStart;
+      }
+    }
+
+    int? oldLineNumber;
+    int? newLineNumber;
+    switch (kind) {
+      case _DiffLineKind.addition:
+        newLineNumber = newLineCursor;
+        if (newLineCursor != null) {
+          newLineCursor = newLineCursor! + 1;
+        }
+      case _DiffLineKind.deletion:
+        oldLineNumber = oldLineCursor;
+        if (oldLineCursor != null) {
+          oldLineCursor = oldLineCursor! + 1;
+        }
+      case _DiffLineKind.context:
+        if (line.startsWith(' ')) {
+          oldLineNumber = oldLineCursor;
+          newLineNumber = newLineCursor;
+          if (oldLineCursor != null) {
+            oldLineCursor = oldLineCursor! + 1;
+          }
+          if (newLineCursor != null) {
+            newLineCursor = newLineCursor! + 1;
+          }
+        }
+      case _DiffLineKind.meta || _DiffLineKind.hunk:
+        break;
+    }
+
+    currentLines.add(
+      _DiffLine(
+        text: line,
+        kind: kind,
+        oldLineNumber: oldLineNumber,
+        newLineNumber: newLineNumber,
+      ),
+    );
+
+    if (kind == _DiffLineKind.addition) {
       additions += 1;
-    } else if (line.startsWith('-') && !line.startsWith('---')) {
+    } else if (kind == _DiffLineKind.deletion) {
       deletions += 1;
     }
   }
 
   commitPatch();
   return patches;
+}
+
+_HunkRange? _parseHunkRange(String line) {
+  final match = RegExp(
+    r'^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@',
+  ).firstMatch(line);
+  if (match == null) {
+    return null;
+  }
+
+  return _HunkRange(
+    oldStart: int.parse(match.group(1)!),
+    newStart: int.parse(match.group(2)!),
+  );
 }
 
 String _normalizeDiffPath(String? rawPath) {
@@ -361,20 +448,27 @@ String _normalizeDiffPath(String? rawPath) {
   return trimmed;
 }
 
-_DiffLineKind _classifyDiffLine(String line) {
+_DiffLineKind _classifyDiffLine(String line, {required bool isBinary}) {
   if (line.startsWith('@@')) {
     return _DiffLineKind.hunk;
   }
 
   if (line.startsWith('diff --git ') ||
       line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ') ||
       line.startsWith('new file mode ') ||
       line.startsWith('deleted file mode ') ||
       line.startsWith('rename from ') ||
       line.startsWith('rename to ') ||
-      line.startsWith('similarity index ')) {
+      line.startsWith('similarity index ') ||
+      line.startsWith(r'\ No newline at end of file') ||
+      line.startsWith('Binary files ') ||
+      line.startsWith('GIT binary patch')) {
+    return _DiffLineKind.meta;
+  }
+
+  if (_isOldDiffPathHeaderLine(line) ||
+      _isNewDiffPathHeaderLine(line) ||
+      isBinary) {
     return _DiffLineKind.meta;
   }
 
@@ -389,13 +483,32 @@ _DiffLineKind _classifyDiffLine(String line) {
   return _DiffLineKind.context;
 }
 
+bool _isOldDiffPathHeaderLine(String line) {
+  return line.startsWith('--- a/') ||
+      line.startsWith('--- b/') ||
+      line == '--- /dev/null';
+}
+
+bool _isNewDiffPathHeaderLine(String line) {
+  return line.startsWith('+++ a/') ||
+      line.startsWith('+++ b/') ||
+      line == '+++ /dev/null';
+}
+
 enum _DiffLineKind { meta, hunk, addition, deletion, context }
 
 class _DiffLine {
-  const _DiffLine({required this.text, required this.kind});
+  const _DiffLine({
+    required this.text,
+    required this.kind,
+    this.oldLineNumber,
+    this.newLineNumber,
+  });
 
   final String text;
   final _DiffLineKind kind;
+  final int? oldLineNumber;
+  final int? newLineNumber;
 }
 
 class _ParsedDiffPatch {
@@ -404,6 +517,7 @@ class _ParsedDiffPatch {
     required this.lines,
     required this.additions,
     required this.deletions,
+    required this.isBinary,
     required this.matchedPaths,
     this.renameFromPath,
     this.renameToPath,
@@ -414,18 +528,11 @@ class _ParsedDiffPatch {
   final List<_DiffLine> lines;
   final int additions;
   final int deletions;
+  final bool isBinary;
   final Set<String> matchedPaths;
   final String? renameFromPath;
   final String? renameToPath;
   final String? statusLabel;
-}
-
-String _displayPathLabel(CodexChangedFile file) {
-  final movePath = file.movePath?.trim();
-  if (movePath == null || movePath.isEmpty || movePath == file.path) {
-    return file.path;
-  }
-  return '${file.path} -> $movePath';
 }
 
 class _DiffStats {
@@ -433,4 +540,11 @@ class _DiffStats {
 
   final int additions;
   final int deletions;
+}
+
+class _HunkRange {
+  const _HunkRange({required this.oldStart, required this.newStart});
+
+  final int oldStart;
+  final int newStart;
 }

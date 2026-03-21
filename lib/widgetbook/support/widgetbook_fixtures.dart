@@ -280,10 +280,29 @@ class WidgetbookFixtures {
     bool isRunning = false,
     String variant = 'mixed',
   }) {
+    ChatChangedFilePresentationContract filePresentation(
+      String path, {
+      String? movePath,
+    }) {
+      return ChatChangedFilePresentationContract.fromPaths(
+        path: path,
+        movePath: movePath,
+      );
+    }
+
     const designDiff = ChatChangedFileDiffContract(
       id: 'diff_transcript_frame',
-      displayPathLabel:
-          'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+      file: ChatChangedFilePresentationContract(
+        currentPath:
+            'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+        fileName: 'approval_request_card.dart',
+        directoryLabel:
+            'lib/src/features/chat/presentation/widgets/transcript/cards',
+        languageLabel: 'Dart',
+        syntaxLanguage: 'dart',
+      ),
+      operationKind: ChatChangedFileOperationKind.modified,
+      operationLabel: 'Edited',
       statusLabel: 'modified',
       stats: ChatChangedFileStatsContract(additions: 42, deletions: 11),
       lines: <ChatChangedFileDiffLineContract>[
@@ -312,14 +331,21 @@ class WidgetbookFixtures {
 
     final createdRow = ChatChangedFileRowContract(
       id: 'changed_file_created',
-      displayPathLabel: 'lib/src/core/ui/primitives/pocket_badge.dart',
+      file: filePresentation('lib/src/core/ui/primitives/pocket_badge.dart'),
       operationKind: ChatChangedFileOperationKind.created,
-      operationLabel: 'created',
+      operationLabel: 'Created',
       stats: const ChatChangedFileStatsContract(additions: 36, deletions: 0),
-      actionLabel: 'Open diff',
       diff: const ChatChangedFileDiffContract(
         id: 'diff_created_badge',
-        displayPathLabel: 'lib/src/core/ui/primitives/pocket_badge.dart',
+        file: ChatChangedFilePresentationContract(
+          currentPath: 'lib/src/core/ui/primitives/pocket_badge.dart',
+          fileName: 'pocket_badge.dart',
+          directoryLabel: 'lib/src/core/ui/primitives',
+          languageLabel: 'Dart',
+          syntaxLanguage: 'dart',
+        ),
+        operationKind: ChatChangedFileOperationKind.created,
+        operationLabel: 'Created',
         statusLabel: 'created',
         stats: ChatChangedFileStatsContract(additions: 36, deletions: 0),
         lines: <ChatChangedFileDiffLineContract>[
@@ -342,26 +368,29 @@ class WidgetbookFixtures {
     final modifiedRows = <ChatChangedFileRowContract>[
       ChatChangedFileRowContract(
         id: 'changed_file_1',
-        displayPathLabel:
-            'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+        file: filePresentation(
+          'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+        ),
         operationKind: ChatChangedFileOperationKind.modified,
-        operationLabel: 'modified',
+        operationLabel: 'Edited',
         stats: const ChatChangedFileStatsContract(additions: 27, deletions: 5),
-        actionLabel: 'Open diff',
         diff: designDiff,
       ),
       ChatChangedFileRowContract(
         id: 'changed_file_2',
-        displayPathLabel:
-            'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+        file: filePresentation(
+          'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+        ),
         operationKind: ChatChangedFileOperationKind.modified,
-        operationLabel: 'modified',
+        operationLabel: 'Edited',
         stats: const ChatChangedFileStatsContract(additions: 54, deletions: 9),
-        actionLabel: 'Open diff',
         diff: ChatChangedFileDiffContract(
           id: 'diff_widgetbook_fixtures',
-          displayPathLabel:
-              'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+          file: filePresentation(
+            'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+          ),
+          operationKind: ChatChangedFileOperationKind.modified,
+          operationLabel: 'Edited',
           statusLabel: 'modified',
           stats: ChatChangedFileStatsContract(additions: 54, deletions: 9),
           lines: <ChatChangedFileDiffLineContract>[
@@ -378,27 +407,36 @@ class WidgetbookFixtures {
       ),
       ChatChangedFileRowContract(
         id: 'changed_file_3',
-        displayPathLabel:
-            'lib/src/features/settings/presentation/connection_sheet.dart',
+        file: filePresentation(
+          'lib/src/features/settings/presentation/connection_sheet.dart',
+        ),
         operationKind: ChatChangedFileOperationKind.modified,
-        operationLabel: 'modified',
+        operationLabel: 'Edited',
         stats: const ChatChangedFileStatsContract(additions: 18, deletions: 4),
-        actionLabel: 'Open diff',
       ),
     ];
 
     final deletedRow = ChatChangedFileRowContract(
       id: 'changed_file_deleted',
-      displayPathLabel:
-          'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+      file: filePresentation(
+        'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+      ),
       operationKind: ChatChangedFileOperationKind.deleted,
-      operationLabel: 'deleted',
+      operationLabel: 'Deleted',
       stats: const ChatChangedFileStatsContract(additions: 0, deletions: 29),
-      actionLabel: 'Open diff',
       diff: const ChatChangedFileDiffContract(
         id: 'diff_deleted_chips',
-        displayPathLabel:
-            'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+        file: ChatChangedFilePresentationContract(
+          currentPath:
+              'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+          fileName: 'transcript_chips.dart',
+          directoryLabel:
+              'lib/src/features/chat/presentation/widgets/transcript/support',
+          languageLabel: 'Dart',
+          syntaxLanguage: 'dart',
+        ),
+        operationKind: ChatChangedFileOperationKind.deleted,
+        operationLabel: 'Deleted',
         statusLabel: 'deleted',
         stats: ChatChangedFileStatsContract(additions: 0, deletions: 29),
         lines: <ChatChangedFileDiffLineContract>[
@@ -572,7 +610,10 @@ class WidgetbookFixtures {
         ChatUserMessageItemContract(block: userMessage()),
         ChatReasoningItemContract(block: reasoningBlock(isRunning: true)),
         ChatPlanUpdateItemContract(block: planUpdateBlock()),
-        ChatWorkLogGroupItemContract(id: 'lane_work_log', entries: workLogGroupItem().entries),
+        ChatWorkLogGroupItemContract(
+          id: 'lane_work_log',
+          entries: workLogGroupItem().entries,
+        ),
         ChatChangedFilesItemContract(
           id: 'lane_changed_files',
           title: changedFilesItem().title,

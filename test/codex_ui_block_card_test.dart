@@ -1930,16 +1930,13 @@ void main() {
       ),
     );
 
-    expect(find.text('2 files'), findsOneWidget);
-    expect(find.text('+11 -3'), findsOneWidget);
-    expect(find.text('View diff'), findsNWidgets(2));
+    expect(
+      find.text('2 files changed · 11 additions · 3 deletions'),
+      findsOneWidget,
+    );
     expect(find.text('Show diff'), findsNothing);
 
-    await tester.tap(
-      find.text(
-        'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
-      ),
-    );
+    await tester.tap(find.text('conversation_entry_card.dart'));
     await tester.pumpAndSettle();
 
     expect(
@@ -1951,12 +1948,14 @@ void main() {
     expect(
       find.textContaining(
         'diff --git a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+        findRichText: true,
       ),
       findsOneWidget,
     );
-    expect(find.text('+8 additions'), findsOneWidget);
-    expect(find.text('-2 deletions'), findsOneWidget);
-    expect(find.text('+new card'), findsOneWidget);
+    expect(find.text('Additions'), findsOneWidget);
+    expect(find.text('Deletions'), findsOneWidget);
+    expect(find.text('Dart'), findsWidgets);
+    expect(find.textContaining('new card', findRichText: true), findsOneWidget);
   });
 
   testWidgets('does not attach a single patch to unrelated file rows', (
@@ -1989,8 +1988,7 @@ void main() {
       ),
     );
 
-    expect(find.text('View diff'), findsOneWidget);
-    expect(find.text('No patch'), findsOneWidget);
+    expect(find.textContaining('patch unavailable'), findsOneWidget);
     expect(find.text('README.md'), findsOneWidget);
   });
 
@@ -2028,7 +2026,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('lib/app.dart'));
+      await tester.tap(find.text('app.dart'));
       await tester.pump();
 
       expect(openedDiff, isNotNull);
@@ -2065,17 +2063,58 @@ void main() {
       ),
     );
 
-    expect(find.text('View diff'), findsOneWidget);
-    expect(find.text('No patch'), findsNothing);
-    expect(find.text('lib/old_name.dart -> lib/new_name.dart'), findsOneWidget);
+    expect(find.text('Renamed from lib/old_name.dart'), findsOneWidget);
+    expect(find.text('new_name.dart'), findsOneWidget);
 
-    await tester.tap(find.text('lib/old_name.dart -> lib/new_name.dart'));
+    await tester.tap(find.text('new_name.dart'));
     await tester.pumpAndSettle();
 
-    expect(find.text('renamed'), findsOneWidget);
-    expect(find.text('+1 additions'), findsOneWidget);
-    expect(find.text('-1 deletions'), findsOneWidget);
-    expect(find.text('+newName();'), findsOneWidget);
+    expect(find.text('RENAMED'), findsOneWidget);
+    expect(find.text('Additions'), findsOneWidget);
+    expect(find.text('Deletions'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'diff --git a/lib/old_name.dart b/lib/new_name.dart',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('renders binary files as binary review surfaces', (tester) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexChangedFilesBlock(
+            id: 'diff_binary_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(path: 'assets/logo.png'),
+            ],
+            unifiedDiff:
+                'diff --git a/assets/logo.png b/assets/logo.png\n'
+                'Binary files a/assets/logo.png and b/assets/logo.png differ\n',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Binary · edited'), findsOneWidget);
+    expect(find.text('logo.png'), findsOneWidget);
+
+    await tester.tap(find.text('logo.png'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Binary'), findsWidgets);
+    expect(
+      find.textContaining(
+        'Binary files a/assets/logo.png and b/assets/logo.png differ',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -2128,9 +2167,9 @@ void main() {
         ),
       );
 
-      expect(find.text('CREATED'), findsOneWidget);
-      expect(find.text('EDITED'), findsOneWidget);
-      expect(find.text('DELETED'), findsOneWidget);
+      expect(find.text('Dart · created'), findsOneWidget);
+      expect(find.text('Dart · edited'), findsOneWidget);
+      expect(find.text('Dart · deleted'), findsOneWidget);
 
       final createdColor = _findDecoratedContainerColorForText(
         tester,
@@ -2177,17 +2216,24 @@ void main() {
       ),
     );
 
-    expect(find.text('2 files'), findsOneWidget);
-    expect(find.text('+2 -2'), findsOneWidget);
-    expect(find.text('lib/first.dart'), findsOneWidget);
-    expect(find.text('lib/second.dart'), findsOneWidget);
-    expect(find.text('View diff'), findsNWidgets(2));
+    expect(
+      find.text('2 files changed · 2 additions · 2 deletions'),
+      findsOneWidget,
+    );
+    expect(find.text('first.dart'), findsOneWidget);
+    expect(find.text('second.dart'), findsOneWidget);
 
-    await tester.tap(find.text('lib/second.dart'));
+    await tester.tap(find.text('second.dart'));
     await tester.pumpAndSettle();
 
-    expect(find.text('+new second'), findsOneWidget);
-    expect(find.text('-old second'), findsOneWidget);
+    expect(
+      find.textContaining('new second', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('old second', findRichText: true),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows a bounded preview for very large diffs', (tester) async {
@@ -2215,22 +2261,24 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('lib/large.dart'));
+    await tester.tap(find.text('large.dart'));
     await tester.pumpAndSettle();
 
     expect(find.text('Load full diff'), findsOneWidget);
     expect(
-      find.text('Showing the first 320 lines to keep the sheet responsive.'),
+      find.text(
+        'Showing the first 320 lines to keep the review surface responsive.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('+line 315'), findsOneWidget);
-    expect(find.text('+line 359'), findsNothing);
+    expect(find.textContaining('line 315', findRichText: true), findsOneWidget);
+    expect(find.textContaining('line 359', findRichText: true), findsNothing);
 
     await tester.tap(find.text('Load full diff'));
     await tester.pumpAndSettle();
 
     expect(find.text('Show preview'), findsOneWidget);
-    expect(find.text('+line 359'), findsOneWidget);
+    expect(find.textContaining('line 359', findRichText: true), findsOneWidget);
   });
 }
 

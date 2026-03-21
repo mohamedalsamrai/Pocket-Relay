@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/features/chat/models/chat_historical_conversati
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
@@ -1669,14 +1670,111 @@ void main() {
         expect(changedFilesItem.headerStats.additions, 1);
         expect(changedFilesItem.headerStats.deletions, 1);
         expect(changedFilesItem.rows.single.displayPathLabel, 'lib/app.dart');
+        expect(changedFilesItem.rows.single.fileName, 'app.dart');
+        expect(changedFilesItem.rows.single.languageLabel, 'Dart');
         expect(changedFilesItem.rows.single.stats.deletions, 1);
         expect(changedFilesItem.rows.single.diff, isNotNull);
+        expect(changedFilesItem.rows.single.diff?.syntaxLanguage, 'dart');
         expect(
           changedFilesItem.rows.single.diff?.lines.first.text,
           'diff --git a/lib/app.dart b/lib/app.dart',
         );
+        expect(changedFilesItem.rows.single.diff?.lines[4].oldLineNumber, 1);
+        expect(changedFilesItem.rows.single.diff?.lines[5].newLineNumber, 1);
       },
     );
+
+    test(
+      'projects renamed files with current-path metadata and rename state',
+      () {
+        final block = CodexChangedFilesBlock(
+          id: 'changed_files_rename_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          title: 'Changed files',
+          files: const <CodexChangedFile>[
+            CodexChangedFile(path: 'lib/new.dart'),
+          ],
+          unifiedDiff:
+              'diff --git a/lib/old.dart b/lib/new.dart\n'
+              'similarity index 88%\n'
+              'rename from lib/old.dart\n'
+              'rename to lib/new.dart\n'
+              '--- a/lib/old.dart\n'
+              '+++ b/lib/new.dart\n'
+              '@@ -1 +1 @@\n'
+              '-oldName();\n'
+              '+newName();\n',
+        );
+
+        final item = projector.project(block) as ChatChangedFilesItemContract;
+        final row = item.rows.single;
+
+        expect(row.operationKind, ChatChangedFileOperationKind.renamed);
+        expect(row.previousPath, 'lib/old.dart');
+        expect(row.currentPath, 'lib/new.dart');
+        expect(row.languageLabel, 'Dart');
+        expect(row.diff?.operationKind, ChatChangedFileOperationKind.renamed);
+        expect(row.diff?.syntaxLanguage, 'dart');
+        expect(row.diff?.lines.last.text, '+newName();');
+      },
+    );
+
+    test(
+      'keeps hunk lines that look like diff headers as real additions and deletions',
+      () {
+        final block = CodexChangedFilesBlock(
+          id: 'changed_files_header_like_lines_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          title: 'Changed files',
+          files: const <CodexChangedFile>[
+            CodexChangedFile(path: 'lib/app.dart'),
+          ],
+          unifiedDiff:
+              'diff --git a/lib/app.dart b/lib/app.dart\n'
+              '--- a/lib/app.dart\n'
+              '+++ b/lib/app.dart\n'
+              '@@ -1,2 +1,2 @@\n'
+              '--- old flag\n'
+              '-keep old branch\n'
+              '+++ new flag\n'
+              '+keep new branch\n',
+        );
+
+        final item = projector.project(block) as ChatChangedFilesItemContract;
+        final diff = item.rows.single.diff!;
+
+        expect(diff.stats.additions, 2);
+        expect(diff.stats.deletions, 2);
+        expect(diff.lines[4].kind, ChatChangedFileDiffLineKind.deletion);
+        expect(diff.lines[4].oldLineNumber, 1);
+        expect(diff.lines[6].kind, ChatChangedFileDiffLineKind.addition);
+        expect(diff.lines[6].newLineNumber, 1);
+      },
+    );
+
+    test('projects binary diffs as binary review items', () {
+      final block = CodexChangedFilesBlock(
+        id: 'changed_files_binary_1',
+        createdAt: DateTime(2026, 3, 15, 12),
+        title: 'Changed files',
+        files: const <CodexChangedFile>[
+          CodexChangedFile(path: 'assets/logo.png'),
+        ],
+        unifiedDiff:
+            'diff --git a/assets/logo.png b/assets/logo.png\n'
+            'Binary files a/assets/logo.png and b/assets/logo.png differ\n',
+      );
+
+      final item = projector.project(block) as ChatChangedFilesItemContract;
+      final row = item.rows.single;
+
+      expect(row.languageLabel, 'Binary');
+      expect(row.isBinary, isTrue);
+      expect(row.diff, isNotNull);
+      expect(row.diff?.syntaxLanguage, isNull);
+      expect(row.diff?.isBinary, isTrue);
+      expect(row.diff?.lines.last.kind, ChatChangedFileDiffLineKind.meta);
+    });
 
     test('projects SSH transcript blocks into SSH item contracts', () {
       final block = CodexSshConnectFailedBlock(

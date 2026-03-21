@@ -734,17 +734,24 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('Changed files'), findsOneWidget);
-      expect(find.text('2 files'), findsOneWidget);
-      expect(find.text('+4 -1'), findsOneWidget);
+      expect(
+        find.text('2 files changed · 4 additions · 1 deletions'),
+        findsOneWidget,
+      );
       expect(find.text('README.md'), findsOneWidget);
-      expect(find.text('lib/app.dart'), findsOneWidget);
-      expect(find.text('View diff'), findsNWidgets(2));
+      expect(find.text('app.dart'), findsOneWidget);
 
       await tester.tap(find.text('README.md'));
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(find.text('+first line'), findsOneWidget);
-      expect(find.text('+second line'), findsOneWidget);
+      expect(
+        find.textContaining('first line', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('second line', findRichText: true),
+        findsOneWidget,
+      );
     },
   );
 
@@ -1529,9 +1536,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Changed files'), findsOneWidget);
-      expect(find.text('2 files'), findsOneWidget);
+      expect(
+        find.text('2 files changed · 2 additions · 1 deletions'),
+        findsOneWidget,
+      );
       final readmeDy = tester.getTopLeft(find.text('README.md')).dy;
-      final appDy = tester.getTopLeft(find.text('lib/app.dart')).dy;
+      final appDy = tester.getTopLeft(find.text('app.dart')).dy;
       expect(readmeDy, lessThan(appDy));
     },
   );
@@ -1611,7 +1621,7 @@ void main() {
 
       expect(find.text('Changed files'), findsNWidgets(2));
       expect(find.text('README.md'), findsNWidgets(2));
-      expect(find.text('lib/app.dart'), findsOneWidget);
+      expect(find.text('app.dart'), findsOneWidget);
       expect(find.textContaining('Intervening warning'), findsOneWidget);
 
       final firstChangedFilesDy = tester
@@ -1731,7 +1741,7 @@ void main() {
 
       expect(find.text('Changed files'), findsNWidgets(2));
       expect(find.text('README.md'), findsNWidgets(2));
-      expect(find.text('lib/app.dart'), findsOneWidget);
+      expect(find.text('app.dart'), findsOneWidget);
       expect(find.text('File change approval resolved'), findsOneWidget);
 
       final firstChangedFilesDy = tester
