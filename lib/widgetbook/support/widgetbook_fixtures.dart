@@ -14,49 +14,48 @@ class WidgetbookFixtures {
   static final DateTime timestamp = DateTime.utc(2026, 3, 21, 10, 30);
 
   static const String assistantMessageMarkdown =
-      'Updated the workspace shell and tightened the lane selection flow.\n\n'
-      '- Added deterministic fixtures for previews\n'
-      '- Kept the app wiring separate from story state\n'
-      '- Left transport ownership outside the visual surface';
+      'I checked the session and found two concrete follow-ups.\n\n'
+      '- The SSH trust prompt is still blocking the first connection.\n'
+      '- One command failed because the saved workspace path is missing.\n'
+      '- The next step is to confirm the host key, then retry the launch.';
 
   static const String reasoningMarkdown =
-      'Comparing the new shell against the prior state.\n\n'
-      '1. Verify lane selection is explicit.\n'
-      '2. Keep storage and transport injected.\n'
-      '3. Render only presentation-focused surfaces in isolation.';
+      'Comparing the latest runtime events before choosing the next action.\n\n'
+      '1. Check whether the failure is trust-related or authentication-related.\n'
+      '2. Keep the blocked action visible while the user decides.\n'
+      '3. Do not hide the consequence behind secondary detail.';
 
   static const String proposedPlanMarkdown =
-      '# Widgetbook Coverage Expansion\n\n'
+      '# Connection Recovery Plan\n\n'
       '## Summary\n\n'
-      'Expose the card family designers review during transcript QA.\n\n'
+      'Recover the current session and keep the user-facing consequences visible.\n\n'
       '## Scope\n\n'
-      '1. Add isolated stories for approval, plan, file-change, and work-log states.\n'
-      '2. Use deterministic fixtures with realistic copy.\n'
-      '3. Keep runtime ownership outside the catalog.\n\n'
+      '1. Re-check the saved connection settings and workspace path.\n'
+      '2. Surface the SSH trust and auth states as distinct blockers.\n'
+      '3. Retry the remote launch only after the blocking state is resolved.\n\n'
       '## Acceptance Criteria\n\n'
-      '- Designers can compare light and dark themes.\n'
-      '- Long content demonstrates truncation and expansion behavior.\n'
-      '- Stories are grouped by product language rather than raw class names.';
+      '- The blocking state is obvious before any action is taken.\n'
+      '- The user can see what host, path, and account are affected.\n'
+      '- Long content still supports truncation and expansion.';
 
   static const String longProposedPlanMarkdown =
-      '# Desktop Transcript Review Pass\n\n'
+      '# Remote Session Recovery\n\n'
       '## Summary\n\n'
-      'Normalize the card shell and expose the transcript states that cause design churn during implementation review.\n\n'
+      'Recover a failing remote session without hiding the evidence that explains the failure.\n\n'
       '## Workstreams\n\n'
-      '1. Foundations\n'
-      '- Promote shared panel, badge, and meta-card primitives into core ownership.\n'
-      '- Reuse a consistent radius and spacing scale across transcript surfaces.\n\n'
-      '2. Transcript Cards\n'
-      '- Add approval-request previews with resolved and unresolved states.\n'
-      '- Add changed-file rows that show create, modify, and delete actions.\n'
-      '- Add work-log previews with command, search, and git variants.\n'
-      '- Add SSH trust states for first-connect host verification.\n\n'
-      '3. Design Review\n'
-      '- Provide long markdown to exercise collapse behavior.\n'
-      '- Keep realistic labels, filenames, and summaries.\n'
-      '- Avoid playground-only knobs that do not map to product decisions.\n\n'
+      '1. Transport\n'
+      '- Re-check the saved host, port, and account details.\n'
+      '- Verify whether the host key is already pinned or still pending trust.\n\n'
+      '2. Transcript\n'
+      '- Keep approval and input-required states visually distinct.\n'
+      '- Keep file changes and command activity readable in dense turns.\n'
+      '- Preserve SSH trust and failure context while recovery actions are available.\n\n'
+      '3. Reliability\n'
+      '- Keep long content expandable without losing the initial summary.\n'
+      '- Avoid duplicate status signals for the same runtime meaning.\n'
+      '- Keep action-required states visually consistent.\n\n'
       '## Notes\n\n'
-      'The catalog should act as a review artifact, not just a developer sandbox. That means every granular story needs a stable narrative and fixture set that represents a real product state rather than arbitrary lorem ipsum.';
+      'This plan focuses on the runtime surfaces the user actually sees while the connection is blocked or recovering.';
 
   static const PocketPlatformBehavior mobileBehavior = PocketPlatformBehavior(
     experience: PocketPlatformExperience.mobile,
@@ -153,7 +152,8 @@ class WidgetbookFixtures {
       id: 'status_message',
       createdAt: timestamp,
       title: 'Session attached',
-      body: 'Pocket Relay is connected to the remote Codex session.',
+      body:
+          'Pocket Relay is connected to the remote session and ready to continue.',
     );
   }
 
@@ -162,8 +162,7 @@ class WidgetbookFixtures {
       id: 'error_message',
       createdAt: timestamp,
       title: 'Remote launch failed',
-      body:
-          'The preview uses a fake client, so no real app-server process was started.',
+      body: 'The remote workspace could not be opened with the saved settings.',
     );
   }
 
@@ -177,7 +176,7 @@ class WidgetbookFixtures {
       requestType: CodexCanonicalRequestType.applyPatchApproval,
       title: 'Approve file edits',
       body:
-          'Codex wants to update the shared transcript card frame and add Widgetbook stories for granular designer review.',
+          'Codex wants to update the connection settings and retry the remote launch.',
       isResolved: isResolved,
       resolutionLabel: isResolved ? 'approved' : null,
     );
@@ -189,9 +188,9 @@ class WidgetbookFixtures {
   }) {
     return PendingUserInputContract(
       requestId: 'user_input_review_scope',
-      title: 'Need designer review input',
+      title: 'Need user input',
       body:
-          'Choose the transcript surfaces that need visual comparison in this pass and provide any review notes that should ship with the story set.',
+          'Choose how to continue this session before the next tool call starts.',
       isResolved: resolved,
       isSubmitting: submitting,
       isSubmitEnabled: !resolved,
@@ -200,37 +199,37 @@ class WidgetbookFixtures {
           : (submitting ? 'submitting' : 'pending'),
       submitLabel: submitting ? 'Submitting…' : 'Submit review',
       submitPayload: const <String, List<String>>{
-        'surface': <String>['Approval Request'],
+        'mode': <String>['Retry now'],
       },
       fields: const <PendingUserInputFieldContract>[
         PendingUserInputFieldContract(
-          id: 'surface',
-          header: 'Surface',
-          prompt: 'Pick the highest-risk transcript surface for visual QA.',
-          inputLabel: 'Surface to review',
-          value: 'Approval Request',
+          id: 'mode',
+          header: 'Action',
+          prompt: 'Pick how the session should continue.',
+          inputLabel: 'Action',
+          value: 'Retry now',
           options: <PendingUserInputOptionContract>[
             PendingUserInputOptionContract(
-              label: 'Approval Request',
-              description: 'Review call-to-action hierarchy',
+              label: 'Retry now',
+              description: 'Retry the remote launch immediately',
             ),
             PendingUserInputOptionContract(
-              label: 'Changed Files',
-              description: 'Review dense list readability',
+              label: 'Open settings',
+              description: 'Review the saved host and workspace path first',
             ),
             PendingUserInputOptionContract(
-              label: 'Work Log',
-              description: 'Review scanability in command-heavy states',
+              label: 'Stop session',
+              description: 'Leave the connection blocked for now',
             ),
           ],
         ),
         PendingUserInputFieldContract(
           id: 'notes',
-          header: 'Review Notes',
-          prompt: 'Capture any readability or hierarchy concerns.',
-          inputLabel: 'Designer notes',
+          header: 'Notes',
+          prompt: 'Add any extra context before continuing.',
+          inputLabel: 'Notes',
           value:
-              'Badge contrast is working well. The changed-file action chips still feel too visually competitive.',
+              'The workspace path changed on the remote host after the last deploy.',
           minLines: 3,
           maxLines: 5,
         ),
@@ -243,18 +242,18 @@ class WidgetbookFixtures {
       id: 'plan_update',
       createdAt: timestamp,
       explanation:
-          'Reordered the implementation around designer-visible surfaces so the next slice improves reviewability instead of only internal structure.',
+          'Updated the recovery steps after the remote launch failed a second time.',
       steps: <CodexRuntimePlanStep>[
         CodexRuntimePlanStep(
-          step: 'Expand the fixture layer with deterministic product states',
+          step: 'Confirm the saved host fingerprint',
           status: CodexRuntimePlanStepStatus.completed,
         ),
         CodexRuntimePlanStep(
-          step: 'Add transcript card stories for designer-facing review states',
+          step: 'Review the saved workspace path',
           status: CodexRuntimePlanStepStatus.inProgress,
         ),
         CodexRuntimePlanStep(
-          step: 'Backfill visual regression coverage for key transcript cards',
+          step: 'Retry the remote launch',
           status: CodexRuntimePlanStepStatus.pending,
         ),
       ],
@@ -279,7 +278,8 @@ class WidgetbookFixtures {
   }) {
     const designDiff = ChatChangedFileDiffContract(
       id: 'diff_transcript_frame',
-      displayPathLabel: 'lib/src/core/ui/surfaces/pocket_transcript_frame.dart',
+      displayPathLabel:
+          'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
       statusLabel: 'modified',
       stats: ChatChangedFileStatsContract(additions: 42, deletions: 11),
       lines: <ChatChangedFileDiffLineContract>[
@@ -288,20 +288,19 @@ class WidgetbookFixtures {
           kind: ChatChangedFileDiffLineKind.hunk,
         ),
         ChatChangedFileDiffLineContract(
-          text: '+class PocketTranscriptFrame extends StatelessWidget {',
+          text: '+  final String blockingReason;',
           kind: ChatChangedFileDiffLineKind.addition,
         ),
         ChatChangedFileDiffLineContract(
-          text:
-              '+  const PocketTranscriptFrame({super.key, required this.child});',
+          text: '+  final bool isDangerous;',
           kind: ChatChangedFileDiffLineKind.addition,
         ),
         ChatChangedFileDiffLineContract(
-          text: '-class TranscriptBadge extends StatelessWidget {',
+          text: '-  final String summary;',
           kind: ChatChangedFileDiffLineKind.deletion,
         ),
         ChatChangedFileDiffLineContract(
-          text: ' child: PocketPanelSurface(...),',
+          text: '   child: PocketTranscriptFrame(...),',
           kind: ChatChangedFileDiffLineKind.context,
         ),
       ],
@@ -318,7 +317,8 @@ class WidgetbookFixtures {
       rows: <ChatChangedFileRowContract>[
         ChatChangedFileRowContract(
           id: 'changed_file_1',
-          displayPathLabel: 'lib/widgetbook/story_catalog.dart',
+          displayPathLabel:
+              'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
           operationKind: ChatChangedFileOperationKind.modified,
           operationLabel: 'modified',
           stats: ChatChangedFileStatsContract(additions: 27, deletions: 5),
@@ -327,25 +327,25 @@ class WidgetbookFixtures {
         ),
         ChatChangedFileRowContract(
           id: 'changed_file_2',
-          displayPathLabel: 'lib/widgetbook/support/widgetbook_fixtures.dart',
-          operationKind: ChatChangedFileOperationKind.created,
-          operationLabel: 'created',
-          stats: ChatChangedFileStatsContract(additions: 54, deletions: 0),
+          displayPathLabel:
+              'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+          operationKind: ChatChangedFileOperationKind.modified,
+          operationLabel: 'modified',
+          stats: ChatChangedFileStatsContract(additions: 54, deletions: 9),
           actionLabel: 'Open diff',
           diff: ChatChangedFileDiffContract(
             id: 'diff_widgetbook_fixtures',
-            displayPathLabel: 'lib/widgetbook/support/widgetbook_fixtures.dart',
-            statusLabel: 'new',
-            stats: ChatChangedFileStatsContract(additions: 54, deletions: 0),
+            displayPathLabel:
+                'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+            statusLabel: 'modified',
+            stats: ChatChangedFileStatsContract(additions: 54, deletions: 9),
             lines: <ChatChangedFileDiffLineContract>[
               ChatChangedFileDiffLineContract(
-                text:
-                    '+static ChatApprovalRequestContract approvalRequest(...) {',
+                text: '+  final bool canSaveFingerprint;',
                 kind: ChatChangedFileDiffLineKind.addition,
               ),
               ChatChangedFileDiffLineContract(
-                text:
-                    '+static ChatChangedFilesItemContract changedFilesItem(...) {',
+                text: '+  final String fingerprintStatus;',
                 kind: ChatChangedFileDiffLineKind.addition,
               ),
             ],
@@ -354,11 +354,11 @@ class WidgetbookFixtures {
         ChatChangedFileRowContract(
           id: 'changed_file_3',
           displayPathLabel:
-              'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
-          operationKind: ChatChangedFileOperationKind.deleted,
-          operationLabel: 'deleted',
-          stats: ChatChangedFileStatsContract(additions: 0, deletions: 31),
-          actionLabel: 'No diff',
+              'lib/src/features/settings/presentation/connection_sheet.dart',
+          operationKind: ChatChangedFileOperationKind.modified,
+          operationLabel: 'modified',
+          stats: ChatChangedFileStatsContract(additions: 18, deletions: 4),
+          actionLabel: 'Open diff',
         ),
       ],
     );
@@ -370,33 +370,32 @@ class WidgetbookFixtures {
       entries: <ChatWorkLogEntryContract>[
         ChatRipgrepSearchWorkLogEntryContract(
           id: 'work_log_rg',
-          commandText: 'rg "PocketPanelSurface|PocketMetaCard" lib/src',
-          queryText: 'PocketPanelSurface|PocketMetaCard',
-          scopeTargets: <String>['lib/src', 'lib/widgetbook'],
+          commandText: 'rg "workspaceDir|hostKey|authMode" lib/src',
+          queryText: 'workspaceDir|hostKey|authMode',
+          scopeTargets: <String>['lib/src'],
           exitCode: 0,
         ),
         ChatGitWorkLogEntryContract(
           id: 'work_log_git',
-          commandText: 'git status --short',
-          subcommandLabel: 'status',
-          summaryLabel: 'Reviewing modified transcript cards',
-          primaryLabel: 'git status --short',
-          secondaryLabel: '6 files changed',
+          commandText: 'git diff --stat',
+          subcommandLabel: 'diff --stat',
+          summaryLabel: 'Reviewing the latest connection-recovery edits',
+          primaryLabel: 'git diff --stat',
+          secondaryLabel: '3 files changed',
           exitCode: 0,
         ),
         ChatGenericWorkLogEntryContract(
           id: 'work_log_generic',
           entryKind: CodexWorkLogEntryKind.dynamicToolCall,
-          title: 'Updated Widgetbook fixtures',
-          preview:
-              'Added approval, changed-files, and work-log preview states.',
+          title: 'Read saved connection details',
+          preview: 'Loaded the current host, auth mode, and workspace path.',
         ),
         ChatGenericWorkLogEntryContract(
           id: 'work_log_running',
           entryKind: CodexWorkLogEntryKind.commandExecution,
-          title: 'Analyzing transcript card library',
+          title: 'Retrying the remote launch',
           preview:
-              'flutter analyze lib/src/features/chat/presentation/widgets/transcript/cards',
+              'ssh relay-dev.internal "cd /workspace/Pocket-Relay && pocket-relay app-server --stdio"',
           isRunning: true,
         ),
       ],
