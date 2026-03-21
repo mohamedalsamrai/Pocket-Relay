@@ -207,11 +207,8 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void startFreshConversation() {
-    _clearConversationRecovery();
-    _clearHistoricalConversationRestoreState();
-    _clearContinuationThread();
-    _applySessionState(
-      _sessionReducer.startFreshThread(
+    _resetConversationState(
+      nextState: _sessionReducer.startFreshThread(
         _sessionState,
         message: 'The next prompt will start a fresh Codex thread.',
       ),
@@ -219,10 +216,9 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void clearTranscript() {
-    _clearConversationRecovery();
-    _clearHistoricalConversationRestoreState();
-    _clearContinuationThread();
-    _applySessionState(_sessionReducer.clearTranscript(_sessionState));
+    _resetConversationState(
+      nextState: _sessionReducer.clearTranscript(_sessionState),
+    );
   }
 
   void openConversationRecoveryAlternateSession() {
@@ -1121,6 +1117,13 @@ class ChatSessionController extends ChangeNotifier {
       return;
     }
     _snackBarMessagesController.add(message);
+  }
+
+  void _resetConversationState({required CodexSessionState nextState}) {
+    _clearConversationRecovery();
+    _clearHistoricalConversationRestoreState();
+    _clearContinuationThread();
+    _applySessionState(nextState);
   }
 
   String? _activeConversationThreadId() {

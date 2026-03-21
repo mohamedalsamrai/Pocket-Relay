@@ -41,22 +41,35 @@ class TranscriptReducer {
     String? message,
     DateTime? createdAt,
   }) {
-    final cleared = _policy.startFreshThread(
-      CodexSessionState.transcript(connectionStatus: state.connectionStatus),
-      message: message,
-      createdAt: createdAt,
+    return _resetSessionTranscript(
+      state,
+      reset: (transcriptState) => _policy.startFreshThread(
+        transcriptState,
+        message: message,
+        createdAt: createdAt,
+      ),
     );
-    return cleared;
   }
 
   CodexSessionState clearTranscript(CodexSessionState state) {
-    return _policy.clearTranscript(
-      CodexSessionState.transcript(connectionStatus: state.connectionStatus),
+    return _resetSessionTranscript(
+      state,
+      reset: _policy.clearTranscript,
     );
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
-    return _policy.detachThread(
+    return _resetSessionTranscript(
+      state,
+      reset: _policy.detachThread,
+    );
+  }
+
+  CodexSessionState _resetSessionTranscript(
+    CodexSessionState state, {
+    required CodexSessionState Function(CodexSessionState transcriptState) reset,
+  }) {
+    return reset(
       CodexSessionState.transcript(connectionStatus: state.connectionStatus),
     );
   }

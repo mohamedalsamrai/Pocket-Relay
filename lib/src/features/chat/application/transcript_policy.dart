@@ -49,12 +49,7 @@ class TranscriptPolicy {
     String? message,
     DateTime? createdAt,
   }) {
-    final cleared = state.copyWithProjectedTranscript(
-      clearThreadId: true,
-      clearActiveTurn: true,
-      clearPendingLocalUserMessageBlockIds: true,
-      clearLocalUserMessageProviderBindings: true,
-    );
+    final cleared = _resetTranscriptState(state);
     if (message == null || message.trim().isEmpty) {
       return cleared;
     }
@@ -74,19 +69,24 @@ class TranscriptPolicy {
   }
 
   CodexSessionState clearTranscript(CodexSessionState state) {
-    return state.copyWithProjectedTranscript(
-      clearThreadId: true,
-      clearActiveTurn: true,
+    return _resetTranscriptState(
+      state,
       blocks: const <CodexUiBlock>[],
-      clearPendingLocalUserMessageBlockIds: true,
-      clearLocalUserMessageProviderBindings: true,
     );
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
+    return _resetTranscriptState(state);
+  }
+
+  CodexSessionState _resetTranscriptState(
+    CodexSessionState state, {
+    List<CodexUiBlock>? blocks,
+  }) {
     return state.copyWithProjectedTranscript(
       clearThreadId: true,
       clearActiveTurn: true,
+      blocks: blocks,
       clearPendingLocalUserMessageBlockIds: true,
       clearLocalUserMessageProviderBindings: true,
     );
