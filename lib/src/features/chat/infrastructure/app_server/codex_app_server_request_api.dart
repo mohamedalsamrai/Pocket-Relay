@@ -78,6 +78,7 @@ class CodexAppServerRequestApi {
   Future<CodexAppServerThread> readThread(
     CodexAppServerConnection connection, {
     required String threadId,
+    bool includeTurns = false,
   }) async {
     connection.requireConnected();
 
@@ -88,7 +89,10 @@ class CodexAppServerRequestApi {
 
     final response = await connection.sendRequest(
       'thread/read',
-      <String, Object?>{'threadId': effectiveThreadId, 'includeTurns': false},
+      <String, Object?>{
+        'threadId': effectiveThreadId,
+        'includeTurns': includeTurns,
+      },
     );
     final payload = _requireObject(response, 'thread/read response');
     final thread = _asThread(
@@ -101,6 +105,42 @@ class CodexAppServerRequestApi {
       );
     }
     return thread;
+  }
+
+  Future<CodexAppServerThreadListPage> listThreads(
+    CodexAppServerConnection connection, {
+    String? cursor,
+    int? limit,
+  }) async {
+    connection.requireConnected();
+    final normalizedCursor = cursor?.trim();
+    final params = <String, Object?>{};
+    if (normalizedCursor != null && normalizedCursor.isNotEmpty) {
+      params['cursor'] = normalizedCursor;
+    }
+    if (limit != null) {
+      params['limit'] = limit;
+    }
+
+    final response = await connection.sendRequest(
+      'thread/list',
+      params,
+    );
+    final payload = _requireObject(response, 'thread/list response');
+    final data = payload['data'];
+    if (data is! List) {
+      throw const CodexAppServerException(
+        'thread/list response did not include a thread list.',
+      );
+    }
+
+    return CodexAppServerThreadListPage(
+      threads: data
+          .map(_asThread)
+          .whereType<CodexAppServerThread>()
+          .toList(growable: false),
+      nextCursor: _asString(payload['nextCursor']),
+    );
   }
 
   Future<CodexAppServerTurn> sendUserMessage(
@@ -344,6 +384,14 @@ class CodexAppServerRequestApi {
 
     return CodexAppServerThread(
       id: threadId,
+      preview: _asString(thread?['preview']) ?? '',
+      ephemeral: thread?['ephemeral'] as bool? ?? false,
+      modelProvider: _asString(thread?['modelProvider']) ?? '',
+      createdAt: _parseUnixTimestamp(thread?['createdAt']),
+      updatedAt: _parseUnixTimestamp(thread?['updatedAt']),
+      path: _asString(thread?['path']),
+      cwd: _asString(thread?['cwd']),
+      promptCount: _countUserPromptItems(thread?['turns']),
       name: _asString(thread?['name']),
       sourceKind: _sourceKind(thread?['source']),
       agentNickname: _asString(thread?['agentNickname']),
@@ -358,6 +406,36 @@ class CodexAppServerRequestApi {
 
     final object = _asObject(raw);
     return _asString(object?['kind']) ?? _asString(object?['type']);
+  }
+
+  static DateTime? _parseUnixTimestamp(Object? raw) {
+    if (raw is! num) {
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(
+      raw.toInt() * 1000,
+      isUtc: true,
+    ).toLocal();
+  }
+
+  static int? _countUserPromptItems(Object? rawTurns) {
+    if (rawTurns is! List) {
+      return null;
+    }
+
+    var count = 0;
+    for (final turn in rawTurns.whereType<Map>()) {
+      final items = turn['items'];
+      if (items is! List) {
+        continue;
+      }
+      for (final item in items.whereType<Map>()) {
+        if (_asString(item['type']) == 'userMessage') {
+          count += 1;
+        }
+      }
+    }
+    return count;
   }
 
   static String _approvalPolicyFor(ConnectionProfile profile) {

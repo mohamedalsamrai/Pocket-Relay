@@ -10,6 +10,8 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
+import 'package:pocket_relay/src/features/workspace/models/codex_workspace_conversation_summary.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_mobile_shell.dart';
 
@@ -80,7 +82,23 @@ void main() {
     });
 
     await controller.initialize();
-    await tester.pumpWidget(_buildShell(controller));
+    await tester.pumpWidget(
+      _buildShell(
+        controller,
+        conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
+          conversations: <CodexWorkspaceConversationSummary>[
+            CodexWorkspaceConversationSummary(
+              threadId: 'thread_saved',
+              preview: 'Saved backend thread',
+              cwd: '/workspace',
+              promptCount: 2,
+              firstPromptAt: DateTime(2026, 3, 20, 9),
+              lastActivityAt: DateTime(2026, 3, 20, 10),
+            ),
+          ],
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('More actions'));
@@ -88,7 +106,8 @@ void main() {
     await tester.tap(find.text('Conversation history'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Could not load conversations'), findsOneWidget);
+    expect(find.text('Saved backend thread'), findsOneWidget);
+    expect(find.textContaining('2 prompts'), findsOneWidget);
   });
 
   testWidgets(
@@ -104,7 +123,15 @@ void main() {
       });
 
       await controller.initialize();
-      await tester.pumpWidget(_buildShell(controller));
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                error: StateError('history backend unavailable'),
+              ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('More actions'));
@@ -747,6 +774,7 @@ void main() {
 Widget _buildShell(
   ConnectionWorkspaceController controller, {
   ConnectionSettingsOverlayDelegate? settingsOverlayDelegate,
+  CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository,
   TargetPlatform platform = TargetPlatform.android,
 }) {
   return MaterialApp(
@@ -754,6 +782,7 @@ Widget _buildShell(
     home: ConnectionWorkspaceMobileShell(
       workspaceController: controller,
       platformPolicy: PocketPlatformPolicy.resolve(platform: platform),
+      conversationHistoryRepository: conversationHistoryRepository,
       settingsOverlayDelegate:
           settingsOverlayDelegate ?? FakeConnectionSettingsOverlayDelegate(),
     ),
@@ -840,5 +869,27 @@ Future<void> _closeClients(
 ) async {
   for (final client in clientsById.values) {
     await client.close();
+  }
+}
+
+class FakeCodexWorkspaceConversationHistoryRepository
+    implements CodexWorkspaceConversationHistoryRepository {
+  FakeCodexWorkspaceConversationHistoryRepository({
+    this.conversations = const <CodexWorkspaceConversationSummary>[],
+    this.error,
+  });
+
+  final List<CodexWorkspaceConversationSummary> conversations;
+  final Object? error;
+
+  @override
+  Future<List<CodexWorkspaceConversationSummary>> loadWorkspaceConversations({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    if (error != null) {
+      throw error!;
+    }
+    return conversations;
   }
 }

@@ -36,6 +36,8 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
         })
       >[];
   final List<String> readThreadCalls = <String>[];
+  final List<({String? cursor, int? limit})> listThreadCalls =
+      <({String? cursor, int? limit})>[];
   final List<String> sentMessages = <String>[];
   final List<
     ({
@@ -101,6 +103,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Completer<void>? sendUserMessageGate;
   final Map<String, CodexAppServerThread> threadsById =
       <String, CodexAppServerThread>{};
+  final List<CodexAppServerThread> listedThreads = <CodexAppServerThread>[];
 
   bool _isConnected = false;
   String? _threadId;
@@ -170,6 +173,25 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       return configuredThread;
     }
     return CodexAppServerThread(id: threadId, sourceKind: 'app-server');
+  }
+
+  @override
+  Future<CodexAppServerThread> readThreadWithTurns({
+    required String threadId,
+  }) {
+    return readThread(threadId: threadId);
+  }
+
+  @override
+  Future<CodexAppServerThreadListPage> listThreads({
+    String? cursor,
+    int? limit,
+  }) async {
+    listThreadCalls.add((cursor: cursor, limit: limit));
+    return CodexAppServerThreadListPage(
+      threads: List<CodexAppServerThread>.from(listedThreads),
+      nextCursor: null,
+    );
   }
 
   @override
