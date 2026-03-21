@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 
 import 'support/fake_codex_app_server_client.dart';
@@ -204,6 +207,101 @@ void main() {
         'Restored answer',
       );
       expect(controller.sessionState.rootThreadId, 'thread_saved');
+    },
+  );
+
+  test(
+    'selectConversationForResume exposes restore loading while transcript history is still in flight',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        )
+        ..readThreadWithTurnsGate = Completer<void>();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final loadingReached = Completer<void>();
+      controller.addListener(() {
+        if (controller.historicalConversationRestoreState?.phase ==
+                ChatHistoricalConversationRestorePhase.loading &&
+            !loadingReached.isCompleted) {
+          loadingReached.complete();
+        }
+      });
+
+      final restoreFuture = controller.selectConversationForResume(
+        'thread_saved',
+      );
+      await loadingReached.future.timeout(const Duration(seconds: 1));
+
+      expect(
+        controller.historicalConversationRestoreState?.phase,
+        ChatHistoricalConversationRestorePhase.loading,
+      );
+      expect(await controller.sendPrompt('blocked while restoring'), isFalse);
+
+      appServerClient.readThreadWithTurnsGate!.complete();
+      await restoreFuture;
+
+      expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'selectConversationForResume surfaces unavailable transcript history instead of silently restoring an empty lane',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_empty'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_empty',
+              name: 'Empty conversation',
+              sourceKind: 'app-server',
+              turns: <CodexAppServerHistoryTurn>[],
+            );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectConversationForResume('thread_empty');
+
+      expect(
+        controller.historicalConversationRestoreState?.phase,
+        ChatHistoricalConversationRestorePhase.unavailable,
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_empty');
+      expect(controller.transcriptBlocks, isEmpty);
+      expect(
+        await controller.sendPrompt('blocked after empty restore'),
+        isFalse,
+      );
     },
   );
 
@@ -832,7 +930,7 @@ void main() {
 
   test('hydrates missing child thread metadata through thread/read', () async {
     final appServerClient = FakeCodexAppServerClient()
-      ..threadsById['thread_child'] = const CodexAppServerThread(
+      ..threadsById['thread_child'] = const CodexAppServerThreadSummary(
         id: 'thread_child',
         name: 'Review Branch',
         agentNickname: 'Reviewer',
@@ -1048,35 +1146,69 @@ ConnectionProfile _configuredProfile() {
   );
 }
 
-CodexAppServerThread _savedConversationThread({required String threadId}) {
-  return CodexAppServerThread(
+CodexAppServerThreadHistory _savedConversationThread({
+  required String threadId,
+}) {
+  return CodexAppServerThreadHistory(
     id: threadId,
     name: 'Saved conversation',
     sourceKind: 'app-server',
-    turns: const <Map<String, dynamic>>[
-      <String, Object?>{
-        'id': 'turn_saved',
-        'status': 'completed',
-        'items': <Object>[
-          <String, Object?>{
-            'id': 'item_user',
-            'type': 'user_message',
-            'status': 'completed',
-            'content': <Object>[
-              <String, Object?>{'text': 'Restore this'},
-            ],
-          },
-          <String, Object?>{
-            'id': 'item_assistant',
-            'type': 'agent_message',
-            'status': 'completed',
-            'content': <Object>[
-              <String, Object?>{'text': 'Restored answer'},
-            ],
-          },
+    turns: const <CodexAppServerHistoryTurn>[
+      CodexAppServerHistoryTurn(
+        id: 'turn_saved',
+        status: 'completed',
+        items: <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant',
+            type: 'agent_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ),
         ],
-      },
-    ].cast<Map<String, dynamic>>(),
+        raw: <String, dynamic>{
+          'id': 'turn_saved',
+          'status': 'completed',
+          'items': <Object>[
+            <String, Object?>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+            <String, Object?>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ],
+        },
+      ),
+    ],
   );
 }
 

@@ -2,15 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_recovery_policy.dart';
+import 'package:pocket_relay/src/features/chat/application/chat_historical_conversation_restorer.dart';
+import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
 import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
@@ -27,9 +30,16 @@ class ChatSessionController extends ChangeNotifier {
         const SavedConnectionConversationState(),
     TranscriptReducer reducer = const TranscriptReducer(),
     CodexRuntimeEventMapper? runtimeEventMapper,
+    CodexHistoricalConversationNormalizer historicalConversationNormalizer =
+        const CodexHistoricalConversationNormalizer(),
+    ChatHistoricalConversationRestorer? historicalConversationRestorer,
     bool? supportsLocalConnectionMode,
   }) : _sessionReducer = reducer,
        _runtimeEventMapper = runtimeEventMapper ?? CodexRuntimeEventMapper(),
+       _historicalConversationNormalizer = historicalConversationNormalizer,
+       _historicalConversationRestorer =
+           historicalConversationRestorer ??
+           ChatHistoricalConversationRestorer(reducer: reducer),
        _conversationSelection = ChatConversationSelectionCoordinator(
          conversationStateStore: conversationStateStore,
          initialConversationState: initialConversationState,
@@ -52,6 +62,8 @@ class ChatSessionController extends ChangeNotifier {
 
   final TranscriptReducer _sessionReducer;
   final CodexRuntimeEventMapper _runtimeEventMapper;
+  final CodexHistoricalConversationNormalizer _historicalConversationNormalizer;
+  final ChatHistoricalConversationRestorer _historicalConversationRestorer;
   final ChatConversationSelectionCoordinator _conversationSelection;
   final ChatConversationRecoveryPolicy _conversationRecoveryPolicy =
       const ChatConversationRecoveryPolicy();
@@ -62,6 +74,7 @@ class ChatSessionController extends ChangeNotifier {
   ConnectionSecrets _secrets = const ConnectionSecrets();
   CodexSessionState _sessionState = CodexSessionState.initial();
   ChatConversationRecoveryState? _conversationRecoveryState;
+  ChatHistoricalConversationRestoreState? _historicalConversationRestoreState;
 
   bool _isLoading = true;
   bool _didInitialize = false;
@@ -78,6 +91,8 @@ class ChatSessionController extends ChangeNotifier {
   CodexSessionState get sessionState => _sessionState;
   ChatConversationRecoveryState? get conversationRecoveryState =>
       _conversationRecoveryState;
+  ChatHistoricalConversationRestoreState?
+  get historicalConversationRestoreState => _historicalConversationRestoreState;
   bool get isLoading => _isLoading;
   List<CodexUiBlock> get transcriptBlocks => _sessionState.transcriptBlocks;
 
@@ -153,7 +168,8 @@ class ChatSessionController extends ChangeNotifier {
     final normalizedPrompt = prompt.trim();
     if (normalizedPrompt.isEmpty ||
         _sessionState.isBusy ||
-        _conversationRecoveryState != null) {
+        _conversationRecoveryState != null ||
+        _historicalConversationRestoreState != null) {
       return false;
     }
 
@@ -191,6 +207,7 @@ class ChatSessionController extends ChangeNotifier {
 
   void startFreshConversation() {
     _clearConversationRecovery();
+    _clearHistoricalConversationRestoreState();
     _clearContinuationThread();
     _applySessionState(
       _sessionReducer.startFreshThread(
@@ -202,6 +219,7 @@ class ChatSessionController extends ChangeNotifier {
 
   void clearTranscript() {
     _clearConversationRecovery();
+    _clearHistoricalConversationRestoreState();
     _clearContinuationThread();
     _applySessionState(_sessionReducer.clearTranscript(_sessionState));
   }
@@ -228,6 +246,7 @@ class ChatSessionController extends ChangeNotifier {
 
     _rememberContinuationThread(alternateThreadId);
     _clearConversationRecovery();
+    _clearHistoricalConversationRestoreState();
     _applySessionState(
       _sessionState.copyWith(
         rootThreadId: alternateThreadId,
@@ -270,6 +289,15 @@ class ChatSessionController extends ChangeNotifier {
       activeThreadId: _activeConversationThreadId(),
     );
     await _restoreConversationTranscript(threadId.trim());
+  }
+
+  Future<void> retryHistoricalConversationRestore() async {
+    final threadId = _historicalConversationRestoreState?.threadId.trim();
+    if (threadId == null || threadId.isEmpty) {
+      return;
+    }
+
+    await _restoreConversationTranscript(threadId);
   }
 
   Future<void> approveRequest(String requestId) {
@@ -384,6 +412,32 @@ class ChatSessionController extends ChangeNotifier {
     }
   }
 
+  void _setHistoricalConversationRestoreState(
+    ChatHistoricalConversationRestoreState nextState,
+  ) {
+    final currentState = _historicalConversationRestoreState;
+    if (currentState?.phase == nextState.phase &&
+        currentState?.threadId == nextState.threadId) {
+      return;
+    }
+
+    _historicalConversationRestoreState = nextState;
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  void _clearHistoricalConversationRestoreState() {
+    if (_historicalConversationRestoreState == null) {
+      return;
+    }
+
+    _historicalConversationRestoreState = null;
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
   CodexSshUnpinnedHostKeyBlock? _findUnpinnedHostKeyBlock(String blockId) {
     for (final block in _sessionState.blocks) {
       if (block is CodexSshUnpinnedHostKeyBlock && block.id == blockId) {
@@ -489,6 +543,12 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   Future<void> _restoreConversationTranscript(String threadId) async {
+    _setHistoricalConversationRestoreState(
+      ChatHistoricalConversationRestoreState(
+        threadId: threadId,
+        phase: ChatHistoricalConversationRestorePhase.loading,
+      ),
+    );
     try {
       await _ensureAppServerConnected();
       final thread = await appServerClient.readThreadWithTurns(
@@ -498,16 +558,27 @@ class ChatSessionController extends ChangeNotifier {
         return;
       }
 
-      var nextState = CodexSessionState.transcript(
-        connectionStatus: CodexRuntimeSessionState.ready,
+      final historicalConversation = _historicalConversationNormalizer
+          .normalize(thread);
+      final nextState = _historicalConversationRestorer.restore(
+        historicalConversation,
       );
-      for (final event in _runtimeEventMapper.mapThreadHistory(thread)) {
-        nextState = _sessionReducer.reduceRuntimeEvent(nextState, event);
-      }
 
       _clearConversationRecovery();
+      _historicalConversationRestoreState = nextState.transcriptBlocks.isEmpty
+          ? ChatHistoricalConversationRestoreState(
+              threadId: threadId,
+              phase: ChatHistoricalConversationRestorePhase.unavailable,
+            )
+          : null;
       _applySessionState(nextState);
     } catch (error) {
+      _setHistoricalConversationRestoreState(
+        ChatHistoricalConversationRestoreState(
+          threadId: threadId,
+          phase: ChatHistoricalConversationRestorePhase.failed,
+        ),
+      );
       _reportAppServerFailure(
         title: 'Conversation load failed',
         message: 'Could not load the saved conversation transcript.',
@@ -778,7 +849,7 @@ class ChatSessionController extends ChangeNotifier {
     );
   }
 
-  bool _hasThreadMetadata(CodexAppServerThread thread) {
+  bool _hasThreadMetadata(CodexAppServerThreadSummary thread) {
     return _hasThreadMetadataValues(
       threadName: thread.name,
       agentNickname: thread.agentNickname,

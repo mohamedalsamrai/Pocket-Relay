@@ -2,78 +2,22 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'shared_preferences_async_migration.dart';
+import 'codex_connection_conversation_state_legacy_migration.dart';
 
-class SavedConversationThread {
-  const SavedConversationThread({
-    required this.threadId,
-    required this.preview,
-    required this.messageCount,
-    required this.firstPromptAt,
-    required this.lastActivityAt,
-  });
-
-  final String threadId;
-  final String preview;
-  final int messageCount;
-  final DateTime? firstPromptAt;
-  final DateTime? lastActivityAt;
-
-  String get normalizedThreadId => threadId.trim();
-
-  SavedConversationThread copyWith({
-    String? threadId,
-    String? preview,
-    int? messageCount,
-    Object? firstPromptAt = _historySentinel,
-    Object? lastActivityAt = _historySentinel,
-  }) {
-    return SavedConversationThread(
-      threadId: threadId ?? this.threadId,
-      preview: preview ?? this.preview,
-      messageCount: messageCount ?? this.messageCount,
-      firstPromptAt: identical(firstPromptAt, _historySentinel)
-          ? this.firstPromptAt
-          : firstPromptAt as DateTime?,
-      lastActivityAt: identical(lastActivityAt, _historySentinel)
-          ? this.lastActivityAt
-          : lastActivityAt as DateTime?,
-    );
-  }
-
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'threadId': normalizedThreadId,
-      'preview': preview,
-      'messageCount': messageCount,
-      'firstPromptAt': firstPromptAt?.toIso8601String(),
-      'lastActivityAt': lastActivityAt?.toIso8601String(),
-    };
-  }
-
-  factory SavedConversationThread.fromJson(Map<String, dynamic> json) {
-    return SavedConversationThread(
-      threadId: json['threadId'] as String? ?? '',
-      preview: json['preview'] as String? ?? '',
-      messageCount: json['messageCount'] as int? ?? 0,
-      firstPromptAt: _parseTimestamp(json['firstPromptAt']),
-      lastActivityAt: _parseTimestamp(json['lastActivityAt']),
-    );
-  }
-
-  static DateTime? _parseTimestamp(Object? value) {
-    if (value is! String) {
-      return null;
-    }
-    return DateTime.tryParse(value);
-  }
-}
+/// This file is not the home for authoritative historical conversation data.
+///
+/// Pocket Relay only persists narrow connection-scoped lane state here,
+/// currently `selectedThreadId`.
+///
+/// Pocket Relay may own other live session/runtime state elsewhere, but
+/// historical conversation lists and historical transcript content belong to
+/// Codex and must be read from Codex when needed.
 
 class SavedConnectionConversationState {
-  const SavedConnectionConversationState({
-    this.selectedThreadId,
-  });
+  const SavedConnectionConversationState({this.selectedThreadId});
 
+  /// The app may remember which upstream thread should be resumed, but it must
+  /// not persist its own historical transcript archive.
   final String? selectedThreadId;
 
   String? get normalizedSelectedThreadId {
@@ -96,9 +40,7 @@ class SavedConnectionConversationState {
   }
 
   Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'selectedThreadId': normalizedSelectedThreadId,
-    };
+    return <String, Object?>{'selectedThreadId': normalizedSelectedThreadId};
   }
 
   factory SavedConnectionConversationState.fromJson(Map<String, dynamic> json) {
@@ -108,8 +50,6 @@ class SavedConnectionConversationState {
   }
 }
 
-const Object _historySentinel = Object();
-
 abstract interface class CodexConversationStateStore {
   Future<SavedConnectionConversationState> loadState();
 
@@ -117,6 +57,10 @@ abstract interface class CodexConversationStateStore {
 }
 
 abstract interface class CodexConnectionConversationStateStore {
+  /// Loads connection-scoped lane state only.
+  ///
+  /// This store must not become a source of truth for historical conversation
+  /// lists or historical transcript content.
   Future<SavedConnectionConversationState> loadState(String connectionId);
 
   Future<void> saveState(
@@ -127,22 +71,23 @@ abstract interface class CodexConnectionConversationStateStore {
   Future<void> deleteState(String connectionId);
 }
 
-class SecureCodexConnectionConversationHistoryStore
+class SecureCodexConnectionConversationStateStore
     implements CodexConnectionConversationStateStore {
   static const _stateKeyPrefix = 'pocket_relay.connection.';
   static const _stateKeySuffix = '.conversation_state';
-  static const _legacyHistoryKeySuffix = '.conversation_history';
-  static const _legacyHandoffKeySuffix = '.conversation_handoff';
-  static const _preferencesMigrationKey =
-      'pocket_relay.connection_conversation_history_async_migration_complete';
+  static const _legacyMigration = CodexConnectionConversationStateLegacyMigration(
+    stateKeyPrefix: _stateKeyPrefix,
+    preferencesMigrationKey:
+        'pocket_relay.connection_conversation_history_async_migration_complete',
+  );
 
-  SecureCodexConnectionConversationHistoryStore({
+  SecureCodexConnectionConversationStateStore({
     SharedPreferencesAsync? preferences,
   }) : _preferences = preferences;
 
   SharedPreferencesAsync? _preferences;
-  final MemoryCodexConnectionConversationHistoryStore _fallbackStore =
-      MemoryCodexConnectionConversationHistoryStore();
+  final MemoryCodexConnectionConversationStateStore _fallbackStore =
+      MemoryCodexConnectionConversationStateStore();
   Future<void>? _preferencesReady;
 
   @override
@@ -165,11 +110,15 @@ class SecureCodexConnectionConversationHistoryStore
       );
     }
 
-    final migratedState = await _loadLegacyState(normalizedConnectionId);
-    if (migratedState == null) {
+    final migratedSelectedThreadId = await _legacyMigration
+        .loadLegacySelectedThreadId(preferences, normalizedConnectionId);
+    if (migratedSelectedThreadId == null) {
       return const SavedConnectionConversationState();
     }
 
+    final migratedState = SavedConnectionConversationState(
+      selectedThreadId: migratedSelectedThreadId,
+    );
     await saveState(normalizedConnectionId, migratedState);
     return migratedState;
   }
@@ -179,6 +128,8 @@ class SecureCodexConnectionConversationHistoryStore
     String connectionId,
     SavedConnectionConversationState state,
   ) async {
+    // Persist only lightweight lane state. Historical transcript content must
+    // remain upstream in Codex because most work may happen outside this app.
     final normalizedConnectionId = _normalizeConnectionId(connectionId);
     final preferences = _resolvedPreferences;
     if (preferences == null) {
@@ -197,12 +148,7 @@ class SecureCodexConnectionConversationHistoryStore
       await preferences.setString(key, jsonEncode(normalizedState.toJson()));
     }
 
-    await preferences.remove(
-      _legacyHistoryKeyForConnection(normalizedConnectionId),
-    );
-    await preferences.remove(
-      _legacyHandoffKeyForConnection(normalizedConnectionId),
-    );
+    await _legacyMigration.clearLegacyKeys(preferences, normalizedConnectionId);
   }
 
   @override
@@ -216,55 +162,14 @@ class SecureCodexConnectionConversationHistoryStore
 
     await _ensurePreferencesReady();
     await preferences.remove(_stateKeyForConnection(normalizedConnectionId));
-    await preferences.remove(
-      _legacyHistoryKeyForConnection(normalizedConnectionId),
-    );
-    await preferences.remove(
-      _legacyHandoffKeyForConnection(normalizedConnectionId),
-    );
-  }
-
-  Future<SavedConnectionConversationState?> _loadLegacyState(
-    String connectionId,
-  ) async {
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      return null;
-    }
-
-    final rawHandoff = await preferences.getString(
-      _legacyHandoffKeyForConnection(connectionId),
-    );
-    if (rawHandoff == null || rawHandoff.trim().isEmpty) {
-      return null;
-    }
-
-    final selectedThreadId = _decodeLegacySelectedThreadId(rawHandoff);
-    return SavedConnectionConversationState(
-      selectedThreadId: selectedThreadId,
-    );
-  }
-
-  String? _decodeLegacySelectedThreadId(String rawHandoff) {
-    final payload = jsonDecode(rawHandoff);
-    if (payload is! Map) {
-      return null;
-    }
-    final selectedThreadId = payload['resumeThreadId'];
-    if (selectedThreadId is! String) {
-      return null;
-    }
-    final normalizedThreadId = selectedThreadId.trim();
-    return normalizedThreadId.isEmpty ? null : normalizedThreadId;
+    await _legacyMigration.clearLegacyKeys(preferences, normalizedConnectionId);
   }
 
   Future<void> _ensurePreferencesReady() {
     if (_resolvedPreferences == null) {
       return Future<void>.value();
     }
-    return _preferencesReady ??= ensureSharedPreferencesAsyncReady(
-      migrationCompletedKey: _preferencesMigrationKey,
-    );
+    return _preferencesReady ??= _legacyMigration.ensurePreferencesReady();
   }
 
   SharedPreferencesAsync? get _resolvedPreferences {
@@ -294,31 +199,23 @@ class SecureCodexConnectionConversationHistoryStore
   String _stateKeyForConnection(String connectionId) {
     return '$_stateKeyPrefix$connectionId$_stateKeySuffix';
   }
-
-  String _legacyHistoryKeyForConnection(String connectionId) {
-    return '$_stateKeyPrefix$connectionId$_legacyHistoryKeySuffix';
-  }
-
-  String _legacyHandoffKeyForConnection(String connectionId) {
-    return '$_stateKeyPrefix$connectionId$_legacyHandoffKeySuffix';
-  }
 }
 
-class MemoryCodexConnectionConversationHistoryStore
+class MemoryCodexConnectionConversationStateStore
     implements CodexConnectionConversationStateStore {
-  MemoryCodexConnectionConversationHistoryStore({
+  MemoryCodexConnectionConversationStateStore({
     Map<String, SavedConnectionConversationState>? initialStates,
-  }) : _statesByConnectionId = (initialStates ??
-               const <String, SavedConnectionConversationState>{})
-           .map(
-               (key, value) =>
-                   MapEntry<String, SavedConnectionConversationState>(
-                     key,
-                     SavedConnectionConversationState(
-                       selectedThreadId: value.selectedThreadId,
+  }) : _statesByConnectionId =
+           (initialStates ?? const <String, SavedConnectionConversationState>{})
+               .map(
+                 (key, value) =>
+                     MapEntry<String, SavedConnectionConversationState>(
+                       key,
+                       SavedConnectionConversationState(
+                         selectedThreadId: value.selectedThreadId,
+                       ),
                      ),
-                   ),
-             );
+               );
 
   final Map<String, SavedConnectionConversationState> _statesByConnectionId;
 

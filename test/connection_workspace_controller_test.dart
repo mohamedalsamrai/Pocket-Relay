@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
+import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
@@ -361,7 +364,7 @@ void main() {
         ],
       );
       final conversationStateStore =
-          MemoryCodexConnectionConversationHistoryStore();
+          MemoryCodexConnectionConversationStateStore();
       final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
         'conn_primary': <FakeCodexAppServerClient>[],
         'conn_secondary': <FakeCodexAppServerClient>[],
@@ -422,7 +425,7 @@ void main() {
     'deleteDormantConnection removes the saved definition and handoff',
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final historyStore = MemoryCodexConnectionConversationHistoryStore();
+      final historyStore = MemoryCodexConnectionConversationStateStore();
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
         historyStore: historyStore,
@@ -463,7 +466,7 @@ void main() {
           ),
         ],
       );
-      final historyStore = MemoryCodexConnectionConversationHistoryStore();
+      final historyStore = MemoryCodexConnectionConversationStateStore();
       final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
         'conn_primary': <FakeCodexAppServerClient>[],
         'conn_secondary': <FakeCodexAppServerClient>[],
@@ -556,7 +559,7 @@ void main() {
             },
           );
       final sessionOwnedConversationStateStore =
-          MemoryCodexConnectionConversationHistoryStore();
+          MemoryCodexConnectionConversationStateStore();
       final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
@@ -609,6 +612,101 @@ void main() {
   );
 
   test(
+    'resumeConversation activates the replacement lane before transcript restore completes',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final historyStore = MemoryCodexConnectionConversationStateStore();
+      final restoreGate = Completer<void>();
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        connectionConversationStateStore: historyStore,
+        laneBindingFactory:
+            ({
+              required connectionId,
+              required connection,
+              required conversationState,
+            }) {
+              final appServerClient = FakeCodexAppServerClient()
+                ..threadHistoriesById['thread_resumed'] =
+                    _savedConversationThread(threadId: 'thread_resumed');
+              if (clientsByConnectionId[connectionId]!.isNotEmpty) {
+                appServerClient.readThreadWithTurnsGate = restoreGate;
+              }
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                conversationStateStore: ConnectionScopedConversationStateStore(
+                  connectionId: connectionId,
+                  conversationStateStore: historyStore,
+                ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                initialConversationState: conversationState,
+                ownsAppServerClient: false,
+              );
+            },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary');
+
+      final resumeFuture = controller.resumeConversation(
+        connectionId: 'conn_primary',
+        threadId: 'thread_resumed',
+      );
+      for (var attempt = 0; attempt < 20; attempt += 1) {
+        if (clientsByConnectionId['conn_primary']!.length >= 2) {
+          break;
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(clientsByConnectionId['conn_primary']!, hasLength(2));
+      final nextBinding = controller.bindingForConnectionId('conn_primary');
+      expect(nextBinding, isNotNull);
+      expect(nextBinding, isNot(same(firstBinding)));
+      expect(controller.selectedLaneBinding, same(nextBinding));
+      expect(
+        nextBinding!
+            .sessionController
+            .historicalConversationRestoreState
+            ?.phase,
+        ChatHistoricalConversationRestorePhase.loading,
+      );
+
+      restoreGate.complete();
+      await resumeFuture;
+
+      expect(
+        nextBinding.sessionController.historicalConversationRestoreState,
+        isNull,
+      );
+    },
+  );
+
+  test(
     'deleting the final dormant connection leaves a valid empty workspace',
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -651,7 +749,7 @@ void main() {
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   MemoryCodexConnectionRepository? repository,
-  MemoryCodexConnectionConversationHistoryStore? historyStore,
+  MemoryCodexConnectionConversationStateStore? historyStore,
 }) {
   final resolvedRepository =
       repository ??
@@ -671,7 +769,7 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   final seededHistoryStore =
       historyStore ??
-      MemoryCodexConnectionConversationHistoryStore(
+      MemoryCodexConnectionConversationStateStore(
         initialStates: <String, SavedConnectionConversationState>{
           'conn_secondary': const SavedConnectionConversationState(
             selectedThreadId: 'thread_saved',
@@ -719,35 +817,69 @@ ConnectionProfile _profile(String label, String host) {
   );
 }
 
-CodexAppServerThread _savedConversationThread({required String threadId}) {
-  return CodexAppServerThread(
+CodexAppServerThreadHistory _savedConversationThread({
+  required String threadId,
+}) {
+  return CodexAppServerThreadHistory(
     id: threadId,
     name: 'Saved conversation',
     sourceKind: 'app-server',
-    turns: const <Map<String, dynamic>>[
-      <String, Object?>{
-        'id': 'turn_saved',
-        'status': 'completed',
-        'items': <Object>[
-          <String, Object?>{
-            'id': 'item_user',
-            'type': 'user_message',
-            'status': 'completed',
-            'content': <Object>[
-              <String, Object?>{'text': 'Restore this'},
-            ],
-          },
-          <String, Object?>{
-            'id': 'item_assistant',
-            'type': 'agent_message',
-            'status': 'completed',
-            'content': <Object>[
-              <String, Object?>{'text': 'Restored answer'},
-            ],
-          },
+    turns: const <CodexAppServerHistoryTurn>[
+      CodexAppServerHistoryTurn(
+        id: 'turn_saved',
+        status: 'completed',
+        items: <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant',
+            type: 'agent_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ),
         ],
-      },
-    ].cast<Map<String, dynamic>>(),
+        raw: <String, dynamic>{
+          'id': 'turn_saved',
+          'status': 'completed',
+          'items': <Object>[
+            <String, Object?>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+            <String, Object?>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ],
+        },
+      ),
+    ],
   );
 }
 

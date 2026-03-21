@@ -1,0 +1,99 @@
+{
+  "thread": {
+    "id": "<thread_1>",
+    "preview": "<preview_1>",
+    "ephemeral": false,
+    "modelProvider": "openai",
+    "createdAt": 1773843162,
+    "updatedAt": 1773843437,
+    "status": {
+      "type": "notLoaded"
+    },
+    "path": "<path_1>",
+    "cwd": "<cwd_1>",
+    "cliVersion": "<string_1>",
+    "source": "<string_2>",
+    "agentNickname": null,
+    "agentRole": null,
+    "gitInfo": {
+      "sha": "<string_3>",
+      "branch": "<string_4>",
+      "originUrl": "<string_5>"
+    },
+    "name": null,
+    "turns": [
+      {
+        "id": "<turn_1>",
+        "items": [
+          {
+            "type": "userMessage",
+            "id": "<item_1>",
+            "content": [
+              {
+                "type": "text",
+                "text": "<text_1>",
+                "text_elements": []
+              }
+            ]
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_2>",
+            "text": "<text_2>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_3>",
+            "text": "<text_3>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_4>",
+            "text": "<text_4>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_5>",
+            "text": "<text_5>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_6>",
+            "text": "<text_6>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_7>",
+            "text": "<text_7>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_8>",
+            "text": "<text_8>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_9>",
+            "text": "<text_9>",
+            "phase": "<string_6>"
+          },
+          {
+            "type": "agentMessage",
+            "id": "<item_10>",
+            "text": "<text_10>",
+            "phase": "<string_7>"
+          }
+        ],
+        "status": "completed",
+        "error": null
+      }
+    ]
+  }
+}

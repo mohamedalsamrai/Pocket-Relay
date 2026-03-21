@@ -98,15 +98,20 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? connectError;
   Object? startSessionError;
   Object? sendUserMessageError;
+  Object? readThreadWithTurnsError;
   String? startSessionModel;
   String? startSessionReasoningEffort;
   String? startSessionCwd;
   int disconnectCalls = 0;
   String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
-  final Map<String, CodexAppServerThread> threadsById =
-      <String, CodexAppServerThread>{};
-  final List<CodexAppServerThread> listedThreads = <CodexAppServerThread>[];
+  Completer<void>? readThreadWithTurnsGate;
+  final Map<String, CodexAppServerThreadSummary> threadsById =
+      <String, CodexAppServerThreadSummary>{};
+  final Map<String, CodexAppServerThreadHistory> threadHistoriesById =
+      <String, CodexAppServerThreadHistory>{};
+  final List<CodexAppServerThreadSummary> listedThreads =
+      <CodexAppServerThreadSummary>[];
 
   bool _isConnected = false;
   String? _threadId;
@@ -165,23 +170,79 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       model: startSessionModel ?? model ?? 'gpt-5.3-codex',
       modelProvider: 'openai',
       reasoningEffort: startSessionReasoningEffort,
-      thread: CodexAppServerThread(id: _threadId!, sourceKind: 'app-server'),
+      thread: CodexAppServerThreadSummary(
+        id: _threadId!,
+        sourceKind: 'app-server',
+      ),
     );
   }
 
   @override
-  Future<CodexAppServerThread> readThread({required String threadId}) async {
+  Future<CodexAppServerThreadSummary> readThread({
+    required String threadId,
+  }) async {
     readThreadCalls.add(threadId);
     final configuredThread = threadsById[threadId];
     if (configuredThread != null) {
       return configuredThread;
     }
-    return CodexAppServerThread(id: threadId, sourceKind: 'app-server');
+    final configuredHistory = threadHistoriesById[threadId];
+    if (configuredHistory != null) {
+      return configuredHistory;
+    }
+    return CodexAppServerThreadSummary(id: threadId, sourceKind: 'app-server');
   }
 
   @override
-  Future<CodexAppServerThread> readThreadWithTurns({required String threadId}) {
-    return readThread(threadId: threadId);
+  Future<CodexAppServerThreadHistory> readThreadWithTurns({
+    required String threadId,
+  }) async {
+    final configuredHistory = threadHistoriesById[threadId];
+    if (configuredHistory != null) {
+      readThreadCalls.add(threadId);
+      if (readThreadWithTurnsGate case final gate?) {
+        await gate.future;
+      }
+      if (readThreadWithTurnsError != null) {
+        throw readThreadWithTurnsError!;
+      }
+      return configuredHistory;
+    }
+
+    final configuredThread = threadsById[threadId];
+    if (configuredThread is CodexAppServerThreadHistory) {
+      readThreadCalls.add(threadId);
+      if (readThreadWithTurnsGate case final gate?) {
+        await gate.future;
+      }
+      if (readThreadWithTurnsError != null) {
+        throw readThreadWithTurnsError!;
+      }
+      return configuredThread;
+    }
+
+    final summary = await readThread(threadId: threadId);
+    if (readThreadWithTurnsGate case final gate?) {
+      await gate.future;
+    }
+    if (readThreadWithTurnsError != null) {
+      throw readThreadWithTurnsError!;
+    }
+    return CodexAppServerThreadHistory(
+      id: summary.id,
+      preview: summary.preview,
+      ephemeral: summary.ephemeral,
+      modelProvider: summary.modelProvider,
+      createdAt: summary.createdAt,
+      updatedAt: summary.updatedAt,
+      path: summary.path,
+      cwd: summary.cwd,
+      promptCount: summary.promptCount,
+      name: summary.name,
+      sourceKind: summary.sourceKind,
+      agentNickname: summary.agentNickname,
+      agentRole: summary.agentRole,
+    );
   }
 
   @override
@@ -191,7 +252,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   }) async {
     listThreadCalls.add((cursor: cursor, limit: limit));
     return CodexAppServerThreadListPage(
-      threads: List<CodexAppServerThread>.from(listedThreads),
+      threads: List<CodexAppServerThreadSummary>.from(listedThreads),
       nextCursor: null,
     );
   }
