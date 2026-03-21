@@ -73,42 +73,53 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   Widget _buildMaterialComposer(BuildContext context) {
     final palette = context.pocketPalette;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.surface,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: palette.surfaceBorder),
         boxShadow: [
           BoxShadow(
             color: palette.shadowColor,
-            blurRadius: 28,
-            offset: const Offset(0, 14),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: _buildContent(
-        input: _wrapInputWithKeyboardSubmit(
-          context,
-          TextField(
-            key: const ValueKey('composer_input'),
-            controller: _controller,
-            minLines: 1,
-            maxLines: 6,
-            textInputAction: TextInputAction.newline,
-            onChanged: _handleChanged,
-            decoration: InputDecoration(
-              hintText: widget.contract.placeholder,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              filled: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+        child: _buildContent(
+          input: _wrapInputWithKeyboardSubmit(
+            context,
+            TextField(
+              key: const ValueKey('composer_input'),
+              controller: _controller,
+              minLines: 1,
+              maxLines: 6,
+              textInputAction: TextInputAction.newline,
+              onChanged: _handleChanged,
+              decoration: InputDecoration(
+                hintText: widget.contract.placeholder,
+                isCollapsed: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+              ),
             ),
           ),
-        ),
-        primaryAction: IconButton.filled(
-          key: const ValueKey('send'),
-          onPressed: _isSendActionEnabled ? widget.onSend : null,
-          icon: const Icon(Icons.send_rounded),
+          primaryAction: SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton.filled(
+              key: const ValueKey('send'),
+              onPressed: _isSendActionEnabled ? widget.onSend : null,
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.arrow_upward_rounded, size: 18),
+            ),
+          ),
+          crossAxisAlignment: CrossAxisAlignment.center,
         ),
       ),
     );

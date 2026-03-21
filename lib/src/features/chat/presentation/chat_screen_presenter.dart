@@ -2,6 +2,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft.dart';
+import 'package:pocket_relay/src/features/chat/presentation/chat_lane_header_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_surface_projector.dart';
@@ -10,9 +11,12 @@ class ChatScreenPresenter {
   const ChatScreenPresenter({
     ChatTranscriptSurfaceProjector transcriptSurfaceProjector =
         const ChatTranscriptSurfaceProjector(),
-  }) : _transcriptSurfaceProjector = transcriptSurfaceProjector;
+    ChatLaneHeaderProjector headerProjector = const ChatLaneHeaderProjector(),
+  }) : _transcriptSurfaceProjector = transcriptSurfaceProjector,
+       _headerProjector = headerProjector;
 
   final ChatTranscriptSurfaceProjector _transcriptSurfaceProjector;
+  final ChatLaneHeaderProjector _headerProjector;
 
   ChatScreenContract present({
     required bool isLoading,
@@ -37,9 +41,9 @@ class ChatScreenPresenter {
         !isLoading &&
         !isBusy &&
         conversationRecoveryNotice == null;
-    final header = _header(
+    final header = _headerProjector.project(
       profile: profile,
-      sessionState: sessionState,
+      metadata: sessionState.headerMetadata,
       isConfigured: isConfigured,
     );
     final displayConnectionMode =
@@ -97,67 +101,6 @@ class ChatScreenPresenter {
         _ => null,
       },
     );
-  }
-
-  ChatHeaderContract _header({
-    required ConnectionProfile profile,
-    required CodexSessionState sessionState,
-    required bool isConfigured,
-  }) {
-    final title = profile.label.trim().isEmpty ? 'Codex' : profile.label.trim();
-    final subtitle = _sessionSubtitle(
-      profile: profile,
-      sessionState: sessionState,
-      isConfigured: isConfigured,
-    );
-    return ChatHeaderContract(title: title, subtitle: subtitle);
-  }
-
-  String _sessionSubtitle({
-    required ConnectionProfile profile,
-    required CodexSessionState sessionState,
-    required bool isConfigured,
-  }) {
-    if (!isConfigured) {
-      return 'Configure Codex';
-    }
-
-    final connectionDescriptor = switch (profile.connectionMode) {
-      ConnectionMode.remote => profile.host.trim(),
-      ConnectionMode.local => 'local Codex',
-    };
-    final model = sessionState.headerMetadata.model?.trim();
-    final effort = sessionState.headerMetadata.reasoningEffort?.trim();
-    final base = connectionDescriptor.isEmpty
-        ? <String>[]
-        : <String>[connectionDescriptor];
-    if (model != null && model.isNotEmpty) {
-      final normalizedEffort = _formatReasoningEffort(effort);
-      if (normalizedEffort == null) {
-        return <String>[...base, model].join(' · ');
-      }
-      return <String>[...base, model, normalizedEffort].join(' · ');
-    }
-    if (base.isNotEmpty) {
-      return base.join(' · ');
-    }
-    return 'Waiting for Codex session';
-  }
-
-  String? _formatReasoningEffort(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return switch (normalized) {
-      'none' => 'no effort',
-      'minimal' => 'minimal effort',
-      'low' => 'low effort',
-      'medium' => 'medium effort',
-      'high' => 'high effort',
-      'xhigh' => 'xhigh effort',
-      _ => normalized,
-    };
   }
 
   List<ChatTimelineSummaryContract> _timelineSummaries(

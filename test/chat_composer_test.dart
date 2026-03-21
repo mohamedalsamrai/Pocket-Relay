@@ -183,6 +183,20 @@ void main() {
     expect(find.byKey(const ValueKey('send')), findsOneWidget);
     expect(find.byKey(const ValueKey('stop')), findsNothing);
   });
+
+  testWidgets('uses a compact chat-style input shell', (tester) async {
+    await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    final sendSize = tester.getSize(find.byKey(const ValueKey('send')));
+
+    expect(field.decoration?.isCollapsed, isTrue);
+    expect(
+      field.decoration?.contentPadding,
+      const EdgeInsets.symmetric(vertical: 4),
+    );
+    expect(sendSize, const Size(36, 36));
+  });
 }
 
 Widget _buildComposerApp({
