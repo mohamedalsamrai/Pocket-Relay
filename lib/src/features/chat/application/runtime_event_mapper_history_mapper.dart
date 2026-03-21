@@ -1,66 +1,57 @@
 part of 'runtime_event_mapper.dart';
 
-List<CodexRuntimeEvent> _mapRuntimeThreadHistory(
-  CodexAppServerThreadHistory thread,
+List<CodexRuntimeEvent> _mapRuntimeHistoricalConversation(
+  CodexHistoricalConversation conversation,
 ) {
-  final fallbackCreatedAt =
-      thread.createdAt ?? thread.updatedAt ?? DateTime.now();
   final events = <CodexRuntimeEvent>[
     CodexRuntimeThreadStartedEvent(
-      createdAt: fallbackCreatedAt,
-      threadId: thread.id,
-      providerThreadId: thread.id,
+      createdAt: conversation.createdAt,
+      threadId: conversation.threadId,
+      providerThreadId: conversation.threadId,
       rawMethod: 'thread/read(response)',
-      threadName: thread.name,
-      sourceKind: thread.sourceKind,
-      agentNickname: thread.agentNickname,
-      agentRole: thread.agentRole,
+      threadName: conversation.threadName,
+      sourceKind: conversation.sourceKind,
+      agentNickname: conversation.agentNickname,
+      agentRole: conversation.agentRole,
     ),
   ];
 
-  for (final turn in thread.turns) {
-    final threadId = turn.threadId ?? thread.id;
-    final turnCreatedAt = _eventTimestamp(
-      turn.raw,
-      fallback: fallbackCreatedAt,
-    );
+  for (final turn in conversation.turns) {
     events.add(
       CodexRuntimeTurnStartedEvent(
-        createdAt: turnCreatedAt,
-        threadId: threadId,
+        createdAt: turn.createdAt,
+        threadId: turn.threadId,
         turnId: turn.id,
         rawMethod: 'thread/read(turn)',
-        rawPayload: turn.raw,
+        rawPayload: turn.snapshot,
         model: turn.model,
         effort: turn.effort,
       ),
     );
 
-    for (final item in turn.items) {
-      final event = _mapHistoricalItemLifecycleEvent(
-        item.raw,
-        threadId: threadId,
-        turnId: turn.id,
-        fallbackCreatedAt: turnCreatedAt,
-      );
-      if (event != null) {
-        events.add(event);
-      }
+    for (final entry in turn.entries) {
+      final rawPayload = <String, Object?>{
+        'threadId': entry.threadId,
+        'turnId': entry.turnId,
+        'itemId': entry.id,
+        'item': entry.snapshot,
+      };
+      events.add(_buildHistoricalLifecycleEvent(entry, rawPayload: rawPayload));
     }
 
     events.add(
       CodexRuntimeTurnCompletedEvent(
-        createdAt: _eventTimestamp(turn.raw, fallback: turnCreatedAt),
-        threadId: threadId,
+        createdAt: turn.completedAt,
+        threadId: turn.threadId,
         turnId: turn.id,
         rawMethod: 'thread/read(turn)',
-        rawPayload: turn.raw,
-        state: _turnState(turn.status),
+        rawPayload: turn.snapshot,
+        state: turn.state,
         stopReason: turn.stopReason,
-        usage: _toTurnUsage(turn.usage),
+        usage: turn.usage,
         modelUsage: turn.modelUsage,
         totalCostUsd: turn.totalCostUsd,
-        errorMessage: _asString(turn.error?['message']),
+        errorMessage: turn.errorMessage,
       ),
     );
   }
@@ -68,96 +59,39 @@ List<CodexRuntimeEvent> _mapRuntimeThreadHistory(
   return events;
 }
 
-CodexRuntimeItemLifecycleEvent? _mapHistoricalItemLifecycleEvent(
-  Map<String, dynamic> item, {
-  required String threadId,
-  required String turnId,
-  required DateTime fallbackCreatedAt,
+CodexRuntimeItemLifecycleEvent _buildHistoricalLifecycleEvent(
+  CodexHistoricalEntry entry, {
+  required Object? rawPayload,
 }) {
-  final itemId = _asString(item['id']);
-  if (itemId == null || itemId.isEmpty) {
-    return null;
-  }
-
-  final payload = <String, Object?>{
-    'threadId': threadId,
-    'turnId': turnId,
-    'itemId': itemId,
-    'item': item,
-  };
-  final createdAt = _eventTimestamp(item, fallback: fallbackCreatedAt);
-  final status = _itemStatus(item['status'], CodexRuntimeItemStatus.completed);
-  if (status == CodexRuntimeItemStatus.inProgress) {
-    return _mapItemLifecycle(
-      payload,
-      createdAt,
+  if (entry.status == CodexRuntimeItemStatus.inProgress) {
+    return CodexRuntimeItemStartedEvent(
+      createdAt: entry.createdAt,
+      itemType: entry.itemType,
+      threadId: entry.threadId,
+      turnId: entry.turnId,
+      itemId: entry.id,
+      status: entry.status,
       rawMethod: 'thread/read(item)',
-      rawPayload: payload,
-      fallbackStatus: CodexRuntimeItemStatus.inProgress,
-      builder:
-          ({
-            required createdAt,
-            required itemType,
-            required threadId,
-            required turnId,
-            required itemId,
-            required status,
-            required rawMethod,
-            required rawPayload,
-            required title,
-            required detail,
-            required snapshot,
-            required collaboration,
-          }) => CodexRuntimeItemStartedEvent(
-            createdAt: createdAt,
-            itemType: itemType,
-            threadId: threadId,
-            turnId: turnId,
-            itemId: itemId,
-            status: status,
-            rawMethod: rawMethod,
-            rawPayload: rawPayload,
-            title: title,
-            detail: detail,
-            snapshot: snapshot,
-            collaboration: collaboration,
-          ),
+      rawPayload: rawPayload,
+      title: entry.title,
+      detail: entry.detail,
+      snapshot: entry.snapshot,
+      collaboration: entry.collaboration,
     );
   }
 
-  return _mapItemLifecycle(
-    payload,
-    createdAt,
+  return CodexRuntimeItemCompletedEvent(
+    createdAt: entry.createdAt,
+    itemType: entry.itemType,
+    threadId: entry.threadId,
+    turnId: entry.turnId,
+    itemId: entry.id,
+    status: entry.status,
     rawMethod: 'thread/read(item)',
-    rawPayload: payload,
-    fallbackStatus: CodexRuntimeItemStatus.completed,
-    builder:
-        ({
-          required createdAt,
-          required itemType,
-          required threadId,
-          required turnId,
-          required itemId,
-          required status,
-          required rawMethod,
-          required rawPayload,
-          required title,
-          required detail,
-          required snapshot,
-          required collaboration,
-        }) => CodexRuntimeItemCompletedEvent(
-          createdAt: createdAt,
-          itemType: itemType,
-          threadId: threadId,
-          turnId: turnId,
-          itemId: itemId,
-          status: status,
-          rawMethod: rawMethod,
-          rawPayload: rawPayload,
-          title: title,
-          detail: detail,
-          snapshot: snapshot,
-          collaboration: collaboration,
-        ),
+    rawPayload: rawPayload,
+    title: entry.title,
+    detail: entry.detail,
+    snapshot: entry.snapshot,
+    collaboration: entry.collaboration,
   );
 }

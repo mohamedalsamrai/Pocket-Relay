@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_recovery_policy.dart';
+import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
 import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
@@ -27,9 +28,12 @@ class ChatSessionController extends ChangeNotifier {
         const SavedConnectionConversationState(),
     TranscriptReducer reducer = const TranscriptReducer(),
     CodexRuntimeEventMapper? runtimeEventMapper,
+    CodexHistoricalConversationNormalizer historicalConversationNormalizer =
+        const CodexHistoricalConversationNormalizer(),
     bool? supportsLocalConnectionMode,
   }) : _sessionReducer = reducer,
        _runtimeEventMapper = runtimeEventMapper ?? CodexRuntimeEventMapper(),
+       _historicalConversationNormalizer = historicalConversationNormalizer,
        _conversationSelection = ChatConversationSelectionCoordinator(
          conversationStateStore: conversationStateStore,
          initialConversationState: initialConversationState,
@@ -52,6 +56,7 @@ class ChatSessionController extends ChangeNotifier {
 
   final TranscriptReducer _sessionReducer;
   final CodexRuntimeEventMapper _runtimeEventMapper;
+  final CodexHistoricalConversationNormalizer _historicalConversationNormalizer;
   final ChatConversationSelectionCoordinator _conversationSelection;
   final ChatConversationRecoveryPolicy _conversationRecoveryPolicy =
       const ChatConversationRecoveryPolicy();
@@ -498,10 +503,14 @@ class ChatSessionController extends ChangeNotifier {
         return;
       }
 
+      final historicalConversation = _historicalConversationNormalizer
+          .normalize(thread);
       var nextState = CodexSessionState.transcript(
         connectionStatus: CodexRuntimeSessionState.ready,
       );
-      for (final event in _runtimeEventMapper.mapThreadHistory(thread)) {
+      for (final event in _runtimeEventMapper.mapHistoricalConversation(
+        historicalConversation,
+      )) {
         nextState = _sessionReducer.reduceRuntimeEvent(nextState, event);
       }
 

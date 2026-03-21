@@ -1,3 +1,4 @@
+import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_json_rpc_codec.dart';
@@ -41,8 +42,10 @@ class CodexRuntimeEventMapper {
     }
   }
 
-  List<CodexRuntimeEvent> mapThreadHistory(CodexAppServerThreadHistory thread) {
-    return _mapRuntimeThreadHistory(thread);
+  List<CodexRuntimeEvent> mapHistoricalConversation(
+    CodexHistoricalConversation conversation,
+  ) {
+    return _mapRuntimeHistoricalConversation(conversation);
   }
 }
 
