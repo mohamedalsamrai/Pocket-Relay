@@ -23,7 +23,11 @@ Implemented result:
 - focused controller and widget tests now cover startup restore, unavailable
   upstream history, reconnect rehydration, and live-lane replacement restore
 
-What is not complete is the product behavior for one critical restore path:
+The remaining sections preserve the original gap analysis and phased checklist
+that justified this follow-up.
+
+At the time this document was opened, the product was still failing one
+critical restore path:
 
 - a lane starts with a persisted `selectedThreadId`
 - Pocket Relay knows which historical thread should be resumed
@@ -48,13 +52,13 @@ That work successfully landed most of the supporting architecture:
 - explicit historical restore UI states
 - explicit history-row resume restoration
 
-However, the remaining startup restore gap is still large enough to fail the
+However, the remaining startup restore gap was still large enough to fail the
 real product expectation:
 
 - if a user resumes a historical conversation, the transcript wall should fill
   with that historical conversation before the next prompt is sent
 
-## Current Reality
+## Original Gap Analysis
 
 ### What already works
 
@@ -73,11 +77,11 @@ Current path:
 
 That path is already covered by focused tests.
 
-### What is still broken
+### What was still broken
 
-The startup/plain lane restore path is incomplete.
+The startup/plain lane restore path was incomplete.
 
-Current startup behavior:
+Startup behavior before the fix:
 
 1. a persisted `selectedThreadId` is loaded into
    `SavedConnectionConversationState`
@@ -95,9 +99,9 @@ But it does not reliably do the product-critical part:
 
 - load and render that thread's historical transcript wall immediately
 
-## Why This Is Not Done
+## Why This Was Not Done
 
-This gap means the repo still fails the definition of done already stated in
+This gap meant the repo still failed the definition of done already stated in
 `docs/032_codex_history_transcript_restoration_upgrade_plan.md`.
 
 That plan says the work is done only when restoring a historical conversation
@@ -106,7 +110,7 @@ either:
 - shows the real transcript on screen, or
 - shows an explicit honest state that Codex did not provide enough history
 
-The startup gap does neither reliably enough.
+The startup gap did neither reliably enough.
 
 ## Existing Evidence In The Repo
 
@@ -141,7 +145,7 @@ This is the key mismatch:
 - Honest unavailable or failed restore states must remain visible when upstream
   history is missing or unusable.
 
-## Remaining Work
+## Implemented Work
 
 ## Phase 1. Auto-Restore On Lane Startup
 
