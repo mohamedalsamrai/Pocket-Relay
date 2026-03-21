@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -441,6 +442,77 @@ void main() {
         overlayDelegate.transientFeedbackMessages.single,
         'Could not rewind this conversation to the selected prompt.',
       );
+    },
+  );
+
+  testWidgets(
+    'secondary-clicking a saved desktop user message exposes continue from here',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        );
+      final overlayDelegate = _FakeChatRootOverlayDelegate();
+      final laneBinding = ConnectionLaneBinding(
+        connectionId: 'conn_primary',
+        profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
+        conversationStateStore: const DiscardingCodexConversationStateStore(),
+        appServerClient: appServerClient,
+        initialSavedProfile: _savedProfile(),
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(appServerClient.close);
+      addTearDown(laneBinding.dispose);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          laneBinding: laneBinding,
+          platformBehavior: PocketPlatformBehavior.resolve(
+            platform: TargetPlatform.macOS,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      appServerClient.threadHistoriesById['thread_saved'] =
+          _rewoundConversationThread(threadId: 'thread_saved');
+
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      addTearDown(gesture.removePointer);
+      await gesture.down(tester.getCenter(find.text('Restore this')));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue From Here'), findsOneWidget);
+      await tester.tap(find.text('Continue From Here').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue From Here'), findsOneWidget);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      expect(
+        appServerClient.rollbackThreadCalls,
+        <({String threadId, int numTurns})>[
+          (threadId: 'thread_saved', numTurns: 2),
+        ],
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('composer_input')))
+            .controller
+            ?.text,
+        'Restore this',
+      );
+      expect(find.text('Earlier answer only'), findsOneWidget);
     },
   );
 

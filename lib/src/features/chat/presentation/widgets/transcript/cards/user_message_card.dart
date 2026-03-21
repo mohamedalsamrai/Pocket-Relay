@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
@@ -7,11 +9,13 @@ class UserMessageCard extends StatelessWidget {
     super.key,
     required this.block,
     this.canContinueFromHere = false,
+    this.showsDesktopContextMenu = false,
     this.onContinueFromHere,
   });
 
   final CodexUserMessageBlock block;
   final bool canContinueFromHere;
+  final bool showsDesktopContextMenu;
   final Future<void> Function(String blockId)? onContinueFromHere;
 
   @override
@@ -35,6 +39,8 @@ class UserMessageCard extends StatelessWidget {
         darkAlpha: isLocalEcho ? 0.20 : 0.28,
       ),
     );
+    final canShowContinueAction =
+        canContinueFromHere && onContinueFromHere != null;
 
     return Align(
       alignment: Alignment.centerRight,
@@ -45,8 +51,15 @@ class UserMessageCard extends StatelessWidget {
           child: InkWell(
             key: ValueKey<String>('user_message_card_${block.id}'),
             borderRadius: BorderRadius.circular(20),
-            onLongPress: canContinueFromHere && onContinueFromHere != null
+            onLongPress: canShowContinueAction
                 ? () => onContinueFromHere!(block.id)
+                : null,
+            onSecondaryTapDown: canShowContinueAction && showsDesktopContextMenu
+                ? (details) {
+                    unawaited(
+                      _showDesktopContextMenu(context, details.globalPosition),
+                    );
+                  }
                 : null,
             child: Padding(
               padding: const EdgeInsets.only(left: 48),
@@ -72,4 +85,33 @@ class UserMessageCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _showDesktopContextMenu(
+    BuildContext context,
+    Offset globalPosition,
+  ) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selection = await showMenu<_UserMessageCardAction>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem<_UserMessageCardAction>(
+          value: _UserMessageCardAction.continueFromHere,
+          child: Text('Continue From Here'),
+        ),
+      ],
+    );
+    if (selection != _UserMessageCardAction.continueFromHere) {
+      return;
+    }
+
+    await onContinueFromHere?.call(block.id);
+  }
 }
+
+enum _UserMessageCardAction { continueFromHere }
