@@ -6,7 +6,8 @@ import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_s
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 
 part 'transcript_request_policy_approval.dart';
-part 'transcript_request_policy_support.dart';
+part 'transcript_request_policy_support_active_turn.dart';
+part 'transcript_request_policy_support_resolution.dart';
 part 'transcript_request_policy_user_input.dart';
 
 class TranscriptRequestPolicy {
