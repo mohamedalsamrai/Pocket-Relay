@@ -1,18 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 
 class PocketPlatformPolicy {
-  const PocketPlatformPolicy({
-    required this.behavior,
-    required this.regionPolicy,
-  });
+  const PocketPlatformPolicy({required this.behavior});
 
   factory PocketPlatformPolicy.resolve({
     TargetPlatform? platform,
     bool isWeb = kIsWeb,
-    ChatRootPlatformPolicy chatRootPlatformPolicy =
-        const ChatRootPlatformPolicy.allFlutter(),
   }) {
     final resolvedPlatform = platform ?? defaultTargetPlatform;
     return PocketPlatformPolicy(
@@ -20,12 +14,10 @@ class PocketPlatformPolicy {
         platform: resolvedPlatform,
         isWeb: isWeb,
       ),
-      regionPolicy: chatRootPlatformPolicy.policyFor(resolvedPlatform),
     );
   }
 
   final PocketPlatformBehavior behavior;
-  final ChatRootRegionPolicy regionPolicy;
 
   bool get supportsLocalConnectionMode => behavior.supportsLocalConnectionMode;
 

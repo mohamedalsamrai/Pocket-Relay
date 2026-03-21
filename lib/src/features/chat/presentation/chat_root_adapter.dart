@@ -6,14 +6,13 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
@@ -22,7 +21,6 @@ class ChatRootAdapter extends StatefulWidget {
     required this.platformPolicy,
     required this.onConnectionSettingsRequested,
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
-    this.rendererDelegate = const FlutterChatRootRendererDelegate(),
     this.supplementalMenuActions = const <ChatChromeMenuAction>[],
   });
 
@@ -31,7 +29,6 @@ class ChatRootAdapter extends StatefulWidget {
   final Future<void> Function(ChatConnectionSettingsLaunchContract payload)
   onConnectionSettingsRequested;
   final ChatRootOverlayDelegate overlayDelegate;
-  final ChatRootRendererDelegate rendererDelegate;
   final List<ChatChromeMenuAction> supplementalMenuActions;
 
   @override
@@ -80,13 +77,11 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
       ]),
       builder: (context, _) {
         final screen = _buildScreenContract();
-        final regionPolicy = widget.platformPolicy.regionPolicy;
-        return widget.rendererDelegate.buildScreenShell(
-          renderer: regionPolicy.screenShell,
+        return FlutterChatScreenRenderer(
           screen: screen,
-          appChrome: _buildAppChrome(screen, regionPolicy),
-          transcriptRegion: _buildTranscriptRegion(screen, regionPolicy),
-          composerRegion: _buildComposerRegion(screen, regionPolicy),
+          appChrome: _buildAppChrome(screen),
+          transcriptRegion: _buildTranscriptRegion(screen),
+          composerRegion: _buildComposerRegion(screen),
           onStopActiveTurn: _stopActiveTurn,
         );
       },
@@ -99,27 +94,19 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  PreferredSizeWidget _buildAppChrome(
-    ChatScreenContract screen,
-    ChatRootRegionPolicy regionPolicy,
-  ) {
-    return widget.rendererDelegate.buildAppChrome(
-      renderer: regionPolicy.rendererFor(ChatRootRegion.appChrome),
+  PreferredSizeWidget _buildAppChrome(ChatScreenContract screen) {
+    return FlutterChatAppChrome(
       screen: screen,
       onScreenAction: (action) => _handleScreenAction(action, screen),
       supplementalMenuActions: widget.supplementalMenuActions,
     );
   }
 
-  Widget _buildTranscriptRegion(
-    ChatScreenContract screen,
-    ChatRootRegionPolicy regionPolicy,
-  ) {
+  Widget _buildTranscriptRegion(ChatScreenContract screen) {
     final laneBinding = widget.laneBinding;
     final sessionController = laneBinding.sessionController;
 
-    return widget.rendererDelegate.buildTranscriptRegion(
-      renderer: regionPolicy.rendererFor(ChatRootRegion.transcript),
+    return FlutterChatTranscriptRegion(
       screen: screen,
       surfaceChangeToken: sessionController.sessionState,
       platformBehavior: widget.platformPolicy.behavior,
@@ -139,12 +126,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  Widget _buildComposerRegion(
-    ChatScreenContract screen,
-    ChatRootRegionPolicy regionPolicy,
-  ) {
-    return widget.rendererDelegate.buildComposerRegion(
-      renderer: regionPolicy.rendererFor(ChatRootRegion.composer),
+  Widget _buildComposerRegion(ChatScreenContract screen) {
+    return FlutterChatComposerRegion(
       platformBehavior: widget.platformPolicy.behavior,
       conversationRecoveryNotice: screen.conversationRecoveryNotice,
       composer: screen.composer,

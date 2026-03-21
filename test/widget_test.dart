@@ -46,7 +46,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Pocket Relay'), findsOneWidget);
+    expect(find.text('Developer Box'), findsOneWidget);
     expect(find.text('Configure remote'), findsWidgets);
     expect(find.byType(ConnectionWorkspaceMobileShell), findsOneWidget);
     expect(find.byKey(const ValueKey('workspace_page_view')), findsOneWidget);
@@ -81,8 +81,10 @@ void main() {
     await tester.pumpWidget(_buildCatalogApp(connectionRepository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('Dev Box · devbox.local'), findsOneWidget);
-    expect(find.text('Second Box · second.local'), findsNothing);
+    expect(find.text('Dev Box'), findsOneWidget);
+    expect(find.text('devbox.local'), findsOneWidget);
+    expect(find.text('Second Box'), findsNothing);
+    expect(find.text('second.local'), findsNothing);
   });
 
   testWidgets('boots an empty workspace into the dormant roster shell', (

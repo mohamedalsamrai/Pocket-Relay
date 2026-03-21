@@ -66,18 +66,19 @@ void main() {
       await tester.pumpWidget(
         _buildShell(
           controller,
-          conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
-            conversations: <CodexWorkspaceConversationSummary>[
-              CodexWorkspaceConversationSummary(
-                threadId: 'thread_saved',
-                preview: 'Saved backend thread',
-                cwd: '/workspace',
-                promptCount: 3,
-                firstPromptAt: DateTime(2026, 3, 20, 9),
-                lastActivityAt: DateTime(2026, 3, 20, 11),
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                conversations: <CodexWorkspaceConversationSummary>[
+                  CodexWorkspaceConversationSummary(
+                    threadId: 'thread_saved',
+                    preview: 'Saved backend thread',
+                    cwd: '/workspace',
+                    promptCount: 3,
+                    firstPromptAt: DateTime(2026, 3, 20, 9),
+                    lastActivityAt: DateTime(2026, 3, 20, 11),
+                  ),
+                ],
               ),
-            ],
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -137,9 +138,7 @@ void main() {
     'desktop overflow menu opens the workspace conversation history sheet',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final controller = _buildWorkspaceController(
-        clientsById: clientsById,
-      );
+      final controller = _buildWorkspaceController(clientsById: clientsById);
       addTearDown(() async {
         controller.dispose();
         await _closeClients(clientsById);
@@ -149,18 +148,19 @@ void main() {
       await tester.pumpWidget(
         _buildShell(
           controller,
-          conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
-            conversations: <CodexWorkspaceConversationSummary>[
-              CodexWorkspaceConversationSummary(
-                threadId: 'thread_saved',
-                preview: 'Saved backend thread',
-                cwd: '/workspace',
-                promptCount: 3,
-                firstPromptAt: DateTime(2026, 3, 20, 9),
-                lastActivityAt: DateTime(2026, 3, 20, 11),
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                conversations: <CodexWorkspaceConversationSummary>[
+                  CodexWorkspaceConversationSummary(
+                    threadId: 'thread_saved',
+                    preview: 'Saved backend thread',
+                    cwd: '/workspace',
+                    promptCount: 3,
+                    firstPromptAt: DateTime(2026, 3, 20, 9),
+                    lastActivityAt: DateTime(2026, 3, 20, 11),
+                  ),
+                ],
               ),
-            ],
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -253,9 +253,7 @@ void main() {
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-    final controller = _buildWorkspaceController(
-      clientsById: clientsById,
-    );
+    final controller = _buildWorkspaceController(clientsById: clientsById);
     addTearDown(() async {
       controller.dispose();
       await _closeClients(clientsById);
@@ -265,9 +263,10 @@ void main() {
     await tester.pumpWidget(
       _buildShell(
         controller,
-        conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
-          error: StateError('history backend unavailable'),
-        ),
+        conversationHistoryRepository:
+            FakeCodexWorkspaceConversationHistoryRepository(
+              error: StateError('history backend unavailable'),
+            ),
       ),
     );
     await tester.pumpAndSettle();
@@ -299,18 +298,19 @@ void main() {
       await tester.pumpWidget(
         _buildShell(
           controller,
-          conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
-            conversations: <CodexWorkspaceConversationSummary>[
-              CodexWorkspaceConversationSummary(
-                threadId: 'thread_saved',
-                preview: 'Saved backend thread',
-                cwd: '/workspace',
-                promptCount: 3,
-                firstPromptAt: DateTime(2026, 3, 20, 9),
-                lastActivityAt: DateTime(2026, 3, 20, 11),
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                conversations: <CodexWorkspaceConversationSummary>[
+                  CodexWorkspaceConversationSummary(
+                    threadId: 'thread_saved',
+                    preview: 'Saved backend thread',
+                    cwd: '/workspace',
+                    promptCount: 3,
+                    firstPromptAt: DateTime(2026, 3, 20, 9),
+                    lastActivityAt: DateTime(2026, 3, 20, 11),
+                  ),
+                ],
               ),
-            ],
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -319,12 +319,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Conversation history'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('workspace_conversation_thread_saved')));
+      await tester.tap(
+        find.byKey(const ValueKey('workspace_conversation_thread_saved')),
+      );
       await tester.pumpAndSettle();
 
       expect(
-        (await conversationStateStore.loadState('conn_primary'))
-            .normalizedSelectedThreadId,
+        (await conversationStateStore.loadState(
+          'conn_primary',
+        )).normalizedSelectedThreadId,
         'thread_saved',
       );
       expect(clientsById['conn_primary']?.disconnectCalls, 1);
@@ -356,7 +359,20 @@ void main() {
 
     expect(controller.state.isShowingLiveLane, isTrue);
     expect(controller.state.selectedConnectionId, 'conn_secondary');
-    expect(find.text('Secondary Box · secondary.local'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        matching: find.text('Secondary Box'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        matching: find.text('secondary.local · /workspace'),
+      ),
+      findsOneWidget,
+    );
     expect(clientsById['conn_primary']?.disconnectCalls, 0);
     expect(clientsById['conn_secondary']?.disconnectCalls, 0);
   });
@@ -388,7 +404,20 @@ void main() {
       find.byKey(const ValueKey('desktop_live_conn_primary')),
       findsNothing,
     );
-    expect(find.text('Secondary Box · secondary.local'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        matching: find.text('Secondary Box'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        matching: find.text('secondary.local · /workspace'),
+      ),
+      findsOneWidget,
+    );
     expect(clientsById['conn_primary']?.disconnectCalls, 1);
     expect(clientsById['conn_secondary']?.disconnectCalls, 0);
   });

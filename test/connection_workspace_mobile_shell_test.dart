@@ -72,9 +72,7 @@ void main() {
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-    final controller = _buildWorkspaceController(
-      clientsById: clientsById,
-    );
+    final controller = _buildWorkspaceController(clientsById: clientsById);
     addTearDown(() async {
       controller.dispose();
       await _closeClients(clientsById);
@@ -84,18 +82,19 @@ void main() {
     await tester.pumpWidget(
       _buildShell(
         controller,
-        conversationHistoryRepository: FakeCodexWorkspaceConversationHistoryRepository(
-          conversations: <CodexWorkspaceConversationSummary>[
-            CodexWorkspaceConversationSummary(
-              threadId: 'thread_saved',
-              preview: 'Saved backend thread',
-              cwd: '/workspace',
-              promptCount: 2,
-              firstPromptAt: DateTime(2026, 3, 20, 9),
-              lastActivityAt: DateTime(2026, 3, 20, 10),
+        conversationHistoryRepository:
+            FakeCodexWorkspaceConversationHistoryRepository(
+              conversations: <CodexWorkspaceConversationSummary>[
+                CodexWorkspaceConversationSummary(
+                  threadId: 'thread_saved',
+                  preview: 'Saved backend thread',
+                  cwd: '/workspace',
+                  promptCount: 2,
+                  firstPromptAt: DateTime(2026, 3, 20, 9),
+                  lastActivityAt: DateTime(2026, 3, 20, 10),
+                ),
+              ],
             ),
-          ],
-        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -113,9 +112,7 @@ void main() {
     'overflow menu shows an honest error until Codex-backed history loading exists',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final controller = _buildWorkspaceController(
-        clientsById: clientsById,
-      );
+      final controller = _buildWorkspaceController(clientsById: clientsById);
       addTearDown(() async {
         controller.dispose();
         await _closeClients(clientsById);
@@ -298,7 +295,8 @@ void main() {
     ]);
     expect(controller.state.selectedConnectionId, 'conn_secondary');
     expect(controller.state.isShowingLiveLane, isTrue);
-    expect(find.text('Secondary Box · secondary.local'), findsOneWidget);
+    expect(find.text('Secondary Box'), findsOneWidget);
+    expect(find.text('secondary.local'), findsOneWidget);
     final pageView = tester.widget<PageView>(
       find.byKey(const ValueKey('workspace_page_view')),
     );
@@ -510,7 +508,8 @@ void main() {
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
       expect(clientsById['conn_primary']?.disconnectCalls, 1);
       expect(find.text('Saved settings are pending'), findsNothing);
-      expect(find.text('Primary Renamed · primary.changed'), findsOneWidget);
+      expect(find.text('Primary Renamed'), findsOneWidget);
+      expect(find.text('primary.changed'), findsOneWidget);
     },
   );
 
@@ -546,7 +545,8 @@ void main() {
       expect(controller.state.liveConnectionIds, <String>['conn_primary']);
       expect(controller.state.selectedConnectionId, 'conn_primary');
       expect(controller.state.isShowingLiveLane, isTrue);
-      expect(find.text('Primary Box · primary.local'), findsOneWidget);
+      expect(find.text('Primary Box'), findsOneWidget);
+      expect(find.text('primary.local'), findsOneWidget);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
       expect(clientsById['conn_secondary']?.disconnectCalls, 1);
     },
@@ -652,6 +652,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Secondary Renamed'), findsOneWidget);
+    expect(find.text('Secondary Renamed'), findsOneWidget);
     expect(find.text('secondary.changed · /workspace'), findsOneWidget);
     expect(
       controller.state.catalog.connectionForId('conn_secondary')?.profile.host,
@@ -701,6 +702,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Secondary Box'), findsOneWidget);
       expect(find.text('secondary.local · Workspace not set'), findsOneWidget);
     },
   );
@@ -709,13 +711,14 @@ void main() {
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-    final conversationStateStore = MemoryCodexConnectionConversationHistoryStore(
-      initialStates: <String, SavedConnectionConversationState>{
-        'conn_secondary': const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
-        ),
-      },
-    );
+    final conversationStateStore =
+        MemoryCodexConnectionConversationHistoryStore(
+          initialStates: <String, SavedConnectionConversationState>{
+            'conn_secondary': const SavedConnectionConversationState(
+              selectedThreadId: 'thread_saved',
+            ),
+          },
+        );
     final controller = _buildWorkspaceController(
       clientsById: clientsById,
       conversationStateStore: conversationStateStore,
