@@ -16,9 +16,6 @@ class SecureCodexProfileStore implements CodexProfileStore {
   static const _profileKey = 'pocket_relay.profile';
   static const _preferencesMigrationKey =
       'pocket_relay.preferences_async_migration_complete';
-  static const _preferencesMigrationGate = SharedPreferencesAsyncMigrationGate(
-    migrationCompletedKey: _preferencesMigrationKey,
-  );
   static const _passwordKey = 'pocket_relay.secret.password';
   static const _privateKeyKey = 'pocket_relay.secret.private_key';
   static const _privateKeyPassphraseKey =
@@ -89,7 +86,9 @@ class SecureCodexProfileStore implements CodexProfileStore {
   }
 
   Future<void> _migrateLegacyPreferencesIfNeeded() async {
-    await _preferencesMigrationGate.ensureReady();
+    await ensureSharedPreferencesAsyncReady(
+      migrationCompletedKey: _preferencesMigrationKey,
+    );
   }
 }
 
