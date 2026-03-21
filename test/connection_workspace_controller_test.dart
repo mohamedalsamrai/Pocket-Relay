@@ -59,6 +59,56 @@ void main() {
   });
 
   test(
+    'initialization hydrates the first live lane transcript from persisted selectedThreadId',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      final historyStore = MemoryCodexConnectionConversationStateStore(
+        initialStates: <String, SavedConnectionConversationState>{
+          'conn_primary': const SavedConnectionConversationState(
+            selectedThreadId: 'thread_saved',
+          ),
+        },
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        historyStore: historyStore,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.selectedLaneBinding;
+      expect(binding, isNotNull);
+
+      await binding!.sessionController.initialize();
+
+      expect(clientsById['conn_primary']?.connectCalls, 1);
+      expect(clientsById['conn_primary']?.readThreadCalls, <String>[
+        'thread_saved',
+      ]);
+      expect(
+        binding.sessionController.transcriptBlocks
+            .whereType<CodexTextBlock>()
+            .single
+            .body,
+        'Restored answer',
+      );
+      expect(
+        binding.sessionController.sessionState.rootThreadId,
+        'thread_saved',
+      );
+      expect(
+        binding.sessionController.historicalConversationRestoreState,
+        isNull,
+      );
+    },
+  );
+
+  test(
     'instantiating a dormant connection selects it without affecting existing live lanes',
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');

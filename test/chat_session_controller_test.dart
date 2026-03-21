@@ -139,6 +139,102 @@ void main() {
     },
   );
 
+  test(
+    'initialize hydrates the saved conversation transcript from initial selectedThreadId',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.initialize();
+
+      expect(appServerClient.startSessionCalls, 0);
+      expect(appServerClient.connectCalls, 1);
+      expect(appServerClient.readThreadCalls, <String>['thread_saved']);
+      expect(
+        controller.transcriptBlocks
+            .whereType<CodexUserMessageBlock>()
+            .single
+            .text,
+        'Restore this',
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexTextBlock>().single.body,
+        'Restored answer',
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_saved');
+      expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'initialize surfaces unavailable history for initial selectedThreadId without waiting for sendPrompt',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_empty'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_empty',
+              name: 'Empty conversation',
+              sourceKind: 'app-server',
+              turns: <CodexAppServerHistoryTurn>[],
+            );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_empty',
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.initialize();
+
+      expect(appServerClient.startSessionCalls, 0);
+      expect(appServerClient.readThreadCalls, <String>['thread_empty']);
+      expect(
+        controller.historicalConversationRestoreState?.phase,
+        ChatHistoricalConversationRestorePhase.unavailable,
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_empty');
+      expect(controller.transcriptBlocks, isEmpty);
+      expect(
+        await controller.sendPrompt('blocked after startup empty restore'),
+        isFalse,
+      );
+    },
+  );
+
   test('sendPrompt records selected thread id by thread id', () async {
     final appServerClient = FakeCodexAppServerClient();
     final historyStore = _RecordingConversationHistoryStore(

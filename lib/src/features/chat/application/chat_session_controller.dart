@@ -77,12 +77,12 @@ class ChatSessionController extends ChangeNotifier {
   ChatHistoricalConversationRestoreState? _historicalConversationRestoreState;
 
   bool _isLoading = true;
-  bool _didInitialize = false;
   bool _isDisposed = false;
   bool _isTrackingSshBootstrapFailures = false;
   bool _sawTrackedSshBootstrapFailure = false;
   final Set<String> _threadMetadataHydrationAttempts = <String>{};
   StreamSubscription<CodexAppServerEvent>? _appServerEventSubscription;
+  Future<void>? _initializationFuture;
 
   Stream<String> get snackBarMessages => _snackBarMessagesController.stream;
 
@@ -96,13 +96,13 @@ class ChatSessionController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   List<CodexUiBlock> get transcriptBlocks => _sessionState.transcriptBlocks;
 
-  Future<void> initialize() async {
-    if (_didInitialize) {
-      return;
-    }
-    _didInitialize = true;
+  Future<void> initialize() {
+    return _initializationFuture ??= _initializeOnce();
+  }
 
+  Future<void> _initializeOnce() async {
     if (!_isLoading) {
+      await _restoreInitialConversationIfNeeded();
       return;
     }
 
@@ -115,6 +115,7 @@ class ChatSessionController extends ChangeNotifier {
     _secrets = savedProfile.secrets;
     _isLoading = false;
     notifyListeners();
+    await _restoreInitialConversationIfNeeded();
   }
 
   Future<void> saveObservedHostFingerprint(String blockId) async {
@@ -539,6 +540,18 @@ class ChatSessionController extends ChangeNotifier {
     if (event is CodexRuntimeThreadStartedEvent) {
       unawaited(_hydrateThreadMetadataIfNeeded(event));
     }
+  }
+
+  Future<void> _restoreInitialConversationIfNeeded() async {
+    final threadId = _resumeConversationThreadId();
+    if (threadId == null ||
+        _historicalConversationRestoreState != null ||
+        _sessionState.rootThreadId != null ||
+        _sessionState.transcriptBlocks.isNotEmpty) {
+      return;
+    }
+
+    await _restoreConversationTranscript(threadId);
   }
 
   Future<void> _restoreConversationTranscript(String threadId) async {
