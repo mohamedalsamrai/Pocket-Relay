@@ -3,6 +3,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
@@ -14,12 +15,14 @@ class ConnectionWorkspaceDesktopShell extends StatefulWidget {
     super.key,
     required this.workspaceController,
     required this.platformPolicy,
+    this.conversationHistoryRepository,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
   });
 
   final ConnectionWorkspaceController workspaceController;
   final PocketPlatformPolicy platformPolicy;
+  final CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
   @override
@@ -75,6 +78,8 @@ class _ConnectionWorkspaceDesktopShellState
                       workspaceController: widget.workspaceController,
                       laneBinding: laneBinding,
                       platformPolicy: widget.platformPolicy,
+                      conversationHistoryRepository:
+                          widget.conversationHistoryRepository,
                       settingsOverlayDelegate: widget.settingsOverlayDelegate,
                     ),
                   _ => const SizedBox.shrink(),

@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
+import 'package:pocket_relay/src/features/workspace/models/codex_workspace_conversation_summary.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 
@@ -21,6 +22,7 @@ class ConnectionWorkspaceLiveLaneSurface extends StatefulWidget {
     required this.workspaceController,
     required this.laneBinding,
     required this.platformPolicy,
+    this.conversationHistoryRepository,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
   });
@@ -28,6 +30,7 @@ class ConnectionWorkspaceLiveLaneSurface extends StatefulWidget {
   final ConnectionWorkspaceController workspaceController;
   final ConnectionLaneBinding laneBinding;
   final PocketPlatformPolicy platformPolicy;
+  final CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
   @override
@@ -215,6 +218,10 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
   }
 
   Future<void> _showConversationHistory() {
+    final repository =
+        widget.conversationHistoryRepository ??
+        const CodexAppServerConversationHistoryRepository();
+    final sessionController = widget.laneBinding.sessionController;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -223,10 +230,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
           heightFactor: 0.82,
           child: ConnectionWorkspaceConversationHistorySheet(
             title: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
-            future: Future<List<SavedConversationThread>>.error(
-              StateError(
-                'Workspace conversation history is unavailable until Codex-backed history loading is implemented.',
-              ),
+            future: repository.loadWorkspaceConversations(
+              profile: sessionController.profile,
+              secrets: sessionController.secrets,
             ),
             onResumeConversation: (conversation) {
               unawaited(_resumeConversation(conversation));
@@ -237,7 +243,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     );
   }
 
-  Future<void> _resumeConversation(SavedConversationThread conversation) async {
+  Future<void> _resumeConversation(
+    CodexWorkspaceConversationSummary conversation,
+  ) async {
     if (!mounted) {
       return;
     }

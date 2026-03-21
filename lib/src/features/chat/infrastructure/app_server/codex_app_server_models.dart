@@ -162,6 +162,14 @@ class CodexAppServerSshRemoteProcessStartedEvent extends CodexAppServerEvent {
 class CodexAppServerThread {
   const CodexAppServerThread({
     required this.id,
+    this.preview = '',
+    this.ephemeral = false,
+    this.modelProvider = '',
+    this.createdAt,
+    this.updatedAt,
+    this.path,
+    this.cwd,
+    this.promptCount,
     this.name,
     this.sourceKind,
     this.agentNickname,
@@ -169,10 +177,28 @@ class CodexAppServerThread {
   });
 
   final String id;
+  final String preview;
+  final bool ephemeral;
+  final String modelProvider;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final String? path;
+  final String? cwd;
+  final int? promptCount;
   final String? name;
   final String? sourceKind;
   final String? agentNickname;
   final String? agentRole;
+}
+
+class CodexAppServerThreadListPage {
+  const CodexAppServerThreadListPage({
+    required this.threads,
+    required this.nextCursor,
+  });
+
+  final List<CodexAppServerThread> threads;
+  final String? nextCursor;
 }
 
 class CodexAppServerSession {

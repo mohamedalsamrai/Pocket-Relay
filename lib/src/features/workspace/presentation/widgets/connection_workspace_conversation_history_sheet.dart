@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/core/storage/codex_connection_conversation_history_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/workspace/models/codex_workspace_conversation_summary.dart';
 
 class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
   const ConnectionWorkspaceConversationHistorySheet({
@@ -12,8 +12,8 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
   });
 
   final String title;
-  final Future<List<SavedConversationThread>> future;
-  final ValueChanged<SavedConversationThread> onResumeConversation;
+  final Future<List<CodexWorkspaceConversationSummary>> future;
+  final ValueChanged<CodexWorkspaceConversationSummary> onResumeConversation;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +86,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
             ),
             const Divider(height: 1),
             Expanded(
-              child: FutureBuilder<List<SavedConversationThread>>(
+              child: FutureBuilder<List<CodexWorkspaceConversationSummary>>(
                 future: future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
@@ -135,9 +135,9 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
                             vertical: 10,
                           ),
                           title: Text(
-                            conversation.preview.trim().isEmpty
+                            conversation.trimmedPreview.isEmpty
                                 ? conversation.normalizedThreadId
-                                : conversation.preview.trim(),
+                                : conversation.trimmedPreview,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -171,12 +171,12 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
     );
   }
 
-  String _subtitleFor(SavedConversationThread conversation) {
+  String _subtitleFor(CodexWorkspaceConversationSummary conversation) {
     final activity = conversation.lastActivityAt?.toLocal();
     final activityLabel = activity == null
         ? 'Unknown activity time'
         : _timestampLabel(activity);
-    return '${conversation.messageCount} prompts · $activityLabel\n${conversation.normalizedThreadId}';
+    return '${conversation.promptCount} prompts · $activityLabel\n${conversation.normalizedThreadId}';
   }
 
   String _timestampLabel(DateTime value) {

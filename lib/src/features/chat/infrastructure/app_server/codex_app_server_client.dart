@@ -66,6 +66,25 @@ class CodexAppServerClient {
     return _requestApi.readThread(_connection, threadId: threadId);
   }
 
+  Future<CodexAppServerThread> readThreadWithTurns({
+    required String threadId,
+  }) async {
+    _ensureNotDisposed();
+    return _requestApi.readThread(
+      _connection,
+      threadId: threadId,
+      includeTurns: true,
+    );
+  }
+
+  Future<CodexAppServerThreadListPage> listThreads({
+    String? cursor,
+    int? limit,
+  }) async {
+    _ensureNotDisposed();
+    return _requestApi.listThreads(_connection, cursor: cursor, limit: limit);
+  }
+
   Future<CodexAppServerTurn> sendUserMessage({
     required String threadId,
     required String text,
