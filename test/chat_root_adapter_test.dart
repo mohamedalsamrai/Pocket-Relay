@@ -382,6 +382,69 @@ void main() {
   );
 
   testWidgets(
+    'long-press rollback failure keeps the transcript intact and shows feedback',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        )
+        ..rollbackThreadError = StateError('transport broke');
+      final overlayDelegate = _FakeChatRootOverlayDelegate();
+      final laneBinding = ConnectionLaneBinding(
+        connectionId: 'conn_primary',
+        profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
+        conversationStateStore: const DiscardingCodexConversationStateStore(),
+        appServerClient: appServerClient,
+        initialSavedProfile: _savedProfile(),
+        initialConversationState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
+      addTearDown(appServerClient.close);
+      addTearDown(laneBinding.dispose);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          laneBinding: laneBinding,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('Restore this'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue From Here'), findsOneWidget);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      expect(
+        appServerClient.rollbackThreadCalls,
+        <({String threadId, int numTurns})>[
+          (threadId: 'thread_saved', numTurns: 2),
+        ],
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('composer_input')))
+            .controller
+            ?.text,
+        isEmpty,
+      );
+      expect(find.text('Restore this'), findsOneWidget);
+      expect(find.text('Second prompt'), findsOneWidget);
+      expect(find.text('Restored answer'), findsOneWidget);
+      expect(find.text('Second answer'), findsOneWidget);
+      expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
+      expect(
+        overlayDelegate.transientFeedbackMessages.single,
+        'Could not rewind this conversation to the selected prompt.',
+      );
+    },
+  );
+
+  testWidgets(
     'menu actions start a fresh thread and clear the transcript through the bound lane',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
