@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
@@ -24,27 +27,29 @@ class ApprovalRequestCard extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 680),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-        decoration: BoxDecoration(
-          color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.14),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cards.accentBorder(accent)),
-          boxShadow: [
-            BoxShadow(
-              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
+      child: PocketPanelSurface(
+        padding: PocketSpacing.cardPadding,
+        radius: PocketRadii.lg,
+        backgroundColor: cards.tintedSurface(
+          accent,
+          lightAlpha: 0.08,
+          darkAlpha: 0.14,
         ),
+        borderColor: cards.accentBorder(accent),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(Icons.gpp_maybe_outlined, size: 16, color: accent),
-                const SizedBox(width: 8),
+                const SizedBox(width: PocketSpacing.xs),
                 Expanded(
                   child: Text(
                     request.title,
@@ -63,7 +68,7 @@ class ApprovalRequestCard extends StatelessWidget {
               ],
             ),
             if (request.body.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: PocketSpacing.xs),
               SelectableText(
                 request.body,
                 style: TextStyle(
@@ -73,7 +78,7 @@ class ApprovalRequestCard extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: PocketSpacing.sm),
             Row(
               children: [
                 OutlinedButton(
@@ -82,7 +87,7 @@ class ApprovalRequestCard extends StatelessWidget {
                       : null,
                   child: const Text('Deny'),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: PocketSpacing.sm),
                 FilledButton(
                   onPressed: canRespond
                       ? () => onApprove!(request.requestId)

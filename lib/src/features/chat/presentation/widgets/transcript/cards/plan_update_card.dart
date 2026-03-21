@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
@@ -15,20 +18,18 @@ class PlanUpdateCard extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 700),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-        decoration: BoxDecoration(
-          color: cards.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cards.accentBorder(accent)),
-          boxShadow: [
-            BoxShadow(
-              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+      child: PocketPanelSurface(
+        padding: PocketSpacing.cardPadding,
+        radius: PocketRadii.lg,
+        backgroundColor: cards.surface,
+        borderColor: cards.accentBorder(accent),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -49,7 +50,7 @@ class PlanUpdateCard extends StatelessWidget {
             ),
             if (block.explanation != null &&
                 block.explanation!.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: PocketSpacing.xs),
               SelectableText(
                 block.explanation!,
                 style: TextStyle(
@@ -60,25 +61,25 @@ class PlanUpdateCard extends StatelessWidget {
               ),
             ],
             if (block.steps.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: PocketSpacing.sm),
               ...block.steps.map((step) {
                 final status = planStepStatus(step.status, cards);
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: PocketSpacing.xs),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
                     color: status.background,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: PocketRadii.circular(16),
                     border: Border.all(color: status.border),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(status.icon, size: 16, color: status.accent),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: PocketSpacing.xs),
                       Expanded(
                         child: Text(
                           step.step,
@@ -89,7 +90,7 @@ class PlanUpdateCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: PocketSpacing.xs),
                       TranscriptBadge(
                         label: status.label,
                         color: status.accent,
@@ -99,7 +100,7 @@ class PlanUpdateCard extends StatelessWidget {
                 );
               }),
             ] else ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: PocketSpacing.xs),
               Text(
                 'Waiting for plan steps…',
                 style: TextStyle(color: cards.textMuted),

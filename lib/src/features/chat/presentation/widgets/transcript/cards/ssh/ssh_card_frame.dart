@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
+import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
 class SshCardFrame extends StatelessWidget {
@@ -36,20 +39,22 @@ class SshCardFrame extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 700),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
-        decoration: BoxDecoration(
-          color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.14),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cards.accentBorder(accent)),
-          boxShadow: [
-            BoxShadow(
-              color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
+      child: PocketPanelSurface(
+        padding: PocketSpacing.cardPadding,
+        radius: PocketRadii.lg,
+        backgroundColor: cards.tintedSurface(
+          accent,
+          lightAlpha: 0.08,
+          darkAlpha: 0.14,
         ),
+        borderColor: cards.accentBorder(accent),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -60,7 +65,7 @@ class SshCardFrame extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 2),
                   child: Icon(icon, size: 18, color: accent),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: PocketSpacing.xs),
                 Expanded(
                   child: Text(
                     title,
@@ -74,7 +79,7 @@ class SshCardFrame extends StatelessWidget {
                 if (trailing case final Widget trailingWidget) trailingWidget,
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: PocketSpacing.xs),
             Text(
               description,
               style: TextStyle(
@@ -83,15 +88,15 @@ class SshCardFrame extends StatelessWidget {
                 height: 1.35,
               ),
             ),
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: cards.codeSurface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: cards.neutralBorder),
+            const SizedBox(height: PocketSpacing.sm),
+            PocketPanelSurface(
+              backgroundColor: cards.codeSurface,
+              borderColor: cards.neutralBorder,
+              padding: const EdgeInsets.symmetric(
+                horizontal: PocketSpacing.md,
+                vertical: PocketSpacing.sm,
               ),
+              radius: PocketRadii.sm,
               child: Text(
                 metadata,
                 style: TextStyle(
@@ -101,10 +106,17 @@ class SshCardFrame extends StatelessWidget {
                 ),
               ),
             ),
-            for (final panel in panels) ...[const SizedBox(height: 10), panel],
+            for (final panel in panels) ...[
+              const SizedBox(height: PocketSpacing.sm),
+              panel,
+            ],
             if (actions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(spacing: 10, runSpacing: 10, children: actions),
+              const SizedBox(height: PocketSpacing.md),
+              Wrap(
+                spacing: PocketSpacing.sm,
+                runSpacing: PocketSpacing.sm,
+                children: actions,
+              ),
             ],
           ],
         ),
@@ -129,14 +141,14 @@ class SshDetailPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = ConversationCardPalette.of(context);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: cards.codeSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cards.neutralBorder),
+    return PocketPanelSurface(
+      backgroundColor: cards.codeSurface,
+      borderColor: cards.neutralBorder,
+      padding: const EdgeInsets.symmetric(
+        horizontal: PocketSpacing.md,
+        vertical: 11,
       ),
+      radius: PocketRadii.sm,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
