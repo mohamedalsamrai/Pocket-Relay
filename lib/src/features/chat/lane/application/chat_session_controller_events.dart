@@ -25,12 +25,12 @@ Future<void> _handleUnsupportedChatSessionHostRequest(
   ChatSessionController controller,
   CodexAppServerRequestEvent event,
 ) async {
-  final payload = ChatSessionController._asObject(event.params);
-  final threadId = ChatSessionController._asString(payload?['threadId']);
-  final turnId = ChatSessionController._asString(payload?['turnId']);
-  final itemId = ChatSessionController._asString(payload?['itemId']);
+  final payload = _chatSessionControllerAsObject(event.params);
+  final threadId = _chatSessionControllerAsString(payload?['threadId']);
+  final turnId = _chatSessionControllerAsString(payload?['turnId']);
+  final itemId = _chatSessionControllerAsString(payload?['itemId']);
   final toolName =
-      ChatSessionController._asString(payload?['tool']) ?? 'dynamic tool';
+      _chatSessionControllerAsString(payload?['tool']) ?? 'dynamic tool';
 
   final (title, message) = switch (event.method) {
     'account/chatgptAuthTokens/refresh' => (

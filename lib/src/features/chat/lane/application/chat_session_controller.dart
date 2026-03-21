@@ -24,6 +24,7 @@ part 'chat_session_controller_history.dart';
 part 'chat_session_controller_init.dart';
 part 'chat_session_controller_prompt_flow.dart';
 part 'chat_session_controller_recovery.dart';
+part 'chat_session_controller_support.dart';
 part 'chat_session_controller_thread_metadata.dart';
 
 class ChatSessionController extends ChangeNotifier {
@@ -301,172 +302,10 @@ class ChatSessionController extends ChangeNotifier {
     await _resolveChatSessionApproval(this, requestId, approved: approved);
   }
 
-  CodexSessionPendingRequest? _findPendingApprovalRequest(String requestId) {
-    final ownerTimeline = _ownerTimelineForRequest(requestId);
-    if (ownerTimeline != null) {
-      return ownerTimeline.pendingApprovalRequests[requestId];
-    }
-
-    return _sessionState.pendingApprovalRequests[requestId];
-  }
-
-  CodexSessionPendingUserInputRequest? _findPendingUserInputRequest(
-    String requestId,
-  ) {
-    final ownerTimeline = _ownerTimelineForRequest(requestId);
-    if (ownerTimeline != null) {
-      return ownerTimeline.pendingUserInputRequests[requestId];
-    }
-
-    return _sessionState.pendingUserInputRequests[requestId];
-  }
-
-  CodexTimelineState? _ownerTimelineForRequest(String requestId) {
-    final ownerThreadId = _sessionState.requestOwnerById[requestId];
-    if (ownerThreadId != null && ownerThreadId.isNotEmpty) {
-      final ownerTimeline = _sessionState.timelineForThread(ownerThreadId);
-      if (ownerTimeline != null) {
-        return ownerTimeline;
-      }
-    }
-
-    for (final timeline in _sessionState.timelinesByThreadId.values) {
-      if (timeline.pendingApprovalRequests.containsKey(requestId) ||
-          timeline.pendingUserInputRequests.containsKey(requestId)) {
-        return timeline;
-      }
-    }
-
-    return null;
-  }
-
-  bool _shouldHydrateThreadMetadata(
-    String threadId,
-    CodexRuntimeThreadStartedEvent event,
-  ) {
-    if (threadId.isEmpty ||
-        event.rawMethod == 'thread/read(response)' ||
-        _threadMetadataHydrationAttempts.contains(threadId)) {
-      return false;
-    }
-
-    final existingEntry = _sessionState.threadRegistry[threadId];
-    return !_hasThreadDisplayMetadataValues(
-      threadName: existingEntry?.threadName ?? event.threadName,
-      agentNickname: existingEntry?.agentNickname ?? event.agentNickname,
-      agentRole: existingEntry?.agentRole ?? event.agentRole,
-    );
-  }
-
-  bool _hasThreadMetadata(CodexAppServerThreadSummary thread) {
-    return _hasThreadMetadataValues(
-      threadName: thread.name,
-      agentNickname: thread.agentNickname,
-      agentRole: thread.agentRole,
-      sourceKind: thread.sourceKind,
-    );
-  }
-
-  bool _hasThreadMetadataValues({
-    String? threadName,
-    String? agentNickname,
-    String? agentRole,
-    String? sourceKind,
-  }) {
-    return _hasNonEmptyValue(threadName) ||
-        _hasNonEmptyValue(agentNickname) ||
-        _hasNonEmptyValue(agentRole) ||
-        _hasNonEmptyValue(sourceKind);
-  }
-
-  bool _hasThreadDisplayMetadataValues({
-    String? threadName,
-    String? agentNickname,
-    String? agentRole,
-  }) {
-    return _hasNonEmptyValue(threadName) ||
-        _hasNonEmptyValue(agentNickname) ||
-        _hasNonEmptyValue(agentRole);
-  }
-
-  bool _hasNonEmptyValue(String? value) {
-    return value != null && value.trim().isNotEmpty;
-  }
-
-  bool _isSshBootstrapFailureRuntimeEvent(CodexRuntimeEvent event) {
-    return switch (event) {
-      CodexRuntimeSshConnectFailedEvent() ||
-      CodexRuntimeSshHostKeyMismatchEvent() ||
-      CodexRuntimeSshAuthenticationFailedEvent() ||
-      CodexRuntimeSshRemoteLaunchFailedEvent() => true,
-      _ => false,
-    };
-  }
-
-  void _emitSnackBar(String message) {
-    if (_isDisposed || _snackBarMessagesController.isClosed) {
-      return;
-    }
-    _snackBarMessagesController.add(message);
-  }
-
-  void _setConversationRecovery(ChatConversationRecoveryState nextState) {
-    _ChatSessionControllerRecovery(this)._setConversationRecovery(nextState);
-  }
-
-  void _clearConversationRecovery() {
-    _ChatSessionControllerRecovery(this)._clearConversationRecovery();
-  }
-
-  void _setHistoricalConversationRestoreState(
-    ChatHistoricalConversationRestoreState nextState,
-  ) {
-    _ChatSessionControllerRecovery(
-      this,
-    )._setHistoricalConversationRestoreState(nextState);
-  }
-
-  String? _activeConversationThreadId() {
-    return _ChatSessionControllerRecovery(this)._activeConversationThreadId();
-  }
-
-  String? _resumeConversationThreadId() {
-    return _ChatSessionControllerRecovery(this)._resumeConversationThreadId();
-  }
-
-  String? _trackedThreadReuseCandidate() {
-    return _ChatSessionControllerRecovery(this)._trackedThreadReuseCandidate();
-  }
-
-  void _rememberContinuationThread(String? threadId) {
-    _ChatSessionControllerRecovery(this)._rememberContinuationThread(threadId);
-  }
-
-  String? _normalizedThreadId(String? value) {
-    return _ChatSessionControllerRecovery(this)._normalizedThreadId(value);
-  }
-
   void _notifyListenersIfMounted() {
     if (!_isDisposed) {
       notifyListeners();
     }
   }
 
-  String _sessionLabel() {
-    return switch (_profile.connectionMode) {
-      ConnectionMode.remote => 'remote Codex',
-      ConnectionMode.local => 'local Codex',
-    };
-  }
-
-  static Map<String, dynamic>? _asObject(Object? value) {
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return null;
-  }
-
-  static String? _asString(Object? value) {
-    return value is String ? value : null;
-  }
 }
