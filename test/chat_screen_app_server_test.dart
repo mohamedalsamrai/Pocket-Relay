@@ -878,6 +878,44 @@ void main() {
     expect(find.text('Search docs'), findsOneWidget);
   });
 
+  testWidgets('renders web-search items with query-focused work-log copy', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    await tester.pumpWidget(_buildCatalogApp(appServerClient: appServerClient));
+
+    await _pumpAppReady(tester);
+
+    appServerClient.emit(
+      const CodexAppServerNotificationEvent(
+        method: 'item/completed',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'item': <String, Object?>{
+            'id': 'item_search_1',
+            'type': 'webSearch',
+            'status': 'completed',
+            'title': 'Search docs',
+            'query': 'Pocket Relay CLI',
+            'result': <String, Object?>{
+              'summary': 'Found CLI reference and API notes',
+            },
+          },
+        },
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Searched'), findsOneWidget);
+    expect(find.text('Pocket Relay CLI'), findsOneWidget);
+    expect(find.text('Found CLI reference and API notes'), findsOneWidget);
+    expect(find.text('Search docs'), findsNothing);
+  });
+
   testWidgets('strips shell-wrapper noise from command work-log titles', (
     tester,
   ) async {
@@ -916,6 +954,54 @@ void main() {
     expect(find.text("sed -n '1,40p' lib/main.dart"), findsNothing);
     expect(find.textContaining('/usr/bin/zsh -lc'), findsNothing);
   });
+
+  testWidgets(
+    'renders plain command executions as dedicated work-log rows',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        _buildCatalogApp(appServerClient: appServerClient),
+      );
+
+      await _pumpAppReady(tester);
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'item_cmd_plain_1',
+              'type': 'commandExecution',
+              'status': 'inProgress',
+              'command': 'pwd',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/commandExecution/outputDelta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_cmd_plain_1',
+            'delta': '/repo',
+          },
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Work log'), findsOneWidget);
+      expect(find.text('Running command'), findsOneWidget);
+      expect(find.text('pwd'), findsOneWidget);
+      expect(find.text('/repo'), findsOneWidget);
+    },
+  );
 
   testWidgets('renders MCP tool calls as structured work-log rows', (
     tester,

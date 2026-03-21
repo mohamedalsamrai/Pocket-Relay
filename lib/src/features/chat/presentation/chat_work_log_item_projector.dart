@@ -20,27 +20,49 @@ class ChatWorkLogItemProjector {
     final mcpToolCall = entry.entryKind == CodexWorkLogEntryKind.mcpToolCall
         ? _projectMcpToolCall(entry)
         : null;
+    final webSearch = mcpToolCall == null &&
+            entry.entryKind == CodexWorkLogEntryKind.webSearch
+        ? _projectWebSearch(entry)
+        : null;
     final readCommand =
         mcpToolCall == null &&
+            webSearch == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseReadCommand(normalizedTitle)
         : null;
     final gitCommand =
         mcpToolCall == null &&
+            webSearch == null &&
             readCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseGitCommand(normalizedTitle)
         : null;
     final searchCommand =
         mcpToolCall == null &&
+            webSearch == null &&
             readCommand == null &&
             gitCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseContentSearchCommand(normalizedTitle)
         : null;
+    final commandExecution =
+        mcpToolCall == null &&
+            webSearch == null &&
+            readCommand == null &&
+            gitCommand == null &&
+            searchCommand == null &&
+            entry.entryKind == CodexWorkLogEntryKind.commandExecution
+        ? _projectCommandExecution(
+            entry,
+            normalizedTitle: normalizedTitle,
+          )
+        : null;
 
     if (mcpToolCall != null) {
       return mcpToolCall;
+    }
+    if (webSearch != null) {
+      return webSearch;
     }
     if (readCommand != null) {
       return _projectReadCommand(
@@ -63,12 +85,33 @@ class ChatWorkLogItemProjector {
         normalizedTitle: normalizedTitle,
       );
     }
+    if (commandExecution != null) {
+      return commandExecution;
+    }
 
     return ChatGenericWorkLogEntryContract(
       id: entry.id,
       entryKind: entry.entryKind,
       title: normalizedTitle,
       preview: _normalizedWorkLogPreview(entry.preview, normalizedTitle),
+      turnId: entry.turnId,
+      isRunning: entry.isRunning,
+      exitCode: entry.exitCode,
+    );
+  }
+
+  ChatCommandExecutionWorkLogEntryContract? _projectCommandExecution(
+    CodexWorkLogEntry entry, {
+    required String normalizedTitle,
+  }) {
+    if (!_looksLikeCommandExecution(normalizedTitle)) {
+      return null;
+    }
+
+    return ChatCommandExecutionWorkLogEntryContract(
+      id: entry.id,
+      commandText: normalizedTitle,
+      outputPreview: _normalizedWorkLogPreview(entry.preview, normalizedTitle),
       turnId: entry.turnId,
       isRunning: entry.isRunning,
       exitCode: entry.exitCode,
@@ -126,6 +169,38 @@ class ChatWorkLogItemProjector {
       rawArguments: snapshot['arguments'],
       rawResult: snapshot['result'],
       rawError: snapshot['error'],
+      turnId: entry.turnId,
+      isRunning: entry.isRunning,
+    );
+  }
+
+  ChatWebSearchWorkLogEntryContract? _projectWebSearch(CodexWorkLogEntry entry) {
+    final snapshot = entry.snapshot;
+    final queries = _webSearchQueries(snapshot);
+    final queryText = _firstNonEmptyString(<Object?>[
+      snapshot?['query'],
+      snapshot?['title'],
+      if (queries != null && queries.isNotEmpty) queries.join(' | '),
+      entry.preview,
+      entry.title,
+    ]);
+    if (queryText == null) {
+      return null;
+    }
+
+    final resultSummary = _firstNonEmptyString(<Object?>[
+      _webSearchResultSummary(snapshot?['result']),
+      _webSearchResultSummary(snapshot?['results']),
+      _summarizeMcpValue(snapshot?['result']),
+      _summarizeMcpValue(snapshot?['results']),
+      entry.preview,
+    ]);
+
+    return ChatWebSearchWorkLogEntryContract(
+      id: entry.id,
+      queryText: queryText,
+      resultSummary: resultSummary == queryText ? null : resultSummary,
+      queryCount: queries?.length,
       turnId: entry.turnId,
       isRunning: entry.isRunning,
     );
@@ -1654,6 +1729,61 @@ String? _normalizedWorkLogPreview(String? preview, String normalizedTitle) {
   return value;
 }
 
+bool _looksLikeCommandExecution(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return false;
+  }
+  if (trimmed.contains('&&') ||
+      trimmed.contains('||') ||
+      trimmed.contains('|') ||
+      trimmed.contains(';')) {
+    return false;
+  }
+
+  final tokens = _tokenizeShellCommand(trimmed);
+  if (tokens == null || tokens.isEmpty) {
+    return false;
+  }
+
+  final commandName = _commandName(tokens.first);
+  if (commandName.isEmpty) {
+    return false;
+  }
+  if (_structuredCommandNames.contains(commandName)) {
+    return false;
+  }
+
+  if (tokens.length == 1) {
+    return true;
+  }
+
+  return tokens.skip(1).any(
+    (token) =>
+        token.startsWith('-') ||
+        token.contains('/') ||
+        token.contains('\\') ||
+        token.contains('.') ||
+        token.contains('=') ||
+        token.contains(':'),
+  );
+}
+
+const Set<String> _structuredCommandNames = <String>{
+  'cat',
+  'findstr',
+  'get-content',
+  'git',
+  'grep',
+  'head',
+  'more',
+  'rg',
+  'sed',
+  'select-string',
+  'tail',
+  'type',
+};
+
 Map<String, dynamic>? _asObjectValue(Object? value) {
   if (value is Map) {
     return Map<String, dynamic>.from(value);
@@ -1681,6 +1811,32 @@ String? _stringValue(Object? value) {
 
 int? _intValue(Object? value) {
   return value is num ? value.toInt() : null;
+}
+
+List<String>? _webSearchQueries(Map<String, dynamic>? snapshot) {
+  final rawQueries = snapshot?['queries'];
+  if (rawQueries is! List) {
+    return null;
+  }
+
+  final queries = rawQueries
+      .map(_stringValue)
+      .whereType<String>()
+      .toList(growable: false);
+  return queries.isEmpty ? null : queries;
+}
+
+String? _webSearchResultSummary(Object? value) {
+  final object = _asObjectValue(value);
+  if (object == null) {
+    return null;
+  }
+  return _firstNonEmptyString(<Object?>[
+    object['summary'],
+    object['text'],
+    object['result'],
+    object['message'],
+  ]);
 }
 
 ChatMcpToolCallStatus _mcpToolCallStatus(
