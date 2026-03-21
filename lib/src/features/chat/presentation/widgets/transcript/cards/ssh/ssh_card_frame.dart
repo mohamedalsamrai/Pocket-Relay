@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
 class SshCardFrame extends StatelessWidget {
@@ -37,89 +38,79 @@ class SshCardFrame extends StatelessWidget {
         ? '$host:$port'
         : '$host:$port  •  $contextLabel';
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 700),
-      child: PocketPanelSurface(
-        padding: PocketSpacing.cardPadding,
-        radius: PocketRadii.lg,
-        backgroundColor: cards.tintedSurface(
-          accent,
-          lightAlpha: 0.08,
-          darkAlpha: 0.14,
-        ),
-        borderColor: cards.accentBorder(accent),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: cards.shadow.withValues(alpha: cards.isDark ? 0.18 : 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Icon(icon, size: 18, color: accent),
-                ),
-                const SizedBox(width: PocketSpacing.xs),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
+    return PocketTranscriptFrame(
+      shadowColor: cards.shadow,
+      shadowOpacity: cards.isDark ? 0.18 : 0.06,
+      backgroundColor: cards.tintedSurface(
+        accent,
+        lightAlpha: 0.08,
+        darkAlpha: 0.14,
+      ),
+      borderColor: cards.accentBorder(accent),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(icon, size: 18, color: accent),
+              ),
+              const SizedBox(width: PocketSpacing.xs),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (trailing case final Widget trailingWidget) trailingWidget,
-              ],
+              ),
+              if (trailing case final Widget trailingWidget) trailingWidget,
+            ],
+          ),
+          const SizedBox(height: PocketSpacing.xs),
+          Text(
+            description,
+            style: TextStyle(
+              color: cards.textSecondary,
+              fontSize: 13,
+              height: 1.35,
             ),
-            const SizedBox(height: PocketSpacing.xs),
-            Text(
-              description,
+          ),
+          const SizedBox(height: PocketSpacing.sm),
+          PocketPanelSurface(
+            backgroundColor: cards.codeSurface,
+            borderColor: cards.neutralBorder,
+            padding: const EdgeInsets.symmetric(
+              horizontal: PocketSpacing.md,
+              vertical: PocketSpacing.sm,
+            ),
+            radius: PocketRadii.sm,
+            child: Text(
+              metadata,
               style: TextStyle(
-                color: cards.textSecondary,
-                fontSize: 13,
-                height: 1.35,
+                color: cards.textMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+          for (final panel in panels) ...[
             const SizedBox(height: PocketSpacing.sm),
-            PocketPanelSurface(
-              backgroundColor: cards.codeSurface,
-              borderColor: cards.neutralBorder,
-              padding: const EdgeInsets.symmetric(
-                horizontal: PocketSpacing.md,
-                vertical: PocketSpacing.sm,
-              ),
-              radius: PocketRadii.sm,
-              child: Text(
-                metadata,
-                style: TextStyle(
-                  color: cards.textMuted,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            for (final panel in panels) ...[
-              const SizedBox(height: PocketSpacing.sm),
-              panel,
-            ],
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: PocketSpacing.md),
-              Wrap(
-                spacing: PocketSpacing.sm,
-                runSpacing: PocketSpacing.sm,
-                children: actions,
-              ),
-            ],
+            panel,
           ],
-        ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: PocketSpacing.md),
+            Wrap(
+              spacing: PocketSpacing.sm,
+              runSpacing: PocketSpacing.sm,
+              children: actions,
+            ),
+          ],
+        ],
       ),
     );
   }

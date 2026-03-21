@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
-import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
+import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
@@ -28,58 +28,57 @@ class _WorkLogGroupCardState extends State<WorkLogGroupCard> {
         ? entries.skip(entries.length - 3).toList(growable: false)
         : entries;
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 700),
-      child: PocketPanelSurface(
-        padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
-        radius: PocketRadii.md,
-        backgroundColor: cards.surface,
-        borderColor: cards.neutralBorder,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.construction_outlined,
-                  size: 16,
+    return PocketTranscriptFrame(
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
+      radius: PocketRadii.md,
+      shadowColor: cards.shadow,
+      boxShadow: const <BoxShadow>[],
+      backgroundColor: cards.surface,
+      borderColor: cards.neutralBorder,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.construction_outlined,
+                size: 16,
+                color: cards.textMuted,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                widget.item.hasOnlyKnownEntries ? 'Work log' : 'Activity',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: cards.textSecondary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${entries.length}',
+                style: TextStyle(
                   color: cards.textMuted,
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  widget.item.hasOnlyKnownEntries ? 'Work log' : 'Activity',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: cards.textSecondary,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${entries.length}',
-                  style: TextStyle(
-                    color: cards.textMuted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: PocketSpacing.xs),
-            ...visibleEntries.map((entry) => _WorkLogEntryRow(entry: entry)),
-            if (hasOverflow) ...[
-              const SizedBox(height: PocketSpacing.xxs),
-              TextButton(
-                onPressed: () => setState(() => _expanded = !_expanded),
-                child: Text(
-                  _expanded
-                      ? 'Show less'
-                      : 'Show ${entries.length - visibleEntries.length} more',
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: PocketSpacing.xs),
+          ...visibleEntries.map((entry) => _WorkLogEntryRow(entry: entry)),
+          if (hasOverflow) ...[
+            const SizedBox(height: PocketSpacing.xxs),
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(
+                _expanded
+                    ? 'Show less'
+                    : 'Show ${entries.length - visibleEntries.length} more',
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
