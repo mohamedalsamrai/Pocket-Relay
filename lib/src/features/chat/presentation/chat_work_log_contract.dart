@@ -48,6 +48,25 @@ final class ChatCommandExecutionWorkLogEntryContract
   String get activityLabel => isRunning ? 'Running command' : 'Ran command';
 }
 
+final class ChatCommandWaitWorkLogEntryContract
+    extends ChatWorkLogEntryContract {
+  const ChatCommandWaitWorkLogEntryContract({
+    required super.id,
+    required this.commandText,
+    this.outputPreview,
+    this.processId,
+    super.turnId,
+    super.isRunning = true,
+    super.exitCode,
+  }) : super(entryKind: CodexWorkLogEntryKind.commandExecution);
+
+  final String commandText;
+  final String? outputPreview;
+  final String? processId;
+
+  String get activityLabel => 'Waiting for background terminal';
+}
+
 final class ChatWebSearchWorkLogEntryContract extends ChatWorkLogEntryContract {
   const ChatWebSearchWorkLogEntryContract({
     required super.id,

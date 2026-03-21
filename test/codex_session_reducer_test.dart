@@ -2004,35 +2004,38 @@ void main() {
     expect(group.entries.single.title, 'rg -n "Pocket Relay" lib test');
   });
 
-  test('normalizes PowerShell-wrapped Select-String titles in work-log entries', () {
-    final reducer = TranscriptReducer();
-    var state = CodexSessionState.initial();
-    final now = DateTime(2026, 3, 14, 12);
+  test(
+    'normalizes PowerShell-wrapped Select-String titles in work-log entries',
+    () {
+      final reducer = TranscriptReducer();
+      var state = CodexSessionState.initial();
+      final now = DateTime(2026, 3, 14, 12);
 
-    state = reducer.reduceRuntimeEvent(
-      state,
-      CodexRuntimeItemCompletedEvent(
-        createdAt: now,
-        itemType: CodexCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'item_command_select_string',
-        status: CodexRuntimeItemStatus.completed,
-        detail:
-            r'powershell.exe -NoLogo -NoProfile -Command "Select-String -Path C:\repo\README.md -Pattern \"Pocket Relay\""',
-        snapshot: const <String, Object?>{
-          'result': <String, Object?>{'output': 'README.md:1:Pocket Relay'},
-          'exitCode': 0,
-        },
-      ),
-    );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemCompletedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'item_command_select_string',
+          status: CodexRuntimeItemStatus.completed,
+          detail:
+              r'powershell.exe -NoLogo -NoProfile -Command "Select-String -Path C:\repo\README.md -Pattern \"Pocket Relay\""',
+          snapshot: const <String, Object?>{
+            'result': <String, Object?>{'output': 'README.md:1:Pocket Relay'},
+            'exitCode': 0,
+          },
+        ),
+      );
 
-    final group = state.transcriptBlocks.single as CodexWorkLogGroupBlock;
-    expect(
-      group.entries.single.title,
-      r'Select-String -Path C:\repo\README.md -Pattern "Pocket Relay"',
-    );
-  });
+      final group = state.transcriptBlocks.single as CodexWorkLogGroupBlock;
+      expect(
+        group.entries.single.title,
+        r'Select-String -Path C:\repo\README.md -Pattern "Pocket Relay"',
+      );
+    },
+  );
 
   test(
     'starts a new work group when a resolved request interrupts work history',
@@ -2478,6 +2481,66 @@ void main() {
         (blocks[2] as CodexApprovalRequestBlock).title,
         'File change approval resolved',
       );
+    },
+  );
+
+  test(
+    'command output clears the background-terminal wait marker when execution resumes',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        CodexSessionState.initial(),
+        CodexRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: CodexCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_wait_1',
+          status: CodexRuntimeItemStatus.inProgress,
+          detail: 'sleep 5',
+          snapshot: const <String, Object?>{'command': 'sleep 5'},
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 10)),
+          itemType: CodexCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_wait_1',
+          status: CodexRuntimeItemStatus.inProgress,
+          rawMethod: 'item/commandExecution/terminalInteraction',
+          detail: '',
+          snapshot: const <String, Object?>{'processId': 'proc_1', 'stdin': ''},
+        ),
+      );
+
+      var activeItem = state.activeTurn?.itemsById['command_wait_1'];
+      expect(activeItem, isNotNull);
+      expect(activeItem?.snapshot?['command'], 'sleep 5');
+      expect(activeItem?.snapshot?['stdin'], '');
+      expect(activeItem?.snapshot?['processId'], 'proc_1');
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        CodexRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 20)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_wait_1',
+          streamKind: CodexRuntimeContentStreamKind.commandOutput,
+          delta: 'ready',
+        ),
+      );
+
+      activeItem = state.activeTurn?.itemsById['command_wait_1'];
+      expect(activeItem, isNotNull);
+      expect(activeItem?.snapshot?['command'], 'sleep 5');
+      expect(activeItem?.snapshot?.containsKey('stdin'), isFalse);
+      expect(activeItem?.snapshot?['processId'], 'proc_1');
     },
   );
 

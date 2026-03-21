@@ -570,11 +570,25 @@ void main() {
           },
         ),
       );
+      final terminalWait = mapper.mapEvent(
+        const CodexAppServerNotificationEvent(
+          method: 'item/commandExecution/terminalInteraction',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_123',
+            'itemId': 'item_789',
+            'processId': 'proc_2',
+            'stdin': '',
+          },
+        ),
+      );
 
       final reasoningEvent =
           reasoningUpdate.single as CodexRuntimeItemUpdatedEvent;
       final terminalEvent =
           terminalInteraction.single as CodexRuntimeItemUpdatedEvent;
+      final terminalWaitEvent =
+          terminalWait.single as CodexRuntimeItemUpdatedEvent;
 
       expect(reasoningEvent.itemType, CodexCanonicalItemType.reasoning);
       expect(reasoningEvent.itemId, 'item_123');
@@ -582,6 +596,13 @@ void main() {
       expect(terminalEvent.itemType, CodexCanonicalItemType.commandExecution);
       expect(terminalEvent.itemId, 'item_456');
       expect(terminalEvent.detail, 'y\n');
+      expect(
+        terminalWaitEvent.itemType,
+        CodexCanonicalItemType.commandExecution,
+      );
+      expect(terminalWaitEvent.itemId, 'item_789');
+      expect(terminalWaitEvent.detail, '');
+      expect(terminalWaitEvent.snapshot?['processId'], 'proc_2');
     },
   );
 

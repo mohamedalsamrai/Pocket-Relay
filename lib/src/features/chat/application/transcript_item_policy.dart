@@ -133,7 +133,7 @@ class TranscriptItemPolicy {
       artifactBaseBody: artifactBaseBody,
       isRunning: event.status == CodexRuntimeItemStatus.inProgress,
       exitCode: exitCode,
-      snapshot: event.snapshot ?? existing?.snapshot,
+      snapshot: _nextLifecycleSnapshot(event, existing?.snapshot),
     );
   }
 
@@ -178,8 +178,51 @@ class TranscriptItemPolicy {
       artifactBaseBody: artifactBaseBody,
       isRunning: true,
       exitCode: existing?.exitCode,
-      snapshot: existing?.snapshot,
+      snapshot: _nextContentDeltaSnapshot(event, existing?.snapshot),
     );
+  }
+
+  Map<String, dynamic>? _nextLifecycleSnapshot(
+    CodexRuntimeItemLifecycleEvent event,
+    Map<String, dynamic>? existingSnapshot,
+  ) {
+    final eventSnapshot = event.snapshot;
+    if (eventSnapshot == null) {
+      return existingSnapshot;
+    }
+
+    if (event.itemType == CodexCanonicalItemType.commandExecution &&
+        event.rawMethod == 'item/commandExecution/terminalInteraction' &&
+        existingSnapshot != null) {
+      return <String, dynamic>{...existingSnapshot, ...eventSnapshot};
+    }
+
+    return eventSnapshot;
+  }
+
+  Map<String, dynamic>? _nextContentDeltaSnapshot(
+    CodexRuntimeContentDeltaEvent event,
+    Map<String, dynamic>? existingSnapshot,
+  ) {
+    if (event.streamKind != CodexRuntimeContentStreamKind.commandOutput ||
+        existingSnapshot == null ||
+        !_isBackgroundTerminalWaitSnapshot(existingSnapshot)) {
+      return existingSnapshot;
+    }
+
+    final nextSnapshot = Map<String, dynamic>.from(existingSnapshot)
+      ..remove('stdin');
+    return nextSnapshot.isEmpty ? null : nextSnapshot;
+  }
+
+  bool _isBackgroundTerminalWaitSnapshot(Map<String, dynamic> snapshot) {
+    final stdin = snapshot['stdin'];
+    if (stdin is! String || stdin.isNotEmpty) {
+      return false;
+    }
+
+    final processId = snapshot['processId'] ?? snapshot['process_id'];
+    return processId is String && processId.isNotEmpty;
   }
 
   String _itemTitle(
