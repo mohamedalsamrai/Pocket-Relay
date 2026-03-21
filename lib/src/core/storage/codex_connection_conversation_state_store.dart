@@ -83,11 +83,9 @@ class SecureCodexConnectionConversationStateStore
 
   SecureCodexConnectionConversationStateStore({
     SharedPreferencesAsync? preferences,
-  }) : _preferences = preferences;
+  }) : _preferences = preferences ?? SharedPreferencesAsync();
 
-  SharedPreferencesAsync? _preferences;
-  final MemoryCodexConnectionConversationStateStore _fallbackStore =
-      MemoryCodexConnectionConversationStateStore();
+  final SharedPreferencesAsync _preferences;
   Future<void>? _preferencesReady;
 
   @override
@@ -95,13 +93,8 @@ class SecureCodexConnectionConversationStateStore
     String connectionId,
   ) async {
     final normalizedConnectionId = _normalizeConnectionId(connectionId);
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      return _fallbackStore.loadState(normalizedConnectionId);
-    }
-
     await _ensurePreferencesReady();
-    final rawState = await preferences.getString(
+    final rawState = await _preferences.getString(
       _stateKeyForConnection(normalizedConnectionId),
     );
     if (rawState != null && rawState.trim().isNotEmpty) {
@@ -111,7 +104,7 @@ class SecureCodexConnectionConversationStateStore
     }
 
     final migratedSelectedThreadId = await _legacyMigration
-        .loadLegacySelectedThreadId(preferences, normalizedConnectionId);
+        .loadLegacySelectedThreadId(_preferences, normalizedConnectionId);
     if (migratedSelectedThreadId == null) {
       return const SavedConnectionConversationState();
     }
@@ -131,57 +124,30 @@ class SecureCodexConnectionConversationStateStore
     // Persist only lightweight lane state. Historical transcript content must
     // remain upstream in Codex because most work may happen outside this app.
     final normalizedConnectionId = _normalizeConnectionId(connectionId);
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      await _fallbackStore.saveState(normalizedConnectionId, state);
-      return;
-    }
-
     await _ensurePreferencesReady();
     final normalizedState = SavedConnectionConversationState(
       selectedThreadId: state.normalizedSelectedThreadId,
     );
     final key = _stateKeyForConnection(normalizedConnectionId);
     if (normalizedState.normalizedSelectedThreadId == null) {
-      await preferences.remove(key);
+      await _preferences.remove(key);
     } else {
-      await preferences.setString(key, jsonEncode(normalizedState.toJson()));
+      await _preferences.setString(key, jsonEncode(normalizedState.toJson()));
     }
 
-    await _legacyMigration.clearLegacyKeys(preferences, normalizedConnectionId);
+    await _legacyMigration.clearLegacyKeys(_preferences, normalizedConnectionId);
   }
 
   @override
   Future<void> deleteState(String connectionId) async {
     final normalizedConnectionId = _normalizeConnectionId(connectionId);
-    final preferences = _resolvedPreferences;
-    if (preferences == null) {
-      await _fallbackStore.deleteState(normalizedConnectionId);
-      return;
-    }
-
     await _ensurePreferencesReady();
-    await preferences.remove(_stateKeyForConnection(normalizedConnectionId));
-    await _legacyMigration.clearLegacyKeys(preferences, normalizedConnectionId);
+    await _preferences.remove(_stateKeyForConnection(normalizedConnectionId));
+    await _legacyMigration.clearLegacyKeys(_preferences, normalizedConnectionId);
   }
 
   Future<void> _ensurePreferencesReady() {
-    if (_resolvedPreferences == null) {
-      return Future<void>.value();
-    }
     return _preferencesReady ??= _legacyMigration.ensurePreferencesReady();
-  }
-
-  SharedPreferencesAsync? get _resolvedPreferences {
-    return _preferences ??= _tryCreatePreferences();
-  }
-
-  SharedPreferencesAsync? _tryCreatePreferences() {
-    try {
-      return SharedPreferencesAsync();
-    } on StateError {
-      return null;
-    }
   }
 
   String _normalizeConnectionId(String connectionId) {
