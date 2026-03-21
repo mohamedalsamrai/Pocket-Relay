@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart';
 
 class UserInputRequestCard extends StatefulWidget {
   const UserInputRequestCard({
