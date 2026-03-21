@@ -12,7 +12,7 @@ class PocketPlatformPolicy {
     TargetPlatform? platform,
     bool isWeb = kIsWeb,
     ChatRootPlatformPolicy chatRootPlatformPolicy =
-        const ChatRootPlatformPolicy.cupertinoFoundation(),
+        const ChatRootPlatformPolicy.allFlutter(),
   }) {
     final resolvedPlatform = platform ?? defaultTargetPlatform;
     return PocketPlatformPolicy(

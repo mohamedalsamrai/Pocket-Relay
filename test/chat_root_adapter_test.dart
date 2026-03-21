@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -18,15 +17,9 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_pol
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_renderer_delegate.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_empty_state.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_transient_feedback.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 
 import 'support/fake_codex_app_server_client.dart';
 
@@ -59,36 +52,8 @@ void main() {
       requestedSettings.single.initialSecrets,
       const ConnectionSecrets(password: 'secret'),
     );
-    expect(find.text('Dev Box · devbox.local'), findsOneWidget);
     expect(appServerClient.disconnectCalls, 0);
   });
-
-  testWidgets(
-    'forwards connection settings requests through the callback for the iOS foundation policy',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      final requestedSettings = <ChatConnectionSettingsLaunchContract>[];
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: const FlutterChatRootOverlayDelegate(),
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
-          onConnectionSettingsRequested: (payload) async {
-            requestedSettings.add(payload);
-          },
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Connection settings'));
-      await tester.pumpAndSettle();
-
-      expect(requestedSettings, hasLength(1));
-      expect(appServerClient.disconnectCalls, 0);
-    },
-  );
 
   testWidgets('routes feedback effects through the overlay delegate', (
     tester,
@@ -106,7 +71,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Hello Codex');
+    await tester.enterText(
+      find.byKey(const ValueKey('composer_input')),
+      'Hello Codex',
+    );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
@@ -115,14 +84,10 @@ void main() {
       overlayDelegate.transientFeedbackMessages.single,
       contains('Could not send the prompt'),
     );
-    expect(
-      overlayDelegate.transientFeedbackRenderers,
-      <ChatTransientFeedbackRenderer>[ChatTransientFeedbackRenderer.material],
-    );
   });
 
   testWidgets(
-    'sends prompts through the cupertino composer foundation path and clears the draft on success',
+    'sends prompts through the material composer path and clears the draft on success',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       final overlayDelegate = _FakeChatRootOverlayDelegate();
@@ -132,26 +97,23 @@ void main() {
         _buildAdapterApp(
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
         ),
       );
       await tester.pumpAndSettle();
 
-      final composerField = find.byType(CupertinoTextField).first;
+      final composerField = find.byKey(const ValueKey('composer_input'));
       await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
       expect(appServerClient.sentMessages, <String>['Hello Codex']);
-      expect(
-        tester.widget<CupertinoTextField>(composerField).controller?.text,
-        isEmpty,
-      );
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
     },
   );
 
   testWidgets(
-    'retains the draft when sending fails through the cupertino composer foundation path',
+    'retains the draft when sending fails through the material composer path',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient()
         ..sendUserMessageError = StateError('transport broke');
@@ -162,92 +124,52 @@ void main() {
         _buildAdapterApp(
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
         ),
       );
       await tester.pumpAndSettle();
 
-      final composerField = find.byType(CupertinoTextField).first;
+      final composerField = find.byKey(const ValueKey('composer_input'));
       await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
 
       expect(appServerClient.sentMessages, isEmpty);
       expect(
-        tester.widget<CupertinoTextField>(composerField).controller?.text,
+        tester.widget<TextField>(composerField).controller?.text,
         'Hello Codex',
       );
       expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
-      expect(
-        overlayDelegate.transientFeedbackRenderers,
-        <ChatTransientFeedbackRenderer>[
-          ChatTransientFeedbackRenderer.cupertino,
-        ],
-      );
     },
   );
 
-  testWidgets(
-    'shows cupertino transient feedback for the iOS foundation path',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient()
-        ..sendUserMessageError = StateError('transport broke');
-      addTearDown(appServerClient.close);
-      addTearDown(CupertinoTransientFeedbackPresenter.dismissActiveEntry);
+  testWidgets('renders the material first-launch empty state on iOS', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
 
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: const FlutterChatRootOverlayDelegate(),
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
+    await tester.pumpWidget(
+      _buildAdapterApp(
+        appServerClient: appServerClient,
+        overlayDelegate: const FlutterChatRootOverlayDelegate(),
+        savedProfile: SavedProfile(
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
         ),
-      );
-      await tester.pumpAndSettle();
-
-      final composerField = find.byType(CupertinoTextField).first;
-      await tester.enterText(composerField, 'Hello Codex');
-      await tester.tap(find.byKey(const ValueKey('send')));
-      await tester.pump();
-
-      expect(find.byType(CupertinoTransientFeedbackBanner), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(find.textContaining('Could not send the prompt'), findsOneWidget);
-
-      CupertinoTransientFeedbackPresenter.dismissActiveEntry();
-      await tester.pump();
-    },
-  );
-
-  testWidgets(
-    'renders the cupertino first-launch empty state for the iOS foundation path',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: const FlutterChatRootOverlayDelegate(),
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
-          savedProfile: SavedProfile(
-            profile: ConnectionProfile.defaults(),
-            secrets: const ConnectionSecrets(),
-          ),
+        platformBehavior: PocketPlatformBehavior.resolve(
+          platform: TargetPlatform.iOS,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoEmptyState), findsOneWidget);
-      expect(
-        find.widgetWithText(CupertinoButton, 'Configure remote'),
-        findsOneWidget,
-      );
-      expect(
-        find.widgetWithText(FilledButton, 'Configure remote'),
-        findsNothing,
-      );
-    },
-  );
+    expect(find.byType(EmptyState), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Configure remote'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'desktop empty-state route selection seeds the settings payload',
@@ -443,7 +365,7 @@ void main() {
   );
 
   testWidgets(
-    'renders through the cupertino shell foundation while transcript stays on the flutter region path',
+    'renders through the material shell foundation on every platform',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       final overlayDelegate = _FakeChatRootOverlayDelegate();
@@ -453,18 +375,14 @@ void main() {
         _buildAdapterApp(
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
-          regionPolicy: const ChatRootRegionPolicy.cupertinoFoundation(),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(CupertinoChatScreenRenderer), findsOneWidget);
-      expect(find.byType(CupertinoChatAppChrome), findsOneWidget);
-      expect(find.byType(CupertinoChatComposerRegion), findsOneWidget);
-      expect(find.byType(FlutterChatScreenRenderer), findsNothing);
-      expect(find.byType(FlutterChatAppChrome), findsNothing);
+      expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
+      expect(find.byType(FlutterChatAppChrome), findsOneWidget);
       expect(find.byType(FlutterChatTranscriptRegion), findsOneWidget);
-      expect(find.byType(FlutterChatComposerRegion), findsNothing);
+      expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
     },
   );
 
@@ -481,8 +399,9 @@ void main() {
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
           rendererDelegate: rendererDelegate,
-          regionPolicy: const ChatRootPlatformPolicy.cupertinoFoundation()
-              .policyFor(TargetPlatform.iOS),
+          regionPolicy: const ChatRootPlatformPolicy.allFlutter().policyFor(
+            TargetPlatform.iOS,
+          ),
           platformBehavior: PocketPlatformBehavior.resolve(
             platform: TargetPlatform.iOS,
           ),
@@ -492,17 +411,17 @@ void main() {
 
       expect(
         rendererDelegate.screenShellRenderer,
-        ChatRootScreenShellRenderer.cupertino,
+        ChatRootScreenShellRenderer.flutter,
       );
       expect(
         rendererDelegate.renderersByRegion,
         <ChatRootRegion, ChatRootRegionRenderer>{
-          ChatRootRegion.appChrome: ChatRootRegionRenderer.cupertino,
+          ChatRootRegion.appChrome: ChatRootRegionRenderer.flutter,
           ChatRootRegion.transcript: ChatRootRegionRenderer.flutter,
-          ChatRootRegion.composer: ChatRootRegionRenderer.cupertino,
+          ChatRootRegion.composer: ChatRootRegionRenderer.flutter,
         },
       );
-      expect(find.text('Injected cupertino screen shell'), findsOneWidget);
+      expect(find.text('Injected flutter screen shell'), findsOneWidget);
     },
   );
 
@@ -519,8 +438,9 @@ void main() {
           appServerClient: appServerClient,
           overlayDelegate: overlayDelegate,
           rendererDelegate: rendererDelegate,
-          regionPolicy: const ChatRootPlatformPolicy.cupertinoFoundation()
-              .policyFor(TargetPlatform.macOS),
+          regionPolicy: const ChatRootPlatformPolicy.allFlutter().policyFor(
+            TargetPlatform.macOS,
+          ),
           platformBehavior: PocketPlatformBehavior.resolve(
             platform: TargetPlatform.macOS,
           ),
@@ -530,17 +450,17 @@ void main() {
 
       expect(
         rendererDelegate.screenShellRenderer,
-        ChatRootScreenShellRenderer.cupertino,
+        ChatRootScreenShellRenderer.flutter,
       );
       expect(
         rendererDelegate.renderersByRegion,
         <ChatRootRegion, ChatRootRegionRenderer>{
-          ChatRootRegion.appChrome: ChatRootRegionRenderer.cupertino,
+          ChatRootRegion.appChrome: ChatRootRegionRenderer.flutter,
           ChatRootRegion.transcript: ChatRootRegionRenderer.flutter,
-          ChatRootRegion.composer: ChatRootRegionRenderer.cupertino,
+          ChatRootRegion.composer: ChatRootRegionRenderer.flutter,
         },
       );
-      expect(find.text('Injected cupertino screen shell'), findsOneWidget);
+      expect(find.text('Injected flutter screen shell'), findsOneWidget);
     },
   );
 
@@ -562,8 +482,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final composerField = find.byType(TextField).first;
+    final composerField = find.byKey(const ValueKey('composer_input'));
     await tester.enterText(composerField, 'Stale draft');
+    await tester.pump();
 
     await tester.pumpWidget(
       _buildAdapterApp(
@@ -580,7 +501,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
-    expect(find.text('Fresh Box · fresh.example.com'), findsOneWidget);
   });
 
   testWidgets('ignores stale send completions after the adapter rebinds', (
@@ -602,8 +522,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final composerField = find.byType(TextField).first;
+    final composerField = find.byKey(const ValueKey('composer_input'));
     await tester.enterText(composerField, 'Old prompt');
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pump();
 
@@ -622,6 +543,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(composerField, 'New draft');
+    await tester.pump();
 
     firstClient.sendUserMessageGate?.complete();
     await tester.pumpAndSettle();
@@ -654,7 +576,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField).first, 'Persistent draft');
+      await tester.enterText(
+        find.byKey(const ValueKey('composer_input')),
+        'Persistent draft',
+      );
       await tester.pump();
 
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
@@ -672,7 +597,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('composer_input')))
+            .controller
+            ?.text,
         'Persistent draft',
       );
     },
@@ -767,23 +695,17 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
   _FakeChatRootOverlayDelegate();
   final List<ChatConnectionSettingsLaunchContract> connectionSettingsPayloads =
       <ChatConnectionSettingsLaunchContract>[];
-  final List<ConnectionSettingsRenderer> connectionSettingsRenderers =
-      <ConnectionSettingsRenderer>[];
   final List<ChatChangedFileDiffContract> changedFileDiffs =
       <ChatChangedFileDiffContract>[];
   final List<String> transientFeedbackMessages = <String>[];
-  final List<ChatTransientFeedbackRenderer> transientFeedbackRenderers =
-      <ChatTransientFeedbackRenderer>[];
 
   @override
   Future<ConnectionSettingsSubmitPayload?> openConnectionSettings({
     required BuildContext context,
     required ChatConnectionSettingsLaunchContract connectionSettings,
     required PocketPlatformBehavior platformBehavior,
-    required ConnectionSettingsRenderer renderer,
   }) async {
     connectionSettingsPayloads.add(connectionSettings);
-    connectionSettingsRenderers.add(renderer);
     return null;
   }
 
@@ -799,10 +721,8 @@ class _FakeChatRootOverlayDelegate implements ChatRootOverlayDelegate {
   void showTransientFeedback({
     required BuildContext context,
     required String message,
-    required ChatTransientFeedbackRenderer renderer,
   }) {
     transientFeedbackMessages.add(message);
-    transientFeedbackRenderers.add(renderer);
   }
 }
 
@@ -958,7 +878,6 @@ class _FakeChatRootRendererDelegate implements ChatRootRendererDelegate {
   @override
   Widget buildTranscriptRegion({
     required ChatRootRegionRenderer renderer,
-    required ChatEmptyStateRenderer emptyStateRenderer,
     required PocketPlatformBehavior platformBehavior,
     required ChatScreenContract screen,
     required Object? surfaceChangeToken,
@@ -1029,6 +948,7 @@ class _FakeChatRootRendererDelegate implements ChatRootRendererDelegate {
               key: const ValueKey('fake_send'),
               onPressed: () async {
                 onComposerDraftChanged('Injected prompt');
+                await WidgetsBinding.instance.endOfFrame;
                 await onSendPrompt();
               },
               child: const Text('Send'),

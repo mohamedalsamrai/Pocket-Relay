@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -7,7 +6,6 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
-import 'package:pocket_relay/src/features/settings/presentation/cupertino_connection_sheet.dart';
 
 void main() {
   testWidgets(
@@ -46,76 +44,6 @@ void main() {
   );
 
   testWidgets(
-    'cupertino settings renderer shows validation from the shared host without a Form widget',
-    (tester) async {
-      await tester.pumpWidget(_buildCupertinoSettingsApp(onSubmit: (_) {}));
-
-      expect(find.byType(Form), findsNothing);
-      expect(find.text('Bad port'), findsNothing);
-
-      await tester.enterText(_cupertinoTextField('Port'), '70000');
-      await tester.ensureVisible(find.text('Save'));
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Bad port'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    'cupertino settings renderer establishes its own text style host under MaterialApp',
-    (tester) async {
-      await tester.pumpWidget(_buildCupertinoSettingsApp(onSubmit: (_) {}));
-
-      final profileLabelText = tester.widget<RichText>(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is RichText &&
-              widget.text.toPlainText() == 'Profile label',
-        ),
-      );
-
-      expect(profileLabelText.text.style?.decoration, TextDecoration.none);
-      expect(
-        profileLabelText.text.style?.decorationColor,
-        isNot(const Color(0xFFFFFF00)),
-      );
-    },
-  );
-
-  testWidgets(
-    'cupertino settings renderer uses adaptive grouped surfaces in dark mode',
-    (tester) async {
-      await tester.pumpWidget(
-        _buildCupertinoSettingsApp(
-          brightness: Brightness.dark,
-          onSubmit: (_) {},
-        ),
-      );
-
-      final surface = tester.widget<DecoratedBox>(
-        find.byKey(const ValueKey('cupertino_settings_surface')),
-      );
-      final context = tester.element(
-        find.byKey(const ValueKey('cupertino_settings_surface')),
-      );
-      final decoration = surface.decoration as BoxDecoration;
-
-      expect(
-        decoration.color,
-        CupertinoDynamicColor.resolve(
-          CupertinoColors.systemGroupedBackground,
-          context,
-        ).withValues(alpha: 0.92),
-      );
-      expect(
-        tester.widget<Text>(find.text('Connection')).style?.color,
-        CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-      );
-    },
-  );
-
-  testWidgets(
     'desktop settings expose a local and remote route chooser and hide SSH fields for local mode',
     (tester) async {
       await tester.pumpWidget(
@@ -140,14 +68,13 @@ void main() {
   );
 
   testWidgets(
-    'shared host submits the same payload semantics through both settings renderers',
+    'shared host submits the expected payload semantics through the material renderer',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 2200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
       ConnectionSettingsSubmitPayload? materialPayload;
-      ConnectionSettingsSubmitPayload? cupertinoPayload;
 
       await tester.pumpWidget(
         _buildMaterialSettingsApp(
@@ -181,42 +108,7 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        _buildCupertinoSettingsApp(
-          onSubmit: (payload) {
-            cupertinoPayload = payload;
-          },
-        ),
-      );
-
-      await tester.enterText(_cupertinoTextField('Profile label'), '  ');
-      await tester.enterText(
-        _cupertinoTextField('Host'),
-        '  ios.example.com  ',
-      );
-      await tester.enterText(_cupertinoTextField('Port'), '2222');
-      await tester.enterText(
-        _cupertinoTextField('Model override (optional)'),
-        '  gpt-5.4-mini  ',
-      );
-      await tester.ensureVisible(find.text('Save'));
-      await tester.tap(
-        find.byKey(
-          const ValueKey<String>('connection_settings_reasoning_effort_button'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(
-          const ValueKey<String>('connection_settings_reasoning_effort_high'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-
       expect(materialPayload, isNotNull);
-      expect(cupertinoPayload, isNotNull);
       expect(materialPayload!.profile.label, 'Developer Box');
       expect(materialPayload!.profile.host, 'ios.example.com');
       expect(materialPayload!.profile.port, 2222);
@@ -224,18 +116,6 @@ void main() {
       expect(
         materialPayload!.profile.reasoningEffort,
         CodexReasoningEffort.high,
-      );
-      expect(cupertinoPayload!.profile.label, materialPayload!.profile.label);
-      expect(cupertinoPayload!.profile.host, materialPayload!.profile.host);
-      expect(cupertinoPayload!.profile.port, materialPayload!.profile.port);
-      expect(cupertinoPayload!.profile.model, materialPayload!.profile.model);
-      expect(
-        cupertinoPayload!.profile.reasoningEffort,
-        materialPayload!.profile.reasoningEffort,
-      );
-      expect(
-        cupertinoPayload!.secrets.password,
-        materialPayload!.secrets.password,
       );
     },
   );
@@ -262,30 +142,6 @@ Widget _buildMaterialSettingsApp({
   );
 }
 
-Widget _buildCupertinoSettingsApp({
-  Brightness brightness = Brightness.light,
-  required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
-  PocketPlatformBehavior platformBehavior = _mobileBehavior,
-}) {
-  return MaterialApp(
-    theme: buildPocketTheme(brightness),
-    darkTheme: buildPocketTheme(Brightness.dark),
-    themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-    home: Scaffold(
-      body: _buildHost(
-        onSubmit: onSubmit,
-        platformBehavior: platformBehavior,
-        builder: (context, viewModel, actions) {
-          return CupertinoConnectionSheet(
-            viewModel: viewModel,
-            actions: actions,
-          );
-        },
-      ),
-    ),
-  );
-}
-
 Widget _buildHost({
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   required ConnectionSettingsHostBuilder builder,
@@ -302,10 +158,6 @@ Widget _buildHost({
 }
 
 Finder _materialTextField(String label) {
-  return find.byKey(_fieldKey(_fieldIdForLabel(label)));
-}
-
-Finder _cupertinoTextField(String label) {
   return find.byKey(_fieldKey(_fieldIdForLabel(label)));
 }
 
@@ -346,6 +198,7 @@ const _mobileBehavior = PocketPlatformBehavior(
   supportsLocalConnectionMode: false,
   supportsWakeLock: true,
   usesDesktopKeyboardSubmit: false,
+  supportsCollapsibleDesktopSidebar: false,
 );
 
 const _desktopBehavior = PocketPlatformBehavior(
@@ -353,4 +206,5 @@ const _desktopBehavior = PocketPlatformBehavior(
   supportsLocalConnectionMode: true,
   supportsWakeLock: false,
   usesDesktopKeyboardSubmit: true,
+  supportsCollapsibleDesktopSidebar: false,
 );

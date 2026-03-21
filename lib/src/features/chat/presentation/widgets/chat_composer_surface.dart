@@ -1,14 +1,10 @@
 import 'dart:async';
-import 'dart:ui';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
-
-enum ChatComposerVisualStyle { material, cupertino }
 
 class ChatComposerSurface extends StatefulWidget {
   const ChatComposerSurface({
@@ -17,14 +13,12 @@ class ChatComposerSurface extends StatefulWidget {
     required this.contract,
     required this.onChanged,
     required this.onSend,
-    required this.style,
   });
 
   final PocketPlatformBehavior platformBehavior;
   final ChatComposerContract contract;
   final ValueChanged<String> onChanged;
   final Future<void> Function() onSend;
-  final ChatComposerVisualStyle style;
 
   @override
   State<ChatComposerSurface> createState() => _ChatComposerSurfaceState();
@@ -73,10 +67,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
   @override
   Widget build(BuildContext context) {
-    return switch (widget.style) {
-      ChatComposerVisualStyle.material => _buildMaterialComposer(context),
-      ChatComposerVisualStyle.cupertino => _buildCupertinoComposer(context),
-    };
+    return _buildMaterialComposer(context);
   }
 
   Widget _buildMaterialComposer(BuildContext context) {
@@ -99,11 +90,12 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
         input: _wrapInputWithKeyboardSubmit(
           context,
           TextField(
+            key: const ValueKey('composer_input'),
             controller: _controller,
             minLines: 1,
             maxLines: 6,
             textInputAction: TextInputAction.newline,
-            onChanged: widget.onChanged,
+            onChanged: _handleChanged,
             decoration: InputDecoration(
               hintText: widget.contract.placeholder,
               border: InputBorder.none,
@@ -115,84 +107,8 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
         ),
         primaryAction: IconButton.filled(
           key: const ValueKey('send'),
-          onPressed: widget.contract.isSendActionEnabled ? widget.onSend : null,
+          onPressed: _isSendActionEnabled ? widget.onSend : null,
           icon: const Icon(Icons.send_rounded),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCupertinoComposer(BuildContext context) {
-    const surfacePadding = EdgeInsets.fromLTRB(14, 8, 10, 8);
-    const inputPadding = EdgeInsets.fromLTRB(2, 6, 8, 6);
-    final separatorColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.separator,
-      context,
-    );
-    final surfaceColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.secondarySystemGroupedBackground,
-      context,
-    ).withValues(alpha: 0.82);
-    final labelColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.label,
-      context,
-    );
-    final placeholderColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.placeholderText,
-      context,
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: DecoratedBox(
-          key: const ValueKey('cupertino_composer_surface'),
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: separatorColor.withValues(alpha: 0.35)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1F000000),
-                blurRadius: 28,
-                offset: Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: surfacePadding,
-            child: _buildContent(
-              input: _wrapInputWithKeyboardSubmit(
-                context,
-                CupertinoTextField(
-                  controller: _controller,
-                  minLines: 1,
-                  maxLines: 6,
-                  textInputAction: TextInputAction.newline,
-                  placeholder: widget.contract.placeholder,
-                  style: TextStyle(color: labelColor),
-                  placeholderStyle: TextStyle(color: placeholderColor),
-                  onChanged: widget.onChanged,
-                  padding: inputPadding,
-                  decoration: const BoxDecoration(),
-                ),
-              ),
-              primaryAction: CupertinoButton.filled(
-                key: const ValueKey('send'),
-                onPressed: widget.contract.isSendActionEnabled
-                    ? widget.onSend
-                    : null,
-                minimumSize: const Size(44, 44),
-                padding: const EdgeInsets.all(10),
-                child: const Icon(
-                  CupertinoIcons.arrow_up_circle_fill,
-                  size: 22,
-                ),
-              ),
-              crossAxisAlignment: CrossAxisAlignment.center,
-            ),
-          ),
         ),
       ),
     );
@@ -257,7 +173,20 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   }
 
   bool get _canSubmitFromKeyboard {
-    return widget.contract.isSendActionEnabled;
+    return _isSendActionEnabled;
+  }
+
+  bool get _isSendActionEnabled {
+    if (widget.contract.draftText == _controller.text) {
+      return widget.contract.isSendActionEnabled;
+    }
+
+    return _controller.text.trim().isNotEmpty;
+  }
+
+  void _handleChanged(String value) {
+    setState(() {});
+    widget.onChanged(value);
   }
 
   void _insertTextAtSelection(String insertedText) {

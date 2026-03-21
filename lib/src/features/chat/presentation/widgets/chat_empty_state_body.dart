@@ -1,10 +1,7 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-
-enum ChatEmptyStateVisualStyle { material, cupertino }
 
 class ChatEmptyStateBody extends StatelessWidget {
   const ChatEmptyStateBody({
@@ -14,7 +11,6 @@ class ChatEmptyStateBody extends StatelessWidget {
     required this.platformBehavior,
     required this.onConfigure,
     this.onSelectConnectionMode,
-    required this.style,
   });
 
   final bool isConfigured;
@@ -22,7 +18,6 @@ class ChatEmptyStateBody extends StatelessWidget {
   final PocketPlatformBehavior platformBehavior;
   final VoidCallback onConfigure;
   final ValueChanged<ConnectionMode>? onSelectConnectionMode;
-  final ChatEmptyStateVisualStyle style;
 
   @override
   Widget build(BuildContext context) {
@@ -145,13 +140,7 @@ class ChatEmptyStateBody extends StatelessWidget {
   }
 
   Widget _buildCard(BuildContext context, Widget content) {
-    return switch (style) {
-      ChatEmptyStateVisualStyle.material => _buildMaterialCard(
-        context,
-        content,
-      ),
-      ChatEmptyStateVisualStyle.cupertino => _buildCupertinoCard(content),
-    };
+    return _buildMaterialCard(context, content);
   }
 
   Widget _buildMaterialCard(BuildContext context, Widget content) {
@@ -176,37 +165,6 @@ class ChatEmptyStateBody extends StatelessWidget {
     );
   }
 
-  Widget _buildCupertinoCard(Widget content) {
-    return Builder(
-      builder: (context) {
-        final surfaceColor = CupertinoDynamicColor.resolve(
-          CupertinoColors.secondarySystemGroupedBackground,
-          context,
-        ).withValues(alpha: 0.92);
-        final borderColor = CupertinoDynamicColor.resolve(
-          CupertinoColors.separator,
-          context,
-        ).withValues(alpha: 0.16);
-        const shapeRadius = BorderRadius.all(Radius.circular(28));
-
-        return ClipRSuperellipse(
-          borderRadius: shapeRadius,
-          child: DecoratedBox(
-            key: const ValueKey('cupertino_empty_state_card'),
-            decoration: ShapeDecoration(
-              color: surfaceColor,
-              shape: RoundedSuperellipseBorder(
-                borderRadius: shapeRadius,
-                side: BorderSide(color: borderColor),
-              ),
-            ),
-            child: content,
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildDesktopRoutePanel(BuildContext context, double availableWidth) {
     final cardWidth = availableWidth >= 720 ? 320.0 : double.infinity;
 
@@ -218,7 +176,6 @@ class ChatEmptyStateBody extends StatelessWidget {
         SizedBox(
           width: cardWidth,
           child: _DesktopRouteCard(
-            style: style,
             title: 'Local',
             subtitle:
                 'Run `codex app-server` here and keep the repo and tools on this machine.',
@@ -231,7 +188,6 @@ class ChatEmptyStateBody extends StatelessWidget {
         SizedBox(
           width: cardWidth,
           child: _DesktopRouteCard(
-            style: style,
             title: 'Remote',
             subtitle:
                 'SSH to a developer box, run Codex there, and stream the session back to this desktop.',
@@ -249,7 +205,6 @@ class ChatEmptyStateBody extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 560),
       child: _DesktopRouteCard(
-        style: style,
         title: connectionMode == ConnectionMode.local
             ? 'Current route: Local'
             : 'Current route: Remote',
@@ -266,27 +221,11 @@ class ChatEmptyStateBody extends StatelessWidget {
     required List<_EmptyStateDetail> items,
     required double maxWidth,
   }) {
-    final (background, border, divider) = switch (style) {
-      ChatEmptyStateVisualStyle.material => (
-        context.pocketPalette.subtleSurface.withValues(alpha: 0.72),
-        context.pocketPalette.surfaceBorder.withValues(alpha: 0.9),
-        context.pocketPalette.surfaceBorder.withValues(alpha: 0.65),
-      ),
-      ChatEmptyStateVisualStyle.cupertino => (
-        CupertinoDynamicColor.resolve(
-          CupertinoColors.tertiarySystemGroupedBackground,
-          context,
-        ),
-        CupertinoDynamicColor.resolve(
-          CupertinoColors.separator,
-          context,
-        ).withValues(alpha: 0.18),
-        CupertinoDynamicColor.resolve(
-          CupertinoColors.separator,
-          context,
-        ).withValues(alpha: 0.12),
-      ),
-    };
+    final (background, border, divider) = (
+      context.pocketPalette.subtleSurface.withValues(alpha: 0.72),
+      context.pocketPalette.surfaceBorder.withValues(alpha: 0.9),
+      context.pocketPalette.surfaceBorder.withValues(alpha: 0.65),
+    );
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
@@ -305,7 +244,7 @@ class ChatEmptyStateBody extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(18),
-                      child: _EmptyStateDetailRow(item: item, style: style),
+                      child: _EmptyStateDetailRow(item: item),
                     ),
                     if (index != items.length - 1)
                       Divider(height: 1, thickness: 1, color: divider),
@@ -319,16 +258,7 @@ class ChatEmptyStateBody extends StatelessWidget {
   }
 
   Widget _buildHeroIcon(BuildContext context, {required bool desktop}) {
-    return switch (style) {
-      ChatEmptyStateVisualStyle.material => _buildMaterialHeroIcon(
-        context,
-        desktop: desktop,
-      ),
-      ChatEmptyStateVisualStyle.cupertino => _buildCupertinoHeroIcon(
-        context,
-        desktop: desktop,
-      ),
-    };
+    return _buildMaterialHeroIcon(context, desktop: desktop);
   }
 
   Widget _buildMaterialHeroIcon(BuildContext context, {required bool desktop}) {
@@ -350,58 +280,19 @@ class ChatEmptyStateBody extends StatelessWidget {
     );
   }
 
-  Widget _buildCupertinoHeroIcon(
-    BuildContext context, {
-    required bool desktop,
-  }) {
-    return Container(
-      width: desktop ? 78 : 66,
-      height: desktop ? 78 : 66,
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5.resolveFrom(context),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Icon(
-        desktop
-            ? CupertinoIcons.desktopcomputer
-            : CupertinoIcons.rectangle_stack_badge_person_crop,
-        size: desktop ? 34 : 30,
-        color: CupertinoColors.activeBlue.resolveFrom(context),
-      ),
+  TextStyle _titleStyle(BuildContext context, {required bool desktop}) {
+    return TextStyle(
+      fontSize: desktop ? 30 : 24,
+      fontWeight: FontWeight.w800,
+      height: 1.14,
     );
   }
 
-  TextStyle _titleStyle(BuildContext context, {required bool desktop}) {
-    return switch (style) {
-      ChatEmptyStateVisualStyle.material => TextStyle(
-        fontSize: desktop ? 30 : 24,
-        fontWeight: FontWeight.w800,
-        height: 1.14,
-      ),
-      ChatEmptyStateVisualStyle.cupertino => TextStyle(
-        fontSize: desktop ? 31 : 25,
-        fontWeight: FontWeight.w700,
-        color: CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-        height: 1.15,
-      ),
-    };
-  }
-
   TextStyle _bodyStyle(BuildContext context) {
-    return switch (style) {
-      ChatEmptyStateVisualStyle.material => TextStyle(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        height: 1.55,
-      ),
-      ChatEmptyStateVisualStyle.cupertino => TextStyle(
-        fontSize: 15,
-        height: 1.45,
-        color: CupertinoDynamicColor.resolve(
-          CupertinoColors.secondaryLabel,
-          context,
-        ),
-      ),
-    };
+    return TextStyle(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      height: 1.55,
+    );
   }
 
   Widget _buildConfigureButton({
@@ -412,26 +303,11 @@ class ChatEmptyStateBody extends StatelessWidget {
     final label = desktop && supportsLocalConnectionMode
         ? 'Configure connection'
         : 'Configure remote';
-    final button = switch (style) {
-      ChatEmptyStateVisualStyle.material => FilledButton.icon(
-        onPressed: onConfigure,
-        icon: const Icon(Icons.settings),
-        label: Text(label),
-      ),
-      ChatEmptyStateVisualStyle.cupertino => CupertinoButton.filled(
-        onPressed: onConfigure,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          children: [
-            const Icon(CupertinoIcons.settings, size: 18),
-            Text(label),
-          ],
-        ),
-      ),
-    };
+    final button = FilledButton.icon(
+      onPressed: onConfigure,
+      icon: const Icon(Icons.settings),
+      label: Text(label),
+    );
 
     if (!fullWidth) {
       return button;
@@ -475,19 +351,16 @@ class ChatEmptyStateBody extends StatelessWidget {
           title: 'Next prompt',
           body: 'Continue the local workspace from the composer below.',
           materialIcon: Icons.play_circle_outline_rounded,
-          cupertinoIcon: CupertinoIcons.play_circle,
         ),
         _EmptyStateDetail(
           title: 'Live transcript',
           body: 'Commands, edits, and replies stay readable in one place.',
           materialIcon: Icons.subject_rounded,
-          cupertinoIcon: CupertinoIcons.doc_text,
         ),
         _EmptyStateDetail(
           title: 'Interruptions',
           body: 'Approvals and follow-up forms stay inline.',
           materialIcon: Icons.rule_folder_outlined,
-          cupertinoIcon: CupertinoIcons.check_mark_circled,
         ),
       ],
       ConnectionMode.remote => const <_EmptyStateDetail>[
@@ -495,19 +368,16 @@ class ChatEmptyStateBody extends StatelessWidget {
           title: 'Next prompt',
           body: 'Continue the remote workspace from the composer below.',
           materialIcon: Icons.play_circle_outline_rounded,
-          cupertinoIcon: CupertinoIcons.play_circle,
         ),
         _EmptyStateDetail(
           title: 'Live transcript',
           body: 'Commands, edits, and replies stay readable in one place.',
           materialIcon: Icons.subject_rounded,
-          cupertinoIcon: CupertinoIcons.doc_text,
         ),
         _EmptyStateDetail(
           title: 'Interruptions',
           body: 'Approvals and follow-up forms stay inline.',
           materialIcon: Icons.rule_folder_outlined,
-          cupertinoIcon: CupertinoIcons.check_mark_circled,
         ),
       ],
     };
@@ -520,21 +390,18 @@ class ChatEmptyStateBody extends StatelessWidget {
           title: 'Next prompt',
           body: 'Resume the remote session from the composer below.',
           materialIcon: Icons.send_outlined,
-          cupertinoIcon: CupertinoIcons.arrow_up_circle,
         ),
         _EmptyStateDetail(
           title: 'Live transcript',
           body:
               'Commands, edits, and replies land in order while the turn runs.',
           materialIcon: Icons.view_stream_outlined,
-          cupertinoIcon: CupertinoIcons.text_alignleft,
         ),
         _EmptyStateDetail(
           title: 'Interruptions',
           body:
               'Approve commands or answer follow-up requests without leaving the session.',
           materialIcon: Icons.fact_check_outlined,
-          cupertinoIcon: CupertinoIcons.check_mark_circled,
         ),
       ];
     }
@@ -545,20 +412,17 @@ class ChatEmptyStateBody extends StatelessWidget {
         body:
             'Point Pocket Relay at your SSH workspace and keep it ready for the next prompt.',
         materialIcon: Icons.link_rounded,
-        cupertinoIcon: CupertinoIcons.link,
       ),
       _EmptyStateDetail(
         title: 'Read the live turn',
         body:
             'Commands, edits, and replies stay in one scroll instead of a terminal wall.',
         materialIcon: Icons.menu_book_outlined,
-        cupertinoIcon: CupertinoIcons.doc_plaintext,
       ),
       _EmptyStateDetail(
         title: 'Handle interruptions',
         body: 'Approvals and follow-up forms stay in the same flow.',
         materialIcon: Icons.pending_actions_outlined,
-        cupertinoIcon: CupertinoIcons.hand_raised,
       ),
     ];
   }
@@ -566,14 +430,12 @@ class ChatEmptyStateBody extends StatelessWidget {
 
 class _DesktopRouteCard extends StatelessWidget {
   const _DesktopRouteCard({
-    required this.style,
     required this.title,
     required this.subtitle,
     required this.isActive,
     this.onTap,
   });
 
-  final ChatEmptyStateVisualStyle style;
   final String title;
   final String subtitle;
   final bool isActive;
@@ -581,32 +443,16 @@ class _DesktopRouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (background, border, titleColor, bodyColor) = switch (style) {
-      ChatEmptyStateVisualStyle.material => (
-        isActive
-            ? context.pocketPalette.subtleSurface
-            : context.pocketPalette.surface,
-        isActive
-            ? context.pocketPalette.surfaceBorder.withValues(alpha: 0.9)
-            : context.pocketPalette.surfaceBorder,
-        Theme.of(context).colorScheme.onSurface,
-        Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      ChatEmptyStateVisualStyle.cupertino => (
-        CupertinoDynamicColor.resolve(
-          isActive
-              ? CupertinoColors.tertiarySystemGroupedBackground
-              : CupertinoColors.secondarySystemGroupedBackground,
-          context,
-        ),
-        CupertinoDynamicColor.resolve(
-          CupertinoColors.separator,
-          context,
-        ).withValues(alpha: isActive ? 0.26 : 0.14),
-        CupertinoDynamicColor.resolve(CupertinoColors.label, context),
-        CupertinoDynamicColor.resolve(CupertinoColors.secondaryLabel, context),
-      ),
-    };
+    final (background, border, titleColor, bodyColor) = (
+      isActive
+          ? context.pocketPalette.subtleSurface
+          : context.pocketPalette.surface,
+      isActive
+          ? context.pocketPalette.surfaceBorder.withValues(alpha: 0.9)
+          : context.pocketPalette.surfaceBorder,
+      Theme.of(context).colorScheme.onSurface,
+      Theme.of(context).colorScheme.onSurfaceVariant,
+    );
 
     final indicatorColor = isActive ? titleColor : bodyColor;
     final card = DecoratedBox(
@@ -675,27 +521,21 @@ class _EmptyStateDetail {
     required this.title,
     required this.body,
     required this.materialIcon,
-    required this.cupertinoIcon,
   });
 
   final String title;
   final String body;
   final IconData materialIcon;
-  final IconData cupertinoIcon;
 }
 
 class _EmptyStateDetailRow extends StatelessWidget {
-  const _EmptyStateDetailRow({required this.item, required this.style});
+  const _EmptyStateDetailRow({required this.item});
 
   final _EmptyStateDetail item;
-  final ChatEmptyStateVisualStyle style;
 
   @override
   Widget build(BuildContext context) {
-    return switch (style) {
-      ChatEmptyStateVisualStyle.material => _buildMaterialRow(context),
-      ChatEmptyStateVisualStyle.cupertino => _buildCupertinoRow(context),
-    };
+    return _buildMaterialRow(context);
   }
 
   Widget _buildMaterialRow(BuildContext context) {
@@ -738,60 +578,6 @@ class _EmptyStateDetailRow extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCupertinoRow(BuildContext context) {
-    final iconBackground = CupertinoDynamicColor.resolve(
-      CupertinoColors.secondarySystemFill,
-      context,
-    );
-    final titleColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.label,
-      context,
-    );
-    final bodyColor = CupertinoDynamicColor.resolve(
-      CupertinoColors.secondaryLabel,
-      context,
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: SizedBox(
-            width: 34,
-            height: 34,
-            child: Icon(
-              item.cupertinoIcon,
-              size: 18,
-              color: CupertinoColors.activeBlue.resolveFrom(context),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(item.body, style: TextStyle(height: 1.45, color: bodyColor)),
             ],
           ),
         ),

@@ -9,9 +9,9 @@ enum ChatRootRegion {
   emptyState,
 }
 
-enum ChatRootScreenShellRenderer { flutter, cupertino }
+enum ChatRootScreenShellRenderer { flutter }
 
-enum ChatRootRegionRenderer { flutter, cupertino }
+enum ChatRootRegionRenderer { flutter }
 
 class ChatRootRegionPolicy {
   const ChatRootRegionPolicy({
@@ -33,17 +33,6 @@ class ChatRootRegionPolicy {
         settingsOverlay: ChatRootRegionRenderer.flutter,
         feedbackOverlay: ChatRootRegionRenderer.flutter,
         emptyState: ChatRootRegionRenderer.flutter,
-      );
-
-  const ChatRootRegionPolicy.cupertinoFoundation()
-    : this(
-        screenShell: ChatRootScreenShellRenderer.cupertino,
-        appChrome: ChatRootRegionRenderer.cupertino,
-        transcript: ChatRootRegionRenderer.flutter,
-        composer: ChatRootRegionRenderer.cupertino,
-        settingsOverlay: ChatRootRegionRenderer.cupertino,
-        feedbackOverlay: ChatRootRegionRenderer.cupertino,
-        emptyState: ChatRootRegionRenderer.cupertino,
       );
 
   final ChatRootScreenShellRenderer screenShell;
@@ -78,13 +67,6 @@ class ChatRootPlatformPolicy {
         fallback: const ChatRootRegionPolicy.allFlutter(),
         iOS: const ChatRootRegionPolicy.allFlutter(),
         macOS: const ChatRootRegionPolicy.allFlutter(),
-      );
-
-  const ChatRootPlatformPolicy.cupertinoFoundation()
-    : this(
-        fallback: const ChatRootRegionPolicy.allFlutter(),
-        iOS: const ChatRootRegionPolicy.cupertinoFoundation(),
-        macOS: const ChatRootRegionPolicy.cupertinoFoundation(),
       );
 
   final ChatRootRegionPolicy fallback;

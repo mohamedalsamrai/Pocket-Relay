@@ -16,7 +16,8 @@ typedef ConnectionLaneBindingFactory =
 class ConnectionWorkspaceController extends ChangeNotifier {
   ConnectionWorkspaceController({
     required CodexConnectionRepository connectionRepository,
-    required CodexConnectionConversationStateStore connectionConversationStateStore,
+    required CodexConnectionConversationStateStore
+    connectionConversationStateStore,
     required ConnectionLaneBindingFactory laneBindingFactory,
   }) : _connectionRepository = connectionRepository,
        _connectionConversationStateStore = connectionConversationStateStore,

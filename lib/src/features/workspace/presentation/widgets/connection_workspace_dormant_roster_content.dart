@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
@@ -6,26 +5,22 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_screen_shell.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/settings/presentation/connection_settings_renderer.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/models/connection_workspace_state.dart';
-
-enum ConnectionWorkspaceRosterStyle { material, cupertino }
 
 class ConnectionWorkspaceDormantRosterContent extends StatefulWidget {
   const ConnectionWorkspaceDormantRosterContent({
     super.key,
     required this.workspaceController,
     required this.description,
-    required this.visualStyle,
     this.platformBehavior = const PocketPlatformBehavior(
       experience: PocketPlatformExperience.mobile,
       supportsLocalConnectionMode: false,
       supportsWakeLock: true,
       usesDesktopKeyboardSubmit: false,
+      supportsCollapsibleDesktopSidebar: false,
     ),
-    this.settingsRenderer = ConnectionSettingsRenderer.material,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
     this.useSafeArea = true,
@@ -33,9 +28,7 @@ class ConnectionWorkspaceDormantRosterContent extends StatefulWidget {
 
   final ConnectionWorkspaceController workspaceController;
   final String description;
-  final ConnectionWorkspaceRosterStyle visualStyle;
   final PocketPlatformBehavior platformBehavior;
-  final ConnectionSettingsRenderer settingsRenderer;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
   final bool useSafeArea;
 
@@ -68,44 +61,21 @@ class _ConnectionWorkspaceDormantRosterContentState
         )
         .toList(growable: false);
 
-    final content = switch (widget.visualStyle) {
-      ConnectionWorkspaceRosterStyle.material => _buildMaterialContent(
-        context,
-        workspaceState: workspaceState,
-        dormantConnections: dormantConnections,
-      ),
-      ConnectionWorkspaceRosterStyle.cupertino => _buildCupertinoContent(
-        context,
-        workspaceState: workspaceState,
-        dormantConnections: dormantConnections,
-      ),
-    };
+    final content = _buildMaterialContent(
+      context,
+      workspaceState: workspaceState,
+      dormantConnections: dormantConnections,
+    );
 
     final wrappedContent = widget.useSafeArea
-        ? switch (widget.visualStyle) {
-            ConnectionWorkspaceRosterStyle.material => SafeArea(
-              bottom: false,
-              child: content,
-            ),
-            ConnectionWorkspaceRosterStyle.cupertino => SafeArea(
-              top: false,
-              bottom: true,
-              child: content,
-            ),
-          }
+        ? SafeArea(bottom: false, child: content)
         : content;
 
     final gradientBackground = ChatScreenGradientBackground(
       child: wrappedContent,
     );
 
-    return switch (widget.visualStyle) {
-      ConnectionWorkspaceRosterStyle.material => Material(
-        type: MaterialType.transparency,
-        child: gradientBackground,
-      ),
-      ConnectionWorkspaceRosterStyle.cupertino => gradientBackground,
-    };
+    return Material(type: MaterialType.transparency, child: gradientBackground);
   }
 
   Widget _buildMaterialContent(
@@ -147,7 +117,6 @@ class _ConnectionWorkspaceDormantRosterContentState
         const SizedBox(height: 18),
         if (dormantConnections.isEmpty)
           _DormantConnectionsEmptyState(
-            visualStyle: widget.visualStyle,
             isEmptyWorkspace: workspaceState.isEmptyWorkspace,
             canReturnToLane: workspaceState.selectedConnectionId != null,
             onReturnToLane: _handleReturnToLiveLane,
@@ -161,7 +130,6 @@ class _ConnectionWorkspaceDormantRosterContentState
                 bottom: index == dormantConnections.length - 1 ? 0 : 12,
               ),
               child: _DormantConnectionCard(
-                visualStyle: widget.visualStyle,
                 connectionId: connection.id,
                 title: connection.profile.label,
                 subtitle: _connectionSubtitle(connection.profile),
@@ -175,73 +143,6 @@ class _ConnectionWorkspaceDormantRosterContentState
             );
           }),
       ],
-    );
-  }
-
-  Widget _buildCupertinoContent(
-    BuildContext context, {
-    required ConnectionWorkspaceState workspaceState,
-    required List<SavedConnectionSummary> dormantConnections,
-  }) {
-    final secondaryLabelColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
-
-    return CupertinoScrollbar(
-      controller: _scrollController,
-      child: ListView(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-            child: Text(
-              widget.description,
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                fontSize: 15,
-                height: 1.4,
-                color: secondaryLabelColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: CupertinoButton.filled(
-              key: const ValueKey('add_connection'),
-              onPressed: _isCreatingConnection ? null : _createConnection,
-              child: Text(
-                _isCreatingConnection
-                    ? ConnectionWorkspaceCopy.addConnectionProgress
-                    : ConnectionWorkspaceCopy.addConnectionAction,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (dormantConnections.isEmpty)
-            _DormantConnectionsEmptyState(
-              visualStyle: widget.visualStyle,
-              isEmptyWorkspace: workspaceState.isEmptyWorkspace,
-              canReturnToLane: workspaceState.selectedConnectionId != null,
-              onReturnToLane: _handleReturnToLiveLane,
-            )
-          else
-            ...dormantConnections.map(
-              (connection) => _DormantConnectionCard(
-                visualStyle: widget.visualStyle,
-                connectionId: connection.id,
-                title: connection.profile.label,
-                subtitle: _connectionSubtitle(connection.profile),
-                isOpening: _instantiatingConnectionIds.contains(connection.id),
-                isEditing: _editingConnectionIds.contains(connection.id),
-                isDeleting: _deletingConnectionIds.contains(connection.id),
-                onOpen: () => _instantiateConnection(connection.id),
-                onEdit: () => _editConnection(connection),
-                onDelete: () => _deleteConnection(connection.id),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -378,30 +279,24 @@ class _ConnectionWorkspaceDormantRosterContentState
       initialProfile: profile,
       initialSecrets: secrets,
       platformBehavior: widget.platformBehavior,
-      renderer: widget.settingsRenderer,
     );
   }
 }
 
 class _DormantConnectionsEmptyState extends StatelessWidget {
   const _DormantConnectionsEmptyState({
-    required this.visualStyle,
     required this.isEmptyWorkspace,
     required this.canReturnToLane,
     required this.onReturnToLane,
   });
 
-  final ConnectionWorkspaceRosterStyle visualStyle;
   final bool isEmptyWorkspace;
   final bool canReturnToLane;
   final VoidCallback onReturnToLane;
 
   @override
   Widget build(BuildContext context) {
-    return switch (visualStyle) {
-      ConnectionWorkspaceRosterStyle.material => _buildMaterial(context),
-      ConnectionWorkspaceRosterStyle.cupertino => _buildCupertino(context),
-    };
+    return _buildMaterial(context);
   }
 
   Widget _buildMaterial(BuildContext context) {
@@ -457,58 +352,10 @@ class _DormantConnectionsEmptyState extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildCupertino(BuildContext context) {
-    final theme = CupertinoTheme.of(context);
-
-    return CupertinoListSection.insetGrouped(
-      hasLeading: false,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                ConnectionWorkspaceCopy.emptySavedConnectionsTitle(
-                  isEmptyWorkspace: isEmptyWorkspace,
-                ),
-                style: theme.textTheme.navTitleTextStyle.copyWith(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ConnectionWorkspaceCopy.emptySavedConnectionsMessage(
-                  isEmptyWorkspace: isEmptyWorkspace,
-                ),
-                style: theme.textTheme.textStyle.copyWith(
-                  fontSize: 15,
-                  height: 1.4,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                ),
-              ),
-              if (canReturnToLane) ...[
-                const SizedBox(height: 14),
-                CupertinoButton.filled(
-                  onPressed: onReturnToLane,
-                  child: const Text(
-                    ConnectionWorkspaceCopy.returnToOpenLaneAction,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _DormantConnectionCard extends StatelessWidget {
   const _DormantConnectionCard({
-    required this.visualStyle,
     required this.connectionId,
     required this.title,
     required this.subtitle,
@@ -520,7 +367,6 @@ class _DormantConnectionCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  final ConnectionWorkspaceRosterStyle visualStyle;
   final String connectionId;
   final String title;
   final String subtitle;
@@ -533,10 +379,7 @@ class _DormantConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (visualStyle) {
-      ConnectionWorkspaceRosterStyle.material => _buildMaterial(context),
-      ConnectionWorkspaceRosterStyle.cupertino => _buildCupertino(context),
-    };
+    return _buildMaterial(context);
   }
 
   Widget _buildMaterial(BuildContext context) {
@@ -616,106 +459,6 @@ class _DormantConnectionCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildCupertino(BuildContext context) {
-    final isBusy = isOpening || isEditing || isDeleting;
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-
-    return CupertinoListSection.insetGrouped(
-      key: ValueKey<String>('dormant_connection_$connectionId'),
-      hasLeading: false,
-      children: [
-        CupertinoListTile.notched(
-          title: Text(
-            title,
-            style: textStyle.copyWith(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: textStyle.copyWith(
-              fontSize: 14,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          trailing: isOpening
-              ? const CupertinoActivityIndicator()
-              : const CupertinoListTileChevron(),
-          onTap: isBusy ? null : onOpen,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: CupertinoButton.filled(
-                  key: ValueKey<String>('instantiate_$connectionId'),
-                  onPressed: isBusy ? null : onOpen,
-                  child: Text(
-                    isOpening
-                        ? ConnectionWorkspaceCopy.openingLaneAction
-                        : ConnectionWorkspaceCopy.openLaneAction,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: CupertinoButton(
-                      key: ValueKey<String>('edit_$connectionId'),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      color: CupertinoColors.secondarySystemFill.resolveFrom(
-                        context,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      onPressed: isBusy ? null : onEdit,
-                      child: Text(
-                        isEditing
-                            ? ConnectionWorkspaceCopy.saveProgress
-                            : ConnectionWorkspaceCopy.editAction,
-                        style: textStyle.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: CupertinoButton(
-                      key: ValueKey<String>('delete_$connectionId'),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      color: CupertinoColors.secondarySystemFill.resolveFrom(
-                        context,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      onPressed: isBusy ? null : onDelete,
-                      child: Text(
-                        isDeleting
-                            ? ConnectionWorkspaceCopy.deleteProgress
-                            : ConnectionWorkspaceCopy.deleteAction,
-                        style: textStyle.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: CupertinoColors.destructiveRed.resolveFrom(
-                            context,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

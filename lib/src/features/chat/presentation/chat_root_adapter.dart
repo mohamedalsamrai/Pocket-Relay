@@ -14,7 +14,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_m
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
@@ -121,7 +120,6 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
 
     return widget.rendererDelegate.buildTranscriptRegion(
       renderer: regionPolicy.rendererFor(ChatRootRegion.transcript),
-      emptyStateRenderer: _emptyStateRendererFor(regionPolicy),
       screen: screen,
       surfaceChangeToken: sessionController.sessionState,
       platformBehavior: widget.platformPolicy.behavior,
@@ -280,25 +278,6 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     }
   }
 
-  ChatEmptyStateRenderer _emptyStateRendererFor(
-    ChatRootRegionPolicy regionPolicy,
-  ) {
-    return switch (regionPolicy.rendererFor(ChatRootRegion.emptyState)) {
-      ChatRootRegionRenderer.flutter => ChatEmptyStateRenderer.flutter,
-      ChatRootRegionRenderer.cupertino => ChatEmptyStateRenderer.cupertino,
-    };
-  }
-
-  ChatTransientFeedbackRenderer _feedbackRendererFor(
-    ChatRootRegionPolicy regionPolicy,
-  ) {
-    return switch (regionPolicy.rendererFor(ChatRootRegion.feedbackOverlay)) {
-      ChatRootRegionRenderer.flutter => ChatTransientFeedbackRenderer.material,
-      ChatRootRegionRenderer.cupertino =>
-        ChatTransientFeedbackRenderer.cupertino,
-    };
-  }
-
   void _showTransientFeedback(String message) {
     if (!mounted) {
       return;
@@ -307,7 +286,6 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     widget.overlayDelegate.showTransientFeedback(
       context: context,
       message: message,
-      renderer: _feedbackRendererFor(widget.platformPolicy.regionPolicy),
     );
   }
 }

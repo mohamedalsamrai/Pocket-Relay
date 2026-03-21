@@ -5,10 +5,6 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_c
 import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_app_chrome.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_composer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/cupertino_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
 
 abstract interface class ChatRootRendererDelegate {
@@ -31,7 +27,6 @@ abstract interface class ChatRootRendererDelegate {
 
   Widget buildTranscriptRegion({
     required ChatRootRegionRenderer renderer,
-    required ChatEmptyStateRenderer emptyStateRenderer,
     required PocketPlatformBehavior platformBehavior,
     required ChatScreenContract screen,
     required Object? surfaceChangeToken,
@@ -71,22 +66,13 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     required Widget composerRegion,
     required Future<void> Function() onStopActiveTurn,
   }) {
-    return switch (renderer) {
-      ChatRootScreenShellRenderer.flutter => FlutterChatScreenRenderer(
-        screen: screen,
-        appChrome: appChrome,
-        transcriptRegion: transcriptRegion,
-        composerRegion: composerRegion,
-        onStopActiveTurn: onStopActiveTurn,
-      ),
-      ChatRootScreenShellRenderer.cupertino => CupertinoChatScreenRenderer(
-        screen: screen,
-        appChrome: appChrome,
-        transcriptRegion: transcriptRegion,
-        composerRegion: composerRegion,
-        onStopActiveTurn: onStopActiveTurn,
-      ),
-    };
+    return FlutterChatScreenRenderer(
+      screen: screen,
+      appChrome: appChrome,
+      transcriptRegion: transcriptRegion,
+      composerRegion: composerRegion,
+      onStopActiveTurn: onStopActiveTurn,
+    );
   }
 
   @override
@@ -97,24 +83,16 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     List<ChatChromeMenuAction> supplementalMenuActions =
         const <ChatChromeMenuAction>[],
   }) {
-    return switch (renderer) {
-      ChatRootRegionRenderer.cupertino => CupertinoChatAppChrome(
-        screen: screen,
-        onScreenAction: onScreenAction,
-        supplementalMenuActions: supplementalMenuActions,
-      ),
-      ChatRootRegionRenderer.flutter => FlutterChatAppChrome(
-        screen: screen,
-        onScreenAction: onScreenAction,
-        supplementalMenuActions: supplementalMenuActions,
-      ),
-    };
+    return FlutterChatAppChrome(
+      screen: screen,
+      onScreenAction: onScreenAction,
+      supplementalMenuActions: supplementalMenuActions,
+    );
   }
 
   @override
   Widget buildTranscriptRegion({
     required ChatRootRegionRenderer renderer,
-    required ChatEmptyStateRenderer emptyStateRenderer,
     required PocketPlatformBehavior platformBehavior,
     required ChatScreenContract screen,
     required Object? surfaceChangeToken,
@@ -129,24 +107,20 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     onSubmitUserInput,
     Future<void> Function(String blockId)? onSaveHostFingerprint,
   }) {
-    return switch (renderer) {
-      ChatRootRegionRenderer.cupertino ||
-      ChatRootRegionRenderer.flutter => FlutterChatTranscriptRegion(
-        screen: screen,
-        emptyStateRenderer: emptyStateRenderer,
-        platformBehavior: platformBehavior,
-        surfaceChangeToken: surfaceChangeToken,
-        onScreenAction: onScreenAction,
-        onSelectTimeline: onSelectTimeline,
-        onSelectConnectionMode: onSelectConnectionMode,
-        onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged,
-        onApproveRequest: onApproveRequest,
-        onDenyRequest: onDenyRequest,
-        onOpenChangedFileDiff: onOpenChangedFileDiff,
-        onSubmitUserInput: onSubmitUserInput,
-        onSaveHostFingerprint: onSaveHostFingerprint,
-      ),
-    };
+    return FlutterChatTranscriptRegion(
+      screen: screen,
+      platformBehavior: platformBehavior,
+      surfaceChangeToken: surfaceChangeToken,
+      onScreenAction: onScreenAction,
+      onSelectTimeline: onSelectTimeline,
+      onSelectConnectionMode: onSelectConnectionMode,
+      onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged,
+      onApproveRequest: onApproveRequest,
+      onDenyRequest: onDenyRequest,
+      onOpenChangedFileDiff: onOpenChangedFileDiff,
+      onSubmitUserInput: onSubmitUserInput,
+      onSaveHostFingerprint: onSaveHostFingerprint,
+    );
   }
 
   @override
@@ -160,23 +134,13 @@ class FlutterChatRootRendererDelegate implements ChatRootRendererDelegate {
     required ValueChanged<ChatConversationRecoveryActionId>
     onConversationRecoveryAction,
   }) {
-    return switch (renderer) {
-      ChatRootRegionRenderer.cupertino => CupertinoChatComposerRegion(
-        platformBehavior: platformBehavior,
-        conversationRecoveryNotice: conversationRecoveryNotice,
-        composer: composer,
-        onComposerDraftChanged: onComposerDraftChanged,
-        onSendPrompt: onSendPrompt,
-        onConversationRecoveryAction: onConversationRecoveryAction,
-      ),
-      ChatRootRegionRenderer.flutter => FlutterChatComposerRegion(
-        platformBehavior: platformBehavior,
-        conversationRecoveryNotice: conversationRecoveryNotice,
-        composer: composer,
-        onComposerDraftChanged: onComposerDraftChanged,
-        onSendPrompt: onSendPrompt,
-        onConversationRecoveryAction: onConversationRecoveryAction,
-      ),
-    };
+    return FlutterChatComposerRegion(
+      platformBehavior: platformBehavior,
+      conversationRecoveryNotice: conversationRecoveryNotice,
+      composer: composer,
+      onComposerDraftChanged: onComposerDraftChanged,
+      onSendPrompt: onSendPrompt,
+      onConversationRecoveryAction: onConversationRecoveryAction,
+    );
   }
 }
