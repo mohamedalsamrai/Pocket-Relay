@@ -6,8 +6,8 @@ import 'package:pocket_relay/src/core/storage/codex_connection_conversation_stat
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_conversation_recovery_policy.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_selection_coordinator.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_recovery_policy.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';

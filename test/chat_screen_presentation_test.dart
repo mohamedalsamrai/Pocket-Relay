@@ -12,10 +12,10 @@ import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pend
 import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pending_request_placement_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_projector.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_effect.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_effect_mapper.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_host.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_contract.dart';

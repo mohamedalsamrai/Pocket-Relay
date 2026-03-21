@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_selection_coordinator.dart';
 
 void main() {
   test('selectConversationForResume persists the selected thread id', () async {

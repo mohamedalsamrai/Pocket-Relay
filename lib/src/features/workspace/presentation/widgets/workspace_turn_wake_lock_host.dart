@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_session_controller.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 

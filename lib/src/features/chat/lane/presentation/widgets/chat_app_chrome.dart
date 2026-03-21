@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_chrome_menu_action.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
 
 class ChatAppChromeTitle extends StatelessWidget {
   const ChatAppChromeTitle({super.key, required this.header});

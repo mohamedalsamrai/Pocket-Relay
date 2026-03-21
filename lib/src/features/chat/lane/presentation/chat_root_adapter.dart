@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_chrome_menu_action.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_overlay_delegate.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_mapper.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_chrome_menu_action.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_effect.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_effect_mapper.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/flutter_chat_screen_renderer.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
 
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({

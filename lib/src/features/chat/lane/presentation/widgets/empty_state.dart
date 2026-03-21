@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/chat_empty_state_body.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/chat_empty_state_body.dart';
 
 class EmptyState extends StatelessWidget {
   const EmptyState({
