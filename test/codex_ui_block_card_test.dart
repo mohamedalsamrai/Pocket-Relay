@@ -44,6 +44,13 @@ void main() {
 
     expect(find.text('Reasoning'), findsOneWidget);
     expect(find.text('Investigating the next step.'), findsOneWidget);
+    expect(
+      _findDecoratedContainerColorForText(
+        tester,
+        'Investigating the next step.',
+      ),
+      isNull,
+    );
   });
 
   testWidgets('renders code fences with readable text in dark mode', (
@@ -72,52 +79,155 @@ void main() {
     expect(codeStyle?.color, const Color(0xFFE7F3F4));
   });
 
-  testWidgets('uses dark surfaces for parsed codex cards in dark mode', (
+  testWidgets('renders status blocks as flat transcript annotations', (
     tester,
   ) async {
     await tester.pumpWidget(
       _buildTestApp(
-        themeMode: ThemeMode.dark,
-        child: Column(
-          children: [
-            _entryCard(
-              block: CodexTextBlock(
-                id: 'reasoning_dark_1',
-                kind: CodexUiBlockKind.reasoning,
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Reasoning',
-                body: 'Dark mode should use the themed surface.',
-              ),
-            ),
-            const SizedBox(height: 16),
-            _entryCard(
-              block: CodexChangedFilesBlock(
-                id: 'files_dark_1',
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Changed files',
-                files: <CodexChangedFile>[
-                  const CodexChangedFile(
-                    path: 'lib/src/features/chat/presentation/widgets/foo.dart',
-                    additions: 2,
-                    deletions: 1,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: _entryCard(
+          block: CodexStatusBlock(
+            id: 'status_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Context compacted',
+            body: 'Older transcript context was compacted upstream.',
+            statusKind: CodexStatusBlockKind.compaction,
+          ),
         ),
       ),
     );
 
+    expect(find.text('Context compacted'), findsOneWidget);
     expect(
-      _findDecoratedContainerColorForText(tester, 'Reasoning'),
-      PocketPalette.dark.surface,
+      find.text('Older transcript context was compacted upstream.'),
+      findsOneWidget,
     );
     expect(
-      _findDecoratedContainerColorForText(tester, 'Changed files'),
-      PocketPalette.dark.surface,
+      _findDecoratedContainerColorForText(
+        tester,
+        'Older transcript context was compacted upstream.',
+      ),
+      isNull,
     );
   });
+
+  testWidgets('renders error blocks as flat transcript annotations', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexErrorBlock(
+            id: 'error_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Patch apply failed',
+            body: 'The patch could not be applied cleanly.',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Patch apply failed'), findsOneWidget);
+    expect(
+      find.text('The patch could not be applied cleanly.'),
+      findsOneWidget,
+    );
+    expect(
+      _findDecoratedContainerColorForText(
+        tester,
+        'The patch could not be applied cleanly.',
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets('renders plan updates as flat transcript annotations', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexPlanUpdateBlock(
+            id: 'plan_update_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            explanation: 'Updated the execution sequence.',
+            steps: const <CodexRuntimePlanStep>[
+              CodexRuntimePlanStep(
+                step: 'Inspect the existing transcript item hierarchy.',
+                status: CodexRuntimePlanStepStatus.completed,
+              ),
+              CodexRuntimePlanStep(
+                step: 'Replace framed transcript annotations.',
+                status: CodexRuntimePlanStepStatus.inProgress,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Updated Plan'), findsOneWidget);
+    expect(find.text('Updated the execution sequence.'), findsOneWidget);
+    expect(
+      find.text('Inspect the existing transcript item hierarchy.'),
+      findsOneWidget,
+    );
+    expect(find.text('Replace framed transcript annotations.'), findsOneWidget);
+    expect(find.text('DONE'), findsOneWidget);
+    expect(find.text('ACTIVE'), findsOneWidget);
+    expect(
+      _findDecoratedContainerColorForText(
+        tester,
+        'Updated the execution sequence.',
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets(
+    'keeps reasoning flat while retaining changed-files surface in dark mode',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          themeMode: ThemeMode.dark,
+          child: Column(
+            children: [
+              _entryCard(
+                block: CodexTextBlock(
+                  id: 'reasoning_dark_1',
+                  kind: CodexUiBlockKind.reasoning,
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Reasoning',
+                  body: 'Dark mode should use the themed surface.',
+                ),
+              ),
+              const SizedBox(height: 16),
+              _entryCard(
+                block: CodexChangedFilesBlock(
+                  id: 'files_dark_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Changed files',
+                  files: <CodexChangedFile>[
+                    const CodexChangedFile(
+                      path:
+                          'lib/src/features/chat/presentation/widgets/foo.dart',
+                      additions: 2,
+                      deletions: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(_findDecoratedContainerColorForText(tester, 'Reasoning'), isNull);
+      expect(
+        _findDecoratedContainerColorForText(tester, 'Changed files'),
+        isNull,
+      );
+    },
+  );
 
   testWidgets('renders assistant messages without a decorated card shell', (
     tester,
@@ -853,6 +963,10 @@ void main() {
       expect(find.text('Ship mobile widgets'), findsOneWidget);
       expect(find.text('Summary'), findsNothing);
       expect(find.text('Expand plan'), findsOneWidget);
+      expect(
+        _findDecoratedContainerColorForText(tester, 'Step 1 for the rollout'),
+        isNull,
+      );
 
       await tester.tap(find.text('Expand plan'));
       await tester.pumpAndSettle();
@@ -1036,6 +1150,55 @@ void main() {
     expect(find.text('running'), findsOneWidget);
   });
 
+  testWidgets(
+    'shows hidden work-log count in the tappable header above visible rows',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexWorkLogGroupBlock(
+              id: 'worklog_overflow_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              entries: <CodexWorkLogEntry>[
+                CodexWorkLogEntry(
+                  id: 'entry_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'first',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_2',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'second',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_3',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 2),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'third',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_4',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 3),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'fourth',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final hiddenSummaryTopLeft = tester.getTopLeft(
+        find.text('4 total · 1 hidden'),
+      );
+      final firstVisibleRowTopLeft = tester.getTopLeft(find.text('second'));
+
+      expect(hiddenSummaryTopLeft.dy, lessThan(firstVisibleRowTopLeft.dy));
+    },
+  );
+
   testWidgets('renders web-search entries as dedicated work-log rows', (
     tester,
   ) async {
@@ -1156,7 +1319,7 @@ void main() {
                   id: 'entry_head',
                   createdAt: DateTime(2026, 3, 14, 12, 0, 1),
                   entryKind: CodexWorkLogEntryKind.commandExecution,
-                  title: 'head -n 40 docs/019_codebase-handoff.md',
+                  title: 'head -n 40 docs/021_codebase-handoff.md',
                 ),
                 CodexWorkLogEntry(
                   id: 'entry_tail',
@@ -1176,14 +1339,14 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Show 1 more'));
+      await tester.tap(find.text('4 total · 1 hidden'));
       await tester.pumpAndSettle();
 
       expect(find.text('Reading full file'), findsOneWidget);
       expect(find.text('README.md'), findsAtLeastNWidgets(2));
 
       expect(find.text('Reading first 40 lines'), findsOneWidget);
-      expect(find.text('019_codebase-handoff.md'), findsOneWidget);
+      expect(find.text('021_codebase-handoff.md'), findsOneWidget);
 
       expect(find.text('Reading last 20 lines'), findsOneWidget);
       expect(find.text('output.txt'), findsOneWidget);
@@ -1193,7 +1356,7 @@ void main() {
 
       expect(find.text('cat README.md'), findsNothing);
       expect(
-        find.text('head -n 40 docs/019_codebase-handoff.md'),
+        find.text('head -n 40 docs/021_codebase-handoff.md'),
         findsNothing,
       );
       expect(find.text('tail -20 logs/output.txt'), findsNothing);
@@ -1245,7 +1408,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Show 1 more'));
+      await tester.tap(find.text('4 total · 1 hidden'));
       await tester.pumpAndSettle();
 
       expect(find.text('Searching for'), findsNWidgets(4));
@@ -1347,7 +1510,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Show 1 more'));
+    await tester.tap(find.text('4 total · 1 hidden'));
     await tester.pumpAndSettle();
 
     expect(find.text('Checking worktree status'), findsOneWidget);
@@ -1836,9 +1999,9 @@ void main() {
         ),
       );
 
-      expect(find.text('Created'), findsOneWidget);
-      expect(find.text('Edited'), findsOneWidget);
-      expect(find.text('Deleted'), findsOneWidget);
+      expect(find.text('CREATED'), findsOneWidget);
+      expect(find.text('EDITED'), findsOneWidget);
+      expect(find.text('DELETED'), findsOneWidget);
 
       final createdColor = _findDecoratedContainerColorForText(
         tester,
@@ -1853,12 +2016,9 @@ void main() {
         'lib/deleted_file.dart',
       );
 
-      expect(createdColor, isNotNull);
-      expect(editedColor, isNotNull);
-      expect(deletedColor, isNotNull);
-      expect(createdColor, isNot(equals(editedColor)));
-      expect(deletedColor, isNot(equals(editedColor)));
-      expect(createdColor, isNot(equals(deletedColor)));
+      expect(createdColor, isNull);
+      expect(editedColor, isNull);
+      expect(deletedColor, isNull);
     },
   );
 

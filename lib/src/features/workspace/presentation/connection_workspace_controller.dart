@@ -365,7 +365,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         ),
       ),
     );
-    if (resumeThreadId case final normalizedThreadId?) {
+    if (resumeThreadId != null) {
       await binding.sessionController.initialize();
       if (_isDisposed) {
         return;
