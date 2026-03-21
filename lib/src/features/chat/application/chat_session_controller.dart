@@ -252,6 +252,23 @@ class ChatSessionController extends ChangeNotifier {
     );
   }
 
+  Future<void> selectConversationForResume(String threadId) async {
+    final normalizedThreadId = _normalizedThreadId(threadId);
+    if (normalizedThreadId == null) {
+      throw ArgumentError.value(
+        threadId,
+        'threadId',
+        'Thread id must not be empty.',
+      );
+    }
+
+    _resumeThreadId = normalizedThreadId;
+    _suppressTrackedThreadReuse = false;
+    await _persistConversationSelection(
+      _activeConversationThreadId() ?? _resumeConversationThreadId(),
+    );
+  }
+
   Future<void> approveRequest(String requestId) {
     return _resolveApproval(requestId, approved: true);
   }

@@ -136,6 +136,35 @@ void main() {
   });
 
   test(
+    'selectConversationForResume persists the selected thread through the session controller',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      final historyStore = _RecordingConversationHistoryStore();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        conversationStateStore: historyStore,
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectConversationForResume('thread_saved');
+
+      expect(historyStore.state.normalizedSelectedThreadId, 'thread_saved');
+    },
+  );
+
+  test(
     'sendPrompt forwards profile model and reasoning effort overrides',
     () async {
       final appServerClient = FakeCodexAppServerClient();

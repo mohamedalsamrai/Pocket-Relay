@@ -514,14 +514,86 @@ void main() {
       expect(nextBinding, isNotNull);
       expect(nextBinding, isNot(same(firstBinding)));
       expect(
-        (await historyStore.loadState('conn_primary'))
-            .normalizedSelectedThreadId,
+        (await historyStore.loadState(
+          'conn_primary',
+        )).normalizedSelectedThreadId,
         'thread_resumed',
       );
       expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
       expect(clientsByConnectionId['conn_primary']!.last.disconnectCalls, 0);
       expect(controller.state.selectedConnectionId, 'conn_primary');
       expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
+    },
+  );
+
+  test(
+    'resumeConversation no longer writes the connection state store directly',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final readOnlyConversationStateStore =
+          _ReadOnlyConnectionConversationStateStore(
+            initialStates: <String, SavedConnectionConversationState>{
+              'conn_primary': const SavedConnectionConversationState(),
+            },
+          );
+      final sessionOwnedConversationStateStore =
+          MemoryCodexConnectionConversationHistoryStore();
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        connectionConversationStateStore: readOnlyConversationStateStore,
+        laneBindingFactory:
+            ({
+              required connectionId,
+              required connection,
+              required conversationState,
+            }) {
+              return ConnectionLaneBinding(
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                conversationStateStore: ConnectionScopedConversationStateStore(
+                  connectionId: connectionId,
+                  conversationStateStore: sessionOwnedConversationStateStore,
+                ),
+                appServerClient: client,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                initialConversationState: conversationState,
+                ownsAppServerClient: false,
+              );
+            },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.close();
+      });
+
+      await controller.initialize();
+      await controller.resumeConversation(
+        connectionId: 'conn_primary',
+        threadId: 'thread_resumed',
+      );
+
+      expect(readOnlyConversationStateStore.saveAttempts, 0);
+      expect(
+        (await sessionOwnedConversationStateStore.loadState(
+          'conn_primary',
+        )).normalizedSelectedThreadId,
+        'thread_resumed',
+      );
     },
   );
 
@@ -661,5 +733,38 @@ Future<void> _closeClientLists(
     for (final client in clients) {
       await client.close();
     }
+  }
+}
+
+class _ReadOnlyConnectionConversationStateStore
+    implements CodexConnectionConversationStateStore {
+  _ReadOnlyConnectionConversationStateStore({
+    required Map<String, SavedConnectionConversationState> initialStates,
+  }) : _states = Map<String, SavedConnectionConversationState>.from(
+         initialStates,
+       );
+
+  final Map<String, SavedConnectionConversationState> _states;
+  int saveAttempts = 0;
+
+  @override
+  Future<SavedConnectionConversationState> loadState(
+    String connectionId,
+  ) async {
+    return _states[connectionId] ?? const SavedConnectionConversationState();
+  }
+
+  @override
+  Future<void> saveState(
+    String connectionId,
+    SavedConnectionConversationState state,
+  ) async {
+    saveAttempts += 1;
+    throw StateError('Workspace controller should not write this store.');
+  }
+
+  @override
+  Future<void> deleteState(String connectionId) async {
+    _states.remove(connectionId);
   }
 }
