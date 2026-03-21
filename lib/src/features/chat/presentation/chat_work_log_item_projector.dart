@@ -28,6 +28,10 @@ class ChatWorkLogItemProjector {
         ChatExecCommandItemContract(entry: commandEntry),
       final ChatCommandWaitWorkLogEntryContract waitEntry =>
         ChatExecWaitItemContract(entry: waitEntry),
+      final ChatWebSearchWorkLogEntryContract webSearchEntry =>
+        ChatWebSearchItemContract(entry: webSearchEntry),
+      final ChatMcpToolCallWorkLogEntryContract mcpEntry =>
+        ChatMcpToolCallItemContract(entry: mcpEntry),
       _ => projected,
     };
   }

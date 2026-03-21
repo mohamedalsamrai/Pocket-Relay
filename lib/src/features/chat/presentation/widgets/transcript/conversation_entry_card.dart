@@ -13,6 +13,7 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_card_host.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/tool_activity_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_result_card.dart';
@@ -75,6 +76,12 @@ class ConversationEntryCard extends StatelessWidget {
       ),
       final ChatExecWaitItemContract execWaitItem => ExecWaitCard(
         entry: execWaitItem.entry,
+      ),
+      final ChatWebSearchItemContract webSearchItem => WebSearchActivityCard(
+        entry: webSearchItem.entry,
+      ),
+      final ChatMcpToolCallItemContract mcpItem => McpToolActivityCard(
+        entry: mcpItem.entry,
       ),
       final ChatChangedFilesItemContract changedFilesItem => ChangedFilesCard(
         item: changedFilesItem,

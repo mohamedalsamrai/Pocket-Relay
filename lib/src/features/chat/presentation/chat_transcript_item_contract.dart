@@ -90,6 +90,24 @@ final class ChatExecWaitItemContract extends ChatTranscriptItemContract {
   String get id => entry.id;
 }
 
+final class ChatWebSearchItemContract extends ChatTranscriptItemContract {
+  const ChatWebSearchItemContract({required this.entry});
+
+  final ChatWebSearchWorkLogEntryContract entry;
+
+  @override
+  String get id => entry.id;
+}
+
+final class ChatMcpToolCallItemContract extends ChatTranscriptItemContract {
+  const ChatMcpToolCallItemContract({required this.entry});
+
+  final ChatMcpToolCallWorkLogEntryContract entry;
+
+  @override
+  String get id => entry.id;
+}
+
 final class ChatChangedFilesItemContract extends ChatTranscriptItemContract {
   const ChatChangedFilesItemContract({
     required this.id,

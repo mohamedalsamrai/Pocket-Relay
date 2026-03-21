@@ -893,9 +893,8 @@ void main() {
         ],
       );
 
-      final item =
-          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
-      final entry = item.entries.single as ChatWebSearchWorkLogEntryContract;
+      final item = projector.project(groupBlock) as ChatWebSearchItemContract;
+      final entry = item.entry;
 
       expect(entry.queryText, 'Pocket Relay CLI');
       expect(entry.resultSummary, 'Found CLI reference and API notes');
@@ -1486,9 +1485,8 @@ void main() {
         ],
       );
 
-      final item =
-          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
-      final entry = item.entries.single as ChatMcpToolCallWorkLogEntryContract;
+      final item = projector.project(groupBlock) as ChatMcpToolCallItemContract;
+      final entry = item.entry;
 
       expect(entry.status, ChatMcpToolCallStatus.completed);
       expect(entry.toolName, 'read_file');
@@ -1522,9 +1520,8 @@ void main() {
         ],
       );
 
-      final item =
-          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
-      final entry = item.entries.single as ChatMcpToolCallWorkLogEntryContract;
+      final item = projector.project(groupBlock) as ChatMcpToolCallItemContract;
+      final entry = item.entry;
 
       expect(entry.status, ChatMcpToolCallStatus.failed);
       expect(entry.identityLabel, 'filesystem.write_file');

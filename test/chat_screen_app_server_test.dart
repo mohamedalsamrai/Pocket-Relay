@@ -904,6 +904,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(find.text('Work log'), findsNothing);
     expect(find.text('Searched'), findsOneWidget);
     expect(find.text('Pocket Relay CLI'), findsOneWidget);
     expect(find.text('Found CLI reference and API notes'), findsOneWidget);
@@ -1170,6 +1171,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(find.text('Work log'), findsNothing);
     expect(find.text('filesystem.read_file'), findsOneWidget);
     expect(find.text('args: path: README.md'), findsOneWidget);
     expect(
@@ -1961,7 +1963,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Work log'), findsNWidgets(2));
+      expect(find.text('Work log'), findsOneWidget);
       expect(find.text('File change approval resolved'), findsOneWidget);
       expect(find.text('Search docs'), findsOneWidget);
 
