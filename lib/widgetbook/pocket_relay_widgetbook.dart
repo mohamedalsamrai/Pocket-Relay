@@ -1,18 +1,8 @@
-// ignore_for_file: implementation_imports, invalid_use_of_internal_member
-
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/widgetbook/story_catalog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:widgetbook/widgetbook.dart' as wb;
-import 'package:widgetbook/src/fields/field_codec.dart';
-import 'package:widgetbook/src/layout/desktop_layout.dart';
-import 'package:widgetbook/src/navigation/widgets/navigation_panel.dart';
-import 'package:widgetbook/src/routing/app_route_config.dart';
-import 'package:widgetbook/src/routing/app_route_parser.dart';
-import 'package:widgetbook/src/settings/mobile_settings_panel.dart';
-import 'package:widgetbook/src/widgetbook_theme.dart' as wb_shell;
-import 'package:widgetbook/src/workbench/workbench.dart';
 
 class PocketRelayWidgetbook extends StatefulWidget {
   const PocketRelayWidgetbook({super.key});
@@ -22,39 +12,55 @@ class PocketRelayWidgetbook extends StatefulWidget {
 }
 
 class _PocketRelayWidgetbookState extends State<PocketRelayWidgetbook> {
-  static const _themePreferenceKey = 'widgetbook.selected_theme';
-  static const _themeGroupName = 'theme';
-  static const _themeFieldName = 'name';
-
-  wb.WidgetbookState? state;
-  _PocketRelayAppRouter? router;
-  bool _isReady = false;
+  String? _initialRoute;
 
   @override
   void initState() {
     super.initState();
-    _initializeWidgetbook();
+    _loadInitialRoute();
   }
 
-  Future<void> _initializeWidgetbook() async {
-    final initialUri = await _resolveInitialUri();
+  Future<void> _loadInitialRoute() async {
+    final initialRoute = await _resolveInitialRoute();
     if (!mounted) {
       return;
     }
 
-    final resolvedState = wb.WidgetbookState(
-      appBuilder: wb.materialAppBuilder,
-      addons: _addons,
-      root: wb.WidgetbookRoot(children: buildPocketRelayWidgetbookCatalog()),
-      home: const _PocketRelayWidgetbookHome(),
-      header: const _PocketRelayWidgetbookHeader(),
-    );
-    resolvedState.addListener(_persistThemeSelection);
     setState(() {
-      state = resolvedState;
-      router = _PocketRelayAppRouter(state: resolvedState, uri: initialUri);
-      _isReady = true;
+      _initialRoute = initialRoute;
     });
+  }
+
+  Future<String> _resolveInitialRoute() async {
+    final baseUri = Uri.base.fragment.isNotEmpty
+        ? Uri.parse(Uri.base.fragment)
+        : Uri.parse('/');
+
+    final routeTheme = _decodeThemeSelection(baseUri.queryParameters['theme']);
+    if (routeTheme != null) {
+      return baseUri.toString();
+    }
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final savedTheme = preferences.getString(
+        _WidgetbookThemePersistence.preferenceKey,
+      );
+      if (savedTheme == null || savedTheme.isEmpty) {
+        return baseUri.toString();
+      }
+
+      return baseUri
+          .replace(
+            queryParameters: <String, String>{
+              ...baseUri.queryParameters,
+              'theme': _encodeThemeSelection(savedTheme),
+            },
+          )
+          .toString();
+    } catch (_) {
+      return baseUri.toString();
+    }
   }
 
   List<wb.WidgetbookAddon> get _addons => <wb.WidgetbookAddon>[
@@ -79,74 +85,9 @@ class _PocketRelayWidgetbookState extends State<PocketRelayWidgetbook> {
     wb.TextScaleAddon(initialScale: 1.0, min: 0.8, max: 1.4, divisions: 3),
   ];
 
-  Future<Uri> _resolveInitialUri() async {
-    final baseUri = Uri.base.fragment.isNotEmpty
-        ? Uri.parse(Uri.base.fragment)
-        : Uri.parse('/');
-    final routeTheme = baseUri.queryParameters[_themeGroupName];
-    if (routeTheme != null && routeTheme.isNotEmpty) {
-      return baseUri;
-    }
-
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      final savedTheme = preferences.getString(_themePreferenceKey);
-      if (savedTheme == null || savedTheme.isEmpty) {
-        return baseUri;
-      }
-
-      return baseUri.replace(
-        queryParameters: <String, String>{
-          ...baseUri.queryParameters,
-          _themeGroupName: FieldCodec.encodeQueryGroup(<String, String>{
-            _themeFieldName: savedTheme,
-          }),
-        },
-      );
-    } catch (_) {
-      // Persistence should not block Widgetbook startup.
-      return baseUri;
-    }
-  }
-
-  Future<void> _persistThemeSelection() async {
-    final currentState = state;
-    if (!_isReady || currentState == null) {
-      return;
-    }
-
-    final encodedTheme = currentState.queryParams[_themeGroupName];
-    if (encodedTheme == null || encodedTheme.isEmpty) {
-      return;
-    }
-
-    final group = FieldCodec.decodeQueryGroup(encodedTheme);
-    final selectedTheme = group[_themeFieldName];
-    if (selectedTheme == null || selectedTheme.isEmpty) {
-      return;
-    }
-
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setString(_themePreferenceKey, selectedTheme);
-    } catch (_) {
-      // Ignore persistence failures and keep the in-memory selection.
-    }
-  }
-
-  @override
-  void dispose() {
-    state?.removeListener(_persistThemeSelection);
-    state?.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final currentState = state;
-    final currentRouter = router;
-
-    if (currentState == null || currentRouter == null) {
+    if (_initialRoute == null) {
       return MaterialApp(
         title: 'Pocket Relay Widgetbook',
         themeMode: ThemeMode.system,
@@ -157,18 +98,77 @@ class _PocketRelayWidgetbookState extends State<PocketRelayWidgetbook> {
       );
     }
 
-    return wb.WidgetbookScope(
-      state: currentState,
-      child: MaterialApp.router(
-        title: 'Pocket Relay Widgetbook',
-        themeMode: ThemeMode.system,
-        theme: _buildWidgetbookShellTheme(Brightness.light),
-        darkTheme: _buildWidgetbookShellTheme(Brightness.dark),
-        routerConfig: currentRouter,
-        debugShowCheckedModeBanner: false,
+    return wb.Widgetbook.material(
+      initialRoute: _initialRoute!,
+      directories: buildPocketRelayWidgetbookCatalog(),
+      addons: _addons,
+      appBuilder: (context, child) => wb.materialAppBuilder(
+        context,
+        _WidgetbookThemePersistence(child: child),
       ),
+      lightTheme: _buildWidgetbookShellTheme(Brightness.light),
+      darkTheme: _buildWidgetbookShellTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
     );
   }
+}
+
+class _WidgetbookThemePersistence extends StatefulWidget {
+  const _WidgetbookThemePersistence({required this.child});
+
+  final Widget child;
+
+  static const String preferenceKey = 'widgetbook.selected_theme';
+
+  @override
+  State<_WidgetbookThemePersistence> createState() =>
+      _WidgetbookThemePersistenceState();
+}
+
+class _WidgetbookThemePersistenceState
+    extends State<_WidgetbookThemePersistence> {
+  wb.WidgetbookState? _state;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextState = wb.WidgetbookState.of(context);
+    if (identical(nextState, _state)) {
+      return;
+    }
+
+    _state?.removeListener(_persistThemeSelection);
+    _state = nextState;
+    _state?.addListener(_persistThemeSelection);
+  }
+
+  @override
+  void dispose() {
+    _state?.removeListener(_persistThemeSelection);
+    super.dispose();
+  }
+
+  Future<void> _persistThemeSelection() async {
+    final encodedTheme = _state?.queryParams['theme'];
+    final selectedTheme = _decodeThemeSelection(encodedTheme);
+    if (selectedTheme == null || selectedTheme.isEmpty) {
+      return;
+    }
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        _WidgetbookThemePersistence.preferenceKey,
+        selectedTheme,
+      );
+    } catch (_) {
+      // Persistence failure should not affect the catalog.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 ThemeData _buildWidgetbookShellTheme(Brightness brightness) {
@@ -243,425 +243,22 @@ ThemeData _buildWidgetbookShellTheme(Brightness brightness) {
   );
 }
 
-class _PocketRelayAppRouter extends RouterConfig<AppRouteConfig> {
-  _PocketRelayAppRouter({required wb.WidgetbookState state, required Uri uri})
-    : super(
-        routeInformationParser: AppRouteParser(),
-        routeInformationProvider: PlatformRouteInformationProvider(
-          initialRouteInformation: RouteInformation(uri: uri),
-        ),
-        routerDelegate: _PocketRelayRouterDelegate(uri: uri, state: state),
-      );
+String _encodeThemeSelection(String themeName) {
+  final encodedName = Uri.encodeComponent(themeName);
+  return '{name:$encodedName}';
 }
 
-class _PocketRelayRouterDelegate extends RouterDelegate<AppRouteConfig>
-    with ChangeNotifier, PopNavigatorRouterDelegateMixin<AppRouteConfig> {
-  _PocketRelayRouterDelegate({required this.uri, required this.state})
-    : _navigatorKey = GlobalKey<NavigatorState>(),
-      _configuration = AppRouteConfig(uri: uri);
-
-  final Uri uri;
-  final wb.WidgetbookState state;
-  final GlobalKey<NavigatorState> _navigatorKey;
-  AppRouteConfig _configuration;
-
-  @override
-  AppRouteConfig? get currentConfiguration => _configuration;
-
-  @override
-  GlobalKey<NavigatorState>? get navigatorKey => _navigatorKey;
-
-  @override
-  Future<void> setNewRoutePath(AppRouteConfig configuration) async {
-    _configuration = configuration;
-    state.updateFromRouteConfig(configuration);
-    notifyListeners();
+String? _decodeThemeSelection(String? encodedTheme) {
+  if (encodedTheme == null ||
+      encodedTheme.isEmpty ||
+      !encodedTheme.startsWith('{name:') ||
+      !encodedTheme.endsWith('}')) {
+    return null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return wb_shell.WidgetbookTheme(
-      data: theme,
-      child: Navigator(
-        key: navigatorKey,
-        onDidRemovePage: (_) => {},
-        pages: <Page<dynamic>>[
-          MaterialPage<dynamic>(
-            child: _configuration.previewMode
-                ? const Workbench()
-                : _PocketRelayResponsiveLayout(
-                    key: ValueKey<AppRouteConfig>(_configuration),
-                    child: const Workbench(),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PocketRelayResponsiveLayout extends StatelessWidget {
-  const _PocketRelayResponsiveLayout({super.key, required this.child});
-
-  final Widget child;
-
-  Widget _buildNavigation(BuildContext context, bool isMobile) {
-    final state = wb.WidgetbookState.of(context);
-    return NavigationPanel(
-      initialPath: state.path,
-      root: state.root,
-      header: state.header,
-      onNodeSelected: (node) {
-        wb.WidgetbookState.of(context).updatePath(node.path);
-        if (isMobile) {
-          Navigator.pop(context);
-        }
-      },
-    );
-  }
-
-  List<Widget> _buildAddons(BuildContext context) {
-    final state = wb.WidgetbookState.of(context);
-    return state.effectiveAddons
-            ?.map((addon) => addon.buildFields(context))
-            .toList() ??
-        const <Widget>[];
-  }
-
-  List<Widget> _buildKnobs(BuildContext context) {
-    final state = wb.WidgetbookState.of(context);
-    return state.knobs.values.map((knob) => knob.buildFields(context)).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = wb.WidgetbookState.of(context);
-    final isEmbedded = state.panels != null;
-    final isMobile = MediaQuery.of(context).size.width < 840;
-
-    return isMobile && !isEmbedded
-        ? _PocketRelayMobileLayout(
-            navigationBuilder: (context) => _buildNavigation(context, true),
-            addonsBuilder: _buildAddons,
-            knobsBuilder: _buildKnobs,
-            workbench: child,
-          )
-        : DesktopLayout(
-            navigationBuilder: (context) => _buildNavigation(context, false),
-            addonsBuilder: _buildAddons,
-            knobsBuilder: _buildKnobs,
-            workbench: child,
-          );
-  }
-}
-
-class _PocketRelayMobileLayout extends StatelessWidget {
-  const _PocketRelayMobileLayout({
-    required this.navigationBuilder,
-    required this.addonsBuilder,
-    required this.knobsBuilder,
-    required this.workbench,
-  });
-
-  final Widget Function(BuildContext context) navigationBuilder;
-  final List<Widget> Function(BuildContext context) addonsBuilder;
-  final List<Widget> Function(BuildContext context) knobsBuilder;
-  final Widget workbench;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(child: workbench),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            label: 'Navigation',
-            icon: Icon(Icons.list_outlined),
-          ),
-          BottomNavigationBarItem(
-            label: 'Addons',
-            icon: Icon(Icons.dashboard_customize_outlined),
-          ),
-          BottomNavigationBarItem(
-            label: 'Knobs',
-            icon: Icon(Icons.tune_outlined),
-          ),
-        ],
-        onTap: (index) => _showPanel(context, index),
-      ),
-    );
-  }
-
-  Future<void> _showPanel(BuildContext context, int index) {
-    final Widget panel = switch (index) {
-      0 => navigationBuilder(context),
-      1 => MobileSettingsPanel(name: 'Addons', builder: addonsBuilder),
-      _ => MobileSettingsPanel(name: 'Knobs', builder: knobsBuilder),
-    };
-
-    final height = MediaQuery.of(context).size.height * 0.92;
-
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).bottomSheetTheme.modalBackgroundColor,
-      builder: (context) {
-        return SizedBox(
-          height: height,
-          child: Material(
-            color: Theme.of(context).bottomSheetTheme.modalBackgroundColor,
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(child: panel),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PocketRelayWidgetbookHeader extends StatelessWidget {
-  const _PocketRelayWidgetbookHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Pocket Relay',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Design Review Catalog',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.78),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PocketRelayWidgetbookHome extends StatelessWidget {
-  const _PocketRelayWidgetbookHome();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final state = wb.WidgetbookState.of(context);
-    final counts =
-        '${state.root.componentsCount} components · ${state.root.useCasesCount} use cases';
-
-    return SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 920),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Wrap(
-              spacing: 24,
-              runSpacing: 24,
-              children: [
-                SizedBox(
-                  width: 420,
-                  child: _HomePanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Pocket Relay Widgetbook',
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            height: 1.05,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'A reviewable catalog for transcript components, shared primitives, and product scenes.',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.76,
-                            ),
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _MetricPill(label: counts),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 420,
-                  child: _HomePanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        _ChecklistItem(
-                          title: 'Foundations',
-                          body:
-                              'Review badges, panel surfaces, and transcript framing before feature-level states.',
-                        ),
-                        SizedBox(height: 16),
-                        _ChecklistItem(
-                          title: 'Transcript Cards',
-                          body:
-                              'Validate approval, plan, changed-file, work-log, and SSH variants across themes.',
-                        ),
-                        SizedBox(height: 16),
-                        _ChecklistItem(
-                          title: 'Review Scenes',
-                          body:
-                              'Use the mixed transcript scenes for real state-flow review instead of isolated widgets only.',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HomePanel extends StatelessWidget {
-  const _HomePanel({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final palette = theme.extension<PocketPalette>()!;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.surface.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.surfaceBorder),
-      ),
-      child: Padding(padding: const EdgeInsets.all(24), child: child),
-    );
-  }
-}
-
-class _ChecklistItem extends StatelessWidget {
-  const _ChecklistItem({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                body,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.28),
-        ),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
+  final value = encodedTheme.substring(
+    '{name:'.length,
+    encodedTheme.length - 1,
+  );
+  return Uri.decodeComponent(value);
 }

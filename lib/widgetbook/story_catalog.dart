@@ -29,8 +29,41 @@ import 'package:pocket_relay/src/features/settings/presentation/connection_setti
 import 'package:pocket_relay/src/features/settings/presentation/connection_sheet.dart';
 import 'package:pocket_relay/widgetbook/support/fake_codex_app_server_client.dart';
 import 'package:pocket_relay/widgetbook/support/widgetbook_fixtures.dart';
-import 'package:pocket_relay/widgetbook/support/widgetbook_story_frame.dart';
 import 'package:widgetbook/widgetbook.dart';
+
+Widget _storyCard({
+  required Widget child,
+  double maxWidth = 860,
+  AlignmentGeometry alignment = Alignment.centerLeft,
+}) {
+  return Padding(
+    padding: const EdgeInsets.all(24),
+    child: Align(
+      alignment: alignment,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    ),
+  );
+}
+
+Widget _storyFill({required Widget child, double? maxWidth}) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: constraints.maxHeight - 48,
+            maxWidth: maxWidth ?? constraints.maxWidth,
+          ),
+          child: child,
+        ),
+      );
+    },
+  );
+}
 
 List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
   return <WidgetbookNode>[
@@ -45,7 +78,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Final',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: AssistantMessageCard(
                       block: WidgetbookFixtures.assistantMessage(),
                     ),
@@ -53,7 +86,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Streaming',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: AssistantMessageCard(
                       block: WidgetbookFixtures.assistantMessage(
                         isRunning: true,
@@ -68,7 +101,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Running',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ReasoningCard(
                       block: WidgetbookFixtures.reasoningBlock(isRunning: true),
                     ),
@@ -76,7 +109,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Complete',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ReasoningCard(
                       block: WidgetbookFixtures.reasoningBlock(
                         isRunning: false,
@@ -91,7 +124,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Sent',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     alignment: Alignment.centerRight,
                     child: UserMessageCard(
                       block: WidgetbookFixtures.userMessage(),
@@ -100,7 +133,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Local Echo',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     alignment: Alignment.centerRight,
                     child: UserMessageCard(
                       block: WidgetbookFixtures.userMessage(
@@ -116,7 +149,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: StatusCard(block: WidgetbookFixtures.statusBlock()),
                   ),
                 ),
@@ -127,7 +160,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ErrorCard(block: WidgetbookFixtures.errorBlock()),
                   ),
                 ),
@@ -138,7 +171,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Pending',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ApprovalRequestCard(
                       request: WidgetbookFixtures.approvalRequest(),
                       onApprove: (_) async {},
@@ -148,7 +181,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Resolved',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ApprovalRequestCard(
                       request: WidgetbookFixtures.approvalRequest(
                         isResolved: true,
@@ -163,7 +196,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: PlanUpdateCard(
                       block: WidgetbookFixtures.planUpdateBlock(),
                     ),
@@ -176,7 +209,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Final',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ProposedPlanCard(
                       block: WidgetbookFixtures.proposedPlanBlock(),
                     ),
@@ -184,7 +217,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Streaming Long',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ProposedPlanCard(
                       block: WidgetbookFixtures.proposedPlanBlock(
                         isStreaming: true,
@@ -200,7 +233,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Completed',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ChangedFilesCard(
                       item: WidgetbookFixtures.changedFilesItem(),
                     ),
@@ -208,7 +241,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Running',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: ChangedFilesCard(
                       item: WidgetbookFixtures.changedFilesItem(
                         isRunning: true,
@@ -223,7 +256,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: WorkLogGroupCard(
                       item: WidgetbookFixtures.workLogGroupItem(),
                     ),
@@ -236,7 +269,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Pending',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: UserInputRequestCard(
                       contract: WidgetbookFixtures.pendingUserInput(),
                       onFieldChanged: (_, value) {},
@@ -246,7 +279,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Resolved',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: UserInputRequestCard(
                       contract: WidgetbookFixtures.pendingUserInput(
                         resolved: true,
@@ -261,7 +294,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: UsageCard(block: WidgetbookFixtures.usageBlock()),
                   ),
                 ),
@@ -272,7 +305,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: TurnBoundaryCard(
                       block: WidgetbookFixtures.turnBoundaryBlock(),
                     ),
@@ -285,7 +318,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Unpinned',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshUnpinnedHostKeyCard(
                       block: WidgetbookFixtures.sshUnpinnedHostKey(),
                       onSaveFingerprint: (_) async {},
@@ -295,7 +328,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Saved',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshUnpinnedHostKeyCard(
                       block: WidgetbookFixtures.sshUnpinnedHostKey(
                         isSaved: true,
@@ -311,7 +344,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Connect Failed',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshConnectFailedCard(
                       block: WidgetbookFixtures.sshConnectFailedBlock(),
                       onOpenConnectionSettings: () {},
@@ -320,7 +353,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Host Key Mismatch',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshHostKeyMismatchCard(
                       block: WidgetbookFixtures.sshHostKeyMismatchBlock(),
                       onOpenConnectionSettings: () {},
@@ -329,7 +362,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Authentication Failed',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshAuthFailedCard(
                       block: WidgetbookFixtures.sshAuthenticationFailedBlock(),
                       onOpenConnectionSettings: () {},
@@ -338,7 +371,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Remote Launch Failed',
-                  builder: (_) => WidgetbookStoryFrame.card(
+                  builder: (_) => _storyCard(
                     child: SshRemoteLaunchFailedCard(
                       block: WidgetbookFixtures.sshRemoteLaunchFailedBlock(),
                       onOpenConnectionSettings: () {},
@@ -354,7 +387,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
               name: 'Mobile',
-              builder: (_) => WidgetbookStoryFrame.card(
+              builder: (_) => _storyCard(
                 maxWidth: 720,
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.mobileBehavior,
@@ -370,12 +403,13 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
             ),
             WidgetbookUseCase(
               name: 'Desktop',
-              builder: (_) => WidgetbookStoryFrame.card(
+              builder: (_) => _storyCard(
                 maxWidth: 920,
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   contract: const ChatComposerContract(
-                    draftText: 'Run the failing test file and explain the regression.',
+                    draftText:
+                        'Run the failing test file and explain the regression.',
                     isSendActionEnabled: true,
                     placeholder: 'Message Pocket Relay',
                   ),
@@ -391,7 +425,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
               name: 'Mobile First Run',
-              builder: (_) => WidgetbookStoryFrame.fill(
+              builder: (_) => _storyFill(
                 child: EmptyState(
                   isConfigured: false,
                   connectionMode: ConnectionMode.remote,
@@ -402,7 +436,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
             ),
             WidgetbookUseCase(
               name: 'Desktop Configured',
-              builder: (_) => WidgetbookStoryFrame.fill(
+              builder: (_) => _storyFill(
                 child: EmptyState(
                   isConfigured: true,
                   connectionMode: ConnectionMode.local,
@@ -424,7 +458,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
               name: 'Remote Password',
-              builder: (_) => WidgetbookStoryFrame.fill(
+              builder: (_) => _storyFill(
                 maxWidth: 920,
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.remoteProfile,
@@ -443,7 +477,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
             ),
             WidgetbookUseCase(
               name: 'Local Workspace',
-              builder: (_) => WidgetbookStoryFrame.fill(
+              builder: (_) => _storyFill(
                 maxWidth: 920,
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.localProfile,
@@ -465,13 +499,13 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
       ],
     ),
     WidgetbookCategory(
-      name: 'Shells',
+      name: 'App',
       children: <WidgetbookNode>[
         WidgetbookComponent(
-          name: 'Pocket Relay App',
+          name: 'Workspace',
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
-              name: 'Mobile Active Lane',
+              name: 'Mobile Workspace',
               builder: (_) => PocketRelayApp(
                 connectionRepository: MemoryCodexConnectionRepository.single(
                   savedProfile: WidgetbookFixtures.savedProfile,
@@ -485,7 +519,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               ),
             ),
             WidgetbookUseCase(
-              name: 'Desktop Active Lane',
+              name: 'Desktop Workspace',
               builder: (_) => PocketRelayApp(
                 connectionRepository: MemoryCodexConnectionRepository.single(
                   savedProfile: WidgetbookFixtures.savedProfile,

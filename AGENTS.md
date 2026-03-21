@@ -66,6 +66,25 @@ Repo rules for future agents.
 - If something would still need to exist without Widgetbook, it belongs in
   `lib/src/...`, not `lib/widgetbook/...`.
 - Do not add review chrome that changes what is being reviewed.
+- Every story must import and render a real app-owned widget.
+- No visual component may be defined inside Widgetbook.
+- No duplicated styling or structure is allowed inside stories.
+- No Storybook/Widgetbook-only replacement such as `FakeCard`, local JSX-like
+  markup clones, or preview-owned visual widgets.
+- If a real component cannot render in Widgetbook, refactor the real component
+  or add app-owned seams. Never fake the surface locally in Widgetbook.
+- Stories are thin shells only: args, mock data, decorators, providers, and
+  composition of real app-owned widgets.
+- Stories must not own UI behavior, reimplement visuals, or patch missing
+  product features locally.
+- If a story hits friction, stop and report the blocker plainly instead of
+  silently bypassing it.
+- Before finishing Widgetbook work, verify all of the following:
+  - every story imports a real component
+  - zero Widgetbook-defined visual components remain
+  - zero duplicated styling remains
+  - deleting Widgetbook would not change app UI
+  - changing the app component would change Widgetbook
 
 ## 7. Use literal naming
 

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/widgetbook/pocket_relay_widgetbook.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:widgetbook/src/state/widgetbook_scope.dart';
+import 'package:widgetbook/widgetbook.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +19,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PocketRelayWidgetbook), findsOneWidget);
-    expect(find.text('Pocket Relay Widgetbook'), findsOneWidget);
-    expect(find.text('Welcome to Widgetbook'), findsNothing);
+    expect(find.byType(WidgetbookScope), findsOneWidget);
   });
 
   testWidgets('restores the persisted Widgetbook theme selection', (
