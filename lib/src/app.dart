@@ -10,7 +10,6 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_root_region_policy.dart';
 import 'package:pocket_relay/src/features/chat/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
@@ -30,17 +29,16 @@ class PocketRelayApp extends StatefulWidget {
     this.platformPolicy,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
-    this.chatRootPlatformPolicy = const ChatRootPlatformPolicy.allFlutter(),
   });
 
   final CodexConnectionRepository? connectionRepository;
   final CodexConnectionConversationStateStore? connectionConversationStateStore;
-  final CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository;
+  final CodexWorkspaceConversationHistoryRepository?
+  conversationHistoryRepository;
   final CodexAppServerClient? appServerClient;
   final DisplayWakeLockController? displayWakeLockController;
   final PocketPlatformPolicy? platformPolicy;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
-  final ChatRootPlatformPolicy chatRootPlatformPolicy;
 
   @override
   State<PocketRelayApp> createState() => _PocketRelayAppState();
@@ -66,8 +64,7 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
         oldWidget.connectionConversationStateStore !=
             widget.connectionConversationStateStore ||
         oldWidget.appServerClient != widget.appServerClient ||
-        oldWidget.platformPolicy != widget.platformPolicy ||
-        oldWidget.chatRootPlatformPolicy != widget.chatRootPlatformPolicy;
+        oldWidget.platformPolicy != widget.platformPolicy;
     if (!workspaceDependenciesChanged) {
       return;
     }
@@ -86,10 +83,7 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
   }
 
   PocketPlatformPolicy get _resolvedPlatformPolicy {
-    return widget.platformPolicy ??
-        PocketPlatformPolicy.resolve(
-          chatRootPlatformPolicy: widget.chatRootPlatformPolicy,
-        );
+    return widget.platformPolicy ?? PocketPlatformPolicy.resolve();
   }
 
   ConnectionWorkspaceController _createWorkspaceController() {
@@ -183,7 +177,8 @@ class _PocketRelayHome extends StatelessWidget {
 
   final ConnectionWorkspaceController workspaceController;
   final PocketPlatformPolicy platformPolicy;
-  final CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository;
+  final CodexWorkspaceConversationHistoryRepository?
+  conversationHistoryRepository;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
   @override

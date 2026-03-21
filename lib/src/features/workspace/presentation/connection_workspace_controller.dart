@@ -228,14 +228,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
     await initialize();
     _requireKnownConnectionId(normalizedConnectionId);
-    await _connectionConversationStateStore.saveState(
-      normalizedConnectionId,
-      (await _connectionConversationStateStore.loadState(
-        normalizedConnectionId,
-      )).copyWith(
-        selectedThreadId: normalizedThreadId,
-      ),
-    );
+    final nextConversationState =
+        (await _connectionConversationStateStore.loadState(
+          normalizedConnectionId,
+        )).copyWith(selectedThreadId: normalizedThreadId);
 
     if (_state.isConnectionLive(normalizedConnectionId)) {
       final previousBinding =
@@ -244,7 +240,17 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         return;
       }
 
-      final nextBinding = await _loadLaneBinding(normalizedConnectionId);
+      final nextBinding = await _loadLaneBinding(
+        normalizedConnectionId,
+        conversationStateOverride: nextConversationState,
+      );
+      if (_isDisposed) {
+        nextBinding.dispose();
+        return;
+      }
+      await nextBinding.sessionController.selectConversationForResume(
+        normalizedThreadId,
+      );
       if (_isDisposed) {
         nextBinding.dispose();
         return;
@@ -271,7 +277,11 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       return;
     }
 
-    await instantiateConnection(normalizedConnectionId);
+    await _instantiateConnection(
+      normalizedConnectionId,
+      conversationStateOverride: nextConversationState,
+      resumeThreadId: normalizedThreadId,
+    );
   }
 
   Future<void> deleteDormantConnection(String connectionId) async {
@@ -315,13 +325,33 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       return;
     }
 
-    final binding = await _loadLaneBinding(normalizedConnectionId);
+    await _instantiateConnection(normalizedConnectionId);
+  }
+
+  Future<void> _instantiateConnection(
+    String connectionId, {
+    SavedConnectionConversationState? conversationStateOverride,
+    String? resumeThreadId,
+  }) async {
+    final binding = await _loadLaneBinding(
+      connectionId,
+      conversationStateOverride: conversationStateOverride,
+    );
     if (_isDisposed) {
       binding.dispose();
       return;
     }
+    if (resumeThreadId case final normalizedThreadId?) {
+      await binding.sessionController.selectConversationForResume(
+        normalizedThreadId,
+      );
+      if (_isDisposed) {
+        binding.dispose();
+        return;
+      }
+    }
 
-    _liveBindingsByConnectionId[normalizedConnectionId] = binding;
+    _liveBindingsByConnectionId[connectionId] = binding;
     final nextLiveConnectionIds = _orderLiveConnectionIds(
       _liveBindingsByConnectionId.keys,
     );
@@ -329,7 +359,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       _state.copyWith(
         isLoading: false,
         liveConnectionIds: nextLiveConnectionIds,
-        selectedConnectionId: normalizedConnectionId,
+        selectedConnectionId: connectionId,
         viewport: ConnectionWorkspaceViewport.liveLane,
         reconnectRequiredConnectionIds: _sanitizeReconnectRequiredConnectionIds(
           catalog: _state.catalog,
@@ -461,16 +491,18 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     );
   }
 
-  Future<ConnectionLaneBinding> _loadLaneBinding(String connectionId) async {
-    final results = await Future.wait<dynamic>(<Future<dynamic>>[
-      _connectionRepository.loadConnection(connectionId),
-      _connectionConversationStateStore.loadState(connectionId),
-    ]);
-    final conversationState = results[1] as SavedConnectionConversationState;
+  Future<ConnectionLaneBinding> _loadLaneBinding(
+    String connectionId, {
+    SavedConnectionConversationState? conversationStateOverride,
+  }) async {
+    final connectionFuture = _connectionRepository.loadConnection(connectionId);
+    final conversationState =
+        conversationStateOverride ??
+        await _connectionConversationStateStore.loadState(connectionId);
 
     return _laneBindingFactory(
       connectionId: connectionId,
-      connection: results[0] as SavedConnection,
+      connection: await connectionFuture,
       conversationState: conversationState,
     );
   }

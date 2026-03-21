@@ -136,6 +136,78 @@ void main() {
   });
 
   test(
+    'selectConversationForResume persists the selected thread through the session controller',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      final historyStore = _RecordingConversationHistoryStore();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        conversationStateStore: historyStore,
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectConversationForResume('thread_saved');
+
+      expect(historyStore.state.normalizedSelectedThreadId, 'thread_saved');
+    },
+  );
+
+  test(
+    'selectConversationForResume hydrates the saved conversation transcript',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadsById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectConversationForResume('thread_saved');
+
+      expect(appServerClient.connectCalls, 1);
+      expect(appServerClient.readThreadCalls, <String>['thread_saved']);
+      expect(
+        controller.transcriptBlocks
+            .whereType<CodexUserMessageBlock>()
+            .single
+            .text,
+        'Restore this',
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexTextBlock>().single.body,
+        'Restored answer',
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_saved');
+    },
+  );
+
+  test(
     'sendPrompt forwards profile model and reasoning effort overrides',
     () async {
       final appServerClient = FakeCodexAppServerClient();
@@ -973,6 +1045,38 @@ ConnectionProfile _configuredProfile() {
     host: 'example.com',
     username: 'vince',
     workspaceDir: '/workspace',
+  );
+}
+
+CodexAppServerThread _savedConversationThread({required String threadId}) {
+  return CodexAppServerThread(
+    id: threadId,
+    name: 'Saved conversation',
+    sourceKind: 'app-server',
+    turns: const <Map<String, dynamic>>[
+      <String, Object?>{
+        'id': 'turn_saved',
+        'status': 'completed',
+        'items': <Object>[
+          <String, Object?>{
+            'id': 'item_user',
+            'type': 'user_message',
+            'status': 'completed',
+            'content': <Object>[
+              <String, Object?>{'text': 'Restore this'},
+            ],
+          },
+          <String, Object?>{
+            'id': 'item_assistant',
+            'type': 'agent_message',
+            'status': 'completed',
+            'content': <Object>[
+              <String, Object?>{'text': 'Restored answer'},
+            ],
+          },
+        ],
+      },
+    ].cast<Map<String, dynamic>>(),
   );
 }
 
