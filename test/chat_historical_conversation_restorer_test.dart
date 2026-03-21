@@ -1,11 +1,18 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation.dart';
+import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation_normalizer.dart';
+import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_thread_read_decoder.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 
 void main() {
   const restorer = ChatHistoricalConversationRestorer();
+  const decoder = CodexAppServerThreadReadDecoder();
+  const normalizer = CodexHistoricalConversationNormalizer();
 
   test('restores a normalized conversation into transcript state', () {
     final conversation = CodexHistoricalConversation(
@@ -78,4 +85,41 @@ void main() {
       'Restored answer',
     );
   });
+
+  test(
+    'restores the captured live thread/read fixture into transcript blocks',
+    () {
+      final thread = decoder.decodeHistoryResponse(
+        _loadFixture(
+          'test/fixtures/app_server/thread_read/live_capture_001.json',
+        ),
+        fallbackThreadId: 'thread_live',
+      );
+      final conversation = normalizer.normalize(thread);
+
+      final restoredState = restorer.restore(conversation);
+
+      expect(restoredState.rootThreadId, '<thread_1>');
+      expect(restoredState.selectedThreadId, '<thread_1>');
+      expect(
+        restoredState.transcriptBlocks
+            .whereType<CodexUserMessageBlock>()
+            .single
+            .text,
+        '<text_1>',
+      );
+
+      final assistantBlocks = restoredState.transcriptBlocks
+          .whereType<CodexTextBlock>()
+          .toList(growable: false);
+      expect(assistantBlocks, hasLength(9));
+      expect(assistantBlocks.first.body, '<text_2>');
+      expect(assistantBlocks.last.body, '<text_10>');
+    },
+  );
+}
+
+Map<String, dynamic> _loadFixture(String path) {
+  final text = File(path).readAsStringSync();
+  return jsonDecode(text) as Map<String, dynamic>;
 }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented Phase 0 contract hardening.
+Implemented and closed with a sanitized live Codex payload capture.
 
 This document records the current `thread/read(includeTurns: true)` contract
 work that was implemented before larger history-restoration refactors.
@@ -87,22 +87,21 @@ Phase 0 added:
 - an integration test proving `readThreadWithTurns()` preserves turns from flat
   `thread/read` responses
 
-## Remaining Decision Gate
+## Live Capture Closure
 
-Phase 0 is not fully complete until the repo also contains one or more
-sanitized real payload captures from a live Codex backend.
+Phase 0 is now closed by the captured live fixture:
 
-The current fixture set is upstream-reference-aligned, which is better than the
-previous invented narrow shape, but it is not the same thing as a captured live
-payload.
+- `test/fixtures/app_server/thread_read/live_capture_001.json`
 
-So the remaining gate is still:
+That capture proved four important things:
 
-1. capture a real `thread/read(includeTurns: true)` payload
-2. sanitize it
-3. add it as a fixture
-4. confirm that the decoder and future restorer logic match that real payload
+1. Codex does return transcript-bearing turn history for this thread.
+2. The live payload still uses the nested `{"thread": {...}}` envelope.
+3. Assistant history items can arrive as top-level `agentMessage.text` fields,
+   not only `content[].text`.
+4. Some summary metadata may be absent or nullable in real history payloads,
+   such as `name` and `promptCount`.
 
-If the live payload does not contain enough transcript history to rebuild the
-conversation on screen, that becomes a backend capability constraint, not a
-frontend architecture problem.
+That means the repo is not in the backend worst case. Historical transcript
+restoration is viable from upstream Codex history, and the decoder/normalizer/
+restorer must simply stay aligned with this real payload contract.

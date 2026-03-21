@@ -46,6 +46,41 @@ void main() {
       expect(assistantEntry.detail, 'Restored answer');
     },
   );
+
+  test(
+    'normalizes captured live thread/read history into canonical conversation snapshot',
+    () {
+      final thread = decoder.decodeHistoryResponse(
+        _loadFixture(
+          'test/fixtures/app_server/thread_read/live_capture_001.json',
+        ),
+        fallbackThreadId: 'thread_live',
+      );
+
+      final conversation = normalizer.normalize(thread);
+
+      expect(conversation.threadId, '<thread_1>');
+      expect(conversation.turns, hasLength(1));
+
+      final turn = conversation.turns.single;
+      expect(turn.id, '<turn_1>');
+      expect(turn.entries, hasLength(10));
+
+      final userEntry = turn.entries.first;
+      expect(userEntry.itemType, CodexCanonicalItemType.userMessage);
+      expect(userEntry.detail, '<text_1>');
+
+      final assistantEntries = turn.entries
+          .where(
+            (entry) =>
+                entry.itemType == CodexCanonicalItemType.assistantMessage,
+          )
+          .toList(growable: false);
+      expect(assistantEntries, hasLength(9));
+      expect(assistantEntries.first.detail, '<text_2>');
+      expect(assistantEntries.last.detail, '<text_10>');
+    },
+  );
 }
 
 Map<String, dynamic> _loadFixture(String path) {

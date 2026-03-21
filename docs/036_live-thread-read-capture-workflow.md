@@ -2,8 +2,9 @@
 
 ## Status
 
-Capture workflow added to close the remaining pre-cleanup gate for historical
-conversation restoration.
+Capture workflow implemented and exercised. The repo now contains one sanitized
+live Codex fixture at
+`test/fixtures/app_server/thread_read/live_capture_001.json`.
 
 ## Why This Exists
 
@@ -16,10 +17,15 @@ Pocket Relay into a local historical archive.
 
 ## Workflow
 
-1. Capture one real `thread/read(includeTurns: true)` JSON payload from a live
-   Codex session outside the repo.
-2. Save that raw payload to a temporary local file.
-3. Sanitize it with:
+1. Preferred path: capture and sanitize directly with:
+
+```bash
+dart run tool/capture_live_thread_read_fixture.dart \
+  --sanitized-output test/fixtures/app_server/thread_read/live_capture_001.json \
+  --raw-output /tmp/raw_thread_read.json
+```
+
+2. Fallback path if the raw payload is captured elsewhere:
 
 ```bash
 dart run tool/sanitize_thread_read_fixture.dart \
@@ -27,8 +33,8 @@ dart run tool/sanitize_thread_read_fixture.dart \
   --output test/fixtures/app_server/thread_read/live_capture_001.json
 ```
 
-4. Add decoder, normalizer, and restore tests against the sanitized fixture.
-5. Re-run:
+3. Add decoder, normalizer, and restore tests against the sanitized fixture.
+4. Re-run:
    - `dart analyze`
    - `flutter test`
 
@@ -54,12 +60,12 @@ It redacts likely-sensitive values into stable placeholders, including:
 
 ## Decision Gate
 
-After the sanitized live fixture is in the repo, the team must confirm one of
-these is true:
+The first live fixture already answered the gate:
 
-1. Pocket Relay already restores the transcript correctly against the real
-   upstream shape.
-2. Pocket Relay still needs frontend parsing/normalization changes.
-3. Codex does not provide enough transcript content in `thread/read`, which
-   makes the remaining blocker an upstream capability gap rather than a local
-   architecture problem.
+1. Codex does provide transcript-bearing history for this captured thread.
+2. Pocket Relay's current decoder, normalizer, and restorer handle the
+   captured live payload shape.
+3. Phase 5 cleanup is no longer blocked on `thread/read` contract uncertainty.
+
+Future captures should still follow this workflow whenever Codex history shape
+changes materially.

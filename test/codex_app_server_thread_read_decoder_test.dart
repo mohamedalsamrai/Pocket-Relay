@@ -49,6 +49,25 @@ void main() {
     expect(thread.turns.single.id, 'turn_saved');
     expect(thread.turns.single.items, hasLength(2));
   });
+
+  test('decodes captured live thread/read history fixture', () {
+    final thread = decoder.decodeHistoryResponse(
+      _loadFixture(
+        'test/fixtures/app_server/thread_read/live_capture_001.json',
+      ),
+      fallbackThreadId: 'thread_live',
+    );
+
+    expect(thread.id, '<thread_1>');
+    expect(thread.preview, '<preview_1>');
+    expect(thread.cwd, '<cwd_1>');
+    expect(thread.promptCount, 1);
+    expect(thread.turns, hasLength(1));
+    expect(thread.turns.single.id, '<turn_1>');
+    expect(thread.turns.single.items, hasLength(10));
+    expect(thread.turns.single.items.first.type, 'userMessage');
+    expect(thread.turns.single.items.last.type, 'agentMessage');
+  });
 }
 
 Map<String, dynamic> _loadFixture(String path) {
