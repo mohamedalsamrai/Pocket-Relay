@@ -19,8 +19,15 @@ import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/c
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/plan_update_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/proposed_plan_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/reasoning_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_auth_failed_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_connect_failed_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_host_key_mismatch_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_remote_launch_failed_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/status_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/usage_card.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_request_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_message_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
@@ -389,6 +396,245 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
               ],
             ),
+            WidgetbookComponent(
+              name: 'User Input Request',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Pending Review',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: UserInputRequestCard(
+                        contract: WidgetbookFixtures.pendingUserInput(),
+                        onFieldChanged: (_, value) {},
+                        onSubmit: () async {},
+                      ),
+                    );
+                  },
+                ),
+                WidgetbookUseCase(
+                  name: 'Submitted',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: UserInputRequestCard(
+                        contract: WidgetbookFixtures.pendingUserInput(
+                          resolved: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'Usage Summary',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Turn Usage',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: UsageCard(block: WidgetbookFixtures.usageBlock()),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'Turn Boundary',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Completed Turn',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: TurnBoundaryCard(
+                        block: WidgetbookFixtures.turnBoundaryBlock(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'SSH Errors',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Connect Failed',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: SshConnectFailedCard(
+                        block: WidgetbookFixtures.sshConnectFailedBlock(),
+                        onOpenConnectionSettings: () {},
+                      ),
+                    );
+                  },
+                ),
+                WidgetbookUseCase(
+                  name: 'Host Key Mismatch',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: SshHostKeyMismatchCard(
+                        block: WidgetbookFixtures.sshHostKeyMismatchBlock(),
+                        onOpenConnectionSettings: () {},
+                      ),
+                    );
+                  },
+                ),
+                WidgetbookUseCase(
+                  name: 'Authentication Failed',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: SshAuthFailedCard(
+                        block:
+                            WidgetbookFixtures.sshAuthenticationFailedBlock(),
+                        onOpenConnectionSettings: () {},
+                      ),
+                    );
+                  },
+                ),
+                WidgetbookUseCase(
+                  name: 'Remote Launch Failed',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.card(
+                      child: SshRemoteLaunchFailedCard(
+                        block: WidgetbookFixtures.sshRemoteLaunchFailedBlock(),
+                        onOpenConnectionSettings: () {},
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        WidgetbookFolder(
+          name: 'Review Scenes',
+          children: <WidgetbookNode>[
+            WidgetbookComponent(
+              name: 'Active Coding Turn',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Mixed Transcript',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.fill(
+                      maxWidth: 920,
+                      child: _WidgetbookTranscriptScene(
+                        children: <Widget>[
+                          _WidgetbookSceneRightAligned(
+                            child: UserMessageCard(
+                              block: WidgetbookFixtures.userMessage(),
+                            ),
+                          ),
+                          ReasoningCard(
+                            block: WidgetbookFixtures.reasoningBlock(),
+                          ),
+                          WorkLogGroupCard(
+                            item: WidgetbookFixtures.workLogGroupItem(),
+                          ),
+                          ChangedFilesCard(
+                            item: WidgetbookFixtures.changedFilesItem(),
+                          ),
+                          AssistantMessageCard(
+                            block: WidgetbookFixtures.assistantMessage(),
+                          ),
+                          TurnBoundaryCard(
+                            block: WidgetbookFixtures.turnBoundaryBlock(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'Approval Review',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Approval Requested',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.fill(
+                      maxWidth: 920,
+                      child: _WidgetbookTranscriptScene(
+                        children: <Widget>[
+                          AssistantMessageCard(
+                            block: WidgetbookFixtures.assistantMessage(
+                              body:
+                                  'I prepared a shared transcript frame and a catalog update. Approval is required before applying the file edits.',
+                            ),
+                          ),
+                          ApprovalRequestCard(
+                            request: WidgetbookFixtures.approvalRequest(),
+                            onApprove: (_) async {},
+                            onDeny: (_) async {},
+                          ),
+                          ChangedFilesCard(
+                            item: WidgetbookFixtures.changedFilesItem(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'Designer Feedback',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Pending Response',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.fill(
+                      maxWidth: 920,
+                      child: _WidgetbookTranscriptScene(
+                        children: <Widget>[
+                          AssistantMessageCard(
+                            block: WidgetbookFixtures.assistantMessage(
+                              body:
+                                  'I added the missing transcript states. I still need your feedback on which surface hierarchy feels the most visually dense.',
+                            ),
+                          ),
+                          UserInputRequestCard(
+                            contract: WidgetbookFixtures.pendingUserInput(),
+                            onFieldChanged: (_, value) {},
+                            onSubmit: () async {},
+                          ),
+                          StatusCard(block: WidgetbookFixtures.statusBlock()),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            WidgetbookComponent(
+              name: 'SSH Recovery',
+              useCases: <WidgetbookUseCase>[
+                WidgetbookUseCase(
+                  name: 'Failure To Trust Flow',
+                  builder: (_) {
+                    return WidgetbookStoryFrame.fill(
+                      maxWidth: 920,
+                      child: _WidgetbookTranscriptScene(
+                        children: <Widget>[
+                          SshConnectFailedCard(
+                            block: WidgetbookFixtures.sshConnectFailedBlock(),
+                            onOpenConnectionSettings: () {},
+                          ),
+                          SshHostKeyMismatchCard(
+                            block: WidgetbookFixtures.sshHostKeyMismatchBlock(),
+                            onOpenConnectionSettings: () {},
+                          ),
+                          SshUnpinnedHostKeyCard(
+                            block: WidgetbookFixtures.sshUnpinnedHostKey(),
+                            onSaveFingerprint: (_) async {},
+                            onOpenConnectionSettings: () {},
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ],
         ),
         WidgetbookComponent(
@@ -570,4 +816,38 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
       ],
     ),
   ];
+}
+
+class _WidgetbookTranscriptScene extends StatelessWidget {
+  const _WidgetbookTranscriptScene({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children:
+          children
+              .expand(
+                (child) => <Widget>[
+                  child,
+                  const SizedBox(height: PocketSpacing.md),
+                ],
+              )
+              .toList(growable: false)
+            ..removeLast(),
+    );
+  }
+}
+
+class _WidgetbookSceneRightAligned extends StatelessWidget {
+  const _WidgetbookSceneRightAligned({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(alignment: Alignment.centerRight, child: child);
+  }
 }

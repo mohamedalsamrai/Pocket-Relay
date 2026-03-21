@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
+import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
@@ -182,6 +183,61 @@ class WidgetbookFixtures {
     );
   }
 
+  static PendingUserInputContract pendingUserInput({
+    bool resolved = false,
+    bool submitting = false,
+  }) {
+    return PendingUserInputContract(
+      requestId: 'user_input_review_scope',
+      title: 'Need designer review input',
+      body:
+          'Choose the transcript surfaces that need visual comparison in this pass and provide any review notes that should ship with the story set.',
+      isResolved: resolved,
+      isSubmitting: submitting,
+      isSubmitEnabled: !resolved,
+      statusBadgeLabel: resolved
+          ? 'submitted'
+          : (submitting ? 'submitting' : 'pending'),
+      submitLabel: submitting ? 'Submitting…' : 'Submit review',
+      submitPayload: const <String, List<String>>{
+        'surface': <String>['Approval Request'],
+      },
+      fields: const <PendingUserInputFieldContract>[
+        PendingUserInputFieldContract(
+          id: 'surface',
+          header: 'Surface',
+          prompt: 'Pick the highest-risk transcript surface for visual QA.',
+          inputLabel: 'Surface to review',
+          value: 'Approval Request',
+          options: <PendingUserInputOptionContract>[
+            PendingUserInputOptionContract(
+              label: 'Approval Request',
+              description: 'Review call-to-action hierarchy',
+            ),
+            PendingUserInputOptionContract(
+              label: 'Changed Files',
+              description: 'Review dense list readability',
+            ),
+            PendingUserInputOptionContract(
+              label: 'Work Log',
+              description: 'Review scanability in command-heavy states',
+            ),
+          ],
+        ),
+        PendingUserInputFieldContract(
+          id: 'notes',
+          header: 'Review Notes',
+          prompt: 'Capture any readability or hierarchy concerns.',
+          inputLabel: 'Designer notes',
+          value:
+              'Badge contrast is working well. The changed-file action chips still feel too visually competitive.',
+          minLines: 3,
+          maxLines: 5,
+        ),
+      ],
+    );
+  }
+
   static CodexPlanUpdateBlock planUpdateBlock() {
     return CodexPlanUpdateBlock(
       id: 'plan_update',
@@ -347,6 +403,28 @@ class WidgetbookFixtures {
     );
   }
 
+  static CodexUsageBlock usageBlock() {
+    return CodexUsageBlock(
+      id: 'usage_block',
+      createdAt: timestamp,
+      title: 'Usage',
+      body:
+          'Last: input 2.1k, cached 0.8k, output 0.9k, reasoning 0.3k, total 4.1k\n'
+          'Total: input 18.4k, cached 6.1k, output 8.2k, reasoning 1.4k, total 34.1k\n'
+          'Context window: 34.1k / 200k',
+    );
+  }
+
+  static CodexTurnBoundaryBlock turnBoundaryBlock() {
+    return CodexTurnBoundaryBlock(
+      id: 'turn_boundary',
+      createdAt: timestamp,
+      label: 'turn completed',
+      elapsed: const Duration(minutes: 2, seconds: 18),
+      usage: usageBlock(),
+    );
+  }
+
   static CodexSshUnpinnedHostKeyBlock sshUnpinnedHostKey({
     bool isSaved = false,
   }) {
@@ -358,6 +436,55 @@ class WidgetbookFixtures {
       keyType: 'ed25519',
       fingerprint: 'SHA256:Kx4q1R3p0z2+9gQmQ4l0o0dXx2nM0Y5M7Fq7zQ8wR0s',
       isSaved: isSaved,
+    );
+  }
+
+  static CodexSshConnectFailedBlock sshConnectFailedBlock() {
+    return CodexSshConnectFailedBlock(
+      id: 'ssh_connect_failed',
+      createdAt: timestamp,
+      host: 'relay-dev.internal',
+      port: 22,
+      message:
+          'Connection timed out while opening the SSH session. Verify the host, port, and network reachability.',
+    );
+  }
+
+  static CodexSshHostKeyMismatchBlock sshHostKeyMismatchBlock() {
+    return CodexSshHostKeyMismatchBlock(
+      id: 'ssh_host_key_mismatch',
+      createdAt: timestamp,
+      host: 'relay-dev.internal',
+      port: 22,
+      keyType: 'ed25519',
+      expectedFingerprint: 'SHA256:0g1gQ2o1T6fK8Yw3oQ6zP2i4lP0d3qf7Jr1nM4xS7iA',
+      actualFingerprint: 'SHA256:Yq7fA9nL2kP0rM8uB3cW6zT1hV4jD9pQ1sN6eR2xC5d',
+    );
+  }
+
+  static CodexSshAuthenticationFailedBlock sshAuthenticationFailedBlock() {
+    return CodexSshAuthenticationFailedBlock(
+      id: 'ssh_auth_failed',
+      createdAt: timestamp,
+      host: 'relay-dev.internal',
+      port: 22,
+      username: 'vince',
+      authMode: AuthMode.privateKey,
+      message:
+          'The server rejected the configured private key. Confirm the selected key and the server account permissions.',
+    );
+  }
+
+  static CodexSshRemoteLaunchFailedBlock sshRemoteLaunchFailedBlock() {
+    return CodexSshRemoteLaunchFailedBlock(
+      id: 'ssh_remote_launch_failed',
+      createdAt: timestamp,
+      host: 'relay-dev.internal',
+      port: 22,
+      username: 'vince',
+      command: 'cd /workspace/Pocket-Relay && pocket-relay app-server --stdio',
+      message:
+          'The workspace directory could not be found on the remote host. Review the saved workspace path.',
     );
   }
 }
