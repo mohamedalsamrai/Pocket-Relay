@@ -464,7 +464,6 @@ void main() {
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               final appServerClient = FakeCodexAppServerClient();
               clientsByConnectionId[connectionId]!.add(appServerClient);
@@ -479,7 +478,6 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -539,7 +537,6 @@ void main() {
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               final appServerClient = FakeCodexAppServerClient()
                 ..threadHistoriesById['thread_saved'] =
@@ -560,7 +557,6 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -662,7 +658,6 @@ void main() {
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               final appServerClient = FakeCodexAppServerClient();
               appServerClient.threadsById['thread_resumed'] =
@@ -683,7 +678,6 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -764,7 +758,6 @@ void main() {
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               return ConnectionLaneBinding(
                 connectionId: connectionId,
@@ -781,7 +774,6 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -809,7 +801,7 @@ void main() {
   );
 
   test(
-    'resumeConversation no longer writes the connection state store directly',
+    'resumeConversation persists the selected thread id through the workspace store before recreating the lane',
     () async {
       final repository = MemoryCodexConnectionRepository(
         initialConnections: <SavedConnection>[
@@ -820,23 +812,19 @@ void main() {
           ),
         ],
       );
-      final readOnlyConversationStateStore =
-          _ReadOnlyConnectionConversationStateStore(
-            initialStates: <String, SavedConnectionConversationState>{
-              'conn_primary': const SavedConnectionConversationState(),
-            },
-          );
-      final sessionOwnedConversationStateStore =
-          MemoryCodexConnectionConversationStateStore();
+      final conversationStateStore = _TrackingConnectionConversationStateStore(
+        initialStates: <String, SavedConnectionConversationState>{
+          'conn_primary': const SavedConnectionConversationState(),
+        },
+      );
       final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        connectionConversationStateStore: readOnlyConversationStateStore,
+        connectionConversationStateStore: conversationStateStore,
         laneBindingFactory:
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               return ConnectionLaneBinding(
                 connectionId: connectionId,
@@ -846,14 +834,13 @@ void main() {
                 ),
                 conversationStateStore: ConnectionScopedConversationStateStore(
                   connectionId: connectionId,
-                  conversationStateStore: sessionOwnedConversationStateStore,
+                  conversationStateStore: conversationStateStore,
                 ),
                 appServerClient: client,
                 initialSavedProfile: SavedProfile(
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -869,9 +856,9 @@ void main() {
         threadId: 'thread_resumed',
       );
 
-      expect(readOnlyConversationStateStore.saveAttempts, 0);
+      expect(conversationStateStore.saveAttempts, 1);
       expect(
-        (await sessionOwnedConversationStateStore.loadState(
+        (await conversationStateStore.loadState(
           'conn_primary',
         )).normalizedSelectedThreadId,
         'thread_resumed',
@@ -903,7 +890,6 @@ void main() {
             ({
               required connectionId,
               required connection,
-              required conversationState,
             }) {
               final appServerClient = FakeCodexAppServerClient()
                 ..threadHistoriesById['thread_resumed'] =
@@ -927,7 +913,6 @@ void main() {
                   profile: connection.profile,
                   secrets: connection.secrets,
                 ),
-                initialConversationState: conversationState,
                 ownsAppServerClient: false,
               );
             },
@@ -1049,7 +1034,6 @@ ConnectionWorkspaceController _buildWorkspaceController({
         ({
           required connectionId,
           required connection,
-          required conversationState,
         }) {
           final appServerClient = clientsById[connectionId]!;
           return ConnectionLaneBinding(
@@ -1067,7 +1051,6 @@ ConnectionWorkspaceController _buildWorkspaceController({
               profile: connection.profile,
               secrets: connection.secrets,
             ),
-            initialConversationState: conversationState,
             ownsAppServerClient: false,
           );
         },
@@ -1176,9 +1159,9 @@ Future<void> _closeClientLists(
   }
 }
 
-class _ReadOnlyConnectionConversationStateStore
+class _TrackingConnectionConversationStateStore
     implements CodexConnectionConversationStateStore {
-  _ReadOnlyConnectionConversationStateStore({
+  _TrackingConnectionConversationStateStore({
     required Map<String, SavedConnectionConversationState> initialStates,
   }) : _states = Map<String, SavedConnectionConversationState>.from(
          initialStates,
@@ -1200,7 +1183,9 @@ class _ReadOnlyConnectionConversationStateStore
     SavedConnectionConversationState state,
   ) async {
     saveAttempts += 1;
-    throw StateError('Workspace controller should not write this store.');
+    _states[connectionId] = SavedConnectionConversationState(
+      selectedThreadId: state.selectedThreadId,
+    );
   }
 
   @override

@@ -29,9 +29,6 @@ void main() {
       );
       final coordinator = ChatConversationSelectionCoordinator(
         conversationStateStore: store,
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_old',
-        ),
       );
 
       coordinator.clearContinuationThread(
@@ -55,9 +52,6 @@ void main() {
       );
       final coordinator = ChatConversationSelectionCoordinator(
         conversationStateStore: store,
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_old',
-        ),
       );
 
       coordinator.schedulePersistConversationSelection(

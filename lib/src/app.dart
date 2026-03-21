@@ -103,7 +103,6 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
           ({
             required String connectionId,
             required SavedConnection connection,
-            required SavedConnectionConversationState conversationState,
           }) {
             final injectedAppServerClient = widget.appServerClient;
             final usingInjectedClient =
@@ -132,7 +131,6 @@ class _PocketRelayAppState extends State<PocketRelayApp> {
                 profile: connection.profile,
                 secrets: connection.secrets,
               ),
-              initialConversationState: conversationState,
               supportsLocalConnectionMode:
                   platformPolicy.supportsLocalConnectionMode,
               ownsAppServerClient: !usingInjectedClient,

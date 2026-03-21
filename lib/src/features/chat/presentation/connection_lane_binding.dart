@@ -18,8 +18,6 @@ class ConnectionLaneBinding {
     this.conversationStateStore = const DiscardingCodexConversationStateStore(),
     required this.appServerClient,
     SavedProfile? initialSavedProfile,
-    SavedConnectionConversationState initialConversationState =
-        const SavedConnectionConversationState(),
     ChatScreenEffectMapper effectMapper = const ChatScreenEffectMapper(),
     bool? supportsLocalConnectionMode,
     bool ownsAppServerClient = false,
@@ -29,7 +27,6 @@ class ConnectionLaneBinding {
          conversationStateStore: conversationStateStore,
          appServerClient: appServerClient,
          initialSavedProfile: initialSavedProfile,
-         initialConversationState: initialConversationState,
          supportsLocalConnectionMode: supportsLocalConnectionMode,
        ) {
     _screenEffectSubscription = sessionController.snackBarMessages

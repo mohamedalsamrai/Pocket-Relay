@@ -865,7 +865,6 @@ ConnectionWorkspaceController _buildWorkspaceController({
         ({
           required connectionId,
           required connection,
-          required conversationState,
         }) {
           final appServerClient = clientsById[connectionId]!;
           return ConnectionLaneBinding(
@@ -883,7 +882,6 @@ ConnectionWorkspaceController _buildWorkspaceController({
               profile: connection.profile,
               secrets: connection.secrets,
             ),
-            initialConversationState: conversationState,
             ownsAppServerClient: false,
           );
         },

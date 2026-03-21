@@ -105,9 +105,6 @@ void main() {
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
-        ),
       );
       addTearDown(controller.dispose);
 
@@ -140,12 +137,17 @@ void main() {
   );
 
   test(
-    'initialize hydrates the saved conversation transcript from initial selectedThreadId',
+    'initialize hydrates the saved conversation transcript from persisted selectedThreadId',
     () async {
       final appServerClient = FakeCodexAppServerClient()
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
           threadId: 'thread_saved',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -155,13 +157,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -195,6 +195,11 @@ void main() {
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
           threadId: 'thread_saved',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -204,13 +209,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -242,6 +245,11 @@ void main() {
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
           threadId: 'thread_saved',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -251,13 +259,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -310,6 +316,11 @@ void main() {
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
           threadId: 'thread_saved',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -319,13 +330,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -354,6 +363,11 @@ void main() {
           threadId: 'thread_saved',
         )
         ..rollbackThreadError = StateError('transport broke');
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -363,13 +377,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -432,6 +444,11 @@ void main() {
         ..threadHistoriesById['thread_forked'] = _savedConversationThread(
           threadId: 'thread_forked',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -441,13 +458,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -485,6 +500,11 @@ void main() {
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
           threadId: 'thread_saved',
         );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -494,13 +514,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -523,6 +541,11 @@ void main() {
           threadId: 'thread_saved',
         )
         ..forkThreadError = StateError('fork broke');
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_saved',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -532,13 +555,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(controller.dispose);
@@ -570,7 +591,7 @@ void main() {
   );
 
   test(
-    'initialize surfaces unavailable history for initial selectedThreadId without waiting for sendPrompt',
+    'initialize surfaces unavailable history for persisted selectedThreadId without waiting for sendPrompt',
     () async {
       final appServerClient = FakeCodexAppServerClient()
         ..threadHistoriesById['thread_empty'] =
@@ -580,6 +601,11 @@ void main() {
               sourceKind: 'app-server',
               turns: <CodexAppServerHistoryTurn>[],
             );
+      final conversationStateStore = _RecordingConversationHistoryStore(
+        initialState: const SavedConnectionConversationState(
+          selectedThreadId: 'thread_empty',
+        ),
+      );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -589,13 +615,11 @@ void main() {
             secrets: const ConnectionSecrets(password: 'secret'),
           ),
         ),
+        conversationStateStore: conversationStateStore,
         appServerClient: appServerClient,
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_empty',
         ),
       );
       addTearDown(controller.dispose);
@@ -1289,8 +1313,10 @@ void main() {
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
         ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_old',
+        conversationStateStore: _RecordingConversationHistoryStore(
+          initialState: const SavedConnectionConversationState(
+            selectedThreadId: 'thread_old',
+          ),
         ),
       );
       addTearDown(controller.dispose);
@@ -1382,9 +1408,6 @@ void main() {
         initialSavedProfile: SavedProfile(
           profile: _configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
-        ),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
         ),
       );
       addTearDown(firstController.dispose);

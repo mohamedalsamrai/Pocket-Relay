@@ -10,7 +10,6 @@ typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
       required String connectionId,
       required SavedConnection connection,
-      required SavedConnectionConversationState conversationState,
     });
 
 class ConnectionWorkspaceController extends ChangeNotifier {
@@ -236,6 +235,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         (await _connectionConversationStateStore.loadState(
           normalizedConnectionId,
         )).copyWith(selectedThreadId: normalizedThreadId);
+    await _connectionConversationStateStore.saveState(
+      normalizedConnectionId,
+      nextConversationState,
+    );
 
     if (_state.isConnectionLive(normalizedConnectionId)) {
       final previousBinding =
@@ -244,10 +247,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         return;
       }
 
-      final nextBinding = await _loadLaneBinding(
-        normalizedConnectionId,
-        conversationStateOverride: nextConversationState,
-      );
+      final nextBinding = await _loadLaneBinding(normalizedConnectionId);
       if (_isDisposed) {
         nextBinding.dispose();
         return;
@@ -284,8 +284,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
     await _instantiateConnection(
       normalizedConnectionId,
-      conversationStateOverride: nextConversationState,
-      resumeThreadId: normalizedThreadId,
+      prepareSelectedConversationForContinuation: true,
     );
   }
 
@@ -335,13 +334,9 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   Future<void> _instantiateConnection(
     String connectionId, {
-    SavedConnectionConversationState? conversationStateOverride,
-    String? resumeThreadId,
+    bool prepareSelectedConversationForContinuation = false,
   }) async {
-    final binding = await _loadLaneBinding(
-      connectionId,
-      conversationStateOverride: conversationStateOverride,
-    );
+    final binding = await _loadLaneBinding(connectionId);
     if (_isDisposed) {
       binding.dispose();
       return;
@@ -363,7 +358,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         ),
       ),
     );
-    if (resumeThreadId != null) {
+    if (prepareSelectedConversationForContinuation) {
       await binding.sessionController.initialize();
       if (_isDisposed) {
         return;
@@ -497,19 +492,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     );
   }
 
-  Future<ConnectionLaneBinding> _loadLaneBinding(
-    String connectionId, {
-    SavedConnectionConversationState? conversationStateOverride,
-  }) async {
-    final connectionFuture = _connectionRepository.loadConnection(connectionId);
-    final conversationState =
-        conversationStateOverride ??
-        await _connectionConversationStateStore.loadState(connectionId);
-
+  Future<ConnectionLaneBinding> _loadLaneBinding(String connectionId) async {
     return _laneBindingFactory(
       connectionId: connectionId,
-      connection: await connectionFuture,
-      conversationState: conversationState,
+      connection: await _connectionRepository.loadConnection(connectionId),
     );
   }
 

@@ -26,8 +26,6 @@ class ChatSessionController extends ChangeNotifier {
         const DiscardingCodexConversationStateStore(),
     required this.appServerClient,
     SavedProfile? initialSavedProfile,
-    SavedConnectionConversationState initialConversationState =
-        const SavedConnectionConversationState(),
     TranscriptReducer reducer = const TranscriptReducer(),
     CodexRuntimeEventMapper? runtimeEventMapper,
     CodexHistoricalConversationNormalizer historicalConversationNormalizer =
@@ -42,7 +40,6 @@ class ChatSessionController extends ChangeNotifier {
            ChatHistoricalConversationRestorer(reducer: reducer),
        _conversationSelection = ChatConversationSelectionCoordinator(
          conversationStateStore: conversationStateStore,
-         initialConversationState: initialConversationState,
        ),
        _supportsLocalConnectionMode =
            supportsLocalConnectionMode ?? supportsLocalCodexConnection() {
@@ -102,7 +99,7 @@ class ChatSessionController extends ChangeNotifier {
 
   Future<void> _initializeOnce() async {
     if (!_isLoading) {
-      await _persistInitialConversationSelectionIfNeeded();
+      await _conversationSelection.hydratePersistedSelection();
       await _restoreInitialConversationIfNeeded();
       return;
     }
@@ -116,19 +113,8 @@ class ChatSessionController extends ChangeNotifier {
     _secrets = savedProfile.secrets;
     _isLoading = false;
     notifyListeners();
-    await _persistInitialConversationSelectionIfNeeded();
+    await _conversationSelection.hydratePersistedSelection();
     await _restoreInitialConversationIfNeeded();
-  }
-
-  Future<void> _persistInitialConversationSelectionIfNeeded() async {
-    final threadId = _resumeConversationThreadId();
-    if (threadId == null) {
-      return;
-    }
-
-    await _conversationSelection.recordConversationSelection(
-      threadId: threadId,
-    );
   }
 
   Future<void> saveObservedHostFingerprint(String blockId) async {
@@ -191,6 +177,8 @@ class ChatSessionController extends ChangeNotifier {
       _emitSnackBar(validationMessage);
       return false;
     }
+
+    await _conversationSelection.hydratePersistedSelection();
 
     final rootThreadId = _sessionState.rootThreadId;
     if (rootThreadId != null && _sessionState.currentThreadId != rootThreadId) {
@@ -428,6 +416,8 @@ class ChatSessionController extends ChangeNotifier {
     if (_historicalConversationRestoreState != null) {
       return;
     }
+
+    await _conversationSelection.hydratePersistedSelection();
 
     final targetThreadId =
         _activeConversationThreadId() ?? _resumeConversationThreadId();
@@ -824,6 +814,7 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   Future<String> _ensureAppServerThread() async {
+    await _conversationSelection.hydratePersistedSelection();
     await _ensureAppServerConnected();
 
     final activeThreadId = _activeConversationThreadId();

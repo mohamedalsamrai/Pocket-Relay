@@ -5,18 +5,26 @@ import 'package:pocket_relay/src/core/storage/codex_connection_conversation_stat
 class ChatConversationSelectionCoordinator {
   ChatConversationSelectionCoordinator({
     required CodexConversationStateStore conversationStateStore,
-    SavedConnectionConversationState initialConversationState =
-        const SavedConnectionConversationState(),
-  }) : _conversationStateStore = conversationStateStore,
-       _resumeThreadId = initialConversationState.normalizedSelectedThreadId;
+  }) : _conversationStateStore = conversationStateStore;
 
   final CodexConversationStateStore _conversationStateStore;
   String? _resumeThreadId;
   bool _suppressTrackedThreadReuse = false;
+  bool _hasHydratedPersistedSelection = false;
+  Future<void>? _hydrationFuture;
   Future<void> _pendingPersistence = Future<void>.value();
   int _persistenceGeneration = 0;
+  int _selectionVersion = 0;
 
   bool get suppressTrackedThreadReuse => _suppressTrackedThreadReuse;
+
+  Future<void> hydratePersistedSelection() {
+    if (_hasHydratedPersistedSelection) {
+      return Future<void>.value();
+    }
+
+    return _hydrationFuture ??= _hydratePersistedSelectionOnce();
+  }
 
   String? resumeThreadId({required bool ephemeralSession}) {
     if (ephemeralSession) {
@@ -40,6 +48,7 @@ class ChatConversationSelectionCoordinator {
       );
     }
 
+    _selectionVersion += 1;
     _resumeThreadId = normalizedThreadId;
     _suppressTrackedThreadReuse = false;
     await _scheduleConversationSelectionPersistence(
@@ -58,6 +67,7 @@ class ChatConversationSelectionCoordinator {
       return;
     }
 
+    _selectionVersion += 1;
     _resumeThreadId = normalizedThreadId;
     _suppressTrackedThreadReuse = false;
     schedulePersistConversationSelection(
@@ -71,6 +81,7 @@ class ChatConversationSelectionCoordinator {
     required bool isDisposed,
     required bool ephemeralSession,
   }) {
+    _selectionVersion += 1;
     _resumeThreadId = null;
     _suppressTrackedThreadReuse = true;
     if (isDisposed) {
@@ -101,6 +112,22 @@ class ChatConversationSelectionCoordinator {
     }
 
     await _scheduleConversationSelectionPersistence(normalizedThreadId);
+  }
+
+  Future<void> _hydratePersistedSelectionOnce() async {
+    final selectionVersion = _selectionVersion;
+    try {
+      final currentState = await _conversationStateStore.loadState();
+      if (selectionVersion != _selectionVersion) {
+        return;
+      }
+
+      _resumeThreadId = currentState.normalizedSelectedThreadId;
+    } catch (_) {
+      // Persisted conversation selection is a convenience, not a requirement.
+    } finally {
+      _hasHydratedPersistedSelection = true;
+    }
   }
 
   Future<void> _scheduleConversationSelectionPersistence(
