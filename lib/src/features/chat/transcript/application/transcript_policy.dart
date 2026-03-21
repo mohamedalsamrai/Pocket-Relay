@@ -6,6 +6,10 @@ import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_e
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 
+part 'transcript_policy_blocks.dart';
+part 'transcript_policy_support_helpers.dart';
+part 'transcript_policy_turns.dart';
+
 class TranscriptPolicy {
   const TranscriptPolicy({
     TranscriptPolicySupport support = const TranscriptPolicySupport(),
@@ -49,7 +53,7 @@ class TranscriptPolicy {
     String? message,
     DateTime? createdAt,
   }) {
-    final cleared = _resetTranscriptState(state);
+    final cleared = _resetTranscriptStateImpl(state);
     if (message == null || message.trim().isEmpty) {
       return cleared;
     }
@@ -69,33 +73,17 @@ class TranscriptPolicy {
   }
 
   CodexSessionState clearTranscript(CodexSessionState state) {
-    return _resetTranscriptState(
-      state,
-      blocks: const <CodexUiBlock>[],
-    );
+    return _resetTranscriptStateImpl(state, blocks: const <CodexUiBlock>[]);
   }
 
   CodexSessionState detachThread(CodexSessionState state) {
-    return _resetTranscriptState(state);
-  }
-
-  CodexSessionState _resetTranscriptState(
-    CodexSessionState state, {
-    List<CodexUiBlock>? blocks,
-  }) {
-    return state.copyWithProjectedTranscript(
-      clearThreadId: true,
-      clearActiveTurn: true,
-      blocks: blocks,
-      clearPendingLocalUserMessageBlockIds: true,
-      clearLocalUserMessageProviderBindings: true,
-    );
+    return _resetTranscriptStateImpl(state);
   }
 
   CodexSessionState clearLocalUserMessageCorrelationState(
     CodexSessionState state,
   ) {
-    return _clearLocalUserMessageCorrelationState(state);
+    return _clearLocalUserMessageCorrelationStateImpl(state);
   }
 
   CodexSessionState rolloverTurnIfNeeded(
@@ -104,35 +92,12 @@ class TranscriptPolicy {
     required String? threadId,
     required DateTime createdAt,
   }) {
-    if (turnId == null) {
-      return state;
-    }
-
-    final currentTurn = state.activeTurn;
-    if (currentTurn == null || currentTurn.turnId == turnId) {
-      return state;
-    }
-
-    final finalizedTurn = _finalizeCommittedTurn(currentTurn, createdAt);
-    final finalizedState = _support.appendBlock(
-      _commitActiveTurn(
-        _clearLocalUserMessageCorrelationState(
-          state.copyWithProjectedTranscript(clearActiveTurn: true),
-        ),
-        activeTurn: finalizedTurn.$1,
-      ),
-      _turnBoundaryBlock(
-        createdAt: createdAt,
-        elapsed: finalizedTurn.$2,
-        usage: finalizedTurn.$1?.pendingThreadTokenUsageBlock,
-      ),
-    );
-    return finalizedState.copyWithProjectedTranscript(
-      activeTurn: _support.startActiveTurn(
-        turnId: turnId,
-        threadId: threadId ?? state.threadId,
-        createdAt: createdAt,
-      ),
+    return _rolloverTurnIfNeededImpl(
+      this,
+      state,
+      turnId: turnId,
+      threadId: threadId,
+      createdAt: createdAt,
     );
   }
 
@@ -140,147 +105,40 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeThreadStateChangedEvent event,
   ) {
-    final finalizedTurn = _finalizeCommittedTurn(
-      state.activeTurn,
-      event.createdAt,
-    );
-    final nextState = _commitActiveTurn(
-      _clearLocalUserMessageCorrelationState(
-        state.copyWithProjectedTranscript(
-          clearThreadId: true,
-          clearActiveTurn: true,
-        ),
-      ),
-      activeTurn: finalizedTurn.$1,
-    );
-    if (finalizedTurn.$1 == null) {
-      return nextState;
-    }
-    return _support.appendBlock(
-      nextState,
-      _turnBoundaryBlock(
-        createdAt: event.createdAt,
-        elapsed: finalizedTurn.$2,
-        usage: finalizedTurn.$1?.pendingThreadTokenUsageBlock,
-      ),
-    );
+    return _applyThreadClosedImpl(this, state, event);
   }
 
   CodexSessionState applySessionExited(
     CodexSessionState state,
     CodexRuntimeSessionExitedEvent event,
   ) {
-    final completedTimer = _support.completeTurnTimer(
-      state.activeTurn?.timer,
-      event.createdAt,
-    );
-    final elapsed = state.activeTurn == null
-        ? null
-        : completedTimer.elapsedAt(event.createdAt);
-    final nextState = _commitActiveTurn(
-      _clearLocalUserMessageCorrelationState(
-        state.copyWithProjectedTranscript(
-          connectionStatus: event.exitKind == CodexRuntimeSessionExitKind.error
-              ? CodexRuntimeSessionState.error
-              : CodexRuntimeSessionState.stopped,
-          clearThreadId: true,
-          clearActiveTurn: true,
-        ),
-      ),
-      activeTurn: state.activeTurn,
-      includePendingUsage: true,
-    );
-    if (event.exitKind != CodexRuntimeSessionExitKind.error) {
-      return nextState;
-    }
-    return _support.appendBlock(
-      nextState,
-      CodexErrorBlock(
-        id: _support.eventEntryId('session-exit', event.createdAt),
-        createdAt: event.createdAt,
-        title: 'Session exited',
-        body: elapsed == null
-            ? (event.reason ?? 'The Codex session ended.')
-            : '${event.reason ?? 'The Codex session ended.'}\n\nElapsed ${formatElapsedDuration(elapsed)}.',
-      ),
-    );
+    return _applySessionExitedImpl(this, state, event);
   }
 
   CodexSessionState applyTurnCompleted(
     CodexSessionState state,
     CodexRuntimeTurnCompletedEvent event,
   ) {
-    if (_hasMismatchedActiveTurn(state, event.turnId)) {
-      return state;
-    }
-
-    final finalizedTurn = _finalizeCommittedTurn(
-      state.activeTurn,
-      event.createdAt,
-    );
-    final nextState = _commitActiveTurn(
-      _clearLocalUserMessageCorrelationState(
-        state.copyWithProjectedTranscript(
-          connectionStatus: CodexRuntimeSessionState.ready,
-          clearActiveTurn: true,
-        ),
-      ),
-      activeTurn: finalizedTurn.$1,
-    );
-    return _support.appendBlock(
-      nextState,
-      _turnBoundaryBlock(
-        createdAt: event.createdAt,
-        elapsed: finalizedTurn.$2,
-        usage: finalizedTurn.$1?.pendingThreadTokenUsageBlock,
-      ),
-    );
+    return _applyTurnCompletedImpl(this, state, event);
   }
 
   CodexSessionState applyTurnAborted(
     CodexSessionState state,
     CodexRuntimeTurnAbortedEvent event,
   ) {
-    if (_hasMismatchedActiveTurn(state, event.turnId)) {
-      return state;
-    }
-
-    final finalizedTurn = _finalizeCommittedTurn(
-      state.activeTurn,
-      event.createdAt,
-    );
-    return _support.appendBlock(
-      _commitActiveTurn(
-        _clearLocalUserMessageCorrelationState(
-          state.copyWithProjectedTranscript(
-            connectionStatus: CodexRuntimeSessionState.ready,
-            clearActiveTurn: true,
-          ),
-        ),
-        activeTurn: finalizedTurn.$1,
-        includePendingUsage: true,
-      ),
-      CodexStatusBlock(
-        id: _support.eventEntryId('status', event.createdAt),
-        createdAt: event.createdAt,
-        title: 'Turn aborted',
-        body: finalizedTurn.$2 == null
-            ? (event.reason ?? 'The active turn was aborted.')
-            : '${event.reason ?? 'The active turn was aborted.'}\n\nElapsed ${formatElapsedDuration(finalizedTurn.$2!)}.',
-        statusKind: CodexStatusBlockKind.info,
-        isTranscriptSignal: true,
-      ),
-    );
+    return _applyTurnAbortedImpl(this, state, event);
   }
 
   CodexSessionState applyTurnPlanUpdated(
     CodexSessionState state,
     CodexRuntimeTurnPlanUpdatedEvent event,
   ) {
-    return _stateWithAppendedTranscriptBlock(
+    return _stateWithAppendedTranscriptBlockImpl(
+      this,
       state,
       CodexPlanUpdateBlock(
-        id: _nextTranscriptEventBlockId(
+        id: _nextTranscriptEventBlockIdImpl(
+          this,
           state,
           prefix: 'turn-plan',
           createdAt: event.createdAt,
@@ -345,7 +203,8 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeWarningEvent event,
   ) {
-    return _stateWithTranscriptBlock(
+    return _stateWithTranscriptBlockImpl(
+      this,
       state,
       _support.statusEntry(
         prefix: 'warning',
@@ -368,10 +227,11 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeUnpinnedHostKeyEvent event,
   ) {
-    return _upsertTopLevelTranscriptBlock(
+    return _upsertTopLevelTranscriptBlockImpl(
+      this,
       state,
       CodexSshUnpinnedHostKeyBlock(
-        id: _sshUnpinnedHostKeyBlockId(host: event.host, port: event.port),
+        id: _sshUnpinnedHostKeyBlockIdImpl(host: event.host, port: event.port),
         createdAt: event.createdAt,
         host: event.host,
         port: event.port,
@@ -385,10 +245,11 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshConnectFailedEvent event,
   ) {
-    return _upsertTopLevelTranscriptBlock(
+    return _upsertTopLevelTranscriptBlockImpl(
+      this,
       state,
       CodexSshConnectFailedBlock(
-        id: _sshConnectFailedBlockId(host: event.host, port: event.port),
+        id: _sshConnectFailedBlockIdImpl(host: event.host, port: event.port),
         createdAt: event.createdAt,
         host: event.host,
         port: event.port,
@@ -401,10 +262,11 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshHostKeyMismatchEvent event,
   ) {
-    return _upsertTopLevelTranscriptBlock(
+    return _upsertTopLevelTranscriptBlockImpl(
+      this,
       state,
       CodexSshHostKeyMismatchBlock(
-        id: _sshHostKeyMismatchBlockId(host: event.host, port: event.port),
+        id: _sshHostKeyMismatchBlockIdImpl(host: event.host, port: event.port),
         createdAt: event.createdAt,
         host: event.host,
         port: event.port,
@@ -419,10 +281,11 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshAuthenticationFailedEvent event,
   ) {
-    return _upsertTopLevelTranscriptBlock(
+    return _upsertTopLevelTranscriptBlockImpl(
+      this,
       state,
       CodexSshAuthenticationFailedBlock(
-        id: _sshAuthenticationFailedBlockId(
+        id: _sshAuthenticationFailedBlockIdImpl(
           host: event.host,
           port: event.port,
           username: event.username,
@@ -441,10 +304,11 @@ class TranscriptPolicy {
     CodexSessionState state,
     CodexRuntimeSshRemoteLaunchFailedEvent event,
   ) {
-    return _upsertTopLevelTranscriptBlock(
+    return _upsertTopLevelTranscriptBlockImpl(
+      this,
       state,
       CodexSshRemoteLaunchFailedBlock(
-        id: _sshRemoteLaunchFailedBlockId(
+        id: _sshRemoteLaunchFailedBlockIdImpl(
           host: event.host,
           port: event.port,
           username: event.username,
@@ -463,69 +327,22 @@ class TranscriptPolicy {
     CodexSessionState state, {
     required String blockId,
   }) {
-    final blockIndex = state.blocks.indexWhere(
-      (block) => block is CodexSshUnpinnedHostKeyBlock && block.id == blockId,
-    );
-    if (blockIndex == -1) {
-      return state;
-    }
-
-    final block = state.blocks[blockIndex] as CodexSshUnpinnedHostKeyBlock;
-    if (block.isSaved) {
-      return state;
-    }
-
-    final nextBlocks = List<CodexUiBlock>.from(state.blocks);
-    nextBlocks[blockIndex] = block.copyWith(isSaved: true);
-    return state.copyWithProjectedTranscript(blocks: nextBlocks);
+    return _markUnpinnedHostKeySavedImpl(state, blockId: blockId);
   }
 
   CodexSessionState applyStatus(
     CodexSessionState state,
     CodexRuntimeStatusEvent event,
   ) {
-    if (event.rawMethod == 'thread/tokenUsage/updated') {
-      final usageBlock = CodexUsageBlock(
-        id: _support.eventEntryId('thread-usage', event.createdAt),
-        createdAt: event.createdAt,
-        title: event.title,
-        body: event.message,
-      );
-      final activeTurn = _support.ensureActiveTurn(
-        state.activeTurn,
-        turnId: event.turnId,
-        threadId: event.threadId,
-        createdAt: event.createdAt,
-      );
-      return state.copyWithProjectedTranscript(
-        activeTurn: activeTurn?.copyWith(
-          pendingThreadTokenUsageBlock: usageBlock,
-        ),
-      );
-    }
-    if (!_support.isTranscriptStatusSignal(event)) {
-      return state;
-    }
-    return _stateWithTranscriptBlock(
-      state,
-      CodexStatusBlock(
-        id: _support.eventEntryId('status', event.createdAt),
-        createdAt: event.createdAt,
-        title: event.title,
-        body: event.message,
-        statusKind: _support.statusKindForRuntimeStatus(event),
-        isTranscriptSignal: true,
-      ),
-      turnId: event.turnId,
-      threadId: event.threadId,
-    );
+    return _applyStatusImpl(this, state, event);
   }
 
   CodexSessionState applyRuntimeError(
     CodexSessionState state,
     CodexRuntimeErrorEvent event,
   ) {
-    return _stateWithTranscriptBlock(
+    return _stateWithTranscriptBlockImpl(
+      this,
       state,
       CodexErrorBlock(
         id: _support.eventEntryId('error', event.createdAt),
@@ -535,217 +352,6 @@ class TranscriptPolicy {
       ),
       turnId: event.turnId,
       threadId: event.threadId,
-    );
-  }
-
-  CodexSessionState _commitActiveTurn(
-    CodexSessionState state, {
-    required CodexActiveTurnState? activeTurn,
-    bool includePendingUsage = false,
-  }) {
-    if (activeTurn == null) {
-      return state;
-    }
-
-    var nextState = state;
-    for (final block in projectCodexTurnArtifacts(activeTurn.artifacts)) {
-      nextState = _support.appendBlock(nextState, block);
-    }
-    if (includePendingUsage &&
-        activeTurn.pendingThreadTokenUsageBlock != null) {
-      nextState = _support.appendBlock(
-        nextState,
-        activeTurn.pendingThreadTokenUsageBlock!,
-      );
-    }
-    return nextState;
-  }
-
-  bool _hasMismatchedActiveTurn(CodexSessionState state, String? turnId) {
-    final activeTurn = state.activeTurn;
-    return activeTurn != null && turnId != null && activeTurn.turnId != turnId;
-  }
-
-  (CodexActiveTurnState?, Duration?) _finalizeCommittedTurn(
-    CodexActiveTurnState? activeTurn,
-    DateTime createdAt,
-  ) {
-    if (activeTurn == null) {
-      return (null, null);
-    }
-
-    final completedTimer = _support.completeTurnTimer(
-      activeTurn.timer,
-      createdAt,
-    );
-    return (
-      activeTurn.copyWith(
-        timer: completedTimer,
-        status: CodexActiveTurnStatus.completing,
-      ),
-      completedTimer.elapsedAt(createdAt),
-    );
-  }
-
-  CodexTurnBoundaryBlock _turnBoundaryBlock({
-    required DateTime createdAt,
-    required Duration? elapsed,
-    CodexUsageBlock? usage,
-  }) {
-    return CodexTurnBoundaryBlock(
-      id: _support.eventEntryId('turn-end', createdAt),
-      createdAt: createdAt,
-      elapsed: elapsed,
-      usage: usage,
-    );
-  }
-
-  CodexSessionState _stateWithTranscriptBlock(
-    CodexSessionState state,
-    CodexUiBlock block, {
-    required String? turnId,
-    required String? threadId,
-  }) {
-    final activeTurn = _support.ensureActiveTurn(
-      state.activeTurn,
-      turnId: turnId,
-      threadId: threadId,
-      createdAt: block.createdAt,
-    );
-    if (activeTurn == null) {
-      return _upsertTopLevelTranscriptBlock(state, block);
-    }
-
-    return state.copyWithProjectedTranscript(
-      activeTurn: _upsertTurnBlock(activeTurn, block),
-    );
-  }
-
-  CodexSessionState _stateWithAppendedTranscriptBlock(
-    CodexSessionState state,
-    CodexUiBlock block, {
-    required String? turnId,
-    required String? threadId,
-  }) {
-    final activeTurn = _support.ensureActiveTurn(
-      state.activeTurn,
-      turnId: turnId,
-      threadId: threadId,
-      createdAt: block.createdAt,
-    );
-    if (activeTurn == null) {
-      return _support.appendBlock(state, block);
-    }
-
-    return state.copyWithProjectedTranscript(
-      activeTurn: _appendTurnBlock(activeTurn, block),
-    );
-  }
-
-  CodexActiveTurnState _upsertTurnBlock(
-    CodexActiveTurnState activeTurn,
-    CodexUiBlock block,
-  ) {
-    final artifact = CodexTurnBlockArtifact(block: block);
-    var nextArtifacts = List<CodexTurnArtifact>.from(activeTurn.artifacts);
-    final index = nextArtifacts.indexWhere(
-      (existing) => existing.id == block.id,
-    );
-    if (index == -1) {
-      nextArtifacts = appendCodexTurnArtifact(nextArtifacts, artifact);
-    } else {
-      nextArtifacts[index] = artifact;
-    }
-
-    return activeTurn.copyWith(artifacts: nextArtifacts);
-  }
-
-  CodexActiveTurnState _appendTurnBlock(
-    CodexActiveTurnState activeTurn,
-    CodexUiBlock block,
-  ) {
-    return activeTurn.copyWith(
-      artifacts: appendCodexTurnArtifact(
-        activeTurn.artifacts,
-        CodexTurnBlockArtifact(block: block),
-      ),
-    );
-  }
-
-  CodexSessionState _upsertTopLevelTranscriptBlock(
-    CodexSessionState state,
-    CodexUiBlock block,
-  ) {
-    final existingIndex = state.blocks.indexWhere(
-      (existing) => existing.id == block.id,
-    );
-    if (existingIndex == -1) {
-      return _support.appendBlock(state, block);
-    }
-
-    final nextBlocks = List<CodexUiBlock>.from(state.blocks);
-    nextBlocks[existingIndex] = block;
-    return state.copyWithProjectedTranscript(blocks: nextBlocks);
-  }
-
-  String _sshUnpinnedHostKeyBlockId({required String host, required int port}) {
-    return 'ssh-unpinned-$host-$port';
-  }
-
-  String _sshConnectFailedBlockId({required String host, required int port}) {
-    return 'ssh-connect-failed-$host-$port';
-  }
-
-  String _sshHostKeyMismatchBlockId({required String host, required int port}) {
-    return 'ssh-hostkey-mismatch-$host-$port';
-  }
-
-  String _sshAuthenticationFailedBlockId({
-    required String host,
-    required int port,
-    required String username,
-  }) {
-    return 'ssh-auth-failed-$username@$host-$port';
-  }
-
-  String _sshRemoteLaunchFailedBlockId({
-    required String host,
-    required int port,
-    required String username,
-  }) {
-    return 'ssh-remote-launch-failed-$username@$host-$port';
-  }
-
-  String _nextTranscriptEventBlockId(
-    CodexSessionState state, {
-    required String prefix,
-    required DateTime createdAt,
-  }) {
-    final usedIds = <String>{
-      ...codexUiBlockIds(state.blocks),
-      if (state.activeTurn != null)
-        ...codexTurnArtifactIds(state.activeTurn!.artifacts),
-    };
-    final baseId = _support.eventEntryId(prefix, createdAt);
-    if (!usedIds.contains(baseId)) {
-      return baseId;
-    }
-
-    var ordinal = 2;
-    var candidate = '$baseId-$ordinal';
-    while (usedIds.contains(candidate)) {
-      ordinal += 1;
-      candidate = '$baseId-$ordinal';
-    }
-    return candidate;
-  }
-
-  CodexSessionState _clearLocalUserMessageCorrelationState(
-    CodexSessionState state,
-  ) {
-    return state.copyWithProjectedTranscript(
-      clearPendingLocalUserMessageBlockIds: true,
-      clearLocalUserMessageProviderBindings: true,
     );
   }
 }
