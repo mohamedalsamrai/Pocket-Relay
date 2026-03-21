@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_relay/src/features/chat/application/transcript_changed_files_parser.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_changed_files_parser.dart';
 
 void main() {
   const parser = TranscriptChangedFilesParser();

@@ -1,7 +1,7 @@
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 
 typedef ChatConversationFailurePresentation = ({
   String title,

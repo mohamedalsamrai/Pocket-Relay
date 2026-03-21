@@ -1,6 +1,6 @@
 import 'package:pocket_relay/src/features/chat/models/codex_request_display.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 
 class ChatRequestProjector {

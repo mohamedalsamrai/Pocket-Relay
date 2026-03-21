@@ -1,12 +1,12 @@
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_lane_header_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_surface_projector.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart';
 
 class ChatScreenPresenter {
   const ChatScreenPresenter({

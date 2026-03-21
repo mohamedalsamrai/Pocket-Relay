@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_relay/src/features/chat/application/transcript_item_support.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_support.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 
 void main() {
   const support = TranscriptItemSupport();

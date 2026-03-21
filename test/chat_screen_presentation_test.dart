@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_composer_draft_host.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_projector.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pending_request_placement_contract.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pending_request_placement_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
@@ -18,9 +18,9 @@ import 'package:pocket_relay/src/features/chat/presentation/chat_screen_effect_m
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_presenter.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_host.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_projector.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_surface_projector.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_contract.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_projector.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
 
 const _defaultTranscriptFollowContract = ChatTranscriptFollowContract(

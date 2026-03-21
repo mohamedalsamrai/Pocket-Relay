@@ -3,24 +3,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pending_request_placement_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_projector.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_projector.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_form_scope.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/alert_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/approval_decision_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/changed_files_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/session_status_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/turn_boundary_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/cards/user_input_result_card.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
-import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/transcript_list.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/alert_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_decision_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/changed_files_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/session_status_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/turn_boundary_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/user_input_result_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/transcript_list.dart';
 
 const _itemProjector = ChatTranscriptItemProjector();
 const _defaultFollowBehavior = ChatTranscriptFollowContract(
@@ -1402,7 +1402,7 @@ void main() {
                 createdAt: DateTime(2026, 3, 14, 12),
                 entryKind: CodexWorkLogEntryKind.commandExecution,
                 title:
-                    "sed -n '1,120p' lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart",
+                    "sed -n '1,120p' lib/src/features/chat/transcript/presentation/widgets/transcript/cards/work_log_group_card.dart",
                 exitCode: 0,
               ),
             ],
@@ -1415,13 +1415,13 @@ void main() {
     expect(find.text('work_log_group_card.dart'), findsOneWidget);
     expect(
       find.text(
-        'lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart',
+        'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/work_log_group_card.dart',
       ),
       findsOneWidget,
     );
     expect(
       find.text(
-        "sed -n '1,120p' lib/src/features/chat/presentation/widgets/transcript/cards/work_log_group_card.dart",
+        "sed -n '1,120p' lib/src/features/chat/transcript/presentation/widgets/transcript/cards/work_log_group_card.dart",
       ),
       findsNothing,
     );
@@ -1907,7 +1907,7 @@ void main() {
               ),
               CodexChangedFile(
                 path:
-                    'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+                    'lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart',
                 additions: 8,
                 deletions: 2,
               ),
@@ -1919,9 +1919,9 @@ void main() {
                 '@@ -1 +1 @@\n'
                 '-old screen\n'
                 '+new screen\n'
-                'diff --git a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart b/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
-                '--- a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
-                '+++ b/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                'diff --git a/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart b/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                '--- a/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart\n'
+                '+++ b/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart\n'
                 '@@ -2 +2 @@\n'
                 '-old card\n'
                 '+new card\n',
@@ -1941,13 +1941,13 @@ void main() {
 
     expect(
       find.text(
-        'lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+        'lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart',
       ),
       findsWidgets,
     );
     expect(
       find.textContaining(
-        'diff --git a/lib/src/features/chat/presentation/widgets/transcript/conversation_entry_card.dart',
+        'diff --git a/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart',
         findRichText: true,
       ),
       findsOneWidget,

@@ -1,4 +1,4 @@
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 
 String codexRequestTitle(CodexCanonicalRequestType requestType) {
   return switch (requestType) {

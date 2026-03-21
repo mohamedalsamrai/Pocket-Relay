@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
-import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_reducer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 
 void main() {
   var monotonicNow = Duration.zero;

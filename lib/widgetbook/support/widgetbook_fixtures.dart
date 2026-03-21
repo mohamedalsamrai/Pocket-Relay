@@ -2,15 +2,15 @@ import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_pending_request_placement_contract.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_pending_request_placement_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/pending_user_input_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_follow_contract.dart';
-import 'package:pocket_relay/src/features/chat/presentation/chat_transcript_item_contract.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_work_log_contract.dart';
 
 class WidgetbookFixtures {
@@ -294,10 +294,10 @@ class WidgetbookFixtures {
       id: 'diff_transcript_frame',
       file: ChatChangedFilePresentationContract(
         currentPath:
-            'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+            'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_request_card.dart',
         fileName: 'approval_request_card.dart',
         directoryLabel:
-            'lib/src/features/chat/presentation/widgets/transcript/cards',
+            'lib/src/features/chat/transcript/presentation/widgets/transcript/cards',
         languageLabel: 'Dart',
         syntaxLanguage: 'dart',
       ),
@@ -369,7 +369,7 @@ class WidgetbookFixtures {
       ChatChangedFileRowContract(
         id: 'changed_file_1',
         file: filePresentation(
-          'lib/src/features/chat/presentation/widgets/transcript/cards/approval_request_card.dart',
+          'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_request_card.dart',
         ),
         operationKind: ChatChangedFileOperationKind.modified,
         operationLabel: 'Edited',
@@ -379,7 +379,7 @@ class WidgetbookFixtures {
       ChatChangedFileRowContract(
         id: 'changed_file_2',
         file: filePresentation(
-          'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+          'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
         ),
         operationKind: ChatChangedFileOperationKind.modified,
         operationLabel: 'Edited',
@@ -387,7 +387,7 @@ class WidgetbookFixtures {
         diff: ChatChangedFileDiffContract(
           id: 'diff_widgetbook_fixtures',
           file: filePresentation(
-            'lib/src/features/chat/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+            'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
           ),
           operationKind: ChatChangedFileOperationKind.modified,
           operationLabel: 'Edited',
@@ -419,7 +419,7 @@ class WidgetbookFixtures {
     final deletedRow = ChatChangedFileRowContract(
       id: 'changed_file_deleted',
       file: filePresentation(
-        'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+        'lib/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_chips.dart',
       ),
       operationKind: ChatChangedFileOperationKind.deleted,
       operationLabel: 'Deleted',
@@ -428,10 +428,10 @@ class WidgetbookFixtures {
         id: 'diff_deleted_chips',
         file: ChatChangedFilePresentationContract(
           currentPath:
-              'lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+              'lib/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_chips.dart',
           fileName: 'transcript_chips.dart',
           directoryLabel:
-              'lib/src/features/chat/presentation/widgets/transcript/support',
+              'lib/src/features/chat/transcript/presentation/widgets/transcript/support',
           languageLabel: 'Dart',
           syntaxLanguage: 'dart',
         ),
@@ -442,7 +442,7 @@ class WidgetbookFixtures {
         lines: <ChatChangedFileDiffLineContract>[
           ChatChangedFileDiffLineContract(
             text:
-                '--- a/lib/src/features/chat/presentation/widgets/transcript/support/transcript_chips.dart',
+                '--- a/lib/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_chips.dart',
             kind: ChatChangedFileDiffLineKind.meta,
           ),
           ChatChangedFileDiffLineContract(

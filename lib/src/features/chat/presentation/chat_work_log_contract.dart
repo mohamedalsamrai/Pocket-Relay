@@ -1,4 +1,4 @@
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 
 sealed class ChatWorkLogEntryContract {
   const ChatWorkLogEntryContract({

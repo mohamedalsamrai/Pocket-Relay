@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/features/chat/application/codex_runtime_payload_support.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 
 void main() {
   const support = CodexRuntimePayloadSupport();

@@ -8,15 +8,15 @@ import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_recovery_policy.dart';
-import 'package:pocket_relay/src/features/chat/application/chat_historical_conversation_restorer.dart';
-import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation_normalizer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';
-import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
-import 'package:pocket_relay/src/features/chat/models/chat_historical_conversation_restore_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_reducer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
 
 class ChatSessionController extends ChangeNotifier {

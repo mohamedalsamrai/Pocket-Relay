@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_relay/src/features/chat/application/codex_historical_conversation_normalizer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_thread_read_decoder.dart';
-import 'package:pocket_relay/src/features/chat/models/codex_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 
 void main() {
   const decoder = CodexAppServerThreadReadDecoder();
