@@ -14,6 +14,9 @@ import 'package:pocket_relay/src/features/chat/transcript_follow/presentation/ch
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
 
+part 'chat_root_adapter_actions.dart';
+part 'chat_root_adapter_effects.dart';
+
 class ChatRootAdapter extends StatefulWidget {
   const ChatRootAdapter({
     super.key,
@@ -88,11 +91,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     );
   }
 
-  void _bindScreenEffects() {
-    _screenEffectSubscription = widget.laneBinding.screenEffects.listen(
-      _handleScreenEffect,
-    );
-  }
+  void _bindScreenEffects() => _bindChatRootScreenEffects(this);
 
   PreferredSizeWidget _buildAppChrome(ChatScreenContract screen) {
     return FlutterChatAppChrome(
@@ -162,161 +161,41 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
 
   Future<void> _requestConnectionSettings(
     ChatConnectionSettingsLaunchContract connectionSettings,
-  ) async {
-    await widget.onConnectionSettingsRequested(connectionSettings);
-  }
+  ) => _requestChatConnectionSettings(this, connectionSettings);
 
-  Future<void> _openChangedFileDiff(ChatChangedFileDiffContract diff) async {
-    if (!mounted) {
-      return;
-    }
+  Future<void> _openChangedFileDiff(ChatChangedFileDiffContract diff) =>
+      _openChatChangedFileDiff(this, diff);
 
-    await widget.overlayDelegate.openChangedFileDiff(
-      context: context,
-      diff: diff,
-    );
-  }
-
-  void _requestChangedFileDiff(ChatChangedFileDiffContract diff) {
-    _handleScreenEffect(ChatOpenChangedFileDiffEffect(payload: diff));
-  }
+  void _requestChangedFileDiff(ChatChangedFileDiffContract diff) =>
+      _requestChatChangedFileDiff(this, diff);
 
   void _handleScreenAction(
     ChatScreenActionId action,
     ChatScreenContract screen,
-  ) {
-    final effect = _effectMapper.mapAction(action: action, screen: screen);
-    if (effect != null) {
-      _handleScreenEffect(effect);
-      return;
-    }
+  ) => _handleChatScreenAction(this, action, screen);
 
-    switch (action) {
-      case ChatScreenActionId.newThread:
-        _startFreshConversation();
-      case ChatScreenActionId.branchConversation:
-        unawaited(_branchConversation());
-      case ChatScreenActionId.clearTranscript:
-        _clearTranscript();
-      case ChatScreenActionId.openSettings:
-        return;
-    }
-  }
-
-  Future<void> _sendPrompt() async {
-    final laneBinding = widget.laneBinding;
-    final controller = laneBinding.sessionController;
-    final sent = await controller.sendPrompt(
-      laneBinding.composerDraftHost.draft.text,
-    );
-    if (!mounted || laneBinding != widget.laneBinding || !sent) {
-      return;
-    }
-
-    laneBinding.transcriptFollowHost.requestFollow(
-      source: ChatTranscriptFollowRequestSource.sendPrompt,
-    );
-    laneBinding.composerDraftHost.clear();
-  }
+  Future<void> _sendPrompt() => _sendChatPrompt(this);
 
   Future<void> _stopActiveTurn() async {
     await widget.laneBinding.sessionController.stopActiveTurn();
   }
 
-  Future<void> _continueFromUserMessage(String blockId) async {
-    if (!mounted) {
-      return;
-    }
+  Future<void> _continueFromUserMessage(String blockId) =>
+      _continueChatFromUserMessage(this, blockId);
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Continue From Here'),
-          content: const Text(
-            'This will discard newer conversation turns in this thread, '
-            'reload the selected prompt into the composer, and keep any local '
-            'file changes exactly as they are. Local file changes are not '
-            'reverted automatically.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Continue'),
-            ),
-          ],
-        );
-      },
-    );
-    if (confirmed != true || !mounted) {
-      return;
-    }
+  void _startFreshConversation() => _startFreshChatConversation(this);
 
-    final laneBinding = widget.laneBinding;
-    final draftText = await laneBinding.sessionController
-        .continueFromUserMessage(blockId);
-    if (!mounted || laneBinding != widget.laneBinding || draftText == null) {
-      return;
-    }
+  Future<void> _branchConversation() => _branchChatConversation(this);
 
-    laneBinding.composerDraftHost.updateText(draftText);
-    laneBinding.transcriptFollowHost.requestFollow(
-      source: ChatTranscriptFollowRequestSource.clearTranscript,
-    );
-  }
-
-  void _startFreshConversation() {
-    widget.laneBinding.transcriptFollowHost.requestFollow(
-      source: ChatTranscriptFollowRequestSource.newThread,
-    );
-    widget.laneBinding.sessionController.startFreshConversation();
-  }
-
-  Future<void> _branchConversation() async {
-    final branched = await widget.laneBinding.sessionController
-        .branchSelectedConversation();
-    if (!branched) {
-      return;
-    }
-    widget.laneBinding.transcriptFollowHost.reset();
-  }
-
-  void _clearTranscript() {
-    widget.laneBinding.transcriptFollowHost.requestFollow(
-      source: ChatTranscriptFollowRequestSource.clearTranscript,
-    );
-    widget.laneBinding.sessionController.clearTranscript();
-  }
+  void _clearTranscript() => _clearChatTranscript(this);
 
   void _handleConversationRecoveryAction(
     ChatConversationRecoveryActionId action,
-  ) {
-    switch (action) {
-      case ChatConversationRecoveryActionId.startFreshConversation:
-        _startFreshConversation();
-      case ChatConversationRecoveryActionId.openAlternateSession:
-        widget.laneBinding.sessionController
-            .openConversationRecoveryAlternateSession();
-    }
-  }
+  ) => _handleChatConversationRecoveryAction(this, action);
 
   void _handleHistoricalConversationRestoreAction(
     ChatHistoricalConversationRestoreActionId action,
-  ) {
-    switch (action) {
-      case ChatHistoricalConversationRestoreActionId.retryRestore:
-        unawaited(
-          widget.laneBinding.sessionController
-              .retryHistoricalConversationRestore(),
-        );
-      case ChatHistoricalConversationRestoreActionId.startFreshConversation:
-        _startFreshConversation();
-    }
-  }
+  ) => _handleChatHistoricalConversationRestoreAction(this, action);
 
   void _selectConnectionMode(ConnectionMode mode) {
     if (_preferredEmptyStateConnectionMode == mode) {
@@ -328,25 +207,9 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
     });
   }
 
-  void _handleScreenEffect(ChatScreenEffect effect) {
-    switch (effect) {
-      case ChatShowSnackBarEffect(:final message):
-        _showTransientFeedback(message);
-      case ChatOpenConnectionSettingsEffect(:final payload):
-        unawaited(_requestConnectionSettings(payload));
-      case ChatOpenChangedFileDiffEffect(:final payload):
-        unawaited(_openChangedFileDiff(payload));
-    }
-  }
+  void _handleScreenEffect(ChatScreenEffect effect) =>
+      _handleChatScreenEffect(this, effect);
 
-  void _showTransientFeedback(String message) {
-    if (!mounted) {
-      return;
-    }
-
-    widget.overlayDelegate.showTransientFeedback(
-      context: context,
-      message: message,
-    );
-  }
+  void _showTransientFeedback(String message) =>
+      _showChatTransientFeedback(this, message);
 }
