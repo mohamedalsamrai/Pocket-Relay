@@ -44,6 +44,13 @@ void main() {
 
     expect(find.text('Reasoning'), findsOneWidget);
     expect(find.text('Investigating the next step.'), findsOneWidget);
+    expect(
+      _findDecoratedContainerColorForText(
+        tester,
+        'Investigating the next step.',
+      ),
+      isNull,
+    );
   });
 
   testWidgets('renders code fences with readable text in dark mode', (
@@ -72,52 +79,51 @@ void main() {
     expect(codeStyle?.color, const Color(0xFFE7F3F4));
   });
 
-  testWidgets('uses dark surfaces for parsed codex cards in dark mode', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _buildTestApp(
-        themeMode: ThemeMode.dark,
-        child: Column(
-          children: [
-            _entryCard(
-              block: CodexTextBlock(
-                id: 'reasoning_dark_1',
-                kind: CodexUiBlockKind.reasoning,
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Reasoning',
-                body: 'Dark mode should use the themed surface.',
+  testWidgets(
+    'keeps reasoning flat while retaining changed-files surface in dark mode',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          themeMode: ThemeMode.dark,
+          child: Column(
+            children: [
+              _entryCard(
+                block: CodexTextBlock(
+                  id: 'reasoning_dark_1',
+                  kind: CodexUiBlockKind.reasoning,
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Reasoning',
+                  body: 'Dark mode should use the themed surface.',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _entryCard(
-              block: CodexChangedFilesBlock(
-                id: 'files_dark_1',
-                createdAt: DateTime(2026, 3, 14, 12),
-                title: 'Changed files',
-                files: <CodexChangedFile>[
-                  const CodexChangedFile(
-                    path: 'lib/src/features/chat/presentation/widgets/foo.dart',
-                    additions: 2,
-                    deletions: 1,
-                  ),
-                ],
+              const SizedBox(height: 16),
+              _entryCard(
+                block: CodexChangedFilesBlock(
+                  id: 'files_dark_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  title: 'Changed files',
+                  files: <CodexChangedFile>[
+                    const CodexChangedFile(
+                      path:
+                          'lib/src/features/chat/presentation/widgets/foo.dart',
+                      additions: 2,
+                      deletions: 1,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(
-      _findDecoratedContainerColorForText(tester, 'Reasoning'),
-      PocketPalette.dark.surface,
-    );
-    expect(
-      _findDecoratedContainerColorForText(tester, 'Changed files'),
-      PocketPalette.dark.surface,
-    );
-  });
+      expect(_findDecoratedContainerColorForText(tester, 'Reasoning'), isNull);
+      expect(
+        _findDecoratedContainerColorForText(tester, 'Changed files'),
+        PocketPalette.dark.surface,
+      );
+    },
+  );
 
   testWidgets('renders assistant messages without a decorated card shell', (
     tester,
