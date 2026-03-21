@@ -30,9 +30,9 @@ class CodexConnectionCatalogRecovery {
   Future<void>? _preferencesReady;
 
   Future<void> ensurePreferencesReady() {
-    return _preferencesReady ??= ensureSharedPreferencesAsyncReady(
+    return _preferencesReady ??= SharedPreferencesAsyncMigrationGate(
       migrationCompletedKey: preferencesMigrationKey,
-    );
+    ).ensureReady();
   }
 
   Future<ConnectionCatalogState?> loadCatalog() async {
