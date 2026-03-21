@@ -361,6 +361,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        find.textContaining('discard newer conversation turns'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('reload the selected prompt into the composer'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          'Local file changes are not reverted automatically',
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
       await tester.pumpAndSettle();
 
