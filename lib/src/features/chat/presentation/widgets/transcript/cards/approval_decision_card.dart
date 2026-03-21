@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
-import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/presentation/chat_request_contract.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/transcript_item_primitives.dart';
 
 class ApprovalDecisionCard extends StatelessWidget {
-  const ApprovalDecisionCard({
-    super.key,
-    required this.request,
-  });
+  const ApprovalDecisionCard({super.key, required this.request});
 
   final ChatApprovalRequestContract request;
 
@@ -18,16 +15,8 @@ class ApprovalDecisionCard extends StatelessWidget {
     final cards = ConversationCardPalette.of(context);
     final accent = _accentColor(Theme.of(context).brightness);
 
-    return PocketTranscriptFrame(
-      maxWidth: 680,
-      shadowColor: cards.shadow,
-      shadowOpacity: cards.isDark ? 0.18 : 0.06,
-      backgroundColor: cards.tintedSurface(
-        accent,
-        lightAlpha: 0.08,
-        darkAlpha: 0.14,
-      ),
-      borderColor: cards.accentBorder(accent),
+    return TranscriptBlocker(
+      accent: accent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

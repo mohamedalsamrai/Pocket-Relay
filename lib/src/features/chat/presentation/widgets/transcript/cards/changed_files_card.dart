@@ -122,6 +122,9 @@ class _ChangedFileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (visuals, rowAccent) = _visualsForRow();
+    final pathPresentation = _ChangedFilePathPresentation.fromLabel(
+      row.displayPathLabel,
+    );
     final body = Padding(
       key: ValueKey<String>('changed_file_row_${row.id}'),
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -151,16 +154,35 @@ class _ChangedFileRow extends StatelessWidget {
                     ),
                     const SizedBox(width: PocketSpacing.xs),
                     Expanded(
-                      child: Text(
-                        row.displayPathLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontFamily: 'monospace',
-                          color: cards.textSecondary,
-                          height: 1.2,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pathPresentation.fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.75,
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w700,
+                              color: cards.textPrimary,
+                              height: 1.2,
+                            ),
+                          ),
+                          if (pathPresentation.secondaryLabel
+                              case final secondary?)
+                            Text(
+                              secondary,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.75,
+                                fontFamily: 'monospace',
+                                color: cards.textMuted,
+                                height: 1.2,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -225,6 +247,45 @@ class _ChangedFileVisuals {
   const _ChangedFileVisuals({required this.icon});
 
   final IconData icon;
+}
+
+class _ChangedFilePathPresentation {
+  const _ChangedFilePathPresentation({
+    required this.fileName,
+    this.secondaryLabel,
+  });
+
+  factory _ChangedFilePathPresentation.fromLabel(String label) {
+    final separator = ' -> ';
+    if (label.contains(separator)) {
+      final parts = label.split(separator);
+      final currentPath = parts.last.trim();
+      final currentName = _basename(currentPath);
+      return _ChangedFilePathPresentation(
+        fileName: currentName,
+        secondaryLabel: label,
+      );
+    }
+
+    final fileName = _basename(label);
+    if (fileName == label) {
+      return _ChangedFilePathPresentation(fileName: fileName);
+    }
+
+    return _ChangedFilePathPresentation(
+      fileName: fileName,
+      secondaryLabel: label,
+    );
+  }
+
+  final String fileName;
+  final String? secondaryLabel;
+
+  static String _basename(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final segments = normalized.split('/');
+    return segments.isEmpty ? path : segments.last;
+  }
 }
 
 class ChangedFileDiffSheet extends StatefulWidget {

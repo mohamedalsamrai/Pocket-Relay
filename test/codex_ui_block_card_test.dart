@@ -1150,6 +1150,55 @@ void main() {
     expect(find.text('running'), findsOneWidget);
   });
 
+  testWidgets(
+    'shows hidden work-log count in the tappable header above visible rows',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexWorkLogGroupBlock(
+              id: 'worklog_overflow_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              entries: <CodexWorkLogEntry>[
+                CodexWorkLogEntry(
+                  id: 'entry_1',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'first',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_2',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 1),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'second',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_3',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 2),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'third',
+                ),
+                CodexWorkLogEntry(
+                  id: 'entry_4',
+                  createdAt: DateTime(2026, 3, 14, 12, 0, 3),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'fourth',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final hiddenSummaryTopLeft = tester.getTopLeft(
+        find.text('4 total · 1 hidden'),
+      );
+      final firstVisibleRowTopLeft = tester.getTopLeft(find.text('second'));
+
+      expect(hiddenSummaryTopLeft.dy, lessThan(firstVisibleRowTopLeft.dy));
+    },
+  );
+
   testWidgets('renders web-search entries as dedicated work-log rows', (
     tester,
   ) async {
@@ -1290,7 +1339,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Show 1 more'));
+      await tester.tap(find.text('4 total · 1 hidden'));
       await tester.pumpAndSettle();
 
       expect(find.text('Reading full file'), findsOneWidget);
@@ -1359,7 +1408,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Show 1 more'));
+      await tester.tap(find.text('4 total · 1 hidden'));
       await tester.pumpAndSettle();
 
       expect(find.text('Searching for'), findsNWidgets(4));
@@ -1461,7 +1510,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Show 1 more'));
+    await tester.tap(find.text('4 total · 1 hidden'));
     await tester.pumpAndSettle();
 
     expect(find.text('Checking worktree status'), findsOneWidget);

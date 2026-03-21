@@ -26,34 +26,102 @@ class _WorkLogGroupCardState extends State<WorkLogGroupCard> {
     final visibleEntries = hasOverflow && !_expanded
         ? entries.skip(entries.length - 3).toList(growable: false)
         : entries;
+    final hiddenCount = entries.length - visibleEntries.length;
 
     return TranscriptAnnotation(
       accent: cards.textMuted,
-      header: TranscriptAnnotationHeader(
-        icon: Icons.construction_outlined,
+      header: _WorkLogHeader(
         label: widget.item.hasOnlyKnownEntries ? 'Work log' : 'Activity',
         accent: cards.textSecondary,
-        trailing: Text(
-          '${entries.length}',
-          style: TextStyle(color: cards.textMuted, fontWeight: FontWeight.w700),
-        ),
+        totalCount: entries.length,
+        hiddenCount: hiddenCount,
+        isExpanded: _expanded,
+        isInteractive: hasOverflow,
+        onTap: hasOverflow
+            ? () => setState(() => _expanded = !_expanded)
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ...visibleEntries.map((entry) => _WorkLogEntryRow(entry: entry)),
-          if (hasOverflow) ...[
-            const SizedBox(height: PocketSpacing.xxs),
-            TextButton(
-              onPressed: () => setState(() => _expanded = !_expanded),
-              child: Text(
-                _expanded
-                    ? 'Show less'
-                    : 'Show ${entries.length - visibleEntries.length} more',
-              ),
-            ),
-          ],
         ],
+      ),
+    );
+  }
+}
+
+class _WorkLogHeader extends StatelessWidget {
+  const _WorkLogHeader({
+    required this.label,
+    required this.accent,
+    required this.totalCount,
+    required this.hiddenCount,
+    required this.isExpanded,
+    required this.isInteractive,
+    this.onTap,
+  });
+
+  final String label;
+  final Color accent;
+  final int totalCount;
+  final int hiddenCount;
+  final bool isExpanded;
+  final bool isInteractive;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = ConversationCardPalette.of(context);
+    final header = Row(
+      children: [
+        Icon(Icons.construction_outlined, size: 16, color: cards.textMuted),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: accent,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        Text(
+          hiddenCount > 0 && !isExpanded
+              ? '$totalCount total · $hiddenCount hidden'
+              : '$totalCount total',
+          style: TextStyle(
+            color: cards.textMuted,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (isInteractive) ...[
+          const SizedBox(width: 6),
+          Icon(
+            isExpanded ? Icons.expand_less : Icons.expand_more,
+            size: 18,
+            color: cards.textMuted,
+          ),
+        ],
+      ],
+    );
+
+    if (!isInteractive || onTap == null) {
+      return header;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: header,
+        ),
       ),
     );
   }

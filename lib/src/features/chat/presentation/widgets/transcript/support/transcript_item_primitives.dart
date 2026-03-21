@@ -25,20 +25,22 @@ class TranscriptAnnotation extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(0, 4, 0, 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Container(
-                width: 3,
-                margin: const EdgeInsets.only(top: 2),
-                constraints: const BoxConstraints(minHeight: 24),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.9),
-                  borderRadius: PocketRadii.circular(PocketRadii.pill),
+              Positioned(
+                left: 0,
+                top: 2,
+                bottom: 2,
+                child: Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.9),
+                    borderRadius: PocketRadii.circular(PocketRadii.pill),
+                  ),
                 ),
               ),
-              const SizedBox(width: PocketSpacing.sm),
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.only(left: PocketSpacing.sm + 3),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
