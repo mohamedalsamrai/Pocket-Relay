@@ -209,7 +209,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         ),
       ),
     );
-    await nextBinding.sessionController.initialize();
+    await nextBinding.initializeSession();
     if (_isDisposed) {
       return;
     }
@@ -270,12 +270,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         ),
       );
       previousBinding.dispose();
-      await nextBinding.sessionController.initialize();
-      if (_isDisposed) {
-        return;
-      }
-      await nextBinding.sessionController
-          .prepareSelectedConversationForContinuation();
+      await nextBinding.activatePersistedConversation();
       if (_isDisposed) {
         return;
       }
@@ -284,7 +279,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
     await _instantiateConnection(
       normalizedConnectionId,
-      prepareSelectedConversationForContinuation: true,
+      activatePersistedConversation: true,
     );
   }
 
@@ -334,7 +329,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   Future<void> _instantiateConnection(
     String connectionId, {
-    bool prepareSelectedConversationForContinuation = false,
+    bool activatePersistedConversation = false,
   }) async {
     final binding = await _loadLaneBinding(connectionId);
     if (_isDisposed) {
@@ -358,13 +353,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         ),
       ),
     );
-    if (prepareSelectedConversationForContinuation) {
-      await binding.sessionController.initialize();
-      if (_isDisposed) {
-        return;
-      }
-      await binding.sessionController
-          .prepareSelectedConversationForContinuation();
+    if (activatePersistedConversation) {
+      await binding.activatePersistedConversation();
       if (_isDisposed) {
         return;
       }

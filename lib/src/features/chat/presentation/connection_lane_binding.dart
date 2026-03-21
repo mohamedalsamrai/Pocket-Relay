@@ -50,6 +50,19 @@ class ConnectionLaneBinding {
 
   Stream<ChatScreenEffect> get screenEffects => _screenEffectsController.stream;
 
+  Future<void> initializeSession() {
+    return sessionController.initialize();
+  }
+
+  Future<void> activatePersistedConversation() async {
+    await initializeSession();
+    if (_isDisposed) {
+      return;
+    }
+
+    await sessionController.prepareSelectedConversationForContinuation();
+  }
+
   void dispose() {
     if (_isDisposed) {
       return;
