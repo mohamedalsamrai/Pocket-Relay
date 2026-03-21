@@ -549,6 +549,97 @@ void main() {
         });
       },
     );
+
+    test(
+      'marks sent root-thread user messages as rewindable when the session is idle',
+      () {
+        final userBlock = CodexUserMessageBlock(
+          id: 'user_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          text: 'Restore this',
+          deliveryState: CodexUserMessageDeliveryState.sent,
+        );
+        final sessionState = CodexSessionState.initial().copyWith(
+          rootThreadId: 'thread_root',
+          sessionThreadId: 'thread_root',
+          sessionBlocks: <CodexUiBlock>[userBlock],
+        );
+
+        final surface = projector.project(
+          profile: _configuredProfile(),
+          sessionState: sessionState,
+        );
+
+        final userItem =
+            surface.mainItems.single as ChatUserMessageItemContract;
+        expect(userItem.block, same(userBlock));
+        expect(userItem.canContinueFromHere, isTrue);
+      },
+    );
+
+    test(
+      'does not mark user messages as rewindable while the session is busy, on child timelines, or for local echo prompts',
+      () {
+        final userBlock = CodexUserMessageBlock(
+          id: 'user_1',
+          createdAt: DateTime(2026, 3, 15, 12),
+          text: 'Restore this',
+          deliveryState: CodexUserMessageDeliveryState.sent,
+        );
+        final childUserBlock = userBlock.copyWith();
+        final localEchoBlock = userBlock.copyWith(
+          deliveryState: CodexUserMessageDeliveryState.localEcho,
+        );
+
+        final busySurface = projector.project(
+          profile: _configuredProfile(),
+          sessionState: CodexSessionState.initial().copyWith(
+            connectionStatus: CodexRuntimeSessionState.running,
+            rootThreadId: 'thread_root',
+            sessionThreadId: 'thread_root',
+            sessionBlocks: <CodexUiBlock>[userBlock],
+          ),
+        );
+        final childTimelineSurface = projector.project(
+          profile: _configuredProfile(),
+          sessionState: CodexSessionState.initial().copyWith(
+            rootThreadId: 'thread_root',
+            selectedThreadId: 'thread_child',
+            timelinesByThreadId: <String, CodexTimelineState>{
+              'thread_root': const CodexTimelineState(threadId: 'thread_root'),
+              'thread_child': CodexTimelineState(
+                threadId: 'thread_child',
+                blocks: <CodexUiBlock>[childUserBlock],
+              ),
+            },
+          ),
+        );
+        final localEchoSurface = projector.project(
+          profile: _configuredProfile(),
+          sessionState: CodexSessionState.initial().copyWith(
+            rootThreadId: 'thread_root',
+            sessionThreadId: 'thread_root',
+            sessionBlocks: <CodexUiBlock>[localEchoBlock],
+          ),
+        );
+
+        expect(
+          (busySurface.mainItems.single as ChatUserMessageItemContract)
+              .canContinueFromHere,
+          isFalse,
+        );
+        expect(
+          (childTimelineSurface.mainItems.single as ChatUserMessageItemContract)
+              .canContinueFromHere,
+          isFalse,
+        );
+        expect(
+          (localEchoSurface.mainItems.single as ChatUserMessageItemContract)
+              .canContinueFromHere,
+          isFalse,
+        );
+      },
+    );
   });
 
   group('ChatRequestProjector', () {
@@ -797,9 +888,7 @@ void main() {
             entryKind: CodexWorkLogEntryKind.webSearch,
             title: 'Search docs',
             preview: 'Found CLI reference and API notes',
-            snapshot: const <String, Object?>{
-              'query': 'Pocket Relay CLI',
-            },
+            snapshot: const <String, Object?>{'query': 'Pocket Relay CLI'},
           ),
         ],
       );
@@ -813,31 +902,34 @@ void main() {
       expect(entry.activityLabel, 'Searched');
     });
 
-    test('projects plain command executions into dedicated command entries', () {
-      final groupBlock = CodexWorkLogGroupBlock(
-        id: 'worklog_command',
-        createdAt: DateTime(2026, 3, 15, 12),
-        entries: <CodexWorkLogEntry>[
-          CodexWorkLogEntry(
-            id: 'entry_command',
-            createdAt: DateTime(2026, 3, 15, 12),
-            entryKind: CodexWorkLogEntryKind.commandExecution,
-            title: 'pwd',
-            preview: '/repo',
-            isRunning: true,
-          ),
-        ],
-      );
+    test(
+      'projects plain command executions into dedicated command entries',
+      () {
+        final groupBlock = CodexWorkLogGroupBlock(
+          id: 'worklog_command',
+          createdAt: DateTime(2026, 3, 15, 12),
+          entries: <CodexWorkLogEntry>[
+            CodexWorkLogEntry(
+              id: 'entry_command',
+              createdAt: DateTime(2026, 3, 15, 12),
+              entryKind: CodexWorkLogEntryKind.commandExecution,
+              title: 'pwd',
+              preview: '/repo',
+              isRunning: true,
+            ),
+          ],
+        );
 
-      final item =
-          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
-      final entry =
-          item.entries.single as ChatCommandExecutionWorkLogEntryContract;
+        final item =
+            projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+        final entry =
+            item.entries.single as ChatCommandExecutionWorkLogEntryContract;
 
-      expect(entry.commandText, 'pwd');
-      expect(entry.outputPreview, '/repo');
-      expect(entry.activityLabel, 'Running command');
-    });
+        expect(entry.commandText, 'pwd');
+        expect(entry.outputPreview, '/repo');
+        expect(entry.activityLabel, 'Running command');
+      },
+    );
 
     test('projects sed -ne read commands into read work-log entries', () {
       final groupBlock = CodexWorkLogGroupBlock(

@@ -27,7 +27,9 @@ class ChatTranscriptItemProjector {
     return switch (block) {
       final CodexUserMessageBlock userBlock => ChatUserMessageItemContract(
         block: userBlock,
-        canContinueFromHere: canContinueFromHere,
+        canContinueFromHere:
+            canContinueFromHere &&
+            userBlock.deliveryState == CodexUserMessageDeliveryState.sent,
       ),
       final CodexTextBlock textBlock
           when textBlock.kind == CodexUiBlockKind.reasoning =>
