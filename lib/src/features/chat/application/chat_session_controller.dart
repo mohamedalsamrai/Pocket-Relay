@@ -7,6 +7,7 @@ import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/application/chat_conversation_selection_coordinator.dart';
+import 'package:pocket_relay/src/features/chat/application/chat_conversation_recovery_policy.dart';
 import 'package:pocket_relay/src/features/chat/application/runtime_event_mapper.dart';
 import 'package:pocket_relay/src/features/chat/application/transcript_reducer.dart';
 import 'package:pocket_relay/src/features/chat/models/chat_conversation_recovery_state.dart';
@@ -52,6 +53,8 @@ class ChatSessionController extends ChangeNotifier {
   final TranscriptReducer _sessionReducer;
   final CodexRuntimeEventMapper _runtimeEventMapper;
   final ChatConversationSelectionCoordinator _conversationSelection;
+  final ChatConversationRecoveryPolicy _conversationRecoveryPolicy =
+      const ChatConversationRecoveryPolicy();
   final bool _supportsLocalConnectionMode;
   final _snackBarMessagesController = StreamController<String>.broadcast();
 
@@ -165,7 +168,12 @@ class ChatSessionController extends ChangeNotifier {
       selectTimeline(rootThreadId);
     }
 
-    final recoveryState = _preflightConversationRecoveryState();
+    final recoveryState = _conversationRecoveryPolicy.preflightRecoveryState(
+      sessionState: _sessionState,
+      activeThreadId: _activeConversationThreadId(),
+      resumeThreadId: _resumeConversationThreadId(),
+      trackedThreadId: _trackedThreadReuseCandidate(),
+    );
     if (recoveryState != null) {
       _setConversationRecovery(recoveryState);
       return false;
@@ -510,34 +518,15 @@ class ChatSessionController extends ChangeNotifier {
       );
       return true;
     } catch (error) {
-      final unexpectedConversationThread = _unexpectedConversationThread(error);
-      final isMissingConversation = _isMissingConversationThreadError(error);
-      if (unexpectedConversationThread case (
-        expectedThreadId: final expectedThreadId,
-        actualThreadId: final actualThreadId,
-      )) {
-        _setConversationRecovery(
-          ChatConversationRecoveryState(
-            reason: ChatConversationRecoveryReason.unexpectedRemoteConversation,
-            alternateThreadId: _alternateRecoveryThreadId(
-              preferredThreadId: actualThreadId,
-            ),
-            expectedThreadId: expectedThreadId,
-            actualThreadId: actualThreadId,
-          ),
-        );
+      final recoveryAssessment = _conversationRecoveryPolicy.assessSendFailure(
+        error: error,
+        sessionState: _sessionState,
+        sessionLabel: _sessionLabel(),
+        preferredAlternateThreadId: appServerClient.threadId,
+      );
+      if (recoveryAssessment.recoveryState != null) {
+        _setConversationRecovery(recoveryAssessment.recoveryState!);
       }
-      if (isMissingConversation) {
-        _setConversationRecovery(
-          ChatConversationRecoveryState(
-            reason: ChatConversationRecoveryReason.missingRemoteConversation,
-            alternateThreadId: _alternateRecoveryThreadId(
-              preferredThreadId: appServerClient.threadId,
-            ),
-          ),
-        );
-      }
-      final failure = _sendFailurePresentation(error);
       if (_sessionState.activeTurn == null &&
           _sessionState.pendingLocalUserMessageBlockIds.isNotEmpty) {
         _applySessionState(
@@ -546,13 +535,13 @@ class ChatSessionController extends ChangeNotifier {
       }
       await Future<void>.microtask(() {});
       _reportAppServerFailure(
-        title: failure.title,
-        message: failure.message,
+        title: recoveryAssessment.presentation.title,
+        message: recoveryAssessment.presentation.message,
         error: error,
-        runtimeErrorMessage: failure.runtimeErrorMessage,
+        runtimeErrorMessage:
+            recoveryAssessment.presentation.runtimeErrorMessage,
         suppressRuntimeError: _sawTrackedSshBootstrapFailure,
-        suppressSnackBar:
-            isMissingConversation || unexpectedConversationThread != null,
+        suppressSnackBar: recoveryAssessment.suppressSnackBar,
       );
       return false;
     } finally {
@@ -850,40 +839,6 @@ class ChatSessionController extends ChangeNotifier {
     }
   }
 
-  ({String title, String message, String? runtimeErrorMessage})
-  _sendFailurePresentation(Object error) {
-    if (_unexpectedConversationThread(error) case (
-      expectedThreadId: final expectedThreadId,
-      actualThreadId: final actualThreadId,
-    )) {
-      final message =
-          'Pocket Relay expected remote conversation "$expectedThreadId", '
-          'but the remote session returned "$actualThreadId". Sending is '
-          'blocked to avoid attaching your draft to a different conversation.';
-      return (
-        title: 'Conversation changed',
-        message: message,
-        runtimeErrorMessage: message,
-      );
-    }
-
-    if (_isMissingConversationThreadError(error)) {
-      const message =
-          'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.';
-      return (
-        title: 'Conversation unavailable',
-        message: message,
-        runtimeErrorMessage: message,
-      );
-    }
-
-    return (
-      title: 'Send failed',
-      message: 'Could not send the prompt to the ${_sessionLabel()} session.',
-      runtimeErrorMessage: null,
-    );
-  }
-
   bool _isSshBootstrapFailureRuntimeEvent(CodexRuntimeEvent event) {
     return switch (event) {
       CodexRuntimeSshConnectFailedEvent() ||
@@ -925,56 +880,6 @@ class ChatSessionController extends ChangeNotifier {
     return _normalizedThreadId(appServerClient.threadId);
   }
 
-  ChatConversationRecoveryState? _preflightConversationRecoveryState() {
-    if (_activeConversationThreadId() != null ||
-        _resumeConversationThreadId() != null) {
-      return null;
-    }
-
-    final trackedThreadId = _trackedThreadReuseCandidate();
-    if (trackedThreadId == null || !_hasConversationHistory()) {
-      return null;
-    }
-
-    return ChatConversationRecoveryState(
-      reason: ChatConversationRecoveryReason.detachedTranscript,
-      alternateThreadId: _alternateRecoveryThreadId(
-        preferredThreadId: trackedThreadId,
-      ),
-    );
-  }
-
-  String? _alternateRecoveryThreadId({String? preferredThreadId}) {
-    final normalizedPreferred = _normalizedThreadId(preferredThreadId);
-    final currentRootThreadId = _normalizedThreadId(_sessionState.rootThreadId);
-    if (normalizedPreferred != null &&
-        normalizedPreferred != currentRootThreadId &&
-        _sessionState.timelineForThread(normalizedPreferred) != null) {
-      return normalizedPreferred;
-    }
-    return null;
-  }
-
-  bool _hasConversationHistory() {
-    return _sessionState.transcriptBlocks.any((block) {
-      return switch (block.kind) {
-        CodexUiBlockKind.userMessage ||
-        CodexUiBlockKind.assistantMessage ||
-        CodexUiBlockKind.reasoning ||
-        CodexUiBlockKind.plan ||
-        CodexUiBlockKind.proposedPlan ||
-        CodexUiBlockKind.workLogEntry ||
-        CodexUiBlockKind.workLogGroup ||
-        CodexUiBlockKind.changedFiles ||
-        CodexUiBlockKind.approvalRequest ||
-        CodexUiBlockKind.userInputRequest ||
-        CodexUiBlockKind.usage ||
-        CodexUiBlockKind.turnBoundary => true,
-        CodexUiBlockKind.status || CodexUiBlockKind.error => false,
-      };
-    });
-  }
-
   void _rememberContinuationThread(String? threadId) {
     _conversationSelection.rememberContinuationThread(
       threadId,
@@ -998,41 +903,6 @@ class ChatSessionController extends ChangeNotifier {
       return null;
     }
     return normalizedValue;
-  }
-
-  bool _isMissingConversationThreadError(Object error) {
-    final normalizedMessage = error.toString().toLowerCase();
-    if (!normalizedMessage.contains('thread')) {
-      return false;
-    }
-
-    return const <String>[
-      'thread not found',
-      'missing thread',
-      'no such thread',
-      'unknown thread',
-      'does not exist',
-    ].any(normalizedMessage.contains);
-  }
-
-  ({String expectedThreadId, String actualThreadId})?
-  _unexpectedConversationThread(Object error) {
-    if (error is! CodexAppServerException) {
-      return null;
-    }
-
-    final payload = _asObject(error.data);
-    final expectedThreadId = _normalizedThreadId(
-      _asString(payload?['expectedThreadId']),
-    );
-    final actualThreadId = _normalizedThreadId(
-      _asString(payload?['actualThreadId']),
-    );
-    if (expectedThreadId == null || actualThreadId == null) {
-      return null;
-    }
-
-    return (expectedThreadId: expectedThreadId, actualThreadId: actualThreadId);
   }
 
   String _sessionLabel() {
