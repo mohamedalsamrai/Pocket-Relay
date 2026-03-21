@@ -323,7 +323,7 @@ void main() {
   );
 
   testWidgets(
-    'long-pressing a saved user message can continue from that prompt after rollback',
+    'long-pressing a saved user message opens a context menu and can continue from that prompt after rollback',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient()
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
@@ -358,6 +358,11 @@ void main() {
           _rewoundConversationThread(threadId: 'thread_saved');
 
       await tester.longPress(find.text('Restore this'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy Prompt'), findsOneWidget);
+      expect(find.text('Continue From Here'), findsOneWidget);
+      await tester.tap(find.text('Continue From Here'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
@@ -397,102 +402,6 @@ void main() {
   );
 
   testWidgets(
-    'eligible saved prompts show a visible continue from here action',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient()
-        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
-          threadId: 'thread_saved',
-        );
-      final overlayDelegate = _FakeChatRootOverlayDelegate();
-      final laneBinding = ConnectionLaneBinding(
-        connectionId: 'conn_primary',
-        profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-        conversationStateStore: const DiscardingCodexConversationStateStore(),
-        appServerClient: appServerClient,
-        initialSavedProfile: _savedProfile(),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
-        ),
-      );
-      addTearDown(appServerClient.close);
-      addTearDown(laneBinding.dispose);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: overlayDelegate,
-          laneBinding: laneBinding,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.widgetWithText(TextButton, 'Continue From Here'),
-        findsNWidgets(2),
-      );
-    },
-  );
-
-  testWidgets(
-    'visible continue from here action rewinds from the selected prompt',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient()
-        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
-          threadId: 'thread_saved',
-        );
-      final overlayDelegate = _FakeChatRootOverlayDelegate();
-      final laneBinding = ConnectionLaneBinding(
-        connectionId: 'conn_primary',
-        profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
-        conversationStateStore: const DiscardingCodexConversationStateStore(),
-        appServerClient: appServerClient,
-        initialSavedProfile: _savedProfile(),
-        initialConversationState: const SavedConnectionConversationState(
-          selectedThreadId: 'thread_saved',
-        ),
-      );
-      addTearDown(appServerClient.close);
-      addTearDown(laneBinding.dispose);
-
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: overlayDelegate,
-          laneBinding: laneBinding,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      appServerClient.threadHistoriesById['thread_saved'] =
-          _rewoundConversationThread(threadId: 'thread_saved');
-
-      await tester.tap(
-        find.widgetWithText(TextButton, 'Continue From Here').first,
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-      await tester.pumpAndSettle();
-
-      expect(
-        appServerClient.rollbackThreadCalls,
-        <({String threadId, int numTurns})>[
-          (threadId: 'thread_saved', numTurns: 2),
-        ],
-      );
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('composer_input')))
-            .controller
-            ?.text,
-        'Restore this',
-      );
-      expect(find.text('Earlier answer only'), findsOneWidget);
-    },
-  );
-
-  testWidgets(
     'long-press rollback failure keeps the transcript intact and shows feedback',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient()
@@ -526,6 +435,11 @@ void main() {
       await tester.longPress(find.text('Restore this'));
       await tester.pumpAndSettle();
 
+      expect(find.text('Copy Prompt'), findsOneWidget);
+      expect(find.text('Continue From Here'), findsOneWidget);
+      await tester.tap(find.text('Continue From Here'));
+      await tester.pumpAndSettle();
+
       expect(find.byType(AlertDialog), findsOneWidget);
       await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
       await tester.pumpAndSettle();
@@ -556,7 +470,7 @@ void main() {
   );
 
   testWidgets(
-    'busy conversations do not show the visible continue from here action',
+    'busy conversations do not surface continue from here in the long-press menu',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient()
         ..threadHistoriesById['thread_saved'] = _savedConversationThread(
@@ -591,11 +505,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.widgetWithText(TextButton, 'Continue From Here'),
-        findsNothing,
-      );
       expect(find.text('Keep running'), findsOneWidget);
+
+      await tester.longPress(find.text('Restore this'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Copy Prompt'), findsOneWidget);
+      expect(
+        tester
+            .widget<ListTile>(
+              find.widgetWithText(ListTile, 'Continue From Here'),
+            )
+            .enabled,
+        isFalse,
+      );
     },
   );
 
@@ -645,7 +568,8 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Continue From Here'), findsAtLeastNWidgets(3));
+      expect(find.text('Copy Prompt'), findsOneWidget);
+      expect(find.text('Continue From Here'), findsOneWidget);
       await tester.tap(find.text('Continue From Here').last);
       await tester.pumpAndSettle();
 

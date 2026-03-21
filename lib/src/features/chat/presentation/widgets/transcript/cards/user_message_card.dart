@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pocket_relay/src/features/chat/models/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/presentation/widgets/transcript/support/conversation_card_palette.dart';
 
@@ -39,8 +40,8 @@ class UserMessageCard extends StatelessWidget {
         darkAlpha: isLocalEcho ? 0.20 : 0.28,
       ),
     );
-    final canShowContinueAction =
-        canContinueFromHere && onContinueFromHere != null;
+    final canContinueAction = canContinueFromHere && onContinueFromHere != null;
+    final hasContextActions = true;
 
     return Align(
       alignment: Alignment.centerRight,
@@ -51,10 +52,30 @@ class UserMessageCard extends StatelessWidget {
           child: InkWell(
             key: ValueKey<String>('user_message_card_${block.id}'),
             borderRadius: BorderRadius.circular(20),
-            onLongPress: canShowContinueAction
-                ? () => onContinueFromHere!(block.id)
+            onLongPress: hasContextActions
+                ? () {
+                    unawaited(
+                      _showTouchActionSheet(
+                        context,
+                        canContinueAction: canContinueAction,
+                      ).then((selection) async {
+                        if (!context.mounted || selection == null) {
+                          return;
+                        }
+
+                        switch (selection) {
+                          case _UserMessageCardAction.copyPrompt:
+                            await Clipboard.setData(
+                              ClipboardData(text: block.text),
+                            );
+                          case _UserMessageCardAction.continueFromHere:
+                            await onContinueFromHere?.call(block.id);
+                        }
+                      }),
+                    );
+                  }
                 : null,
-            onSecondaryTapDown: canShowContinueAction && showsDesktopContextMenu
+            onSecondaryTapDown: showsDesktopContextMenu
                 ? (details) {
                     unawaited(
                       _showDesktopContextMenu(context, details.globalPosition),
@@ -81,37 +102,6 @@ class UserMessageCard extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
-                    if (canShowContinueAction) ...[
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          key: ValueKey<String>(
-                            'continue_from_here_action_${block.id}',
-                          ),
-                          onPressed: () => onContinueFromHere!(block.id),
-                          icon: const Icon(Icons.history, size: 16),
-                          label: const Text('Continue From Here'),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            foregroundColor: cards.textPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            backgroundColor: cards.accentBorder(
-                              accent,
-                              lightAlpha: 0.12,
-                              darkAlpha: 0.20,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -126,8 +116,43 @@ class UserMessageCard extends StatelessWidget {
     BuildContext context,
     Offset globalPosition,
   ) async {
+    await _showContextActions(context, globalPosition: globalPosition);
+  }
+
+  Future<void> _showContextActions(
+    BuildContext context, {
+    required Offset globalPosition,
+  }) async {
+    final canContinueAction = canContinueFromHere && onContinueFromHere != null;
+    final selection = showsDesktopContextMenu
+        ? await _showDesktopMenu(
+            context,
+            globalPosition: globalPosition,
+            canContinueAction: canContinueAction,
+          )
+        : await _showTouchActionSheet(
+            context,
+            canContinueAction: canContinueAction,
+          );
+    if (!context.mounted || selection == null) {
+      return;
+    }
+
+    switch (selection) {
+      case _UserMessageCardAction.copyPrompt:
+        await Clipboard.setData(ClipboardData(text: block.text));
+      case _UserMessageCardAction.continueFromHere:
+        await onContinueFromHere?.call(block.id);
+    }
+  }
+
+  Future<_UserMessageCardAction?> _showDesktopMenu(
+    BuildContext context, {
+    required Offset globalPosition,
+    required bool canContinueAction,
+  }) async {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final selection = await showMenu<_UserMessageCardAction>(
+    return showMenu<_UserMessageCardAction>(
       context: context,
       position: RelativeRect.fromLTRB(
         globalPosition.dx,
@@ -135,19 +160,56 @@ class UserMessageCard extends StatelessWidget {
         overlay.size.width - globalPosition.dx,
         overlay.size.height - globalPosition.dy,
       ),
-      items: const [
+      items: [
+        const PopupMenuItem<_UserMessageCardAction>(
+          value: _UserMessageCardAction.copyPrompt,
+          child: Text('Copy Prompt'),
+        ),
         PopupMenuItem<_UserMessageCardAction>(
           value: _UserMessageCardAction.continueFromHere,
-          child: Text('Continue From Here'),
+          enabled: canContinueAction,
+          child: const Text('Continue From Here'),
         ),
       ],
     );
-    if (selection != _UserMessageCardAction.continueFromHere) {
-      return;
-    }
+  }
 
-    await onContinueFromHere?.call(block.id);
+  Future<_UserMessageCardAction?> _showTouchActionSheet(
+    BuildContext context, {
+    required bool canContinueAction,
+  }) {
+    return showModalBottomSheet<_UserMessageCardAction>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.copy_all_outlined),
+                title: const Text('Copy Prompt'),
+                onTap: () {
+                  Navigator.of(context).pop(_UserMessageCardAction.copyPrompt);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: const Text('Continue From Here'),
+                enabled: canContinueAction,
+                onTap: canContinueAction
+                    ? () {
+                        Navigator.of(
+                          context,
+                        ).pop(_UserMessageCardAction.continueFromHere);
+                      }
+                    : null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 
-enum _UserMessageCardAction { continueFromHere }
+enum _UserMessageCardAction { copyPrompt, continueFromHere }
