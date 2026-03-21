@@ -1258,6 +1258,42 @@ void main() {
     expect(find.text('/repo'), findsOneWidget);
   });
 
+  testWidgets(
+    'renders empty-stdin terminal interactions as a dedicated command wait row',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _entryCard(
+            block: CodexWorkLogGroupBlock(
+              id: 'worklog_command_wait',
+              createdAt: DateTime(2026, 3, 14, 12),
+              entries: <CodexWorkLogEntry>[
+                CodexWorkLogEntry(
+                  id: 'entry_command_wait',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entryKind: CodexWorkLogEntryKind.commandExecution,
+                  title: 'sleep 5',
+                  preview: 'still running',
+                  isRunning: true,
+                  snapshot: const <String, Object?>{
+                    'processId': 'proc_1',
+                    'stdin': '',
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('waiting'), findsOneWidget);
+      expect(find.text('Waiting for background terminal'), findsOneWidget);
+      expect(find.text('sleep 5'), findsOneWidget);
+      expect(find.text('still running'), findsOneWidget);
+      expect(find.text('Running command'), findsNothing);
+    },
+  );
+
   testWidgets('renders simple sed reads as structured read work-log rows', (
     tester,
   ) async {

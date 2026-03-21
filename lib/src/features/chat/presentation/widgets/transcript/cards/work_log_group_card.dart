@@ -190,6 +190,12 @@ class _WorkLogEntryRow extends StatelessWidget {
         accent: amberAccent(Theme.of(context).brightness),
         icon: Icons.source_outlined,
       ),
+      final ChatCommandWaitWorkLogEntryContract waitEntry =>
+        _CommandWaitWorkLogEntryRow(
+          entry: waitEntry,
+          accent: Theme.of(context).colorScheme.tertiary,
+          icon: Icons.hourglass_top_rounded,
+        ),
       final ChatCommandExecutionWorkLogEntryContract commandEntry =>
         _CommandExecutionWorkLogEntryRow(
           entry: commandEntry,
@@ -337,6 +343,45 @@ class _WebSearchWorkLogEntryRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CommandWaitWorkLogEntryRow extends StatelessWidget {
+  const _CommandWaitWorkLogEntryRow({
+    required this.entry,
+    required this.accent,
+    required this.icon,
+  });
+
+  final ChatCommandWaitWorkLogEntryContract entry;
+  final Color accent;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = ConversationCardPalette.of(context);
+
+    return _WorkLogRowShell(
+      icon: icon,
+      accent: accent,
+      label: entry.activityLabel,
+      title: entry.commandText,
+      statusBadge: TranscriptBadge(label: 'waiting', color: accent),
+      details: entry.outputPreview == null
+          ? const <Widget>[]
+          : <Widget>[
+              Text(
+                entry.outputPreview!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: cards.textSecondary,
+                  fontSize: 11.25,
+                  height: 1.25,
+                ),
+              ),
+            ],
     );
   }
 }

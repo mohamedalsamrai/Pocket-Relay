@@ -20,19 +20,28 @@ class ChatWorkLogItemProjector {
     final mcpToolCall = entry.entryKind == CodexWorkLogEntryKind.mcpToolCall
         ? _projectMcpToolCall(entry)
         : null;
-    final webSearch = mcpToolCall == null &&
+    final webSearch =
+        mcpToolCall == null &&
             entry.entryKind == CodexWorkLogEntryKind.webSearch
         ? _projectWebSearch(entry)
+        : null;
+    final commandWait =
+        mcpToolCall == null &&
+            webSearch == null &&
+            entry.entryKind == CodexWorkLogEntryKind.commandExecution
+        ? _projectCommandWait(entry, normalizedTitle: normalizedTitle)
         : null;
     final readCommand =
         mcpToolCall == null &&
             webSearch == null &&
+            commandWait == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseReadCommand(normalizedTitle)
         : null;
     final gitCommand =
         mcpToolCall == null &&
             webSearch == null &&
+            commandWait == null &&
             readCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
         ? _tryParseGitCommand(normalizedTitle)
@@ -40,6 +49,7 @@ class ChatWorkLogItemProjector {
     final searchCommand =
         mcpToolCall == null &&
             webSearch == null &&
+            commandWait == null &&
             readCommand == null &&
             gitCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
@@ -48,14 +58,12 @@ class ChatWorkLogItemProjector {
     final commandExecution =
         mcpToolCall == null &&
             webSearch == null &&
+            commandWait == null &&
             readCommand == null &&
             gitCommand == null &&
             searchCommand == null &&
             entry.entryKind == CodexWorkLogEntryKind.commandExecution
-        ? _projectCommandExecution(
-            entry,
-            normalizedTitle: normalizedTitle,
-          )
+        ? _projectCommandExecution(entry, normalizedTitle: normalizedTitle)
         : null;
 
     if (mcpToolCall != null) {
@@ -63,6 +71,9 @@ class ChatWorkLogItemProjector {
     }
     if (webSearch != null) {
       return webSearch;
+    }
+    if (commandWait != null) {
+      return commandWait;
     }
     if (readCommand != null) {
       return _projectReadCommand(
@@ -100,11 +111,38 @@ class ChatWorkLogItemProjector {
     );
   }
 
+  ChatCommandWaitWorkLogEntryContract? _projectCommandWait(
+    CodexWorkLogEntry entry, {
+    required String normalizedTitle,
+  }) {
+    if (!_isBackgroundTerminalWait(
+      entry.snapshot,
+      isRunning: entry.isRunning,
+    )) {
+      return null;
+    }
+
+    final snapshot = entry.snapshot;
+    return ChatCommandWaitWorkLogEntryContract(
+      id: entry.id,
+      commandText: normalizedTitle,
+      outputPreview: _normalizedWorkLogPreview(entry.preview, normalizedTitle),
+      processId: _firstNonEmptyString(<Object?>[
+        snapshot?['processId'],
+        snapshot?['process_id'],
+      ]),
+      turnId: entry.turnId,
+      isRunning: entry.isRunning,
+      exitCode: entry.exitCode,
+    );
+  }
+
   ChatCommandExecutionWorkLogEntryContract? _projectCommandExecution(
     CodexWorkLogEntry entry, {
     required String normalizedTitle,
   }) {
-    if (!_looksLikeCommandExecution(normalizedTitle)) {
+    if (!_looksLikeCommandExecution(normalizedTitle) &&
+        !_hasBackgroundTerminalMetadata(entry.snapshot)) {
       return null;
     }
 
@@ -174,7 +212,9 @@ class ChatWorkLogItemProjector {
     );
   }
 
-  ChatWebSearchWorkLogEntryContract? _projectWebSearch(CodexWorkLogEntry entry) {
+  ChatWebSearchWorkLogEntryContract? _projectWebSearch(
+    CodexWorkLogEntry entry,
+  ) {
     final snapshot = entry.snapshot;
     final queries = _webSearchQueries(snapshot);
     final queryText = _firstNonEmptyString(<Object?>[
@@ -1729,6 +1769,38 @@ String? _normalizedWorkLogPreview(String? preview, String normalizedTitle) {
   return value;
 }
 
+bool _isBackgroundTerminalWait(
+  Map<String, dynamic>? snapshot, {
+  required bool isRunning,
+}) {
+  if (!isRunning || snapshot == null) {
+    return false;
+  }
+
+  final stdin = snapshot['stdin'];
+  if (stdin is! String || stdin.isNotEmpty) {
+    return false;
+  }
+
+  return _firstNonEmptyString(<Object?>[
+        snapshot['processId'],
+        snapshot['process_id'],
+      ]) !=
+      null;
+}
+
+bool _hasBackgroundTerminalMetadata(Map<String, dynamic>? snapshot) {
+  if (snapshot == null) {
+    return false;
+  }
+
+  return _firstNonEmptyString(<Object?>[
+        snapshot['processId'],
+        snapshot['process_id'],
+      ]) !=
+      null;
+}
+
 bool _looksLikeCommandExecution(String value) {
   final trimmed = value.trim();
   if (trimmed.isEmpty) {
@@ -1758,15 +1830,17 @@ bool _looksLikeCommandExecution(String value) {
     return true;
   }
 
-  return tokens.skip(1).any(
-    (token) =>
-        token.startsWith('-') ||
-        token.contains('/') ||
-        token.contains('\\') ||
-        token.contains('.') ||
-        token.contains('=') ||
-        token.contains(':'),
-  );
+  return tokens
+      .skip(1)
+      .any(
+        (token) =>
+            token.startsWith('-') ||
+            token.contains('/') ||
+            token.contains('\\') ||
+            token.contains('.') ||
+            token.contains('=') ||
+            token.contains(':'),
+      );
 }
 
 const Set<String> _structuredCommandNames = <String>{

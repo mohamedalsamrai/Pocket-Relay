@@ -930,6 +930,72 @@ void main() {
         expect(entry.activityLabel, 'Running command');
       },
     );
+    test(
+      'projects empty-stdin terminal interactions into command wait entries',
+      () {
+        final groupBlock = CodexWorkLogGroupBlock(
+          id: 'worklog_command_wait',
+          createdAt: DateTime(2026, 3, 15, 12),
+          entries: <CodexWorkLogEntry>[
+            CodexWorkLogEntry(
+              id: 'entry_command_wait',
+              createdAt: DateTime(2026, 3, 15, 12),
+              entryKind: CodexWorkLogEntryKind.commandExecution,
+              title: 'sleep 5',
+              preview: 'still running',
+              isRunning: true,
+              snapshot: const <String, Object?>{
+                'processId': 'proc_1',
+                'stdin': '',
+              },
+            ),
+          ],
+        );
+
+        final item =
+            projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+        final entry =
+            item.entries.single as ChatCommandWaitWorkLogEntryContract;
+
+        expect(entry.commandText, 'sleep 5');
+        expect(entry.outputPreview, 'still running');
+        expect(entry.processId, 'proc_1');
+        expect(entry.activityLabel, 'Waiting for background terminal');
+      },
+    );
+
+    test(
+      'keeps resumed background-terminal commands in the command execution family',
+      () {
+        final groupBlock = CodexWorkLogGroupBlock(
+          id: 'worklog_command_wait_resumed',
+          createdAt: DateTime(2026, 3, 15, 12),
+          entries: <CodexWorkLogEntry>[
+            CodexWorkLogEntry(
+              id: 'entry_command_wait_resumed',
+              createdAt: DateTime(2026, 3, 15, 12),
+              entryKind: CodexWorkLogEntryKind.commandExecution,
+              title: 'sleep 5',
+              preview: 'ready',
+              isRunning: true,
+              snapshot: const <String, Object?>{
+                'command': 'sleep 5',
+                'processId': 'proc_1',
+              },
+            ),
+          ],
+        );
+
+        final item =
+            projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+        final entry =
+            item.entries.single as ChatCommandExecutionWorkLogEntryContract;
+
+        expect(entry.commandText, 'sleep 5');
+        expect(entry.outputPreview, 'ready');
+        expect(entry.activityLabel, 'Running command');
+      },
+    );
 
     test('projects sed -ne read commands into read work-log entries', () {
       final groupBlock = CodexWorkLogGroupBlock(
