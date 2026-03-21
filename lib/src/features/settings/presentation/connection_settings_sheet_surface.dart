@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_host.dart';
 
@@ -17,119 +18,16 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final contract = viewModel.contract;
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildDragHandle(context),
-        const SizedBox(height: 18),
-        Text(contract.title, style: _titleStyle(context)),
-        const SizedBox(height: 8),
-        Text(contract.description, style: _descriptionStyle(context)),
-        const SizedBox(height: 20),
-        _buildSection(
-          context,
-          title: contract.profileSection.title,
-          child: _buildFieldColumn(context, contract.profileSection.fields),
-        ),
-        if (contract.connectionModeSection case final modeSection?) ...[
-          const SizedBox(height: 14),
-          _buildSection(
-            context,
-            title: modeSection.title,
-            child: _buildConnectionModePicker(context, modeSection),
-          ),
-        ],
-        if (contract.remoteConnectionSection case final remoteSection?) ...[
-          const SizedBox(height: 14),
-          _buildSection(
-            context,
-            title: remoteSection.title,
-            child: _buildRemoteConnectionFields(context, remoteSection.fields),
-          ),
-        ],
-        const SizedBox(height: 14),
-        _buildSection(
-          context,
-          title: contract.codexSection.title,
-          child: _buildFieldColumn(context, contract.codexSection.fields),
-        ),
-        const SizedBox(height: 14),
-        _buildSection(
-          context,
-          title: contract.modelSection.title,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFieldColumn(context, contract.modelSection.fields),
-              const SizedBox(height: 14),
-              _buildReasoningEffortPicker(context, contract.modelSection),
-            ],
-          ),
-        ),
-        if (contract.authenticationSection case final authSection?) ...[
-          const SizedBox(height: 14),
-          _buildSection(
-            context,
-            title: authSection.title,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAuthModePicker(context, authSection),
-                const SizedBox(height: 14),
-                _buildFieldColumn(context, authSection.fields),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 14),
-        _buildSection(
-          context,
-          title: contract.runModeSection.title,
-          child: Column(
-            children: contract.runModeSection.toggles
-                .map((toggle) => _buildToggle(context, toggle))
-                .toList(growable: false),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _buildFooter(context, contract),
-      ],
-    );
-
-    return _buildMaterialSurface(context, content);
+    return _buildMaterialSurface(context, contract);
   }
 
-  Widget _buildMaterialSurface(BuildContext context, Widget content) {
-    final palette = context.pocketPalette;
-
-    return Material(
-      color: palette.sheetBackground,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(child: content),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDragHandle(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 48,
-        height: 5,
-        decoration: BoxDecoration(
-          color: context.pocketPalette.dragHandle,
-          borderRadius: BorderRadius.circular(999),
-        ),
-      ),
+  Widget _buildMaterialSurface(
+    BuildContext context,
+    ConnectionSettingsContract contract,
+  ) {
+    return ModalSheetScaffold(
+      header: _buildStickyHeader(context, contract),
+      body: _buildScrollableContent(context, contract),
     );
   }
 
@@ -318,23 +216,112 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter(
+  Widget _buildStickyHeader(
     BuildContext context,
     ConnectionSettingsContract contract,
   ) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: actions.onCancel,
-            child: const Text('Cancel'),
+        const ModalSheetDragHandle(),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                key: const ValueKey<String>('connection_settings_cancel_top'),
+                onPressed: actions.onCancel,
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                key: const ValueKey<String>('connection_settings_save_top'),
+                onPressed: actions.onSave,
+                child: Text(contract.saveAction.label),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(contract.title, style: _titleStyle(context)),
+        const SizedBox(height: 8),
+        Text(contract.description, style: _descriptionStyle(context)),
+      ],
+    );
+  }
+
+  Widget _buildScrollableContent(
+    BuildContext context,
+    ConnectionSettingsContract contract,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSection(
+          context,
+          title: contract.profileSection.title,
+          child: _buildFieldColumn(context, contract.profileSection.fields),
+        ),
+        if (contract.connectionModeSection case final modeSection?) ...[
+          const SizedBox(height: 14),
+          _buildSection(
+            context,
+            title: modeSection.title,
+            child: _buildConnectionModePicker(context, modeSection),
+          ),
+        ],
+        if (contract.remoteConnectionSection case final remoteSection?) ...[
+          const SizedBox(height: 14),
+          _buildSection(
+            context,
+            title: remoteSection.title,
+            child: _buildRemoteConnectionFields(context, remoteSection.fields),
+          ),
+        ],
+        const SizedBox(height: 14),
+        _buildSection(
+          context,
+          title: contract.codexSection.title,
+          child: _buildFieldColumn(context, contract.codexSection.fields),
+        ),
+        const SizedBox(height: 14),
+        _buildSection(
+          context,
+          title: contract.modelSection.title,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFieldColumn(context, contract.modelSection.fields),
+              const SizedBox(height: 14),
+              _buildReasoningEffortPicker(context, contract.modelSection),
+            ],
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: FilledButton(
-            onPressed: actions.onSave,
-            child: Text(contract.saveAction.label),
+        if (contract.authenticationSection case final authSection?) ...[
+          const SizedBox(height: 14),
+          _buildSection(
+            context,
+            title: authSection.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildAuthModePicker(context, authSection),
+                const SizedBox(height: 14),
+                _buildFieldColumn(context, authSection.fields),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        _buildSection(
+          context,
+          title: contract.runModeSection.title,
+          child: Column(
+            children: contract.runModeSection.toggles
+                .map((toggle) => _buildToggle(context, toggle))
+                .toList(growable: false),
           ),
         ),
       ],

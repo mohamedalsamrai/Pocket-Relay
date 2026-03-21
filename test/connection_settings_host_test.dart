@@ -17,11 +17,48 @@ void main() {
       expect(find.text('Bad port'), findsNothing);
 
       await tester.enterText(_materialTextField('Port'), '70000');
-      await tester.ensureVisible(find.text('Save'));
-      await tester.tap(find.text('Save'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Bad port'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'material settings renderer keeps cancel and save pinned at the top',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(_buildMaterialSettingsApp(onSubmit: (_) {}));
+
+      expect(
+        find.byKey(const ValueKey<String>('connection_settings_cancel_top')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+        findsOneWidget,
+      );
+      expect(find.text('Danger zone'), findsNothing);
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -500),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('connection_settings_cancel_top')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -104,8 +141,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('High').last);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save'));
-      await tester.tap(find.text('Save'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+      );
       await tester.pumpAndSettle();
 
       expect(materialPayload, isNotNull);
