@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_thread_read_decoder.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_thread_read_decoder.dart';
 
 void main() {
   const decoder = CodexAppServerThreadReadDecoder();

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_thread_read_fixture_sanitizer.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_json_rpc_codec.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_thread_read_fixture_sanitizer.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_json_rpc_codec.dart';
 
 Future<void> main(List<String> args) async {
   final options = _parseArgs(args);

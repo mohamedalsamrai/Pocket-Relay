@@ -9,7 +9,7 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_conversation_state_store.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_overlay_delegate.dart';
@@ -20,7 +20,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/empty_s
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
 
-import 'support/fake_codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 
 void main() {
   testWidgets('forwards connection settings requests through the callback', (

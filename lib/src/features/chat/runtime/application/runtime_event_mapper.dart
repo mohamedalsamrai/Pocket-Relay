@@ -1,7 +1,7 @@
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/runtime/application/codex_runtime_payload_support.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_json_rpc_codec.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_json_rpc_codec.dart';
 
 part 'runtime_event_mapper_transport_mapper.dart';
 part 'runtime_event_mapper_notification_mapper.dart';

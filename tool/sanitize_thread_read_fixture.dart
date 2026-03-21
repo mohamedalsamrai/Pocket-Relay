@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_thread_read_fixture_sanitizer.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_thread_read_fixture_sanitizer.dart';
 
 Future<void> main(List<String> args) async {
   final parsed = _parseArgs(args);

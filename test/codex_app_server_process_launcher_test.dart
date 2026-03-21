@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_process_launcher.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_process_launcher.dart';
 
 void main() {
   test('delegates remote mode to the remote launcher', () async {

@@ -6,7 +6,7 @@ import 'package:pocket_relay/src/core/storage/codex_connection_conversation_stat
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/settings/presentation/connection_settings_contract.dart';
@@ -17,7 +17,7 @@ import 'package:pocket_relay/src/features/workspace/models/codex_workspace_conve
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_desktop_shell.dart';
 
-import 'support/fake_codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 import 'support/fake_connection_settings_overlay_delegate.dart';
 
 void main() {

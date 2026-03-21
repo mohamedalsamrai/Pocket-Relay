@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/infrastructure/app_server/codex_app_server_ssh_process.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_ssh_process.dart';
 
 void main() {
   test('builds a remote command for a plain codex binary', () {

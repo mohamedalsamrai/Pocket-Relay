@@ -16,7 +16,7 @@ import 'package:pocket_relay/src/features/workspace/presentation/widgets/connect
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/connection_workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_workspace_controller.dart';
 
-import 'support/fake_codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 
 void main() {
   testWidgets(
