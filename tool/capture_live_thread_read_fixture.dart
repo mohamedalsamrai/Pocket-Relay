@@ -18,6 +18,13 @@ final class CodexLaunchInvocation {
   final List<String> arguments;
 }
 
+typedef CodexProcessStarter =
+    Future<Process> Function(
+      String executable,
+      List<String> arguments, {
+      String? workingDirectory,
+    });
+
 Future<void> main(List<String> args) async {
   final options = _parseArgs(args);
   if (options == null) {
@@ -70,14 +77,8 @@ Future<void> main(List<String> args) async {
     final invocation = buildCodexLaunchInvocation(codexPath);
     stderr.writeln('Launching app-server from $workingDirectory...');
 
-    final process = await Process.start(
-      invocation.executable,
-      <String>[
-        ...invocation.arguments,
-        'app-server',
-        '--listen',
-        'stdio://',
-      ],
+    final process = await startCodexLaunchInvocation(
+      invocation: invocation,
       workingDirectory: workingDirectory,
     );
 
@@ -171,6 +172,18 @@ CodexLaunchInvocation buildCodexLaunchInvocation(
   return CodexLaunchInvocation(
     executable: invocation.executable,
     arguments: invocation.arguments,
+  );
+}
+
+Future<Process> startCodexLaunchInvocation({
+  required CodexLaunchInvocation invocation,
+  required String workingDirectory,
+  CodexProcessStarter processStarter = Process.start,
+}) {
+  return processStarter(
+    invocation.executable,
+    invocation.arguments,
+    workingDirectory: workingDirectory,
   );
 }
 
