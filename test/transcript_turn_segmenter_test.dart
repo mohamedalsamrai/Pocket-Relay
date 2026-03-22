@@ -114,4 +114,65 @@ $largeDiff
       lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffChars),
     );
   });
+
+  test('bounds total retained changed-file entry diffs across many entries', () {
+    CodexActiveTurnState turn = initialTurn();
+    final entryCount = 6;
+    final perEntryLines = 260;
+
+    for (var index = 0; index < entryCount; index += 1) {
+      final diffLines = List<String>.generate(
+        perEntryLines,
+        (lineIndex) => '+entry $index line $lineIndex ${'x' * 80}',
+      ).join('\n');
+      turn = builder.upsertItem(
+        turn,
+        changedFilesItem(
+          itemId: 'item-$index',
+          entryId: 'entry-$index',
+          body: '''
+--- a/lib/file_$index.dart
++++ b/lib/file_$index.dart
+@@ -0,0 +1,$perEntryLines @@
+$diffLines
+''',
+        ),
+      );
+    }
+
+    final artifact = turn.artifacts.single as CodexTurnChangedFilesArtifact;
+    final retainedEntryDiffs = artifact.entries
+        .map((entry) => entry.unifiedDiff)
+        .whereType<String>()
+        .toList(growable: false);
+    final totalRetainedEntryChars = retainedEntryDiffs.fold<int>(
+      0,
+      (total, diff) => total + diff.length,
+    );
+    final totalRetainedEntryLines = retainedEntryDiffs.fold<int>(
+      0,
+      (total, diff) => total + '\n'.allMatches(diff).length + 1,
+    );
+
+    expect(artifact.entries, hasLength(entryCount));
+    expect(retainedEntryDiffs, isNotEmpty);
+    expect(
+      totalRetainedEntryChars,
+      lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffChars),
+    );
+    expect(
+      totalRetainedEntryLines,
+      lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffLines),
+    );
+    expect(artifact.entries.first.unifiedDiff, isNull);
+    expect(artifact.entries.last.unifiedDiff, isNotNull);
+    expect(
+      artifact.unifiedDiff!.length,
+      lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffChars),
+    );
+    expect(
+      '\n'.allMatches(artifact.unifiedDiff!).length + 1,
+      lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffLines),
+    );
+  });
 }
