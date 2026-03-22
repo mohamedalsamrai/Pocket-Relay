@@ -7,6 +7,9 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'codex_app_server_models.dart';
 import 'codex_json_rpc_codec.dart';
 
+part 'codex_app_server_connection_lifecycle.dart';
+part 'codex_app_server_connection_messages.dart';
+
 class CodexAppServerConnection {
   CodexAppServerConnection({
     required CodexAppServerProcessLauncher processLauncher,
@@ -48,92 +51,15 @@ class CodexAppServerConnection {
   Future<void> connect({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
-  }) async {
-    _ensureNotDisposed();
-    if (isConnected) {
-      await disconnect();
-    }
-
-    _disconnecting = false;
-
-    try {
-      final process = await _processLauncher(
-        profile: profile,
-        secrets: secrets,
-        emitEvent: _emitEvent,
-      );
-
-      _process = process;
-      _profile = profile;
-      _stdoutClosedCompleter = Completer<void>();
-      _stderrClosedCompleter = Completer<void>();
-      _stdoutSubscription = _decodeLines(process.stdout).listen(
-        _handleStdoutLine,
-        onError: (Object error, StackTrace stackTrace) {
-          _emitEvent(
-            CodexAppServerDiagnosticEvent(
-              message: 'Failed to decode app-server stdout: $error',
-              isError: true,
-            ),
-          );
-        },
-        onDone: () {
-          _stdoutClosedCompleter?.complete();
-          _handleProcessClosed();
-        },
-      );
-      _stderrSubscription = _decodeLines(process.stderr).listen(
-        (line) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty) {
-            return;
-          }
-
-          _emitEvent(
-            CodexAppServerDiagnosticEvent(message: trimmed, isError: true),
-          );
-        },
-        onDone: () {
-          _stderrClosedCompleter?.complete();
-        },
-      );
-
-      process.done.then((_) {
-        if (!_disconnecting) {
-          _handleProcessClosed();
-        }
-      });
-
-      final initializeResponse = await sendRequest(
-        'initialize',
-        <String, Object?>{
-          'clientInfo': <String, String>{
-            'name': clientName,
-            'title': 'Pocket Relay',
-            'version': clientVersion,
-          },
-          'capabilities': const <String, bool>{'experimentalApi': true},
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      writeMessage(const CodexJsonRpcNotification(method: 'initialized'));
-      final payload = _asObject(initializeResponse);
-      _emitEvent(
-        CodexAppServerConnectedEvent(
-          userAgent: _asString(payload?['userAgent']),
-        ),
-      );
-    } catch (error) {
-      await _disconnect(emitDisconnectedEvent: false);
-      rethrow;
-    }
+  }) {
+    return _connectImpl(this, profile: profile, secrets: secrets);
   }
 
-  Future<void> disconnect() async {
+  Future<void> disconnect() {
     if (_isDisposed) {
-      return;
+      return Future<void>.value();
     }
-    await _disconnect(emitDisconnectedEvent: true);
+    return _disconnect(emitDisconnectedEvent: true);
   }
 
   Future<void> dispose() async {
@@ -247,137 +173,20 @@ class CodexAppServerConnection {
     _activeTurnId = turnId;
   }
 
-  Future<void> _disconnect({required bool emitDisconnectedEvent}) async {
-    _disconnecting = true;
-
-    final process = _process;
-    _process = null;
-    _profile = null;
-    _threadId = null;
-    _activeTurnId = null;
-
-    if (process != null) {
-      final exitCode = process.exitCode;
-      await process.close();
-      await _drainOutputStreams();
-      await _stdoutSubscription?.cancel();
-      await _stderrSubscription?.cancel();
-      _stdoutSubscription = null;
-      _stderrSubscription = null;
-      _stdoutClosedCompleter = null;
-      _stderrClosedCompleter = null;
-      _requestTracker.failPending(
-        const CodexAppServerException('App-server session disconnected.'),
-      );
-      _inboundRequestStore.clear();
-      if (emitDisconnectedEvent) {
-        _emitEvent(CodexAppServerDisconnectedEvent(exitCode: exitCode));
-      }
-      return;
-    }
-
-    await _stdoutSubscription?.cancel();
-    await _stderrSubscription?.cancel();
-    _stdoutSubscription = null;
-    _stderrSubscription = null;
-    _stdoutClosedCompleter = null;
-    _stderrClosedCompleter = null;
-    _requestTracker.failPending(
-      const CodexAppServerException('App-server session disconnected.'),
-    );
-    _inboundRequestStore.clear();
+  Future<void> _disconnect({required bool emitDisconnectedEvent}) {
+    return _disconnectImpl(this, emitDisconnectedEvent: emitDisconnectedEvent);
   }
 
   void _handleStdoutLine(String line) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) {
-      return;
-    }
-
-    switch (_jsonRpcCodec.decodeLine(trimmed)) {
-      case CodexJsonRpcMalformedMessage(:final problem):
-        _emitEvent(
-          CodexAppServerDiagnosticEvent(
-            message: 'Malformed app-server message: $problem',
-            isError: true,
-          ),
-        );
-      case CodexJsonRpcDecodedMessage(:final message):
-        switch (message) {
-          case CodexJsonRpcRequest():
-            _inboundRequestStore.remember(message);
-            _emitEvent(
-              CodexAppServerRequestEvent(
-                requestId: message.id.token,
-                method: message.method,
-                params: message.params,
-              ),
-            );
-          case CodexJsonRpcNotification():
-            _updateRuntimePointers(message.method, message.params);
-            _emitEvent(
-              CodexAppServerNotificationEvent(
-                method: message.method,
-                params: message.params,
-              ),
-            );
-          case CodexJsonRpcResponse():
-            if (_requestTracker.completeResponse(message)) {
-              return;
-            }
-
-            _emitEvent(
-              CodexAppServerDiagnosticEvent(
-                message:
-                    'Received response for unknown request ${message.id.displayValue}.',
-                isError: false,
-              ),
-            );
-        }
-    }
+    _handleStdoutLineImpl(this, line);
   }
 
   void _updateRuntimePointers(String method, Object? params) {
-    final payload = _asObject(params);
-    switch (method) {
-      case 'session/exited':
-      case 'session/closed':
-        _threadId = null;
-        _activeTurnId = null;
-        break;
-      case 'thread/started':
-        final thread = _asObject(payload?['thread']);
-        _threadId = _asString(thread?['id']) ?? _asString(payload?['threadId']);
-        _activeTurnId = null;
-        break;
-      case 'thread/closed':
-        final threadId = _asString(payload?['threadId']);
-        if (threadId == null || threadId == _threadId) {
-          _threadId = null;
-          _activeTurnId = null;
-        }
-        break;
-      case 'turn/started':
-        _threadId = _asString(payload?['threadId']) ?? _threadId;
-        final turn = _asObject(payload?['turn']);
-        _activeTurnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
-        break;
-      case 'turn/completed':
-      case 'turn/aborted':
-        final turn = _asObject(payload?['turn']);
-        final turnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
-        if (turnId == null || turnId == _activeTurnId) {
-          _activeTurnId = null;
-        }
-        break;
-    }
+    _updateRuntimePointersImpl(this, method, params);
   }
 
   void _handleProcessClosed() {
-    if (_process == null) {
-      return;
-    }
-    unawaited(_disconnect(emitDisconnectedEvent: true));
+    _handleProcessClosedImpl(this);
   }
 
   void writeMessage(CodexJsonRpcMessage message) {
