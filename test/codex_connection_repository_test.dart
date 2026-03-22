@@ -177,6 +177,122 @@ void main() {
   );
 
   test(
+    'loadCatalog upgrades a seeded default catalog entry with legacy singleton data',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+        hostFingerprint: 'SHA256:legacyfingerprint',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+        'pocket_relay.connections.index': jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_seed'],
+        }),
+        'pocket_relay.connection.conn_seed.profile': jsonEncode(
+          ConnectionProfile.defaults().toJson(),
+        ),
+      });
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.secret.password': 'secret',
+      });
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: legacyProfile,
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      expect(
+        await preferences.getString(
+          'pocket_relay.connection.conn_seed.profile',
+        ),
+        jsonEncode(legacyProfile.toJson()),
+      );
+      expect(
+        secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
+        'secret',
+      );
+    },
+  );
+
+  test(
+    'loadCatalog ignores orphaned legacy secrets when the legacy profile is missing',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.secret.password': 'secret',
+      });
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(
+        secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
+        isNull,
+      );
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+    },
+  );
+
+  test(
+    'loadCatalog falls back to the default profile when legacy singleton json is corrupt',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': '{not json',
+      });
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.secret.password': 'secret',
+      });
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+    },
+  );
+
+  test(
     'loadConnection preserves user-entered workspace directories even when they match an old placeholder path',
     () async {
       final preferences = SharedPreferencesAsync();

@@ -6,34 +6,36 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
   await repository._catalogRecovery.ensurePreferencesReady();
 
   final seededCatalog = await repository._catalogRecovery.loadCatalog();
+  final legacyConnection = await _loadLegacySingletonConnection(repository);
   if (seededCatalog case final existingCatalog? when existingCatalog.isNotEmpty) {
+    final migratedCatalog =
+        await _migrateLegacySingletonIntoSeededCatalogIfNeeded(
+          repository,
+          catalog: existingCatalog,
+          legacyConnection: legacyConnection,
+        );
+    if (migratedCatalog != null) {
+      return migratedCatalog;
+    }
     return existingCatalog;
   }
 
   if (seededCatalog case final existingCatalog?) {
+    if (legacyConnection != null) {
+      return _seedCatalogWithConnection(repository, legacyConnection);
+    }
     return existingCatalog;
   }
 
-  final seededConnection =
-      await _loadLegacySingletonConnection(repository) ??
-      SavedConnection(
-        id: repository._connectionIdGenerator(),
-        profile: ConnectionProfile.defaults(),
-        secrets: const ConnectionSecrets(),
-      );
-  final nextCatalog = ConnectionCatalogState(
-    orderedConnectionIds: <String>[seededConnection.id],
-    connectionsById: <String, SavedConnectionSummary>{
-      seededConnection.id: seededConnection.toSummary(),
-    },
+  return _seedCatalogWithConnection(
+    repository,
+    legacyConnection ??
+        SavedConnection(
+          id: repository._connectionIdGenerator(),
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
+        ),
   );
-
-  await _persistConnectionProfile(repository, seededConnection);
-  await _persistConnectionSecrets(repository, seededConnection);
-  await repository._catalogRecovery.persistCatalogIndex(
-    nextCatalog.orderedConnectionIds,
-  );
-  return nextCatalog;
 }
 
 Future<SavedConnection> _secureLoadConnection(
@@ -203,6 +205,10 @@ Future<SavedConnection?> _loadLegacySingletonConnection(
   final rawProfile = await repository._preferences.getString(
     SecureCodexConnectionRepository._legacySingletonProfileKey,
   );
+  if (rawProfile == null) {
+    return null;
+  }
+
   final password = await _readSecret(
     repository,
     SecureCodexConnectionRepository._legacySingletonPasswordKey,
@@ -216,18 +222,7 @@ Future<SavedConnection?> _loadLegacySingletonConnection(
     SecureCodexConnectionRepository._legacySingletonPrivateKeyPassphraseKey,
   );
 
-  if (rawProfile == null &&
-      password.isEmpty &&
-      privateKeyPem.isEmpty &&
-      privateKeyPassphrase.isEmpty) {
-    return null;
-  }
-
-  final profile = rawProfile == null
-      ? ConnectionProfile.defaults()
-      : ConnectionProfile.fromJson(
-          jsonDecode(rawProfile) as Map<String, dynamic>,
-        );
+  final profile = _decodeLegacySingletonProfile(rawProfile);
 
   return SavedConnection(
     id: repository._connectionIdGenerator(),
@@ -238,6 +233,78 @@ Future<SavedConnection?> _loadLegacySingletonConnection(
       privateKeyPassphrase: privateKeyPassphrase,
     ),
   );
+}
+
+Future<ConnectionCatalogState> _seedCatalogWithConnection(
+  SecureCodexConnectionRepository repository,
+  SavedConnection connection,
+) async {
+  final nextCatalog = ConnectionCatalogState(
+    orderedConnectionIds: <String>[connection.id],
+    connectionsById: <String, SavedConnectionSummary>{
+      connection.id: connection.toSummary(),
+    },
+  );
+
+  await _persistConnectionProfile(repository, connection);
+  await _persistConnectionSecrets(repository, connection);
+  await repository._catalogRecovery.persistCatalogIndex(
+    nextCatalog.orderedConnectionIds,
+  );
+  return nextCatalog;
+}
+
+Future<ConnectionCatalogState?> _migrateLegacySingletonIntoSeededCatalogIfNeeded(
+  SecureCodexConnectionRepository repository, {
+  required ConnectionCatalogState catalog,
+  required SavedConnection? legacyConnection,
+}) async {
+  if (legacyConnection == null || !_looksLikeSeededDefaultCatalog(catalog)) {
+    return null;
+  }
+
+  final seededConnectionId = catalog.orderedConnectionIds.single;
+  final seededSummary = catalog.connectionForId(seededConnectionId);
+  if (seededSummary == null ||
+      seededSummary.profile != ConnectionProfile.defaults()) {
+    return null;
+  }
+
+  final seededSecrets = await _readSecrets(repository, seededConnectionId);
+  if (seededSecrets != const ConnectionSecrets()) {
+    return null;
+  }
+
+  final migratedConnection = legacyConnection.copyWith(id: seededConnectionId);
+  await _persistConnectionProfile(repository, migratedConnection);
+  await _persistConnectionSecrets(repository, migratedConnection);
+  return ConnectionCatalogState(
+    orderedConnectionIds: catalog.orderedConnectionIds,
+    connectionsById: <String, SavedConnectionSummary>{
+      ...catalog.connectionsById,
+      seededConnectionId: migratedConnection.toSummary(),
+    },
+  );
+}
+
+bool _looksLikeSeededDefaultCatalog(ConnectionCatalogState catalog) {
+  if (catalog.orderedConnectionIds.length != 1) {
+    return false;
+  }
+
+  final seededConnectionId = catalog.orderedConnectionIds.single;
+  final seededSummary = catalog.connectionForId(seededConnectionId);
+  return seededSummary?.profile == ConnectionProfile.defaults();
+}
+
+ConnectionProfile _decodeLegacySingletonProfile(String rawProfile) {
+  try {
+    return ConnectionProfile.fromJson(
+      jsonDecode(rawProfile) as Map<String, dynamic>,
+    );
+  } catch (_) {
+    return ConnectionProfile.defaults();
+  }
 }
 
 Future<void> _deleteConnectionPreferences(
