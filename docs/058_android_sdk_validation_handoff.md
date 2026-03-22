@@ -34,14 +34,20 @@ Key facts:
 
 - Android now declares `FOREGROUND_SERVICE` and
   `FOREGROUND_SERVICE_DATA_SYNC`.
+- Android also declares `POST_NOTIFICATIONS` and requests it at runtime on
+  Android 13+ before enabling the foreground service.
 - The app declares a native service:
   `me.vinch.pocketrelay.ActiveTurnForegroundService`.
 - Flutter calls the method channel
   `me.vinch.pocketrelay/background_execution`.
-- Android handles `setActiveTurnForegroundServiceEnabled`.
+- Android handles `setActiveTurnForegroundServiceEnabled`,
+  `notificationsPermissionGranted`, and `requestNotificationPermission`.
 - The service is only supposed to run while at least one live lane has a
   ticking turn.
 - The service posts an ongoing low-importance notification.
+- Android now exposes a real `app` flavor for the production app entrypoint
+  `lib/main.dart`.
+- Widgetbook remains a separate Android flavor at `lib/widgetbook/main.dart`.
 
 Current commits that introduced this path:
 
@@ -76,13 +82,13 @@ flutter test test/workspace_turn_background_grace_host_test.dart
 flutter test test/workspace_app_lifecycle_host_test.dart
 flutter test test/pocket_platform_behavior_test.dart
 flutter test test/pocket_platform_policy_test.dart
-flutter build apk --debug
+flutter build apk --debug --flavor app -t lib/main.dart
 ```
 
 If the machine uses an attached device or emulator:
 
 ```bash
-flutter run -d <device-id>
+flutter run -d <device-id> --flavor app -t lib/main.dart
 ```
 
 ## Manual Android Test Matrix
@@ -112,6 +118,9 @@ Steps:
 
 Expected:
 
+- Android 13+ may first show a notification permission prompt
+- if permission is requested and allowed, the ongoing notification appears after
+  permission grant
 - an ongoing notification appears quickly
 - notification text matches the strings in
   [`android/app/src/main/res/values/strings.xml`](../android/app/src/main/res/values/strings.xml)
@@ -198,6 +207,7 @@ List notifications:
 ```bash
 adb shell cmd notification post-history
 adb shell dumpsys notification | rg pocketrelay -n
+adb shell cmd appops get me.vinch.pocketrelay POST_NOTIFICATION
 ```
 
 Inspect services:
@@ -224,12 +234,18 @@ If `rg` is unavailable on the machine, use `grep`.
 
 Android validation passes only if all of the following are true:
 
-- `flutter build apk --debug` succeeds
+- `flutter build apk --debug --flavor app -t lib/main.dart` succeeds
 - app launches on device or emulator
 - the service starts only when a live turn is truly active
 - the service stops when no live ticking turn remains
 - app switching during a live turn does not self-kill the active lane
 - no duplicate or orphaned notification remains after turn completion
+
+Widgetbook may still be validated separately with:
+
+```bash
+flutter build apk --debug --flavor widgetbook -t lib/widgetbook/main.dart
+```
 
 ## Failures To Record Precisely
 
