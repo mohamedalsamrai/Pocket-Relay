@@ -174,7 +174,7 @@ class ChatSessionController extends ChangeNotifier {
     ).retryHistoricalConversationRestore();
   }
 
-  Future<String?> continueFromUserMessage(String blockId) {
+  Future<ChatComposerDraft?> continueFromUserMessage(String blockId) {
     return _ChatSessionControllerRecovery(
       this,
     ).continueFromUserMessage(blockId);

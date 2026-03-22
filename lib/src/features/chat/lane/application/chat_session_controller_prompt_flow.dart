@@ -115,7 +115,8 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
     _applySessionState(
       _sessionReducer.addUserMessage(
         _sessionState,
-        text: normalizedDraft.text.trim(),
+        text: normalizedDraft.text,
+        draft: normalizedDraft,
       ),
     );
     return _sendDraftWithAppServer(normalizedDraft);

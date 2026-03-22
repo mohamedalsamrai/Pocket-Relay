@@ -105,16 +105,16 @@ Future<void> _continueChatFromUserMessage(
   }
 
   final laneBinding = state.widget.laneBinding;
-  final draftText = await laneBinding.sessionController.continueFromUserMessage(
+  final draft = await laneBinding.sessionController.continueFromUserMessage(
     blockId,
   );
   if (!state.mounted ||
       laneBinding != state.widget.laneBinding ||
-      draftText == null) {
+      draft == null) {
     return;
   }
 
-  laneBinding.composerDraftHost.updateText(draftText);
+  laneBinding.composerDraftHost.updateDraft(draft);
   laneBinding.transcriptFollowHost.requestFollow(
     source: ChatTranscriptFollowRequestSource.clearTranscript,
   );

@@ -127,6 +127,28 @@ void main() {
 
       expect(sent, isTrue);
       expect(appServerClient.startSessionCalls, 1);
+      expect(controller.transcriptBlocks.first, isA<CodexUserMessageBlock>());
+      final messageBlock =
+          controller.transcriptBlocks.first as CodexUserMessageBlock;
+      expect(
+        messageBlock.draft,
+        const ChatComposerDraft(
+          text: 'See [Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          localImageAttachments: <ChatComposerLocalImageAttachment>[
+            ChatComposerLocalImageAttachment(
+              path: '/tmp/reference.png',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
+      );
       expect(appServerClient.sentTurns.single, (
         threadId: 'thread_123',
         input: const CodexAppServerTurnInput(
@@ -316,11 +338,9 @@ void main() {
           .whereType<CodexUserMessageBlock>()
           .firstWhere((block) => block.text == 'Restore this');
 
-      final draftText = await controller.continueFromUserMessage(
-        selectedBlock.id,
-      );
+      final draft = await controller.continueFromUserMessage(selectedBlock.id);
 
-      expect(draftText, 'Restore this');
+      expect(draft?.text, 'Restore this');
       expect(
         appServerClient.rollbackThreadCalls,
         <({String threadId, int numTurns})>[
@@ -374,11 +394,9 @@ void main() {
           .whereType<CodexUserMessageBlock>()
           .firstWhere((block) => block.text == 'Restore this');
 
-      final draftText = await controller.continueFromUserMessage(
-        selectedBlock.id,
-      );
+      final draft = await controller.continueFromUserMessage(selectedBlock.id);
 
-      expect(draftText, isNull);
+      expect(draft, isNull);
       expect(appServerClient.rollbackThreadCalls, isEmpty);
     },
   );
@@ -426,11 +444,9 @@ void main() {
           .whereType<CodexUserMessageBlock>()
           .firstWhere((block) => block.text == 'Restore this');
 
-      final draftText = await controller.continueFromUserMessage(
-        selectedBlock.id,
-      );
+      final draft = await controller.continueFromUserMessage(selectedBlock.id);
 
-      expect(draftText, isNull);
+      expect(draft, isNull);
       expect(
         appServerClient.rollbackThreadCalls,
         <({String threadId, int numTurns})>[
@@ -452,6 +468,94 @@ void main() {
       expect(
         await snackBarMessage,
         'Could not rewind this conversation to the selected prompt.',
+      );
+    },
+  );
+
+  test(
+    'continueFromUserMessage restores a structured local image draft',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_123'] = _rewoundConversationThread(
+          threadId: 'thread_123',
+        );
+      addTearDown(appServerClient.close);
+
+      final profile = _configuredProfile().copyWith(
+        connectionMode: ConnectionMode.local,
+      );
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: profile,
+            secrets: const ConnectionSecrets(),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: profile,
+          secrets: const ConnectionSecrets(),
+        ),
+        supportsLocalConnectionMode: true,
+      );
+      addTearDown(controller.dispose);
+
+      expect(
+        await controller.sendDraft(
+          const ChatComposerDraft(
+            text: 'See [Image #1]',
+            textElements: <ChatComposerTextElement>[
+              ChatComposerTextElement(
+                start: 4,
+                end: 14,
+                placeholder: '[Image #1]',
+              ),
+            ],
+            localImageAttachments: <ChatComposerLocalImageAttachment>[
+              ChatComposerLocalImageAttachment(
+                path: '/tmp/reference.png',
+                placeholder: '[Image #1]',
+              ),
+            ],
+          ),
+        ),
+        isTrue,
+      );
+
+      final selectedBlock = controller.transcriptBlocks
+          .whereType<CodexUserMessageBlock>()
+          .single;
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final draft = await controller.continueFromUserMessage(selectedBlock.id);
+
+      expect(
+        draft,
+        const ChatComposerDraft(
+          text: 'See [Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          localImageAttachments: <ChatComposerLocalImageAttachment>[
+            ChatComposerLocalImageAttachment(
+              path: '/tmp/reference.png',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
       );
     },
   );
