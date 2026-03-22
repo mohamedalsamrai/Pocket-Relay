@@ -18,10 +18,14 @@ void main() {
       final workspaceController = _buildWorkspaceController(
         clientsById: clientsById,
       );
+      var cleanedUp = false;
       final foregroundServiceController = _FakeForegroundServiceController();
       final notificationPermissionController =
           _FakeNotificationPermissionController();
       addTearDown(() async {
+        if (cleanedUp) {
+          return;
+        }
         workspaceController.dispose();
         await _closeClients(clientsById);
       });
@@ -66,6 +70,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(foregroundServiceController.enabledStates, <bool>[true, false]);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      workspaceController.dispose();
+      await _closeClients(clientsById);
+      cleanedUp = true;
     },
   );
 }
