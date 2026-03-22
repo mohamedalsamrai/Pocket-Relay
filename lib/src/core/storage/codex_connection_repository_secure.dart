@@ -15,6 +15,7 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
           legacyConnection: legacyConnection,
         );
     if (migratedCatalog != null) {
+      await _deleteLegacySingletonStorage(repository);
       return migratedCatalog;
     }
     return existingCatalog;
@@ -22,12 +23,14 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
 
   if (seededCatalog case final existingCatalog?) {
     if (legacyConnection != null) {
-      return _seedCatalogWithConnection(repository, legacyConnection);
+      final catalog = await _seedCatalogWithConnection(repository, legacyConnection);
+      await _deleteLegacySingletonStorage(repository);
+      return catalog;
     }
     return existingCatalog;
   }
 
-  return _seedCatalogWithConnection(
+  final catalog = await _seedCatalogWithConnection(
     repository,
     legacyConnection ??
         SavedConnection(
@@ -36,6 +39,10 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
           secrets: const ConnectionSecrets(),
         ),
   );
+  if (legacyConnection != null) {
+    await _deleteLegacySingletonStorage(repository);
+  }
+  return catalog;
 }
 
 Future<SavedConnection> _secureLoadConnection(
@@ -209,6 +216,11 @@ Future<SavedConnection?> _loadLegacySingletonConnection(
     return null;
   }
 
+  final profile = _decodeLegacySingletonProfile(rawProfile);
+  if (profile == null) {
+    return null;
+  }
+
   final password = await _readSecret(
     repository,
     SecureCodexConnectionRepository._legacySingletonPasswordKey,
@@ -221,8 +233,6 @@ Future<SavedConnection?> _loadLegacySingletonConnection(
     repository,
     SecureCodexConnectionRepository._legacySingletonPrivateKeyPassphraseKey,
   );
-
-  final profile = _decodeLegacySingletonProfile(rawProfile);
 
   return SavedConnection(
     id: repository._connectionIdGenerator(),
@@ -297,14 +307,31 @@ bool _looksLikeSeededDefaultCatalog(ConnectionCatalogState catalog) {
   return seededSummary?.profile == ConnectionProfile.defaults();
 }
 
-ConnectionProfile _decodeLegacySingletonProfile(String rawProfile) {
+ConnectionProfile? _decodeLegacySingletonProfile(String rawProfile) {
   try {
     return ConnectionProfile.fromJson(
       jsonDecode(rawProfile) as Map<String, dynamic>,
     );
   } catch (_) {
-    return ConnectionProfile.defaults();
+    return null;
   }
+}
+
+Future<void> _deleteLegacySingletonStorage(
+  SecureCodexConnectionRepository repository,
+) async {
+  await repository._preferences.remove(
+    SecureCodexConnectionRepository._legacySingletonProfileKey,
+  );
+  await repository._secureStorage.delete(
+    key: SecureCodexConnectionRepository._legacySingletonPasswordKey,
+  );
+  await repository._secureStorage.delete(
+    key: SecureCodexConnectionRepository._legacySingletonPrivateKeyKey,
+  );
+  await repository._secureStorage.delete(
+    key: SecureCodexConnectionRepository._legacySingletonPrivateKeyPassphraseKey,
+  );
 }
 
 Future<void> _deleteConnectionPreferences(

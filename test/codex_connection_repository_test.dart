@@ -173,6 +173,8 @@ void main() {
         secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
         'secret',
       );
+      expect(await preferences.getString('pocket_relay.profile'), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
     },
   );
 
@@ -227,6 +229,8 @@ void main() {
         secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
         'secret',
       );
+      expect(await preferences.getString('pocket_relay.profile'), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
     },
   );
 
@@ -264,7 +268,7 @@ void main() {
   );
 
   test(
-    'loadCatalog falls back to the default profile when legacy singleton json is corrupt',
+    'loadCatalog ignores malformed legacy singleton data instead of migrating it',
     () async {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'pocket_relay.profile': '{not json',
@@ -286,9 +290,15 @@ void main() {
         SavedConnection(
           id: 'conn_seed',
           profile: ConnectionProfile.defaults(),
-          secrets: const ConnectionSecrets(password: 'secret'),
+          secrets: const ConnectionSecrets(),
         ),
       );
+      expect(
+        secureStorage.data['pocket_relay.connection.conn_seed.secret.password'],
+        isNull,
+      );
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+      expect(await preferences.getString('pocket_relay.profile'), '{not json');
     },
   );
 
