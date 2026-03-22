@@ -151,8 +151,12 @@ class _ConnectionWorkspaceDormantRosterContentState
     });
 
     try {
-      final savedConnection = await widget.workspaceController
+      final savedConnectionFuture = widget.workspaceController
           .loadSavedConnection(connectionId);
+      final cachedModelCatalogFuture = widget.workspaceController
+          .loadConnectionModelCatalog(connectionId);
+      final savedConnection = await savedConnectionFuture;
+      final cachedModelCatalog = await cachedModelCatalogFuture;
       if (!mounted) {
         return;
       }
@@ -160,6 +164,7 @@ class _ConnectionWorkspaceDormantRosterContentState
       final payload = await _openConnectionSettings(
         profile: savedConnection.profile,
         secrets: savedConnection.secrets,
+        availableModelCatalog: cachedModelCatalog,
       );
       if (!mounted || payload == null) {
         return;
@@ -212,12 +217,14 @@ class _ConnectionWorkspaceDormantRosterContentState
   Future<ConnectionSettingsSubmitPayload?> _openConnectionSettings({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
+    ConnectionModelCatalog? availableModelCatalog,
   }) {
     return widget.settingsOverlayDelegate.openConnectionSettings(
       context: context,
       initialProfile: profile,
       initialSecrets: secrets,
       platformBehavior: widget.platformBehavior,
+      availableModelCatalog: availableModelCatalog,
     );
   }
 }

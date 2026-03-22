@@ -110,6 +110,106 @@ void main() {
   );
 
   testWidgets(
+    'dormant roster edit action launches settings with the cached model catalog',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final modelCatalogStore = MemoryConnectionModelCatalogStore();
+      final cachedCatalog = ConnectionModelCatalog(
+        connectionId: 'conn_secondary',
+        fetchedAt: DateTime.utc(2026, 3, 22),
+        models: const <ConnectionAvailableModel>[
+          ConnectionAvailableModel(
+            id: 'preset_cached_secondary_default',
+            model: 'gpt-cached-secondary',
+            displayName: 'GPT Cached Secondary',
+            description: 'Dormant cached backend default.',
+            hidden: false,
+            supportedReasoningEfforts:
+                <ConnectionAvailableModelReasoningEffortOption>[
+                  ConnectionAvailableModelReasoningEffortOption(
+                    reasoningEffort: CodexReasoningEffort.medium,
+                    description: 'Balanced cached mode.',
+                  ),
+                ],
+            defaultReasoningEffort: CodexReasoningEffort.medium,
+            inputModalities: <String>['text'],
+            supportsPersonality: false,
+            isDefault: true,
+          ),
+        ],
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        modelCatalogStore: modelCatalogStore,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.saveConnectionModelCatalog(cachedCatalog);
+      await tester.pumpWidget(
+        _buildDormantRosterApp(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogs.single,
+        cachedCatalog,
+      );
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'dormant roster add action still launches settings without a cached model catalog',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final modelCatalogStore = MemoryConnectionModelCatalogStore();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        modelCatalogStore: modelCatalogStore,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildDormantRosterApp(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('add_connection')));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+      expect(settingsOverlayDelegate.launchedModelCatalogs.single, isNull);
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'dormant roster offers return to open lane when every saved connection is already live',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
