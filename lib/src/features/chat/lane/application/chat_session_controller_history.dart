@@ -128,6 +128,7 @@ Future<bool> _sendTurnInputWithAppServerForController(
 }) async {
   controller._isTrackingSshBootstrapFailures = true;
   controller._sawTrackedSshBootstrapFailure = false;
+  controller._sawTrackedUnpinnedHostKeyFailure = false;
   try {
     final threadId = await _ensureChatSessionAppServerThread(controller);
     controller._clearConversationRecovery();
@@ -181,12 +182,15 @@ Future<bool> _sendTurnInputWithAppServerForController(
       error: error,
       runtimeErrorMessage: recoveryAssessment.presentation.runtimeErrorMessage,
       suppressRuntimeError: controller._sawTrackedSshBootstrapFailure,
-      suppressSnackBar: recoveryAssessment.suppressSnackBar,
+      suppressSnackBar:
+          recoveryAssessment.suppressSnackBar ||
+          controller._sawTrackedUnpinnedHostKeyFailure,
     );
     return false;
   } finally {
     controller._isTrackingSshBootstrapFailures = false;
     controller._sawTrackedSshBootstrapFailure = false;
+    controller._sawTrackedUnpinnedHostKeyFailure = false;
   }
 }
 

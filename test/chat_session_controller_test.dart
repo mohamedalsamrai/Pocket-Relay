@@ -2370,6 +2370,55 @@ void main() {
   );
 
   test(
+    'sendPrompt suppresses duplicate generic failures when an unpinned host key prompt already surfaced',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..connectEventsBeforeThrow.add(
+          const CodexAppServerUnpinnedHostKeyEvent(
+            host: 'example.com',
+            port: 22,
+            keyType: 'ssh-ed25519',
+            fingerprint: '7a:9f:d7:dc:2e:f2',
+          ),
+        )
+        ..connectError = StateError('connect failed after host key prompt');
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(milliseconds: 100),
+      );
+
+      final sent = await controller.sendPrompt('Hello controller');
+
+      expect(sent, isFalse);
+      expect(
+        controller.transcriptBlocks.whereType<CodexSshUnpinnedHostKeyBlock>(),
+        hasLength(1),
+      );
+      expect(controller.transcriptBlocks.whereType<CodexErrorBlock>(), isEmpty);
+      await expectLater(
+        snackBarMessage,
+        throwsA(isA<TimeoutException>()),
+      );
+    },
+  );
+
+  test(
     'sendPrompt suppresses duplicate generic transcript errors when SSH bootstrap already surfaced a typed failure',
     () async {
       final appServerClient = FakeCodexAppServerClient()

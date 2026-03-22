@@ -47,6 +47,17 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
               profile: sessionController.profile,
               secrets: sessionController.secrets,
             ),
+            onOpenConnectionSettings: () {
+              Navigator.of(context).pop();
+              unawaited(
+                _handleConnectionSettingsRequested(
+                  ChatConnectionSettingsLaunchContract(
+                    initialProfile: sessionController.profile,
+                    initialSecrets: sessionController.secrets,
+                  ),
+                ),
+              );
+            },
             onResumeConversation: (conversation) {
               unawaited(_resumeConversation(conversation));
             },

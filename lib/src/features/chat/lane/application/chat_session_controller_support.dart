@@ -96,6 +96,7 @@ extension on ChatSessionController {
   bool _isSshBootstrapFailureRuntimeEvent(CodexRuntimeEvent event) {
     return switch (event) {
       CodexRuntimeSshConnectFailedEvent() ||
+      CodexRuntimeUnpinnedHostKeyEvent() ||
       CodexRuntimeSshHostKeyMismatchEvent() ||
       CodexRuntimeSshAuthenticationFailedEvent() ||
       CodexRuntimeSshRemoteLaunchFailedEvent() => true,

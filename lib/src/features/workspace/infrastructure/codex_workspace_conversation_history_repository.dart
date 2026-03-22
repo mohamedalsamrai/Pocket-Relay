@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -13,6 +14,26 @@ abstract interface class CodexWorkspaceConversationHistoryRepository {
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   });
+}
+
+final class CodexWorkspaceConversationHistoryUnpinnedHostKeyException
+    implements Exception {
+  const CodexWorkspaceConversationHistoryUnpinnedHostKeyException({
+    required this.host,
+    required this.port,
+    required this.keyType,
+    required this.fingerprint,
+  });
+
+  final String host;
+  final int port;
+  final String keyType;
+  final String fingerprint;
+
+  @override
+  String toString() {
+    return 'Host key not pinned for $host:$port ($keyType $fingerprint).';
+  }
 }
 
 typedef CodexAppServerClientFactory = CodexAppServerClient Function();
@@ -40,7 +61,14 @@ class CodexAppServerConversationHistoryRepository
     }
 
     final client = clientFactory?.call() ?? CodexAppServerClient();
+    StreamSubscription<CodexAppServerEvent>? eventsSubscription;
+    CodexAppServerUnpinnedHostKeyEvent? unpinnedHostKeyEvent;
     try {
+      eventsSubscription = client.events.listen((event) {
+        if (event is CodexAppServerUnpinnedHostKeyEvent) {
+          unpinnedHostKeyEvent = event;
+        }
+      });
       await client.connect(profile: profile, secrets: secrets);
       final threads = await _loadAllThreads(client);
       final matchingThreads = threads.where(
@@ -88,7 +116,19 @@ class CodexAppServerConversationHistoryRepository
         return left.normalizedThreadId.compareTo(right.normalizedThreadId);
       });
       return conversations;
+    } catch (error) {
+      await Future<void>.microtask(() {});
+      if (unpinnedHostKeyEvent case final event?) {
+        throw CodexWorkspaceConversationHistoryUnpinnedHostKeyException(
+          host: event.host,
+          port: event.port,
+          keyType: event.keyType,
+          fingerprint: event.fingerprint,
+        );
+      }
+      rethrow;
     } finally {
+      await eventsSubscription?.cancel();
       await client.dispose();
     }
   }

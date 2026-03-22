@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 
 class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
   const ConnectionWorkspaceConversationHistorySheet({
@@ -9,11 +10,13 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
     required this.title,
     required this.future,
     required this.onResumeConversation,
+    this.onOpenConnectionSettings,
   });
 
   final String title;
   final Future<List<CodexWorkspaceConversationSummary>> future;
   final ValueChanged<CodexWorkspaceConversationSummary> onResumeConversation;
+  final VoidCallback? onOpenConnectionSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +105,23 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
               }
 
               if (snapshot.hasError) {
+                if (snapshot.error
+                    is CodexWorkspaceConversationHistoryUnpinnedHostKeyException) {
+                  final error =
+                      snapshot.error
+                          as CodexWorkspaceConversationHistoryUnpinnedHostKeyException;
+                  return _ConversationHistoryMessage(
+                    title: 'Host key not pinned',
+                    body:
+                        'Conversation history cannot connect until this host '
+                        'fingerprint is saved to the connection profile.\n'
+                        'Observed fingerprint: ${error.fingerprint}',
+                    actionLabel: onOpenConnectionSettings == null
+                        ? null
+                        : 'Open connection settings',
+                    onAction: onOpenConnectionSettings,
+                  );
+                }
                 return _ConversationHistoryMessage(
                   title: 'Could not load conversations',
                   body: '${snapshot.error}',
@@ -174,10 +194,17 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
 }
 
 class _ConversationHistoryMessage extends StatelessWidget {
-  const _ConversationHistoryMessage({required this.title, required this.body});
+  const _ConversationHistoryMessage({
+    required this.title,
+    required this.body,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final String title;
   final String body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +230,16 @@ class _ConversationHistoryMessage extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              TextButton(
+                key: const ValueKey(
+                  'conversation_history_open_connection_settings',
+                ),
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
+            ],
           ],
         ),
       ),

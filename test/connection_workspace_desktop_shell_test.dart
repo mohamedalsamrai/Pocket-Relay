@@ -329,6 +329,62 @@ void main() {
   });
 
   testWidgets(
+    'desktop conversation history can open connection settings for an unpinned host key',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                error:
+                    const CodexWorkspaceConversationHistoryUnpinnedHostKeyException(
+                      host: 'example.com',
+                      port: 22,
+                      keyType: 'ssh-ed25519',
+                      fingerprint: '7a:9f:d7:dc:2e:f2',
+                    ),
+              ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Conversation history'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host key not pinned'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('conversation_history_open_connection_settings'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(settingsOverlayDelegate.launchedSettings, hasLength(1));
+      expect(
+        settingsOverlayDelegate.launchedSettings.single.$1.host,
+        'primary.local',
+      );
+      expect(
+        settingsOverlayDelegate.launchedSettings.single.$2.password,
+        'secret-1',
+      );
+    },
+  );
+
+  testWidgets(
     'desktop conversation history row resumes the selected Codex thread',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');

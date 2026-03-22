@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_conversation_history_sheet.dart';
 
 void main() {
@@ -78,11 +79,50 @@ void main() {
     expect(find.text('Could not load conversations'), findsOneWidget);
     expect(find.textContaining('history backend unavailable'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows a connection-settings action for unpinned host key failures',
+    (tester) async {
+      var openedConnectionSettings = false;
+      final completer = Completer<List<CodexWorkspaceConversationSummary>>();
+
+      await tester.pumpWidget(
+        _buildSheet(
+          future: completer.future,
+          onOpenConnectionSettings: () {
+            openedConnectionSettings = true;
+          },
+        ),
+      );
+      completer.completeError(
+        const CodexWorkspaceConversationHistoryUnpinnedHostKeyException(
+          host: 'example.com',
+          port: 22,
+          keyType: 'ssh-ed25519',
+          fingerprint: '7a:9f:d7:dc:2e:f2',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host key not pinned'), findsOneWidget);
+      expect(find.textContaining('7a:9f:d7:dc:2e:f2'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('conversation_history_open_connection_settings'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(openedConnectionSettings, isTrue);
+    },
+  );
 }
 
 Widget _buildSheet({
   required Future<List<CodexWorkspaceConversationSummary>> future,
   ValueChanged<CodexWorkspaceConversationSummary>? onResumeConversation,
+  VoidCallback? onOpenConnectionSettings,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
@@ -91,6 +131,7 @@ Widget _buildSheet({
         title: 'Conversation history',
         future: future,
         onResumeConversation: onResumeConversation ?? (_) {},
+        onOpenConnectionSettings: onOpenConnectionSettings,
       ),
     ),
   );
