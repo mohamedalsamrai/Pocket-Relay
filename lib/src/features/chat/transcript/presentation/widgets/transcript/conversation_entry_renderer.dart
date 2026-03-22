@@ -80,9 +80,6 @@ class ConversationEntryRenderer extends StatelessWidget {
       final ChatWebSearchItemContract webSearchItem => WebSearchActivitySurface(
         entry: webSearchItem.entry,
       ),
-      final ChatMcpToolCallItemContract mcpItem => McpToolActivitySurface(
-        entry: mcpItem.entry,
-      ),
       final ChatChangedFilesItemContract changedFilesItem =>
         ChangedFilesSurface(
           item: changedFilesItem,

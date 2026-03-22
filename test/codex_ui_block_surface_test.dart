@@ -1742,6 +1742,50 @@ void main() {
     expect(find.text('MCP tool call'), findsNothing);
   });
 
+  testWidgets('keeps a single MCP tool call inside the work-log section', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entrySurface(
+          block: CodexWorkLogGroupBlock(
+            id: 'worklog_mcp_single',
+            createdAt: DateTime(2026, 3, 14, 12),
+            entries: <CodexWorkLogEntry>[
+              CodexWorkLogEntry(
+                id: 'entry_mcp_single',
+                createdAt: DateTime(2026, 3, 14, 12),
+                entryKind: CodexWorkLogEntryKind.mcpToolCall,
+                title: 'MCP tool call',
+                snapshot: const <String, Object?>{
+                  'server': 'filesystem',
+                  'tool': 'read_file',
+                  'status': 'completed',
+                  'arguments': <String, Object?>{'path': 'README.md'},
+                  'result': <String, Object?>{
+                    'structuredContent': <String, Object?>{
+                      'path': 'README.md',
+                      'encoding': 'utf-8',
+                    },
+                  },
+                  'durationMs': 42,
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Work log'), findsOneWidget);
+    expect(find.text('filesystem.read_file'), findsOneWidget);
+    expect(
+      find.text('completed · path: README.md, encoding: utf-8 · 42 ms'),
+      findsOneWidget,
+    );
+    expect(find.text('MCP tool call'), findsNothing);
+  });
+
   testWidgets('renders thread token usage as a compact usage strip', (
     tester,
   ) async {

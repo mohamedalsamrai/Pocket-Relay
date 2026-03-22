@@ -1229,7 +1229,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Work log'), findsNothing);
+    expect(find.text('Work log'), findsOneWidget);
     expect(find.text('filesystem.read_file'), findsOneWidget);
     expect(find.text('args: path: README.md'), findsOneWidget);
     expect(
