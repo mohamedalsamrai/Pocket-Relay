@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 part 'connection_models_catalog.dart';
+part 'connection_models_codex_models.dart';
 part 'connection_models_profile.dart';
 part 'connection_models_saved_connection.dart';
 

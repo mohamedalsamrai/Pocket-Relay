@@ -117,10 +117,6 @@ class _ConnectionSettingsPresentationState {
   final String? codexPathError;
   final String? passwordError;
   final String? privateKeyError;
-
-  String get modelHelperText => draft.model.trim().isEmpty
-      ? 'Leave blank to use the Codex or workspace default.'
-      : 'Sent to Codex when the session starts and when each turn starts.';
 }
 
 bool _hasChanges({
@@ -142,7 +138,8 @@ bool _hasChanges({
       draft.privateKeyPem != initialSecrets.privateKeyPem ||
       draft.privateKeyPassphrase != initialSecrets.privateKeyPassphrase ||
       draft.authMode != initialProfile.authMode ||
-      draft.dangerouslyBypassSandbox != initialProfile.dangerouslyBypassSandbox ||
+      draft.dangerouslyBypassSandbox !=
+          initialProfile.dangerouslyBypassSandbox ||
       draft.ephemeralSession != initialProfile.ephemeralSession;
 }
 

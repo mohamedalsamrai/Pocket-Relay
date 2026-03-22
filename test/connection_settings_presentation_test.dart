@@ -130,6 +130,12 @@ void main() {
       expect(contract.authenticationSection, isNull);
       expect(contract.codexSection.title, 'Local Codex');
       expect(contract.modelSection.selectedReasoningEffort, isNull);
+      expect(
+        contract.modelSection.modelOptions.any(
+          (option) => option.modelId == 'gpt-5.4',
+        ),
+        isTrue,
+      );
       expect(payload, isNotNull);
       expect(payload!.profile.connectionMode, ConnectionMode.local);
       expect(payload.profile.workspaceDir, '/workspace/local');
@@ -210,6 +216,38 @@ void main() {
         expect(payload, isNotNull);
         expect(payload!.profile.model, 'gpt-5.4');
         expect(payload.profile.reasoningEffort, CodexReasoningEffort.high);
+      },
+    );
+
+    test(
+      'filters reasoning effort options to the selected reference model',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState =
+            ConnectionSettingsFormState.initial(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(
+              draft: ConnectionSettingsDraft.fromConnection(
+                profile: initialProfile,
+                secrets: initialSecrets,
+              ).copyWith(model: 'gpt-5.1-codex-mini'),
+            );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+        );
+
+        expect(contract.modelSection.selectedModelId, 'gpt-5.1-codex-mini');
+        expect(
+          contract.modelSection.reasoningEffortOptions
+              .map((option) => option.label)
+              .toList(growable: false),
+          <String>['Default', 'Medium', 'High'],
+        );
       },
     );
   });

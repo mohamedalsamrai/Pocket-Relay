@@ -72,6 +72,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       ),
       ConnectionSettingsHostActions(
         onFieldChanged: _updateField,
+        onModelChanged: _updateModel,
         onConnectionModeChanged: _updateConnectionMode,
         onAuthModeChanged: _updateAuthMode,
         onReasoningEffortChanged: _updateReasoningEffort,
@@ -134,6 +135,22 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
     });
   }
 
+  void _updateModel(String? modelId) {
+    final normalizedModel = modelId?.trim() ?? '';
+    final nextEffort = codexNormalizedReasoningEffortForModel(
+      normalizedModel.isEmpty ? null : normalizedModel,
+      _formState.draft.reasoningEffort,
+    );
+    setState(() {
+      _formState = _formState.copyWith(
+        draft: _formState.draft.copyWith(
+          model: normalizedModel,
+          reasoningEffort: nextEffort,
+        ),
+      );
+    });
+  }
+
   void _save() {
     final nextState = _formState.revealValidationErrors();
     final contract = _buildContract(nextState);
@@ -175,6 +192,7 @@ class ConnectionSettingsHostViewModel {
 class ConnectionSettingsHostActions {
   const ConnectionSettingsHostActions({
     required this.onFieldChanged,
+    required this.onModelChanged,
     required this.onConnectionModeChanged,
     required this.onAuthModeChanged,
     required this.onReasoningEffortChanged,
@@ -185,6 +203,7 @@ class ConnectionSettingsHostActions {
 
   final void Function(ConnectionSettingsFieldId fieldId, String value)
   onFieldChanged;
+  final ValueChanged<String?> onModelChanged;
   final ValueChanged<ConnectionMode> onConnectionModeChanged;
   final ValueChanged<AuthMode> onAuthModeChanged;
   final ValueChanged<CodexReasoningEffort?> onReasoningEffortChanged;

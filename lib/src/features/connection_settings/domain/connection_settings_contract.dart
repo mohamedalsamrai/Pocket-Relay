@@ -130,19 +130,37 @@ class ConnectionSettingsReasoningEffortOptionContract {
   final String description;
 }
 
+class ConnectionSettingsModelOptionContract {
+  const ConnectionSettingsModelOptionContract({
+    required this.modelId,
+    required this.label,
+    required this.description,
+  });
+
+  final String? modelId;
+  final String label;
+  final String description;
+}
+
 class ConnectionSettingsModelSectionContract {
   const ConnectionSettingsModelSectionContract({
     required this.title,
-    required this.fields,
+    required this.selectedModelId,
+    required this.modelOptions,
+    required this.modelHelperText,
     required this.selectedReasoningEffort,
     required this.reasoningEffortOptions,
+    required this.reasoningEffortHelperText,
   });
 
   final String title;
-  final List<ConnectionSettingsTextFieldContract> fields;
+  final String? selectedModelId;
+  final List<ConnectionSettingsModelOptionContract> modelOptions;
+  final String modelHelperText;
   final CodexReasoningEffort? selectedReasoningEffort;
   final List<ConnectionSettingsReasoningEffortOptionContract>
   reasoningEffortOptions;
+  final String reasoningEffortHelperText;
 }
 
 class ConnectionSettingsToggleContract {

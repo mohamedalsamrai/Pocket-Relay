@@ -185,9 +185,9 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     return DropdownButtonFormField<CodexReasoningEffort?>(
       key: const ValueKey<String>('connection_settings_reasoning_effort'),
       initialValue: section.selectedReasoningEffort,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         labelText: 'Reasoning effort',
-        helperText: 'Applied to new sessions and each new turn.',
+        helperText: section.reasoningEffortHelperText,
       ),
       items: section.reasoningEffortOptions
           .map(
@@ -198,6 +198,29 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
           )
           .toList(growable: false),
       onChanged: actions.onReasoningEffortChanged,
+    );
+  }
+
+  Widget _buildModelPicker(
+    BuildContext context,
+    ConnectionSettingsModelSectionContract section,
+  ) {
+    return DropdownButtonFormField<String?>(
+      key: const ValueKey<String>('connection_settings_model'),
+      initialValue: section.selectedModelId,
+      decoration: InputDecoration(
+        labelText: 'Model override (optional)',
+        helperText: section.modelHelperText,
+      ),
+      items: section.modelOptions
+          .map(
+            (option) => DropdownMenuItem<String?>(
+              value: option.modelId,
+              child: Text(option.label),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: actions.onModelChanged,
     );
   }
 
@@ -293,7 +316,7 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFieldColumn(context, contract.modelSection.fields),
+              _buildModelPicker(context, contract.modelSection),
               const SizedBox(height: 14),
               _buildReasoningEffortPicker(context, contract.modelSection),
             ],

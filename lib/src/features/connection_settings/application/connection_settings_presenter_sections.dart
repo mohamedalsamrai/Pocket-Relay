@@ -30,8 +30,7 @@ ConnectionSettingsConnectionModeSectionContract? _buildConnectionModeSection(
       ConnectionSettingsConnectionModeOptionContract(
         mode: ConnectionMode.remote,
         label: 'Remote',
-        description:
-            'Connect to a developer box over SSH and run Codex there.',
+        description: 'Connect to a developer box over SSH and run Codex there.',
       ),
       ConnectionSettingsConnectionModeOptionContract(
         mode: ConnectionMode.local,
@@ -170,57 +169,91 @@ ConnectionSettingsModelSectionContract _buildModelSection(
   _ConnectionSettingsPresentationState state,
 ) {
   final draft = state.draft;
+  final selectedModelId = _selectedModelIdForDraft(draft);
+  final selectedModel = codexReferenceModelForId(selectedModelId);
+  final hasUnknownModel = selectedModelId != null && selectedModel == null;
+  final effectiveModel = codexEffectiveReferenceModelForId(selectedModelId);
+  final selectedReasoningEffort = codexNormalizedReasoningEffortForModel(
+    selectedModelId,
+    draft.reasoningEffort,
+  );
   return ConnectionSettingsModelSectionContract(
     title: 'Model defaults',
-    fields: <ConnectionSettingsTextFieldContract>[
-      ConnectionSettingsTextFieldContract(
-        id: ConnectionSettingsFieldId.model,
-        label: 'Model override (optional)',
-        value: draft.model,
-        hintText: 'gpt-5.4 or gpt-5.4-mini',
-        helperText: state.modelHelperText,
+    selectedModelId: selectedModelId,
+    modelOptions: <ConnectionSettingsModelOptionContract>[
+      const ConnectionSettingsModelOptionContract(
+        modelId: null,
+        label: 'Default',
+        description: 'Use the default Codex model from the reference catalog.',
+      ),
+      if (hasUnknownModel)
+        ConnectionSettingsModelOptionContract(
+          modelId: selectedModelId,
+          label: selectedModelId,
+          description:
+              'Saved model outside the standard reference picker list.',
+        ),
+      ...codexReferenceVisibleModels.map(
+        (model) => ConnectionSettingsModelOptionContract(
+          modelId: model.id,
+          label: model.label,
+          description: model.description,
+        ),
       ),
     ],
-    selectedReasoningEffort: draft.reasoningEffort,
-    reasoningEffortOptions:
-        const <ConnectionSettingsReasoningEffortOptionContract>[
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: null,
-            label: 'Default',
-            description: 'Use the model or workspace default effort.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.none,
-            label: 'None',
-            description: 'Disable extra reasoning where supported.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.minimal,
-            label: 'Minimal',
-            description: 'Use the lightest reasoning pass.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.low,
-            label: 'Low',
-            description: 'Favor speed over deeper planning.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.medium,
-            label: 'Medium',
-            description: 'Balanced default for general work.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.high,
-            label: 'High',
-            description: 'Spend more reasoning on harder tasks.',
-          ),
-          ConnectionSettingsReasoningEffortOptionContract(
-            effort: CodexReasoningEffort.xhigh,
-            label: 'XHigh',
-            description: 'Maximum reasoning depth when supported.',
-          ),
-        ],
+    modelHelperText: hasUnknownModel
+        ? 'Saved model outside the standard reference picker list.'
+        : selectedModel == null
+        ? 'Standard picker list only. Leave blank to use the default Codex model.'
+        : selectedModel.description,
+    selectedReasoningEffort: selectedReasoningEffort,
+    reasoningEffortOptions: <ConnectionSettingsReasoningEffortOptionContract>[
+      const ConnectionSettingsReasoningEffortOptionContract(
+        effort: null,
+        label: 'Default',
+        description: 'Use the selected model default effort.',
+      ),
+      ...effectiveModel.supportedReasoningEfforts.map(
+        (effort) => ConnectionSettingsReasoningEffortOptionContract(
+          effort: effort,
+          label: _reasoningEffortLabel(effort),
+          description: _reasoningEffortDescription(effort),
+        ),
+      ),
+    ],
+    reasoningEffortHelperText: hasUnknownModel
+        ? 'Available efforts use the fallback default-model list.'
+        : selectedModel == null
+        ? 'Available efforts follow the default model.'
+        : 'Available efforts follow ${effectiveModel.label}.',
   );
+}
+
+String? _selectedModelIdForDraft(ConnectionSettingsDraft draft) {
+  final normalized = draft.model.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _reasoningEffortLabel(CodexReasoningEffort effort) {
+  return switch (effort) {
+    CodexReasoningEffort.none => 'None',
+    CodexReasoningEffort.minimal => 'Minimal',
+    CodexReasoningEffort.low => 'Low',
+    CodexReasoningEffort.medium => 'Medium',
+    CodexReasoningEffort.high => 'High',
+    CodexReasoningEffort.xhigh => 'XHigh',
+  };
+}
+
+String _reasoningEffortDescription(CodexReasoningEffort effort) {
+  return switch (effort) {
+    CodexReasoningEffort.none => 'Disable extra reasoning where supported.',
+    CodexReasoningEffort.minimal => 'Use the lightest reasoning pass.',
+    CodexReasoningEffort.low => 'Favor speed over deeper planning.',
+    CodexReasoningEffort.medium => 'Balanced default for general work.',
+    CodexReasoningEffort.high => 'Spend more reasoning on harder tasks.',
+    CodexReasoningEffort.xhigh => 'Maximum reasoning depth when supported.',
+  };
 }
 
 ConnectionSettingsSubmitPayload _buildSubmitPayload({
@@ -239,8 +272,11 @@ ConnectionSettingsSubmitPayload _buildSubmitPayload({
       username: draft.username.trim(),
       workspaceDir: draft.workspaceDir.trim(),
       codexPath: draft.codexPath.trim(),
-      model: draft.model.trim(),
-      reasoningEffort: draft.reasoningEffort,
+      model: _selectedModelIdForDraft(draft) ?? '',
+      reasoningEffort: codexNormalizedReasoningEffortForModel(
+        _selectedModelIdForDraft(draft),
+        draft.reasoningEffort,
+      ),
       authMode: draft.authMode,
       hostFingerprint: draft.hostFingerprint.trim(),
       dangerouslyBypassSandbox: draft.dangerouslyBypassSandbox,

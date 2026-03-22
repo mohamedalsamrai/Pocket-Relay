@@ -124,10 +124,15 @@ void main() {
       await tester.enterText(_materialTextField('Profile label'), '  ');
       await tester.enterText(_materialTextField('Host'), '  ios.example.com  ');
       await tester.enterText(_materialTextField('Port'), '2222');
-      await tester.enterText(
-        _materialTextField('Model override (optional)'),
-        '  gpt-5.4-mini  ',
+      await tester.ensureVisible(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
       );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('gpt-5.4').last);
+      await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(
           const ValueKey<String>('connection_settings_reasoning_effort'),
@@ -150,11 +155,40 @@ void main() {
       expect(materialPayload!.profile.label, 'Developer Box');
       expect(materialPayload!.profile.host, 'ios.example.com');
       expect(materialPayload!.profile.port, 2222);
-      expect(materialPayload!.profile.model, 'gpt-5.4-mini');
+      expect(materialPayload!.profile.model, 'gpt-5.4');
       expect(
         materialPayload!.profile.reasoningEffort,
         CodexReasoningEffort.high,
       );
+    },
+  );
+
+  testWidgets(
+    'reasoning effort dropdown follows the selected model picker entry',
+    (tester) async {
+      await tester.pumpWidget(_buildMaterialSettingsApp(onSubmit: (_) {}));
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('gpt-5.1-codex-mini').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Medium').last, findsOneWidget);
+      expect(find.text('High').last, findsOneWidget);
+      expect(find.text('Low'), findsNothing);
+      expect(find.text('XHigh'), findsNothing);
     },
   );
 }
@@ -211,7 +245,6 @@ ConnectionSettingsFieldId _fieldIdForLabel(String label) {
     'Username' => ConnectionSettingsFieldId.username,
     'Workspace directory' => ConnectionSettingsFieldId.workspaceDir,
     'Codex launch command' => ConnectionSettingsFieldId.codexPath,
-    'Model override (optional)' => ConnectionSettingsFieldId.model,
     'Host fingerprint (optional)' => ConnectionSettingsFieldId.hostFingerprint,
     'SSH password' => ConnectionSettingsFieldId.password,
     'Private key PEM' => ConnectionSettingsFieldId.privateKeyPem,
