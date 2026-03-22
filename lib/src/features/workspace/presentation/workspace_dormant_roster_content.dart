@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
-import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/chat_screen_shell.dart';
@@ -12,8 +11,10 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 
-part 'workspace_dormant_roster_content_cards.dart';
+part 'workspace_dormant_roster_content_items.dart';
 part 'workspace_dormant_roster_content_shell.dart';
+
+const double _dormantRosterPanelRadius = 12;
 
 class ConnectionWorkspaceDormantRosterContent extends StatefulWidget {
   const ConnectionWorkspaceDormantRosterContent({

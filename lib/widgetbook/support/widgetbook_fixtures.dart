@@ -304,8 +304,8 @@ class WidgetbookFixtures {
       id: 'diff_transcript_frame',
       file: ChatChangedFilePresentationContract(
         currentPath:
-            'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_request_card.dart',
-        fileName: 'approval_request_card.dart',
+            'lib/src/features/chat/transcript/presentation/widgets/transcript/surfaces/approval_request_surface.dart',
+        fileName: 'approval_request_surface.dart',
         directoryLabel:
             'lib/src/features/chat/transcript/presentation/widgets/transcript/cards',
         languageLabel: 'Dart',
@@ -379,7 +379,7 @@ class WidgetbookFixtures {
       ChatChangedFileRowContract(
         id: 'changed_file_1',
         file: filePresentation(
-          'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_request_card.dart',
+          'lib/src/features/chat/transcript/presentation/widgets/transcript/surfaces/approval_request_surface.dart',
         ),
         operationKind: ChatChangedFileOperationKind.modified,
         operationLabel: 'Edited',
@@ -389,7 +389,7 @@ class WidgetbookFixtures {
       ChatChangedFileRowContract(
         id: 'changed_file_2',
         file: filePresentation(
-          'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+          'lib/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_unpinned_host_key_surface.dart',
         ),
         operationKind: ChatChangedFileOperationKind.modified,
         operationLabel: 'Edited',
@@ -397,7 +397,7 @@ class WidgetbookFixtures {
         diff: ChatChangedFileDiffContract(
           id: 'diff_widgetbook_fixtures',
           file: filePresentation(
-            'lib/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart',
+            'lib/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_unpinned_host_key_surface.dart',
           ),
           operationKind: ChatChangedFileOperationKind.modified,
           operationLabel: 'Edited',

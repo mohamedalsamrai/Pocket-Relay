@@ -52,7 +52,7 @@ extension on _ConnectionWorkspaceDormantRosterContentState {
               padding: EdgeInsets.only(
                 bottom: index == dormantConnections.length - 1 ? 0 : 12,
               ),
-              child: _DormantConnectionCard(
+              child: _DormantConnectionItem(
                 connectionId: connection.id,
                 title: connection.profile.label,
                 subtitle: _connectionSubtitle(connection.profile),

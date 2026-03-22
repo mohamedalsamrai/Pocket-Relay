@@ -1,7 +1,7 @@
 part of 'chat_empty_state_body.dart';
 
 extension on ChatEmptyStateBody {
-  Widget _buildMobileCard(BuildContext context) {
+  Widget _buildMobileShell(BuildContext context) {
     final content = Padding(
       padding: const EdgeInsets.all(28),
       child: Column(
@@ -34,7 +34,7 @@ extension on ChatEmptyStateBody {
       ),
     );
 
-    return _buildCard(context, content);
+    return _buildShell(context, content);
   }
 
   List<_EmptyStateDetail> _mobileDetails() {

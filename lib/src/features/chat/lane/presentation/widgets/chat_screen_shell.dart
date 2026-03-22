@@ -33,6 +33,8 @@ class ChatScreenBody extends StatelessWidget {
     required this.composerRegion,
     required this.loadingIndicator,
     required this.onStopActiveTurn,
+    this.laneRestartAction,
+    this.onRestartLane,
   });
 
   final ChatScreenContract screen;
@@ -40,6 +42,8 @@ class ChatScreenBody extends StatelessWidget {
   final Widget composerRegion;
   final Widget loadingIndicator;
   final Future<void> Function() onStopActiveTurn;
+  final ChatLaneRestartActionContract? laneRestartAction;
+  final Future<void> Function()? onRestartLane;
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +54,14 @@ class ChatScreenBody extends StatelessWidget {
     return Column(
       children: [
         Expanded(child: transcriptRegion),
-        if (screen.turnIndicator case final turnIndicator?)
+        if (screen.turnIndicator != null || laneRestartAction != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
             child: TurnElapsedFooter(
-              turnTimer: turnIndicator.timer,
+              turnTimer: screen.turnIndicator?.timer,
               onStop: onStopActiveTurn,
+              laneRestartAction: laneRestartAction,
+              onRestart: onRestartLane,
             ),
           ),
         composerRegion,

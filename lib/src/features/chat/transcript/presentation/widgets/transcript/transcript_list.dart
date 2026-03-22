@@ -6,7 +6,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_con
 import 'package:pocket_relay/src/features/chat/transcript_follow/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/requests/presentation/pending_user_input_form_scope.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/empty_state.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_card.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_renderer.dart';
 
 class TranscriptList extends StatefulWidget {
   const TranscriptList({
@@ -120,7 +120,7 @@ class _TranscriptListState extends State<TranscriptList> {
                 final item = widget
                     .surface
                     .mainItems[index - _transcriptListLeadingItemCount];
-                return ConversationEntryCard(
+                return ConversationEntryRenderer(
                   key: ValueKey<String>('transcript_${item.id}'),
                   item: item,
                   showsDesktopContextMenu:
@@ -161,7 +161,7 @@ class _TranscriptListState extends State<TranscriptList> {
                                 ? 0
                                 : 8,
                           ),
-                          child: ConversationEntryCard(
+                          child: ConversationEntryRenderer(
                             key: ValueKey<String>('pinned_${item.id}'),
                             item: item,
                             showsDesktopContextMenu:

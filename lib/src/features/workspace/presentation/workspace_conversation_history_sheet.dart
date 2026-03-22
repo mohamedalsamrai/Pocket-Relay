@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
 
 class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
@@ -17,7 +17,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cards = ConversationCardPalette.of(context);
+    final cards = TranscriptPalette.of(context);
 
     return ModalSheetScaffold(
       header: _buildStickyHeader(context, cards),
@@ -42,10 +42,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
     return '${value.year}-$twoDigitMonth-$twoDigitDay $twoDigitHour:$twoDigitMinute';
   }
 
-  Widget _buildStickyHeader(
-    BuildContext context,
-    ConversationCardPalette cards,
-  ) {
+  Widget _buildStickyHeader(BuildContext context, TranscriptPalette cards) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -65,7 +62,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(BuildContext context, ConversationCardPalette cards) {
+  Widget _buildBody(BuildContext context, TranscriptPalette cards) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

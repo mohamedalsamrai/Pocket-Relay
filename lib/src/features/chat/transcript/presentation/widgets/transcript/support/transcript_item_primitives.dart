@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
 class TranscriptAnnotation extends StatelessWidget {
   const TranscriptAnnotation({
@@ -113,7 +113,7 @@ class TranscriptCodeInset extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cards = ConversationCardPalette.of(context);
+    final cards = TranscriptPalette.of(context);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -125,52 +125,6 @@ class TranscriptCodeInset extends StatelessWidget {
   }
 }
 
-class TranscriptBlocker extends StatelessWidget {
-  const TranscriptBlocker({
-    super.key,
-    required this.child,
-    required this.accent,
-    this.maxWidth = 680,
-  });
-
-  final Widget child;
-  final Color accent;
-  final double maxWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    final cards = ConversationCardPalette.of(context);
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: cards.tintedSurface(
-              accent,
-              lightAlpha: 0.06,
-              darkAlpha: 0.12,
-            ),
-            borderRadius: PocketRadii.circular(PocketRadii.md),
-            border: Border.all(
-              color: cards.accentBorder(
-                accent,
-                lightAlpha: 0.24,
-                darkAlpha: 0.34,
-              ),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class TranscriptDividerLabel extends StatelessWidget {
   const TranscriptDividerLabel({super.key, required this.label});
 
@@ -178,7 +132,7 @@ class TranscriptDividerLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cards = ConversationCardPalette.of(context);
+    final cards = TranscriptPalette.of(context);
 
     return Row(
       children: [
