@@ -147,7 +147,7 @@ void main() {
                   'content': <Object>[
                     <String, Object?>{
                       'type': 'image',
-                      'url': 'data:image/png;base64,cmVmZXJlbmNl',
+                      'image_url': 'data:image/png;base64,cmVmZXJlbmNl',
                     },
                     <String, Object?>{
                       'type': 'text',
@@ -180,6 +180,72 @@ void main() {
             ChatComposerTextElement(
               start: 4,
               end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          imageAttachments: <ChatComposerImageAttachment>[
+            ChatComposerImageAttachment(
+              imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
+  test(
+    'restores mixed text and remote-image user messages when history omits placeholder spans',
+    () {
+      final conversation = CodexHistoricalConversation(
+        threadId: 'thread_mixed_remote_images',
+        createdAt: DateTime(2026, 3, 20, 10),
+        turns: <CodexHistoricalTurn>[
+          CodexHistoricalTurn(
+            id: 'turn_mixed_remote_images',
+            threadId: 'thread_mixed_remote_images',
+            createdAt: DateTime(2026, 3, 20, 10, 1),
+            completedAt: DateTime(2026, 3, 20, 10, 2),
+            state: CodexRuntimeTurnState.completed,
+            entries: <CodexHistoricalEntry>[
+              CodexHistoricalEntry(
+                id: 'item_user_mixed_remote_images',
+                threadId: 'thread_mixed_remote_images',
+                turnId: 'turn_mixed_remote_images',
+                createdAt: DateTime(2026, 3, 20, 10, 1),
+                itemType: CodexCanonicalItemType.userMessage,
+                status: CodexRuntimeItemStatus.completed,
+                title: 'You',
+                detail: 'See reference',
+                snapshot: const <String, dynamic>{
+                  'type': 'userMessage',
+                  'content': <Object>[
+                    <String, Object?>{
+                      'type': 'image',
+                      'image_url': 'data:image/png;base64,cmVmZXJlbmNl',
+                    },
+                    <String, Object?>{'type': 'text', 'text': 'See reference'},
+                  ],
+                },
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final restoredState = restorer.restore(conversation);
+
+      final block = restoredState.transcriptBlocks
+          .whereType<CodexUserMessageBlock>()
+          .single;
+      expect(
+        block.draft,
+        const ChatComposerDraft(
+          text: 'See reference\n[Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 14,
+              end: 24,
               placeholder: '[Image #1]',
             ),
           ],

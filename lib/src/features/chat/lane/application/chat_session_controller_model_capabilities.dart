@@ -118,13 +118,13 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
   }
 
   String? _effectiveModelForCapabilities([List<CodexAppServerModel>? catalog]) {
-    final liveModel = _sessionState.headerMetadata.model?.trim();
-    if (liveModel != null && liveModel.isNotEmpty) {
-      return liveModel;
-    }
     final configuredModel = _profile.model.trim();
     if (configuredModel.isNotEmpty) {
       return configuredModel;
+    }
+    final liveModel = _sessionState.headerMetadata.model?.trim();
+    if (liveModel != null && liveModel.isNotEmpty) {
+      return liveModel;
     }
 
     final effectiveCatalog = catalog ?? _modelCatalog;

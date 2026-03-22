@@ -29,7 +29,7 @@ List<Object> _turnInputPayload(CodexAppServerTurnInput input) {
     if (image.url.isEmpty) {
       continue;
     }
-    items.add(<String, Object?>{'type': 'image', 'url': image.url});
+    items.add(<String, Object?>{'type': 'image', 'image_url': image.url});
   }
   if (input.hasText) {
     items.add(<String, Object?>{

@@ -69,34 +69,39 @@ class TranscriptItemSupport {
       return null;
     }
 
+    final baseText = parsedText?.text ?? '';
+    final baseTextElements =
+        parsedText?.textElements ?? const <ChatComposerTextElement>[];
     final imagePlaceholders = parsedText?.imagePlaceholders ?? const <String>[];
-    if (imagePlaceholders.isEmpty &&
-        parsedText != null &&
-        parsedText.text.trim().isNotEmpty) {
-      // Upstream can represent remote images outside the text body. Pocket Relay
-      // currently needs placeholder spans to keep image attachments structured.
-      return null;
-    }
-
-    final effectiveText = imagePlaceholders.isNotEmpty
-        ? parsedText?.text ?? ''
-        : _synthesizedImageOnlyText(imageUrls.length);
-    final effectiveTextElements = imagePlaceholders.isNotEmpty
-        ? parsedText?.textElements ?? const <ChatComposerTextElement>[]
-        : _synthesizedImageOnlyTextElements(imageUrls.length);
+    final synthesizedPlaceholders = imageUrls.length > imagePlaceholders.length
+        ? _synthesizedImagePlaceholders(
+            baseText,
+            imageUrls.length - imagePlaceholders.length,
+          )
+        : const <String>[];
+    final allPlaceholders = <String>[
+      ...imagePlaceholders.take(imageUrls.length),
+      ...synthesizedPlaceholders,
+    ];
+    final effectiveTextAndElements =
+        imagePlaceholders.length >= imageUrls.length
+        ? (text: baseText, textElements: baseTextElements)
+        : _textAndElementsWithTrailingImagePlaceholders(
+            baseText: baseText,
+            existingTextElements: baseTextElements,
+            trailingPlaceholders: synthesizedPlaceholders,
+          );
     final imageAttachments = <ChatComposerImageAttachment>[
       for (var index = 0; index < imageUrls.length; index += 1)
         ChatComposerImageAttachment(
           imageUrl: imageUrls[index],
-          placeholder: index < imagePlaceholders.length
-              ? imagePlaceholders[index]
-              : imagePlaceholder(index + 1),
+          placeholder: allPlaceholders[index],
         ),
     ];
 
     final draft = ChatComposerDraft(
-      text: effectiveText,
-      textElements: effectiveTextElements,
+      text: effectiveTextAndElements.text,
+      textElements: effectiveTextAndElements.textElements,
       imageAttachments: imageAttachments,
     ).normalized();
     return draft.hasStructuredDraft ? draft : null;
@@ -163,6 +168,7 @@ class TranscriptItemSupport {
       }
 
       final url = _stringFromCandidatesPreservingWhitespace(<Object?>[
+        object['image_url'],
         object['url'],
       ]);
       if (url == null || url.trim().isEmpty) {
@@ -216,36 +222,82 @@ class TranscriptItemSupport {
     return elements;
   }
 
-  String _synthesizedImageOnlyText(int imageCount) {
-    return List<String>.generate(
-      imageCount,
-      (index) => imagePlaceholder(index + 1),
-    ).join(' ');
+  List<String> _synthesizedImagePlaceholders(String text, int imageCount) {
+    final reservedNumbers = _placeholderNumbersInText(text);
+    final placeholders = <String>[];
+    var candidate = 1;
+    while (placeholders.length < imageCount) {
+      if (reservedNumbers.contains(candidate)) {
+        candidate += 1;
+        continue;
+      }
+      placeholders.add(imagePlaceholder(candidate));
+      reservedNumbers.add(candidate);
+      candidate += 1;
+    }
+    return placeholders;
   }
 
-  List<ChatComposerTextElement> _synthesizedImageOnlyTextElements(
-    int imageCount,
-  ) {
-    final elements = <ChatComposerTextElement>[];
-    final buffer = StringBuffer();
-    for (var index = 0; index < imageCount; index += 1) {
+  ({String text, List<ChatComposerTextElement> textElements})
+  _textAndElementsWithTrailingImagePlaceholders({
+    required String baseText,
+    required List<ChatComposerTextElement> existingTextElements,
+    required List<String> trailingPlaceholders,
+  }) {
+    if (trailingPlaceholders.isEmpty) {
+      return (text: baseText, textElements: existingTextElements);
+    }
+
+    final separator = baseText.isEmpty || _endsWithWhitespace(baseText)
+        ? ''
+        : '\n';
+    final placeholderText = trailingPlaceholders.join(' ');
+    final effectiveText = '$baseText$separator$placeholderText';
+    final placeholderStartOffset = baseText.length + separator.length;
+    final trailingElements = <ChatComposerTextElement>[];
+    var cursor = placeholderStartOffset;
+    for (var index = 0; index < trailingPlaceholders.length; index += 1) {
       if (index > 0) {
-        buffer.write(' ');
+        cursor += 1;
       }
-      final placeholder = imagePlaceholder(index + 1);
-      final startOffset = buffer.length;
-      buffer.write(placeholder);
-      final endOffset = buffer.length;
-      final text = buffer.toString();
-      elements.add(
+      final placeholder = trailingPlaceholders[index];
+      final startOffset = cursor;
+      cursor += placeholder.length;
+      trailingElements.add(
         ChatComposerTextElement(
-          start: _utf8ByteOffset(text, startOffset),
-          end: _utf8ByteOffset(text, endOffset),
+          start: _utf8ByteOffset(effectiveText, startOffset),
+          end: _utf8ByteOffset(effectiveText, cursor),
           placeholder: placeholder,
         ),
       );
     }
-    return elements;
+
+    return (
+      text: effectiveText,
+      textElements: <ChatComposerTextElement>[
+        ...existingTextElements,
+        ...trailingElements,
+      ],
+    );
+  }
+
+  Set<int> _placeholderNumbersInText(String text) {
+    final numbers = <int>{};
+    final matches = RegExp(r'\[Image #(\d+)\]').allMatches(text);
+    for (final match in matches) {
+      final placeholderNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+      if (placeholderNumber > 0) {
+        numbers.add(placeholderNumber);
+      }
+    }
+    return numbers;
+  }
+
+  bool _endsWithWhitespace(String text) {
+    if (text.isEmpty) {
+      return false;
+    }
+    return RegExp(r'\s$').hasMatch(text);
   }
 
   int _utf8ByteOffset(String text, int codeUnitOffset) {
