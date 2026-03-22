@@ -3,7 +3,7 @@
 ## Status
 
 This document turns the findings in
-[`056_background_execution_publishability_findings.md`](./056_background_execution_publishability_findings.md)
+[`059_background_execution_publishability_findings.md`](./059_background_execution_publishability_findings.md)
 into an execution plan.
 
 The goal is not just resilience in the abstract. The goal is to make Pocket
@@ -400,4 +400,4 @@ Likely ownership by layer:
 
 - [`docs/052_ios_background_ssh_resilience_plan.md`](./052_ios_background_ssh_resilience_plan.md)
 - [`docs/053_ios_background_restore_handoff.md`](./053_ios_background_restore_handoff.md)
-- [`docs/056_background_execution_publishability_findings.md`](./056_background_execution_publishability_findings.md)
+- [`docs/059_background_execution_publishability_findings.md`](./059_background_execution_publishability_findings.md)

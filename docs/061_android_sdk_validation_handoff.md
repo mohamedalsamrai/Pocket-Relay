@@ -14,8 +14,8 @@ was added to improve live-lane survival while Pocket Relay is backgrounded.
 
 This is the Android-specific follow-up to the background-execution work in:
 
-- [`056_background_execution_publishability_findings.md`](./056_background_execution_publishability_findings.md)
-- [`057_background_execution_publishability_phased_plan.md`](./057_background_execution_publishability_phased_plan.md)
+- [`059_background_execution_publishability_findings.md`](./059_background_execution_publishability_findings.md)
+- [`060_background_execution_publishability_phased_plan.md`](./060_background_execution_publishability_phased_plan.md)
 
 ## Current Implementation To Validate
 

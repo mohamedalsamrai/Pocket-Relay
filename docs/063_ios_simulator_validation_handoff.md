@@ -15,9 +15,9 @@ live turns more honestly during ordinary app switching.
 
 This is the iOS-specific counterpart to:
 
-- [`056_background_execution_publishability_findings.md`](./056_background_execution_publishability_findings.md)
-- [`057_background_execution_publishability_phased_plan.md`](./057_background_execution_publishability_phased_plan.md)
-- [`058_android_sdk_validation_handoff.md`](./058_android_sdk_validation_handoff.md)
+- [`059_background_execution_publishability_findings.md`](./059_background_execution_publishability_findings.md)
+- [`060_background_execution_publishability_phased_plan.md`](./060_background_execution_publishability_phased_plan.md)
+- [`061_android_sdk_validation_handoff.md`](./061_android_sdk_validation_handoff.md)
 
 It is separate from the cold-start restore work documented in:
 
