@@ -5,6 +5,9 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_json_r
 
 part 'runtime_event_mapper_transport_mapper.dart';
 part 'runtime_event_mapper_notification_mapper.dart';
+part 'runtime_event_mapper_notification_mapper_session_thread.dart';
+part 'runtime_event_mapper_notification_mapper_turn_item.dart';
+part 'runtime_event_mapper_notification_mapper_request_error.dart';
 part 'runtime_event_mapper_request_mapper.dart';
 part 'runtime_event_mapper_support.dart';
 
