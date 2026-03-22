@@ -14,6 +14,7 @@ class ConnectionSettingsPresenter {
     required ConnectionSettingsFormState formState,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
+    bool didModelCatalogRefreshFail = false,
     bool supportsModelCatalogRefresh = false,
     bool isRefreshingModelCatalog = false,
     bool supportsLocalConnectionMode = false,
@@ -24,6 +25,7 @@ class ConnectionSettingsPresenter {
       formState: formState,
       availableModelCatalog: availableModelCatalog,
       availableModelCatalogSource: availableModelCatalogSource,
+      didModelCatalogRefreshFail: didModelCatalogRefreshFail,
       supportsModelCatalogRefresh: supportsModelCatalogRefresh,
       isRefreshingModelCatalog: isRefreshingModelCatalog,
     );

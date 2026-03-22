@@ -49,6 +49,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   late ConnectionSettingsFormState _formState;
   ConnectionModelCatalog? _availableModelCatalog;
   ConnectionSettingsModelCatalogSource? _availableModelCatalogSource;
+  bool _didModelCatalogRefreshFail = false;
   bool _isRefreshingModelCatalog = false;
 
   @override
@@ -107,6 +108,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       formState: formState ?? _formState,
       availableModelCatalog: _availableModelCatalog,
       availableModelCatalogSource: _availableModelCatalogSource,
+      didModelCatalogRefreshFail: _didModelCatalogRefreshFail,
       supportsModelCatalogRefresh: widget.onRefreshModelCatalog != null,
       isRefreshingModelCatalog: _isRefreshingModelCatalog,
       supportsLocalConnectionMode:
@@ -179,11 +181,18 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
 
     setState(() {
       _isRefreshingModelCatalog = true;
+      _didModelCatalogRefreshFail = false;
     });
 
     try {
       final refreshedCatalog = await onRefreshModelCatalog(_formState.draft);
-      if (!mounted || refreshedCatalog == null) {
+      if (!mounted) {
+        return;
+      }
+      if (refreshedCatalog == null) {
+        setState(() {
+          _didModelCatalogRefreshFail = true;
+        });
         return;
       }
 
@@ -199,10 +208,17 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         _availableModelCatalog = refreshedCatalog;
         _availableModelCatalogSource =
             ConnectionSettingsModelCatalogSource.connectionCache;
+        _didModelCatalogRefreshFail = false;
         _formState = _formState.copyWith(
           draft: _formState.draft.copyWith(reasoningEffort: nextEffort),
         );
       });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _didModelCatalogRefreshFail = true;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {

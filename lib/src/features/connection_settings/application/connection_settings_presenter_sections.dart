@@ -435,20 +435,60 @@ String _refreshActionHelperText(_ConnectionSettingsPresentationState state) {
       'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes.',
     null => null,
   };
+  final cachedCatalogTimestamp = _catalogRefreshTimestamp(
+    state.availableModelCatalogSource,
+    state.availableModelCatalog?.fetchedAt,
+  );
+  final refreshFailureStatus = state.didModelCatalogRefreshFail
+      ? state.availableModelCatalog == null
+            ? 'Refresh failed. Could not load models from the backend.'
+            : 'Refresh failed. Showing the previous model list.'
+      : null;
+  final leadingStatus = _joinHelperText(<String?>[
+    refreshFailureStatus,
+    cachedCatalogStatus,
+    cachedCatalogTimestamp,
+  ]);
 
   if (state.draft.workspaceDir.trim().isEmpty) {
-    return cachedCatalogStatus == null
-        ? 'Set a workspace directory to enable model refresh.'
-        : '$cachedCatalogStatus Set a workspace directory to enable model refresh.';
+    return _joinHelperText(<String?>[
+      leadingStatus,
+      'Set a workspace directory to enable model refresh.',
+    ]);
   }
 
   if (!state.supportsModelCatalogRefresh) {
-    return cachedCatalogStatus == null
-        ? 'Model refresh is available when this settings sheet is opened from a live backend connection.'
-        : '$cachedCatalogStatus Model refresh is available when this settings sheet is opened from a live backend connection.';
+    return _joinHelperText(<String?>[
+      leadingStatus,
+      'Model refresh is available when this settings sheet is opened from a live backend connection.',
+    ]);
   }
 
-  return cachedCatalogStatus == null
-      ? 'Refresh available models and reasoning efforts from the backend.'
-      : '$cachedCatalogStatus Use Refresh models to update from the backend.';
+  return _joinHelperText(<String?>[
+    leadingStatus,
+    state.didModelCatalogRefreshFail
+        ? 'Use Refresh models to try again.'
+        : 'Use Refresh models to update from the backend.',
+  ]);
+}
+
+String? _catalogRefreshTimestamp(
+  ConnectionSettingsModelCatalogSource? source,
+  DateTime? fetchedAt,
+) {
+  if (source == null || fetchedAt == null) {
+    return null;
+  }
+
+  final utc = fetchedAt.toUtc();
+  final year = utc.year.toString().padLeft(4, '0');
+  final month = utc.month.toString().padLeft(2, '0');
+  final day = utc.day.toString().padLeft(2, '0');
+  final hour = utc.hour.toString().padLeft(2, '0');
+  final minute = utc.minute.toString().padLeft(2, '0');
+  return 'Last refreshed $year-$month-$day $hour:$minute UTC.';
+}
+
+String _joinHelperText(Iterable<String?> parts) {
+  return parts.whereType<String>().where((part) => part.isNotEmpty).join(' ');
 }

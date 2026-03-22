@@ -391,6 +391,7 @@ void main() {
           formState: formState,
           availableModelCatalog: codexReferenceModelCatalog(
             connectionId: 'presenter-cache-copy-test',
+            fetchedAt: DateTime.utc(2026, 3, 22, 12, 30),
           ),
           availableModelCatalogSource:
               ConnectionSettingsModelCatalogSource.lastKnownCache,
@@ -398,7 +399,38 @@ void main() {
 
         expect(
           contract.modelSection.refreshActionHelperText,
-          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Model refresh is available when this settings sheet is opened from a live backend connection.',
+          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 12:30 UTC. Model refresh is available when this settings sheet is opened from a live backend connection.',
+        );
+      },
+    );
+
+    test(
+      'calls out refresh failure while preserving cached catalog context',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState = ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          availableModelCatalog: codexReferenceModelCatalog(
+            connectionId: 'presenter-cache-failure-test',
+            fetchedAt: DateTime.utc(2026, 3, 22, 15, 45),
+          ),
+          availableModelCatalogSource:
+              ConnectionSettingsModelCatalogSource.lastKnownCache,
+          didModelCatalogRefreshFail: true,
+          supportsModelCatalogRefresh: true,
+        );
+
+        expect(
+          contract.modelSection.refreshActionHelperText,
+          'Refresh failed. Showing the previous model list. Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 15:45 UTC. Use Refresh models to try again.',
         );
       },
     );

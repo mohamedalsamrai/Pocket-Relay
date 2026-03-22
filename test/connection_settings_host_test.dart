@@ -399,10 +399,47 @@ void main() {
 
       expect(
         find.text(
-          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Model refresh is available when this settings sheet is opened from a live backend connection.',
+          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 00:00 UTC. Model refresh is available when this settings sheet is opened from a live backend connection.',
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'shared host keeps the previous catalog and shows refresh failure feedback when refresh throws',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          availableModelCatalog: _backendAvailableModelCatalog(),
+          availableModelCatalogSource:
+              ConnectionSettingsModelCatalogSource.lastKnownCache,
+          onRefreshModelCatalog: (draft) async {
+            throw StateError('refresh failed');
+          },
+        ),
+      );
+
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey<String>('connection_settings_refresh_models'),
+        ),
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_refresh_models'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Refresh failed. Showing the previous model list. Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 00:00 UTC. Use Refresh models to try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('GPT Live Default'), findsNothing);
     },
   );
 
