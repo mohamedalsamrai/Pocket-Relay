@@ -25,43 +25,37 @@ void main() {
     ]);
   });
 
-  test(
-    'normalizes image placeholders by text order and renumbers them',
-    () {
-      final draft = const ChatComposerDraft(
-        text: '[Image #2] then [Image #1]',
-        imageAttachments: <ChatComposerImageAttachment>[
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,c2Vjb25k',
-            displayName: 'second.png',
-            placeholder: '[Image #1]',
-          ),
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,Zmlyc3Q=',
-            displayName: 'first.png',
-            placeholder: '[Image #2]',
-          ),
-        ],
-      ).normalized();
+  test('normalizes image placeholders by text order and renumbers them', () {
+    final draft = const ChatComposerDraft(
+      text: '[Image #2] then [Image #1]',
+      imageAttachments: <ChatComposerImageAttachment>[
+        ChatComposerImageAttachment(
+          imageUrl: 'data:image/png;base64,c2Vjb25k',
+          displayName: 'second.png',
+          placeholder: '[Image #1]',
+        ),
+        ChatComposerImageAttachment(
+          imageUrl: 'data:image/png;base64,Zmlyc3Q=',
+          displayName: 'first.png',
+          placeholder: '[Image #2]',
+        ),
+      ],
+    ).normalized();
 
-      expect(draft.text, '[Image #1] then [Image #2]');
-      expect(
-        draft.imageAttachments,
-        const <ChatComposerImageAttachment>[
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,Zmlyc3Q=',
-            displayName: 'first.png',
-            placeholder: '[Image #1]',
-          ),
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,c2Vjb25k',
-            displayName: 'second.png',
-            placeholder: '[Image #2]',
-          ),
-        ],
-      );
-    },
-  );
+    expect(draft.text, '[Image #1] then [Image #2]');
+    expect(draft.imageAttachments, const <ChatComposerImageAttachment>[
+      ChatComposerImageAttachment(
+        imageUrl: 'data:image/png;base64,Zmlyc3Q=',
+        displayName: 'first.png',
+        placeholder: '[Image #1]',
+      ),
+      ChatComposerImageAttachment(
+        imageUrl: 'data:image/png;base64,c2Vjb25k',
+        displayName: 'second.png',
+        placeholder: '[Image #2]',
+      ),
+    ]);
+  });
 
   test(
     'insertImageAttachment preserves placeholder order when inserting before an existing image',
@@ -101,6 +95,38 @@ void main() {
           ),
         ],
       );
+    },
+  );
+
+  test(
+    'insertImageAttachment avoids reusing a user-typed placeholder token',
+    () {
+      final insertion =
+          const ChatComposerDraft(
+            text: 'Manual [Image #1] token ',
+          ).insertImageAttachment(
+            attachment: const ChatComposerImageAttachment(
+              imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+              displayName: 'reference.png',
+            ),
+            selectionStart: 24,
+            selectionEnd: 24,
+          );
+
+      expect(insertion.draft.text, 'Manual [Image #1] token [Image #2]');
+      expect(
+        insertion.draft.imageAttachments,
+        const <ChatComposerImageAttachment>[
+          ChatComposerImageAttachment(
+            imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+            displayName: 'reference.png',
+            placeholder: '[Image #2]',
+          ),
+        ],
+      );
+      expect(insertion.draft.textElements, const <ChatComposerTextElement>[
+        ChatComposerTextElement(start: 24, end: 34, placeholder: '[Image #2]'),
+      ]);
     },
   );
 
@@ -175,16 +201,13 @@ void main() {
       expect(controller.text, 'See [Image #1] for details');
       expect(find.text('[Image #1] reference.png'), findsOneWidget);
       expect(latestDraft?.text, 'See [Image #1] for details');
-      expect(
-        latestDraft?.imageAttachments,
-        const <ChatComposerImageAttachment>[
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
-            displayName: 'reference.png',
-            placeholder: '[Image #1]',
-          ),
-        ],
-      );
+      expect(latestDraft?.imageAttachments, const <ChatComposerImageAttachment>[
+        ChatComposerImageAttachment(
+          imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+          displayName: 'reference.png',
+          placeholder: '[Image #1]',
+        ),
+      ]);
       expect(latestDraft?.textElements, const <ChatComposerTextElement>[
         ChatComposerTextElement(start: 4, end: 14, placeholder: '[Image #1]'),
       ]);
@@ -251,16 +274,13 @@ void main() {
 
       expect(controller.text, 'AB[Image #1]C');
       expect(latestDraft?.text, 'AB[Image #1]C');
-      expect(
-        latestDraft?.imageAttachments,
-        const <ChatComposerImageAttachment>[
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,c2Vjb25k',
-            displayName: 'second.png',
-            placeholder: '[Image #1]',
-          ),
-        ],
-      );
+      expect(latestDraft?.imageAttachments, const <ChatComposerImageAttachment>[
+        ChatComposerImageAttachment(
+          imageUrl: 'data:image/png;base64,c2Vjb25k',
+          displayName: 'second.png',
+          placeholder: '[Image #1]',
+        ),
+      ]);
     },
   );
 
@@ -311,16 +331,13 @@ void main() {
 
       expect(controller.text, 'A[Image #1]xB');
       expect(latestDraft?.text, 'A[Image #1]xB');
-      expect(
-        latestDraft?.imageAttachments,
-        const <ChatComposerImageAttachment>[
-          ChatComposerImageAttachment(
-            imageUrl: 'data:image/png;base64,Zmlyc3Q=',
-            displayName: 'first.png',
-            placeholder: '[Image #1]',
-          ),
-        ],
-      );
+      expect(latestDraft?.imageAttachments, const <ChatComposerImageAttachment>[
+        ChatComposerImageAttachment(
+          imageUrl: 'data:image/png;base64,Zmlyc3Q=',
+          displayName: 'first.png',
+          placeholder: '[Image #1]',
+        ),
+      ]);
     },
   );
 

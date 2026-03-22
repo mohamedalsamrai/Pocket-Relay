@@ -233,6 +233,154 @@ void main() {
   );
 
   test(
+    'sendDraft blocks image input when the default catalog model is text-only',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+      appServerClient.listedModels.add(
+        const CodexAppServerModel(
+          id: 'preset_default_text_only',
+          model: 'gpt-default-text-only',
+          displayName: 'GPT Default Text Only',
+          description: '',
+          hidden: false,
+          supportedReasoningEfforts: <CodexAppServerReasoningEffortOption>[],
+          defaultReasoningEffort: CodexReasoningEffort.medium,
+          inputModalities: <String>['text'],
+          supportsPersonality: false,
+          isDefault: true,
+        ),
+      );
+
+      final profile = _configuredProfile().copyWith(model: '');
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: profile,
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: profile,
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendDraft(
+        const ChatComposerDraft(
+          text: 'See [Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          imageAttachments: <ChatComposerImageAttachment>[
+            ChatComposerImageAttachment(
+              imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+              displayName: 'reference.png',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
+      );
+
+      expect(sent, isFalse);
+      expect(appServerClient.connectCalls, 1);
+      expect(appServerClient.listModelCalls, hasLength(1));
+      expect(appServerClient.startSessionCalls, 0);
+      expect(appServerClient.sentTurns, isEmpty);
+      expect(controller.currentModelSupportsImageInput, isFalse);
+      expect(
+        await snackBarMessage,
+        'Model gpt-default-text-only does not support image inputs. Remove images or switch models.',
+      );
+    },
+  );
+
+  test(
+    'sendDraft retries model catalog hydration after a transient listModels failure',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..listModelsError = StateError('temporary model list failure');
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Warm up the lane'), isTrue);
+      expect(appServerClient.listModelCalls, isEmpty);
+
+      appServerClient.listModelsError = null;
+      appServerClient.listedModels.add(
+        const CodexAppServerModel(
+          id: 'preset_session_text_only',
+          model: 'gpt-5.3-codex',
+          displayName: 'GPT Session Text Only',
+          description: '',
+          hidden: false,
+          supportedReasoningEfforts: <CodexAppServerReasoningEffortOption>[],
+          defaultReasoningEffort: CodexReasoningEffort.medium,
+          inputModalities: <String>['text'],
+          supportsPersonality: false,
+          isDefault: false,
+        ),
+      );
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendDraft(
+        const ChatComposerDraft(
+          text: 'See [Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          imageAttachments: <ChatComposerImageAttachment>[
+            ChatComposerImageAttachment(
+              imageUrl: 'data:image/png;base64,cmVmZXJlbmNl',
+              displayName: 'reference.png',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
+      );
+
+      expect(sent, isFalse);
+      expect(appServerClient.listModelCalls, hasLength(1));
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentTurns, hasLength(1));
+      expect(controller.currentModelSupportsImageInput, isFalse);
+      expect(
+        await snackBarMessage,
+        'Model gpt-5.3-codex does not support image inputs. Remove images or switch models.',
+      );
+    },
+  );
+
+  test(
     'sendPrompt starts a fresh conversation after controller restart until history is explicitly picked',
     () async {
       final appServerClient = FakeCodexAppServerClient();

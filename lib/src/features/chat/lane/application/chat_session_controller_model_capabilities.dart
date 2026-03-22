@@ -16,6 +16,12 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
     _modelCatalogHydrationFuture = hydration;
     try {
       await hydration;
+    } catch (_) {
+      if (identical(_modelCatalogHydrationFuture, hydration)) {
+        _didAttemptModelCatalogHydration = false;
+        _modelCatalogHydrationFuture = null;
+      }
+      rethrow;
     } finally {
       if (identical(_modelCatalogHydrationFuture, hydration)) {
         _modelCatalogHydrationFuture = null;
@@ -50,13 +56,9 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
   }
 
   bool _currentModelSupportsImageInput() {
-    final effectiveModel = _effectiveModelForCapabilities();
-    if (effectiveModel == null) {
-      return true;
-    }
-
     final catalog = _modelCatalog;
-    if (catalog == null) {
+    final effectiveModel = _effectiveModelForCapabilities(catalog);
+    if (effectiveModel == null || catalog == null) {
       return true;
     }
 
@@ -108,14 +110,14 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
   }
 
   String _imageInputsNotSupportedMessage() {
-    final effectiveModel = _effectiveModelForCapabilities();
+    final effectiveModel = _effectiveModelForCapabilities(_modelCatalog);
     if (effectiveModel == null) {
       return 'This model does not support image inputs. Remove images or switch models.';
     }
     return 'Model $effectiveModel does not support image inputs. Remove images or switch models.';
   }
 
-  String? _effectiveModelForCapabilities() {
+  String? _effectiveModelForCapabilities([List<CodexAppServerModel>? catalog]) {
     final liveModel = _sessionState.headerMetadata.model?.trim();
     if (liveModel != null && liveModel.isNotEmpty) {
       return liveModel;
@@ -123,6 +125,19 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
     final configuredModel = _profile.model.trim();
     if (configuredModel.isNotEmpty) {
       return configuredModel;
+    }
+
+    final effectiveCatalog = catalog ?? _modelCatalog;
+    if (effectiveCatalog == null) {
+      return null;
+    }
+    for (final model in effectiveCatalog) {
+      if (model.isDefault) {
+        final modelName = model.model.trim();
+        if (modelName.isNotEmpty) {
+          return modelName;
+        }
+      }
     }
     return null;
   }

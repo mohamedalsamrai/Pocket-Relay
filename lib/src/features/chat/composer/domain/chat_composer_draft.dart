@@ -49,6 +49,11 @@ class ChatComposerDraft {
     final nextAttachments = <ChatComposerImageAttachment>[];
     final nextTextElementRanges =
         <({int start, int end, String placeholder})>[];
+    final reservedPlaceholderNumbers = _reservedPlaceholderNumbers(
+      text,
+      locatedAttachments,
+    );
+    final assignedPlaceholderNumbers = <int>{};
     final buffer = StringBuffer();
     var cursor = 0;
     for (var index = 0; index < locatedAttachments.length; index++) {
@@ -57,7 +62,14 @@ class ChatComposerDraft {
         buffer.write(text.substring(cursor, locatedAttachment.start));
       }
 
-      final normalizedPlaceholder = imagePlaceholder(index + 1);
+      final normalizedPlaceholderNumber = _nextAvailablePlaceholderNumber(
+        reservedNumbers: reservedPlaceholderNumbers,
+        assignedNumbers: assignedPlaceholderNumbers,
+      );
+      assignedPlaceholderNumbers.add(normalizedPlaceholderNumber);
+      final normalizedPlaceholder = imagePlaceholder(
+        normalizedPlaceholderNumber,
+      );
       final placeholderStart = buffer.length;
       buffer.write(normalizedPlaceholder);
       final placeholderEnd = buffer.length;
@@ -133,7 +145,7 @@ class ChatComposerDraft {
   }
 
   int nextImagePlaceholderNumber() {
-    var maxNumber = 0;
+    var maxNumber = _maxPlaceholderNumberInText(text);
     for (final attachment in imageAttachments) {
       final placeholderNumber = _placeholderNumber(attachment.placeholder);
       if (placeholderNumber > maxNumber) {
@@ -303,6 +315,66 @@ int _placeholderNumber(String? placeholder) {
 
   final match = RegExp(r'^\[Image #(\d+)\]$').firstMatch(placeholder.trim());
   return int.tryParse(match?.group(1) ?? '') ?? 0;
+}
+
+int _maxPlaceholderNumberInText(String text) {
+  var maxNumber = 0;
+  final matches = RegExp(r'\[Image #(\d+)\]').allMatches(text);
+  for (final match in matches) {
+    final placeholderNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+    if (placeholderNumber > maxNumber) {
+      maxNumber = placeholderNumber;
+    }
+  }
+  return maxNumber;
+}
+
+Set<int> _reservedPlaceholderNumbers(
+  String text,
+  List<_LocatedImageAttachment> locatedAttachments,
+) {
+  final reservedNumbers = <int>{};
+  var cursor = 0;
+  for (final locatedAttachment in locatedAttachments) {
+    if (locatedAttachment.start > cursor) {
+      reservedNumbers.addAll(
+        _placeholderNumbersInTextSegment(
+          text.substring(cursor, locatedAttachment.start),
+        ),
+      );
+    }
+    cursor = locatedAttachment.end;
+  }
+  if (cursor < text.length) {
+    reservedNumbers.addAll(
+      _placeholderNumbersInTextSegment(text.substring(cursor)),
+    );
+  }
+  return reservedNumbers;
+}
+
+Set<int> _placeholderNumbersInTextSegment(String text) {
+  final numbers = <int>{};
+  final matches = RegExp(r'\[Image #(\d+)\]').allMatches(text);
+  for (final match in matches) {
+    final placeholderNumber = int.tryParse(match.group(1) ?? '') ?? 0;
+    if (placeholderNumber > 0) {
+      numbers.add(placeholderNumber);
+    }
+  }
+  return numbers;
+}
+
+int _nextAvailablePlaceholderNumber({
+  required Set<int> reservedNumbers,
+  required Set<int> assignedNumbers,
+}) {
+  var candidate = 1;
+  while (reservedNumbers.contains(candidate) ||
+      assignedNumbers.contains(candidate)) {
+    candidate += 1;
+  }
+  return candidate;
 }
 
 List<_LocatedImageAttachment> _locatedImageAttachments(
