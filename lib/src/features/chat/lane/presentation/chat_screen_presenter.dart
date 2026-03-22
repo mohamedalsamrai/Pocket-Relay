@@ -48,6 +48,11 @@ class ChatScreenPresenter {
         !sessionState.isBusy &&
         conversationRecoveryNotice == null &&
         historicalConversationRestoreNotice == null;
+    final canResetConversation =
+        hasWorkspaceScope &&
+        !sessionState.isBusy &&
+        conversationRecoveryNotice == null &&
+        historicalConversationRestoreNotice == null;
     final canSend =
         isConfigured &&
         !isLoading &&
@@ -80,7 +85,7 @@ class ChatScreenPresenter {
           id: ChatScreenActionId.newThread,
           label: 'New thread',
           placement: ChatScreenActionPlacement.menu,
-          isEnabled: hasWorkspaceScope,
+          isEnabled: canResetConversation,
         ),
         ChatScreenActionContract(
           id: ChatScreenActionId.branchConversation,
@@ -92,7 +97,7 @@ class ChatScreenPresenter {
           id: ChatScreenActionId.clearTranscript,
           label: 'Clear transcript',
           placement: ChatScreenActionPlacement.menu,
-          isEnabled: hasWorkspaceScope,
+          isEnabled: canResetConversation,
         ),
       ],
       timelineSummaries: timelineSummaries,

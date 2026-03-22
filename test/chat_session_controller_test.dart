@@ -838,6 +838,57 @@ void main() {
   );
 
   test(
+    'startFreshConversation refuses to reset while a turn is active',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Keep running'), isTrue);
+      final originalRootThreadId = controller.sessionState.rootThreadId;
+      final originalUserTexts = controller.transcriptBlocks
+          .whereType<CodexUserMessageBlock>()
+          .map((block) => block.text)
+          .toList(growable: false);
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+
+      controller.startFreshConversation();
+
+      expect(controller.sessionState.rootThreadId, originalRootThreadId);
+      expect(
+        controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+          (block) => block.text,
+        ),
+        originalUserTexts,
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexStatusBlock>(),
+        isEmpty,
+      );
+      expect(
+        await snackBarMessage,
+        'Stop the active turn before starting a new thread.',
+      );
+    },
+  );
+
+  test(
     'selectConversationForResume surfaces unavailable transcript history instead of silently restoring an empty lane',
     () async {
       final appServerClient = FakeCodexAppServerClient()
@@ -1493,6 +1544,50 @@ void main() {
       expect(appServerClient.startSessionCalls, 2);
     },
   );
+
+  test('clearTranscript refuses to reset while a turn is active', () async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
+
+    final controller = ChatSessionController(
+      profileStore: MemoryCodexProfileStore(
+        initialValue: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      ),
+      appServerClient: appServerClient,
+      initialSavedProfile: SavedProfile(
+        profile: _configuredProfile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      ),
+    );
+    addTearDown(controller.dispose);
+
+    expect(await controller.sendPrompt('Keep running'), isTrue);
+    final originalRootThreadId = controller.sessionState.rootThreadId;
+    final originalUserTexts = controller.transcriptBlocks
+        .whereType<CodexUserMessageBlock>()
+        .map((block) => block.text)
+        .toList(growable: false);
+    final snackBarMessage = controller.snackBarMessages.first.timeout(
+      const Duration(seconds: 1),
+    );
+
+    controller.clearTranscript();
+
+    expect(controller.sessionState.rootThreadId, originalRootThreadId);
+    expect(
+      controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+        (block) => block.text,
+      ),
+      originalUserTexts,
+    );
+    expect(
+      await snackBarMessage,
+      'Stop the active turn before clearing the transcript.',
+    );
+  });
 
   test(
     'sendPrompt reselects the root timeline before sending from a child timeline',

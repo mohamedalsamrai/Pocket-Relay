@@ -453,64 +453,63 @@ void main() {
     },
   );
 
-  testWidgets(
-    'continue from here can rewind from a later saved prompt',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient()
-        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
-          threadId: 'thread_saved',
-        );
-      final overlayDelegate = _FakeChatRootOverlayDelegate();
-      final laneBinding = ConnectionLaneBinding(
-        connectionId: 'conn_primary',
-        profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
+  testWidgets('continue from here can rewind from a later saved prompt', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient()
+      ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+        threadId: 'thread_saved',
+      );
+    final overlayDelegate = _FakeChatRootOverlayDelegate();
+    final laneBinding = ConnectionLaneBinding(
+      connectionId: 'conn_primary',
+      profileStore: MemoryCodexProfileStore(initialValue: _savedProfile()),
+      appServerClient: appServerClient,
+      initialSavedProfile: _savedProfile(),
+    );
+    addTearDown(appServerClient.close);
+    addTearDown(laneBinding.dispose);
+    await _restoreConversationInLane(laneBinding, 'thread_saved');
+
+    await tester.pumpWidget(
+      _buildAdapterApp(
         appServerClient: appServerClient,
-        initialSavedProfile: _savedProfile(),
-      );
-      addTearDown(appServerClient.close);
-      addTearDown(laneBinding.dispose);
-      await _restoreConversationInLane(laneBinding, 'thread_saved');
+        overlayDelegate: overlayDelegate,
+        laneBinding: laneBinding,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.pumpWidget(
-        _buildAdapterApp(
-          appServerClient: appServerClient,
-          overlayDelegate: overlayDelegate,
-          laneBinding: laneBinding,
-        ),
-      );
-      await tester.pumpAndSettle();
+    appServerClient.threadHistoriesById['thread_saved'] =
+        _partiallyRewoundConversationThread(threadId: 'thread_saved');
 
-      appServerClient.threadHistoriesById['thread_saved'] =
-          _partiallyRewoundConversationThread(threadId: 'thread_saved');
+    await tester.longPress(find.text('Second prompt'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue From Here'));
+    await tester.pumpAndSettle();
 
-      await tester.longPress(find.text('Second prompt'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue From Here'));
-      await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
-      await tester.pumpAndSettle();
-
-      expect(
-        appServerClient.rollbackThreadCalls,
-        <({String threadId, int numTurns})>[
-          (threadId: 'thread_saved', numTurns: 1),
-        ],
-      );
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const ValueKey('composer_input')))
-            .controller
-            ?.text,
-        'Second prompt',
-      );
-      expect(find.text('Restore this'), findsOneWidget);
-      expect(find.text('Restored answer'), findsOneWidget);
-      expect(find.text('Second prompt'), findsOneWidget);
-      expect(find.text('Second answer'), findsNothing);
-    },
-  );
+    expect(
+      appServerClient.rollbackThreadCalls,
+      <({String threadId, int numTurns})>[
+        (threadId: 'thread_saved', numTurns: 1),
+      ],
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('composer_input')))
+          .controller
+          ?.text,
+      'Second prompt',
+    );
+    expect(find.text('Restore this'), findsOneWidget);
+    expect(find.text('Restored answer'), findsOneWidget);
+    expect(find.text('Second prompt'), findsOneWidget);
+    expect(find.text('Second answer'), findsNothing);
+  });
 
   testWidgets(
     'long-press rollback failure keeps the transcript intact and shows feedback',
@@ -722,6 +721,8 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
+      _completeActiveTurn(appServerClient);
+      await tester.pumpAndSettle();
 
       expect(find.text('Hello Codex'), findsOneWidget);
 
@@ -744,6 +745,8 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('send')));
       await tester.pumpAndSettle();
+      _completeActiveTurn(appServerClient, turnId: 'turn_2');
+      await tester.pumpAndSettle();
 
       expect(find.text('Second transcript'), findsOneWidget);
 
@@ -758,6 +761,56 @@ void main() {
         ChatTranscriptFollowRequestSource.clearTranscript,
       );
       expect(laneBinding.sessionController.transcriptBlocks, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'menu disables new thread and clear transcript while a turn is active',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      final overlayDelegate = _FakeChatRootOverlayDelegate();
+      final laneBinding = _buildLaneBinding(
+        appServerClient: appServerClient,
+        savedProfile: _savedProfile(),
+      );
+      addTearDown(appServerClient.close);
+      addTearDown(laneBinding.dispose);
+
+      await tester.pumpWidget(
+        _buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+          laneBinding: laneBinding,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('composer_input')),
+        'Keep running',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+
+      final newThreadItem = tester.widget<PopupMenuItem<int>>(
+        find.ancestor(
+          of: find.text('New thread'),
+          matching: find.byType(PopupMenuItem<int>),
+        ),
+      );
+      final clearTranscriptItem = tester.widget<PopupMenuItem<int>>(
+        find.ancestor(
+          of: find.text('Clear transcript'),
+          matching: find.byType(PopupMenuItem<int>),
+        ),
+      );
+
+      expect(newThreadItem.enabled, isFalse);
+      expect(clearTranscriptItem.enabled, isFalse);
     },
   );
 
@@ -1390,4 +1443,19 @@ class _ChatRootAdapterHarnessState extends State<_ChatRootAdapterHarness> {
     _ownedLaneBinding = nextLaneBinding;
     previousLaneBinding?.dispose();
   }
+}
+
+void _completeActiveTurn(
+  FakeCodexAppServerClient appServerClient, {
+  String turnId = 'turn_1',
+}) {
+  appServerClient.emit(
+    CodexAppServerNotificationEvent(
+      method: 'turn/completed',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turn': <String, Object?>{'id': turnId, 'status': 'completed'},
+      },
+    ),
+  );
 }

@@ -2,6 +2,10 @@ part of 'chat_session_controller.dart';
 
 extension _ChatSessionControllerRecovery on ChatSessionController {
   void startFreshConversation() {
+    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
+      _emitSnackBar('Stop the active turn before starting a new thread.');
+      return;
+    }
     _resetConversationState(
       nextState: _sessionReducer.startFreshThread(
         _sessionState,
@@ -11,6 +15,10 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
   }
 
   void clearTranscript() {
+    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
+      _emitSnackBar('Stop the active turn before clearing the transcript.');
+      return;
+    }
     _resetConversationState(
       nextState: _sessionReducer.clearTranscript(_sessionState),
     );

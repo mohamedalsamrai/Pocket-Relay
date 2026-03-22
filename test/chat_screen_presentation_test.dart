@@ -130,6 +130,42 @@ void main() {
       },
     );
 
+    test('disables conversation reset actions while the session is busy', () {
+      final activeTurn = CodexActiveTurnState(
+        turnId: 'turn_1',
+        timer: CodexSessionTurnTimer(
+          turnId: 'turn_1',
+          startedAt: DateTime(2026, 3, 15, 12),
+        ),
+      );
+      final sessionState = CodexSessionState.initial()
+          .copyWith(connectionStatus: CodexRuntimeSessionState.running)
+          .copyWithProjectedTranscript(activeTurn: activeTurn);
+
+      final contract = presenter.present(
+        isLoading: false,
+        profile: _configuredProfile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        sessionState: sessionState,
+        conversationRecoveryState: null,
+        composerDraft: const ChatComposerDraft(text: 'Keep draft'),
+        transcriptFollow: _defaultTranscriptFollowContract,
+      );
+
+      final actionsById = <ChatScreenActionId, ChatScreenActionContract>{
+        for (final action in contract.menuActions) action.id: action,
+      };
+      expect(actionsById[ChatScreenActionId.newThread]?.isEnabled, isFalse);
+      expect(
+        actionsById[ChatScreenActionId.branchConversation]?.isEnabled,
+        isFalse,
+      );
+      expect(
+        actionsById[ChatScreenActionId.clearTranscript]?.isEnabled,
+        isFalse,
+      );
+    });
+
     test(
       'disables send and exposes recovery actions when conversation recovery is active',
       () {
