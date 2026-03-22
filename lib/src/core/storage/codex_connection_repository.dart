@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'codex_connection_catalog_recovery.dart';
 
+part 'codex_connection_repository_memory.dart';
+part 'codex_connection_repository_secure.dart';
+
 typedef ConnectionIdGenerator = String Function();
 
 abstract interface class CodexConnectionRepository {
@@ -41,14 +44,9 @@ class MemoryCodexConnectionRepository implements CodexConnectionRepository {
     required SavedProfile savedProfile,
     String connectionId = 'conn_1',
   }) {
-    return MemoryCodexConnectionRepository(
-      initialConnections: <SavedConnection>[
-        SavedConnection(
-          id: connectionId,
-          profile: savedProfile.profile,
-          secrets: savedProfile.secrets,
-        ),
-      ],
+    return _memoryRepositorySingle(
+      savedProfile: savedProfile,
+      connectionId: connectionId,
     );
   }
 
@@ -57,57 +55,25 @@ class MemoryCodexConnectionRepository implements CodexConnectionRepository {
   final ConnectionIdGenerator _connectionIdGenerator;
 
   @override
-  Future<ConnectionCatalogState> loadCatalog() async {
-    return ConnectionCatalogState(
-      orderedConnectionIds: List<String>.from(_orderedConnectionIds),
-      connectionsById: <String, SavedConnectionSummary>{
-        for (final entry in _connectionsById.entries)
-          entry.key: entry.value.toSummary(),
-      },
-    );
-  }
+  Future<ConnectionCatalogState> loadCatalog() => _memoryLoadCatalog(this);
 
   @override
-  Future<SavedConnection> loadConnection(String connectionId) async {
-    final connection = _connectionsById[connectionId];
-    if (connection == null) {
-      throw StateError('Unknown saved connection: $connectionId');
-    }
-    return connection;
-  }
+  Future<SavedConnection> loadConnection(String connectionId) =>
+      _memoryLoadConnection(this, connectionId);
 
   @override
   Future<SavedConnection> createConnection({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
-  }) async {
-    late SavedConnection connection;
-    do {
-      connection = SavedConnection(
-        id: _connectionIdGenerator(),
-        profile: profile,
-        secrets: secrets,
-      );
-    } while (_connectionsById.containsKey(connection.id));
-
-    await saveConnection(connection);
-    return connection;
-  }
+  }) => _memoryCreateConnection(this, profile: profile, secrets: secrets);
 
   @override
-  Future<void> saveConnection(SavedConnection connection) async {
-    final exists = _connectionsById.containsKey(connection.id);
-    _connectionsById[connection.id] = connection;
-    if (!exists) {
-      _orderedConnectionIds.add(connection.id);
-    }
-  }
+  Future<void> saveConnection(SavedConnection connection) =>
+      _memorySaveConnection(this, connection);
 
   @override
-  Future<void> deleteConnection(String connectionId) async {
-    _connectionsById.remove(connectionId);
-    _orderedConnectionIds.remove(connectionId);
-  }
+  Future<void> deleteConnection(String connectionId) =>
+      _memoryDeleteConnection(this, connectionId);
 }
 
 class SecureCodexConnectionRepository implements CodexConnectionRepository {
@@ -145,230 +111,25 @@ class SecureCodexConnectionRepository implements CodexConnectionRepository {
       );
 
   @override
-  Future<ConnectionCatalogState> loadCatalog() async {
-    await _catalogRecovery.ensurePreferencesReady();
-
-    final seededCatalog = await _catalogRecovery.loadCatalog();
-    if (seededCatalog case final existingCatalog?
-        when existingCatalog.isNotEmpty) {
-      return existingCatalog;
-    }
-
-    if (seededCatalog case final existingCatalog?) {
-      return existingCatalog;
-    }
-
-    final seededConnection = SavedConnection(
-      id: _connectionIdGenerator(),
-      profile: ConnectionProfile.defaults(),
-      secrets: const ConnectionSecrets(),
-    );
-    final nextCatalog = ConnectionCatalogState(
-      orderedConnectionIds: <String>[seededConnection.id],
-      connectionsById: <String, SavedConnectionSummary>{
-        seededConnection.id: seededConnection.toSummary(),
-      },
-    );
-
-    await _persistConnectionProfile(seededConnection);
-    await _persistConnectionSecrets(seededConnection);
-    await _catalogRecovery.persistCatalogIndex(
-      nextCatalog.orderedConnectionIds,
-    );
-    return nextCatalog;
-  }
+  Future<ConnectionCatalogState> loadCatalog() => _secureLoadCatalog(this);
 
   @override
-  Future<SavedConnection> loadConnection(String connectionId) async {
-    final normalizedConnectionId = _requireConnectionId(connectionId);
-    final catalog = await loadCatalog();
-    final summary = catalog.connectionForId(normalizedConnectionId);
-    if (summary == null) {
-      throw StateError('Unknown saved connection: $normalizedConnectionId');
-    }
-
-    return SavedConnection(
-      id: normalizedConnectionId,
-      profile: summary.profile,
-      secrets: await _readSecrets(normalizedConnectionId),
-    );
-  }
+  Future<SavedConnection> loadConnection(String connectionId) =>
+      _secureLoadConnection(this, connectionId);
 
   @override
   Future<SavedConnection> createConnection({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
-  }) async {
-    final catalog = await loadCatalog();
-
-    late SavedConnection connection;
-    do {
-      connection = SavedConnection(
-        id: _connectionIdGenerator(),
-        profile: profile,
-        secrets: secrets,
-      );
-    } while (catalog.connectionForId(connection.id) != null);
-
-    await saveConnection(connection);
-    return connection;
-  }
+  }) => _secureCreateConnection(this, profile: profile, secrets: secrets);
 
   @override
-  Future<void> saveConnection(SavedConnection connection) async {
-    final normalizedConnection = _normalizeConnection(connection);
-    final catalog = await loadCatalog();
-    final exists = catalog.connectionForId(normalizedConnection.id) != null;
-    final orderedConnectionIds = exists
-        ? catalog.orderedConnectionIds
-        : <String>[...catalog.orderedConnectionIds, normalizedConnection.id];
-    final nextCatalog = ConnectionCatalogState(
-      orderedConnectionIds: orderedConnectionIds,
-      connectionsById: <String, SavedConnectionSummary>{
-        ...catalog.connectionsById,
-        normalizedConnection.id: normalizedConnection.toSummary(),
-      },
-    );
-
-    await _persistConnectionProfile(normalizedConnection);
-    await _persistConnectionSecrets(normalizedConnection);
-    await _catalogRecovery.persistCatalogIndex(
-      nextCatalog.orderedConnectionIds,
-    );
-  }
+  Future<void> saveConnection(SavedConnection connection) =>
+      _secureSaveConnection(this, connection);
 
   @override
-  Future<void> deleteConnection(String connectionId) async {
-    final normalizedConnectionId = _requireConnectionId(connectionId);
-    final catalog = await loadCatalog();
-    if (catalog.connectionForId(normalizedConnectionId) == null) {
-      return;
-    }
-
-    final nextCatalog = ConnectionCatalogState(
-      orderedConnectionIds: catalog.orderedConnectionIds
-          .where((id) => id != normalizedConnectionId)
-          .toList(growable: false),
-      connectionsById: <String, SavedConnectionSummary>{
-        for (final entry in catalog.connectionsById.entries)
-          if (entry.key != normalizedConnectionId) entry.key: entry.value,
-      },
-    );
-
-    await _deleteConnectionPreferences(normalizedConnectionId);
-    await _deleteConnectionSecrets(normalizedConnectionId);
-    await _catalogRecovery.persistCatalogIndex(
-      nextCatalog.orderedConnectionIds,
-    );
-  }
-
-  Future<void> _persistConnectionProfile(SavedConnection connection) async {
-    await _preferences.setString(
-      _profileKeyForConnection(connection.id),
-      jsonEncode(connection.profile.toJson()),
-    );
-  }
-
-  Future<void> _persistConnectionSecrets(SavedConnection connection) async {
-    await _writeSecret(
-      _passwordKeyForConnection(connection.id),
-      connection.secrets.password,
-    );
-    await _writeSecret(
-      _privateKeyKeyForConnection(connection.id),
-      connection.secrets.privateKeyPem,
-    );
-    await _writeSecret(
-      _privateKeyPassphraseKeyForConnection(connection.id),
-      connection.secrets.privateKeyPassphrase,
-    );
-  }
-
-  Future<ConnectionSecrets> _readSecrets(String connectionId) async {
-    return ConnectionSecrets(
-      password: await _readSecret(_passwordKeyForConnection(connectionId)),
-      privateKeyPem: await _readSecret(
-        _privateKeyKeyForConnection(connectionId),
-      ),
-      privateKeyPassphrase: await _readSecret(
-        _privateKeyPassphraseKeyForConnection(connectionId),
-      ),
-    );
-  }
-
-  Future<void> _writeSecret(String key, String value) async {
-    if (value.trim().isEmpty) {
-      await _secureStorage.delete(key: key);
-      return;
-    }
-
-    await _secureStorage.write(key: key, value: value);
-  }
-
-  Future<String> _readSecret(String key) async {
-    return await _secureStorage.read(key: key) ?? '';
-  }
-
-  Future<void> _deleteConnectionPreferences(String connectionId) async {
-    final keys = await _preferences.getKeys();
-    final allowedKeys = <String>{
-      for (final key in keys)
-        if (key.startsWith('$_profileKeyPrefix$connectionId.')) key,
-    };
-    if (allowedKeys.isNotEmpty) {
-      await _preferences.clear(allowList: allowedKeys);
-    }
-  }
-
-  Future<void> _deleteConnectionSecrets(String connectionId) async {
-    final prefix = '$_secretKeyPrefix$connectionId.';
-    final secureEntries = await _secureStorage.readAll();
-    final matchingKeys = <String>[
-      for (final key in secureEntries.keys)
-        if (key.startsWith(prefix)) key,
-    ];
-
-    for (final key in matchingKeys) {
-      await _secureStorage.delete(key: key);
-    }
-  }
-
-  SavedConnection _normalizeConnection(SavedConnection connection) {
-    final normalizedConnectionId = _requireConnectionId(connection.id);
-    if (normalizedConnectionId == connection.id) {
-      return connection;
-    }
-
-    return connection.copyWith(id: normalizedConnectionId);
-  }
-
-  String _requireConnectionId(String connectionId) {
-    final normalizedConnectionId = connectionId.trim();
-    if (normalizedConnectionId.isEmpty) {
-      throw ArgumentError.value(
-        connectionId,
-        'connectionId',
-        'Connection id must not be empty.',
-      );
-    }
-    return normalizedConnectionId;
-  }
-
-  String _profileKeyForConnection(String connectionId) {
-    return '$_profileKeyPrefix$connectionId$_profileKeySuffix';
-  }
-
-  String _passwordKeyForConnection(String connectionId) {
-    return '$_secretKeyPrefix$connectionId$_passwordKeySuffix';
-  }
-
-  String _privateKeyKeyForConnection(String connectionId) {
-    return '$_secretKeyPrefix$connectionId$_privateKeyKeySuffix';
-  }
-
-  String _privateKeyPassphraseKeyForConnection(String connectionId) {
-    return '$_secretKeyPrefix$connectionId$_privateKeyPassphraseKeySuffix';
-  }
+  Future<void> deleteConnection(String connectionId) =>
+      _secureDeleteConnection(this, connectionId);
 }
 
 String generateConnectionId() {
