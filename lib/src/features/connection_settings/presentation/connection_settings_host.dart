@@ -20,6 +20,7 @@ class ConnectionSettingsHost extends StatefulWidget {
     required this.initialProfile,
     required this.initialSecrets,
     this.availableModelCatalog,
+    this.availableModelCatalogSource,
     this.onRefreshModelCatalog,
     required this.onCancel,
     required this.onSubmit,
@@ -30,6 +31,7 @@ class ConnectionSettingsHost extends StatefulWidget {
   final ConnectionProfile initialProfile;
   final ConnectionSecrets initialSecrets;
   final ConnectionModelCatalog? availableModelCatalog;
+  final ConnectionSettingsModelCatalogSource? availableModelCatalogSource;
   final Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog;
   final VoidCallback onCancel;
@@ -46,6 +48,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   late final Map<ConnectionSettingsFieldId, TextEditingController> _controllers;
   late ConnectionSettingsFormState _formState;
   ConnectionModelCatalog? _availableModelCatalog;
+  ConnectionSettingsModelCatalogSource? _availableModelCatalogSource;
   bool _isRefreshingModelCatalog = false;
 
   @override
@@ -56,6 +59,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       secrets: widget.initialSecrets,
     );
     _availableModelCatalog = widget.availableModelCatalog;
+    _availableModelCatalogSource = widget.availableModelCatalogSource;
     final draft = _formState.draft;
     _controllers = <ConnectionSettingsFieldId, TextEditingController>{
       for (final fieldId in ConnectionSettingsFieldId.values)
@@ -102,6 +106,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       initialSecrets: widget.initialSecrets,
       formState: formState ?? _formState,
       availableModelCatalog: _availableModelCatalog,
+      availableModelCatalogSource: _availableModelCatalogSource,
       supportsModelCatalogRefresh: widget.onRefreshModelCatalog != null,
       isRefreshingModelCatalog: _isRefreshingModelCatalog,
       supportsLocalConnectionMode:
@@ -192,6 +197,8 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       );
       setState(() {
         _availableModelCatalog = refreshedCatalog;
+        _availableModelCatalogSource =
+            ConnectionSettingsModelCatalogSource.connectionCache;
         _formState = _formState.copyWith(
           draft: _formState.draft.copyWith(reasoningEffort: nextEffort),
         );

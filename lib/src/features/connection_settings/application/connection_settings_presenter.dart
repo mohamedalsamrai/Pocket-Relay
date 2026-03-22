@@ -13,6 +13,7 @@ class ConnectionSettingsPresenter {
     required ConnectionSecrets initialSecrets,
     required ConnectionSettingsFormState formState,
     ConnectionModelCatalog? availableModelCatalog,
+    ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     bool supportsModelCatalogRefresh = false,
     bool isRefreshingModelCatalog = false,
     bool supportsLocalConnectionMode = false,
@@ -22,6 +23,7 @@ class ConnectionSettingsPresenter {
       initialSecrets: initialSecrets,
       formState: formState,
       availableModelCatalog: availableModelCatalog,
+      availableModelCatalogSource: availableModelCatalogSource,
       supportsModelCatalogRefresh: supportsModelCatalogRefresh,
       isRefreshingModelCatalog: isRefreshingModelCatalog,
     );

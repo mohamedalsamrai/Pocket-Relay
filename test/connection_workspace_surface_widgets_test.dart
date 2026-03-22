@@ -168,6 +168,10 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogs.single,
         cachedCatalog,
       );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.connectionCache,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -232,6 +236,10 @@ void main() {
       expect(
         settingsOverlayDelegate.launchedModelCatalogs.single,
         lastKnownCatalog,
+      );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.lastKnownCache,
       );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
 
@@ -299,6 +307,10 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogs.single,
         lastKnownCatalog,
       );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.lastKnownCache,
+      );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
 
       settingsOverlayDelegate.complete(null);
@@ -336,6 +348,7 @@ void main() {
 
       expect(settingsOverlayDelegate.launchCount, 1);
       expect(settingsOverlayDelegate.launchedModelCatalogs.single, isNull);
+      expect(settingsOverlayDelegate.launchedModelCatalogSources.single, isNull);
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
 
       settingsOverlayDelegate.complete(null);
@@ -457,6 +470,10 @@ void main() {
       expect(
         settingsOverlayDelegate.launchedModelCatalogs.single,
         lastKnownCatalog,
+      );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.lastKnownCache,
       );
       expect(
         settingsOverlayDelegate.launchedRefreshCallbacks.single,
@@ -690,6 +707,10 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogs.single,
         cachedCatalog,
       );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.connectionCache,
+      );
       expect(client.listModelCalls, isEmpty);
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
 
@@ -820,6 +841,8 @@ class _DeferredConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
+  final List<ConnectionSettingsModelCatalogSource?> launchedModelCatalogSources =
+      <ConnectionSettingsModelCatalogSource?>[];
   final List<
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   >
@@ -837,12 +860,14 @@ class _DeferredConnectionSettingsOverlayDelegate
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
+    ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
+    launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     return _completer.future;
   }

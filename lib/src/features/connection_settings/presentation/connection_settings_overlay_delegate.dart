@@ -14,6 +14,7 @@ abstract interface class ConnectionSettingsOverlayDelegate {
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
+    ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   });
@@ -30,6 +31,7 @@ class ModalConnectionSettingsOverlayDelegate
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
+    ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   }) {
@@ -43,6 +45,7 @@ class ModalConnectionSettingsOverlayDelegate
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
           availableModelCatalog: availableModelCatalog,
+          availableModelCatalogSource: availableModelCatalogSource,
           onRefreshModelCatalog: onRefreshModelCatalog,
           platformBehavior: platformBehavior,
           onCancel: () => Navigator.of(sheetContext).pop(),

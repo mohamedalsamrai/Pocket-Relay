@@ -58,7 +58,8 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         initialProfile: initialSettings.$1,
         initialSecrets: initialSettings.$2,
         platformBehavior: platformPolicy.behavior,
-        availableModelCatalog: availableModelCatalog,
+        availableModelCatalog: availableModelCatalog.$1,
+        availableModelCatalogSource: availableModelCatalog.$2,
         onRefreshModelCatalog: onRefreshModelCatalog,
       );
       if (!_matchesLiveRequestContext(
@@ -130,7 +131,10 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
     return (savedConnection.profile, savedConnection.secrets);
   }
 
-  Future<ConnectionModelCatalog?> _resolveAvailableModelCatalog({
+  Future<(
+    ConnectionModelCatalog?,
+    ConnectionSettingsModelCatalogSource?
+  )> _resolveAvailableModelCatalog({
     required ConnectionWorkspaceController workspaceController,
     required String connectionId,
     required bool preferConnectionCatalog,
@@ -140,10 +144,23 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
       connectionId: connectionId,
     );
     if (connectionCatalog != null || preferConnectionCatalog) {
-      return connectionCatalog;
+      return (
+        connectionCatalog,
+        connectionCatalog == null
+            ? null
+            : ConnectionSettingsModelCatalogSource.connectionCache,
+      );
     }
 
-    return _loadLastKnownModelCatalog(workspaceController: workspaceController);
+    final lastKnownCatalog = await _loadLastKnownModelCatalog(
+      workspaceController: workspaceController,
+    );
+    return (
+      lastKnownCatalog,
+      lastKnownCatalog == null
+          ? null
+          : ConnectionSettingsModelCatalogSource.lastKnownCache,
+    );
   }
 
   Future<ConnectionModelCatalog?> _loadCachedModelCatalog({

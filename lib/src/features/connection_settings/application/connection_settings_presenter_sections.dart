@@ -410,9 +410,13 @@ String _refreshActionHelperText(_ConnectionSettingsPresentationState state) {
     return 'Refreshing available models from the backend.';
   }
 
-  final cachedCatalogStatus = state.availableModelCatalog == null
-      ? null
-      : 'Showing cached models from the last backend refresh.';
+  final cachedCatalogStatus = switch (state.availableModelCatalogSource) {
+    ConnectionSettingsModelCatalogSource.connectionCache =>
+      'Showing models cached for this connection.',
+    ConnectionSettingsModelCatalogSource.lastKnownCache =>
+      'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes.',
+    null => null,
+  };
 
   if (state.draft.workspaceDir.trim().isEmpty) {
     return cachedCatalogStatus == null

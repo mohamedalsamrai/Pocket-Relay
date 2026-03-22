@@ -348,11 +348,13 @@ void main() {
           availableModelCatalog: codexReferenceModelCatalog(
             connectionId: 'presenter-cache-copy-test',
           ),
+          availableModelCatalogSource:
+              ConnectionSettingsModelCatalogSource.lastKnownCache,
         );
 
         expect(
           contract.modelSection.refreshActionHelperText,
-          'Showing cached models from the last backend refresh. Model refresh is available when this settings sheet is opened from a live backend connection.',
+          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Model refresh is available when this settings sheet is opened from a live backend connection.',
         );
       },
     );

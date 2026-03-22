@@ -18,6 +18,8 @@ enum ConnectionSettingsKeyboardType { text, number }
 
 enum ConnectionSettingsAuthOptionIcon { password, privateKey }
 
+enum ConnectionSettingsModelCatalogSource { connectionCache, lastKnownCache }
+
 class ConnectionSettingsConnectionModeOptionContract {
   const ConnectionSettingsConnectionModeOptionContract({
     required this.mode,

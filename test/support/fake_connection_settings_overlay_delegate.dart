@@ -17,6 +17,8 @@ class FakeConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
+  final List<ConnectionSettingsModelCatalogSource?> launchedModelCatalogSources =
+      <ConnectionSettingsModelCatalogSource?>[];
   final List<
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   >
@@ -32,11 +34,13 @@ class FakeConnectionSettingsOverlayDelegate
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
+    ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   }) async {
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
+    launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     if (_results.isEmpty) {
       return null;

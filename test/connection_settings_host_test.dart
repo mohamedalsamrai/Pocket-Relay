@@ -346,12 +346,14 @@ void main() {
         _buildMaterialSettingsApp(
           onSubmit: (_) {},
           availableModelCatalog: _backendAvailableModelCatalog(),
+          availableModelCatalogSource:
+              ConnectionSettingsModelCatalogSource.lastKnownCache,
         ),
       );
 
       expect(
         find.text(
-          'Showing cached models from the last backend refresh. Model refresh is available when this settings sheet is opened from a live backend connection.',
+          'Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Model refresh is available when this settings sheet is opened from a live backend connection.',
         ),
         findsOneWidget,
       );
@@ -413,6 +415,7 @@ Widget _buildMaterialSettingsApp({
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
   ConnectionModelCatalog? availableModelCatalog,
+  ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
@@ -426,6 +429,7 @@ Widget _buildMaterialSettingsApp({
         onSubmit: onSubmit,
         platformBehavior: platformBehavior,
         availableModelCatalog: availableModelCatalog,
+        availableModelCatalogSource: availableModelCatalogSource,
         initialProfile: initialProfile,
         onRefreshModelCatalog: onRefreshModelCatalog,
         builder: (context, viewModel, actions) {
@@ -441,6 +445,7 @@ Widget _buildHost({
   required ConnectionSettingsHostBuilder builder,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
   ConnectionModelCatalog? availableModelCatalog,
+  ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
@@ -449,6 +454,7 @@ Widget _buildHost({
     initialProfile: initialProfile ?? _configuredProfile(),
     initialSecrets: const ConnectionSecrets(password: 'secret'),
     availableModelCatalog: availableModelCatalog,
+    availableModelCatalogSource: availableModelCatalogSource,
     onRefreshModelCatalog: onRefreshModelCatalog,
     platformBehavior: platformBehavior,
     onCancel: () {},
