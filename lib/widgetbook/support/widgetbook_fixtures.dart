@@ -65,6 +65,8 @@ class WidgetbookFixtures {
     experience: PocketPlatformExperience.mobile,
     supportsLocalConnectionMode: false,
     supportsWakeLock: true,
+    supportsFiniteBackgroundGrace: false,
+    supportsActiveTurnForegroundService: false,
     usesDesktopKeyboardSubmit: false,
     supportsCollapsibleDesktopSidebar: false,
   );
@@ -73,6 +75,8 @@ class WidgetbookFixtures {
     experience: PocketPlatformExperience.desktop,
     supportsLocalConnectionMode: true,
     supportsWakeLock: false,
+    supportsFiniteBackgroundGrace: false,
+    supportsActiveTurnForegroundService: false,
     usesDesktopKeyboardSubmit: true,
     supportsCollapsibleDesktopSidebar: true,
   );

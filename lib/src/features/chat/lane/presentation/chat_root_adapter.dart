@@ -26,6 +26,7 @@ class ChatRootAdapter extends StatefulWidget {
     this.screenPresenter = const ChatScreenPresenter(),
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
     this.supplementalMenuActions = const <ChatChromeMenuAction>[],
+    this.supplementalComposerNotice,
     this.laneRestartAction,
     this.onRestartLane,
   });
@@ -37,6 +38,7 @@ class ChatRootAdapter extends StatefulWidget {
   final ChatScreenPresenter screenPresenter;
   final ChatRootOverlayDelegate overlayDelegate;
   final List<ChatChromeMenuAction> supplementalMenuActions;
+  final Widget? supplementalComposerNotice;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
 
@@ -101,6 +103,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
             sessionScreen: sessionScreen,
             laneBinding: laneBinding,
             platformPolicy: widget.platformPolicy,
+            supplementalNotice: widget.supplementalComposerNotice,
             onSendPrompt: _sendPrompt,
             onConversationRecoveryAction: _handleConversationRecoveryAction,
             onHistoricalConversationRestoreAction:
@@ -258,6 +261,7 @@ class _ChatComposerRegionHost extends StatelessWidget {
     required this.sessionScreen,
     required this.laneBinding,
     required this.platformPolicy,
+    this.supplementalNotice,
     required this.onSendPrompt,
     required this.onConversationRecoveryAction,
     required this.onHistoricalConversationRestoreAction,
@@ -266,6 +270,7 @@ class _ChatComposerRegionHost extends StatelessWidget {
   final ChatScreenSessionContract sessionScreen;
   final ConnectionLaneBinding laneBinding;
   final PocketPlatformPolicy platformPolicy;
+  final Widget? supplementalNotice;
   final Future<void> Function() onSendPrompt;
   final void Function(ChatConversationRecoveryActionId action)
   onConversationRecoveryAction;
@@ -283,6 +288,7 @@ class _ChatComposerRegionHost extends StatelessWidget {
         );
         return FlutterChatComposerRegion(
           platformBehavior: platformPolicy.behavior,
+          supplementalNotice: supplementalNotice,
           conversationRecoveryNotice: screen.conversationRecoveryNotice,
           historicalConversationRestoreNotice:
               screen.historicalConversationRestoreNotice,
