@@ -79,6 +79,33 @@ void main() {
 
     expect(codeStyle, isNotNull);
     expect(codeStyle?.color, const Color(0xFFE7F3F4));
+    expect(codeStyle?.fontFamily, 'monospace');
+    expect(
+      _findDecoratedContainerColorForText(tester, 'final answer = 42;'),
+      const Color(0xFF0A1314),
+    );
+  });
+
+  testWidgets('renders inline code with monospace styling', (tester) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entryCard(
+          block: CodexTextBlock(
+            id: 'assistant_inline_code_1',
+            kind: CodexUiBlockKind.assistantMessage,
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Assistant',
+            body: 'Use `dart test` before shipping.',
+          ),
+        ),
+      ),
+    );
+
+    final inlineCodeStyle = _findStyleForText(tester, 'dart test');
+
+    expect(inlineCodeStyle, isNotNull);
+    expect(inlineCodeStyle?.fontFamily, 'monospace');
+    expect(inlineCodeStyle?.backgroundColor, const Color(0xFFE8E0CF));
   });
 
   testWidgets(

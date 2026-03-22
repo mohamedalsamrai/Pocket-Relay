@@ -13,6 +13,7 @@ class ConversationCardPalette {
     required this.textSecondary,
     required this.textMuted,
     required this.codeSurface,
+    required this.codeBorder,
     required this.codeText,
     required this.terminalShell,
     required this.terminalBody,
@@ -33,7 +34,8 @@ class ConversationCardPalette {
       textPrimary: isDark ? const Color(0xFFF4F2ED) : const Color(0xFF1C1917),
       textSecondary: isDark ? const Color(0xFFD6D0C5) : const Color(0xFF57534E),
       textMuted: isDark ? const Color(0xFFA8A29E) : const Color(0xFF78716C),
-      codeSurface: isDark ? const Color(0xFF0F191B) : const Color(0xFFF0EBDE),
+      codeSurface: isDark ? const Color(0xFF0A1314) : const Color(0xFFE8E0CF),
+      codeBorder: isDark ? const Color(0xFF274043) : const Color(0xFFD0C2A6),
       codeText: isDark ? const Color(0xFFE7F3F4) : const Color(0xFF1C1917),
       terminalShell: isDark ? const Color(0xFF111B1D) : const Color(0xFF1F2937),
       terminalBody: isDark ? const Color(0xFF0A1112) : const Color(0xFF111827),
@@ -49,6 +51,7 @@ class ConversationCardPalette {
   final Color textSecondary;
   final Color textMuted;
   final Color codeSurface;
+  final Color codeBorder;
   final Color codeText;
   final Color terminalShell;
   final Color terminalBody;

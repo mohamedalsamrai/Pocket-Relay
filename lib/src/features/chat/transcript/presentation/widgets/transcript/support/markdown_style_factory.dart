@@ -14,16 +14,10 @@ MarkdownStyleSheet buildConversationMarkdownStyle({
       fontSize: isAssistant ? 16 : 14,
       height: isAssistant ? 1.45 : 1.38,
     ),
-    codeblockDecoration: BoxDecoration(
-      color: cards.codeSurface,
-      borderRadius: BorderRadius.circular(12),
-    ),
+    codeblockPadding: const EdgeInsets.all(12),
+    codeblockDecoration: _codeBlockDecoration(cards),
     blockquoteDecoration: BoxDecoration(
-      color: cards.tintedSurface(
-        accent,
-        lightAlpha: 0.08,
-        darkAlpha: 0.18,
-      ),
+      color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
       borderRadius: BorderRadius.circular(12),
     ),
     h1: theme.textTheme.headlineSmall?.copyWith(
@@ -38,10 +32,9 @@ MarkdownStyleSheet buildConversationMarkdownStyle({
       color: cards.textPrimary,
       fontSize: isAssistant ? 16 : 15,
     ),
-    code: theme.textTheme.bodyMedium?.copyWith(
-      color: cards.codeText,
-      fontFamily: 'monospace',
-      backgroundColor: cards.codeSurface,
+    code: _codeTextStyle(
+      theme.textTheme.bodyMedium,
+      cards: cards,
       fontSize: isAssistant ? 14 : 13,
     ),
   );
@@ -58,19 +51,39 @@ MarkdownStyleSheet buildPlanMarkdownStyle({
       fontSize: 14,
       height: 1.38,
     ),
-    codeblockDecoration: BoxDecoration(
-      color: cards.codeSurface,
-      borderRadius: BorderRadius.circular(12),
-    ),
+    codeblockPadding: const EdgeInsets.all(12),
+    codeblockDecoration: _codeBlockDecoration(cards),
     blockquoteDecoration: BoxDecoration(
       color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
       borderRadius: BorderRadius.circular(12),
     ),
-    code: theme.textTheme.bodyMedium?.copyWith(
-      color: cards.codeText,
-      fontFamily: 'monospace',
-      backgroundColor: cards.codeSurface,
+    code: _codeTextStyle(
+      theme.textTheme.bodyMedium,
+      cards: cards,
       fontSize: 13,
     ),
+  );
+}
+
+TextStyle? _codeTextStyle(
+  TextStyle? base, {
+  required ConversationCardPalette cards,
+  required double fontSize,
+}) {
+  return base?.copyWith(
+    color: cards.codeText,
+    fontFamily: 'monospace',
+    fontSize: fontSize,
+    height: 1.45,
+    letterSpacing: 0,
+    backgroundColor: cards.codeSurface,
+  );
+}
+
+BoxDecoration _codeBlockDecoration(ConversationCardPalette cards) {
+  return BoxDecoration(
+    color: cards.codeSurface,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: cards.codeBorder),
   );
 }
