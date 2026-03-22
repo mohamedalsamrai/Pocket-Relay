@@ -291,7 +291,8 @@ void main() {
         isNot(contains('Restore my draft')),
       );
       expect(
-        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        secureStorage
+            .data['pocket_relay.workspace.recovery_state.draft_text.conn_secondary'],
         'Restore my draft',
       );
     },

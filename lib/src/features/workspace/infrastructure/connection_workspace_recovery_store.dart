@@ -74,8 +74,10 @@ class MemoryConnectionWorkspaceRecoveryStore
 class SecureConnectionWorkspaceRecoveryStore
     implements ConnectionWorkspaceRecoveryStore {
   static const _recoveryStateKey = 'pocket_relay.workspace.recovery_state';
-  static const _draftTextStorageKey =
+  static const _legacyDraftTextStorageKey =
       'pocket_relay.workspace.recovery_state.draft_text';
+  static const _draftTextStorageKeyPrefix =
+      'pocket_relay.workspace.recovery_state.draft_text.';
   static const _legacyDraftTextKey = 'draftText';
   static const _preferencesMigrationKey =
       'pocket_relay.workspace_recovery_async_migration_complete';
@@ -105,28 +107,36 @@ class SecureConnectionWorkspaceRecoveryStore
 
     final sanitizedMap = Map<String, dynamic>.from(decoded)
       ..remove(_legacyDraftTextKey);
+    final state = ConnectionWorkspaceRecoveryState.fromJson(sanitizedMap);
+    if (state.connectionId.isEmpty) {
+      return null;
+    }
+
     final hasLegacyDraftText = decoded.containsKey(_legacyDraftTextKey);
     final legacyDraftText = _recoveryDraftText(decoded[_legacyDraftTextKey]);
+    var persistedDraftText = await _readDraftText(state.connectionId);
+    final legacySecureDraftText = persistedDraftText.isEmpty
+        ? await _readLegacyDraftText()
+        : '';
+    if (persistedDraftText.isEmpty && legacySecureDraftText.isNotEmpty) {
+      await _writeDraftText(state.connectionId, legacySecureDraftText);
+      await _deleteLegacyDraftText();
+      persistedDraftText = legacySecureDraftText;
+    }
     if (hasLegacyDraftText) {
+      if (persistedDraftText.isEmpty && legacyDraftText.isNotEmpty) {
+        await _writeDraftText(state.connectionId, legacyDraftText);
+        persistedDraftText = legacyDraftText;
+      }
       await _preferences.setString(
         _recoveryStateKey,
         jsonEncode(_persistableStateJson(sanitizedMap)),
       );
     }
 
-    final state = ConnectionWorkspaceRecoveryState.fromJson(sanitizedMap);
-    if (state.connectionId.isEmpty) {
-      return null;
-    }
-    final persistedDraftText = await _readDraftText();
     final effectiveDraftText = persistedDraftText.isNotEmpty
         ? persistedDraftText
         : legacyDraftText;
-    if (hasLegacyDraftText &&
-        persistedDraftText.isEmpty &&
-        legacyDraftText.isNotEmpty) {
-      await _writeDraftText(legacyDraftText);
-    }
     return ConnectionWorkspaceRecoveryState(
       connectionId: state.connectionId,
       selectedThreadId: state.selectedThreadId,
@@ -139,16 +149,21 @@ class SecureConnectionWorkspaceRecoveryStore
   Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
     await _ensurePreferencesReady();
     if (state == null) {
+      final persistedConnectionId = await _loadPersistedConnectionId();
       await _preferences.remove(_recoveryStateKey);
-      await _deleteDraftText();
+      if (persistedConnectionId != null) {
+        await _deleteDraftText(persistedConnectionId);
+      }
+      await _deleteLegacyDraftText();
       return;
     }
 
+    await _writeDraftText(state.connectionId, state.draftText);
+    await _deleteLegacyDraftText();
     await _preferences.setString(
       _recoveryStateKey,
       jsonEncode(_persistableStateJson(state.toJson())),
     );
-    await _writeDraftText(state.draftText);
   }
 
   Future<void> _ensurePreferencesReady() {
@@ -157,21 +172,62 @@ class SecureConnectionWorkspaceRecoveryStore
     );
   }
 
-  Future<String> _readDraftText() async {
-    return await _secureStorage.read(key: _draftTextStorageKey) ?? '';
+  Future<String?> _loadPersistedConnectionId() async {
+    final rawState = await _preferences.getString(_recoveryStateKey);
+    if (rawState == null || rawState.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(rawState);
+      if (decoded is! Map) {
+        return null;
+      }
+      return _normalizedRecoveryString(
+        Map<String, dynamic>.from(decoded)['connectionId'],
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
-  Future<void> _writeDraftText(String value) async {
+  Future<String> _readDraftText(String connectionId) async {
+    return await _secureStorage.read(
+          key: _draftTextStorageKeyForConnection(connectionId),
+        ) ??
+        '';
+  }
+
+  Future<String> _readLegacyDraftText() async {
+    return await _secureStorage.read(key: _legacyDraftTextStorageKey) ?? '';
+  }
+
+  Future<void> _writeDraftText(String connectionId, String value) async {
     if (value.isEmpty) {
-      await _deleteDraftText();
+      await _deleteDraftText(connectionId);
       return;
     }
-    await _secureStorage.write(key: _draftTextStorageKey, value: value);
+    await _secureStorage.write(
+      key: _draftTextStorageKeyForConnection(connectionId),
+      value: value,
+    );
   }
 
-  Future<void> _deleteDraftText() {
-    return _secureStorage.delete(key: _draftTextStorageKey);
+  Future<void> _deleteDraftText(String connectionId) {
+    return _secureStorage.delete(
+      key: _draftTextStorageKeyForConnection(connectionId),
+    );
   }
+
+  Future<void> _deleteLegacyDraftText() {
+    return _secureStorage.delete(key: _legacyDraftTextStorageKey);
+  }
+}
+
+String _draftTextStorageKeyForConnection(String connectionId) {
+  final normalizedConnectionId = _normalizedRecoveryString(connectionId) ?? '';
+  return '${
+      SecureConnectionWorkspaceRecoveryStore._draftTextStorageKeyPrefix
+    }$normalizedConnectionId';
 }
 
 Map<String, Object?> _persistableStateJson(Map<String, dynamic> json) {

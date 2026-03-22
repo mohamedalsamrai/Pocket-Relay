@@ -63,7 +63,8 @@ void main() {
       expect(rawState, isNot(contains('super secret draft')));
       expect(rawState, isNot(contains('draftText')));
       expect(
-        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        secureStorage
+            .data['pocket_relay.workspace.recovery_state.draft_text.conn_primary'],
         'super secret draft',
       );
 
@@ -100,8 +101,97 @@ void main() {
       expect(rawState, isNot(contains('legacy secret')));
       expect(rawState, isNot(contains('draftText')));
       expect(
-        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        secureStorage
+            .data['pocket_relay.workspace.recovery_state.draft_text.conn_primary'],
         'legacy secret',
+      );
+    },
+  );
+
+  test(
+    'secure store migrates legacy global secure drafts into a connection-scoped key on load',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.workspace.recovery_state.draft_text': 'legacy global',
+      });
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.workspace.recovery_state',
+        '{"connectionId":"conn_primary","selectedThreadId":"thread_saved","backgroundedAt":"2026-03-22T12:00:00.000Z"}',
+      );
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      final loadedState = await store.load();
+
+      expect(loadedState, isNotNull);
+      expect(loadedState!.draftText, 'legacy global');
+      expect(
+        secureStorage
+            .data['pocket_relay.workspace.recovery_state.draft_text.conn_primary'],
+        'legacy global',
+      );
+      expect(
+        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'secure store keeps drafts bound to their connection when a later metadata write is interrupted',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      await store.save(
+        const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_primary',
+          draftText: 'primary draft',
+        ),
+      );
+
+      secureStorage.data['pocket_relay.workspace.recovery_state.draft_text.conn_secondary'] =
+          'secondary draft';
+
+      final loadedState = await store.load();
+
+      expect(loadedState, isNotNull);
+      expect(loadedState!.connectionId, 'conn_primary');
+      expect(loadedState.draftText, 'primary draft');
+    },
+  );
+
+  test(
+    'legacy preference drafts stay persisted if secure migration fails before completion',
+    () async {
+      final secureStorage = _ThrowingFlutterSecureStorage(
+        <String, String>{},
+        keyToThrowOn:
+            'pocket_relay.workspace.recovery_state.draft_text.conn_primary',
+      );
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.workspace.recovery_state',
+        '{"connectionId":"conn_primary","selectedThreadId":"thread_saved","draftText":"legacy secret","backgroundedAt":"2026-03-22T12:00:00.000Z"}',
+      );
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      await expectLater(store.load(), throwsA(isA<StateError>()));
+
+      expect(
+        await preferences.getString('pocket_relay.workspace.recovery_state'),
+        contains('"draftText":"legacy secret"'),
       );
     },
   );
@@ -154,5 +244,37 @@ class _FakeFlutterSecureStorage extends FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     data.remove(key);
+  }
+}
+
+class _ThrowingFlutterSecureStorage extends _FakeFlutterSecureStorage {
+  _ThrowingFlutterSecureStorage(super.data, {required this.keyToThrowOn});
+
+  final String keyToThrowOn;
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == keyToThrowOn) {
+      throw StateError('secure storage unavailable');
+    }
+    await super.write(
+      key: key,
+      value: value,
+      iOptions: iOptions,
+      aOptions: aOptions,
+      lOptions: lOptions,
+      webOptions: webOptions,
+      mOptions: mOptions,
+      wOptions: wOptions,
+    );
   }
 }
