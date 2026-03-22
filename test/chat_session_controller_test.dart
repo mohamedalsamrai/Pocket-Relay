@@ -165,13 +165,17 @@ void main() {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
       appServerClient.listedModels.add(
-        const CodexAppServerModelDescription(
+        const CodexAppServerModel(
           id: 'preset_text_only',
           model: 'gpt-text-only',
           displayName: 'GPT Text Only',
-          inputModalities: <CodexAppServerInputModality>[
-            CodexAppServerInputModality.text,
-          ],
+          description: '',
+          hidden: false,
+          supportedReasoningEfforts: <CodexAppServerReasoningEffortOption>[],
+          defaultReasoningEffort: CodexReasoningEffort.medium,
+          inputModalities: <String>['text'],
+          supportsPersonality: false,
+          isDefault: false,
         ),
       );
 

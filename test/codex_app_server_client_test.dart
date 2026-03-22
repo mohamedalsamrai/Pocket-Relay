@@ -316,7 +316,7 @@ void main() {
     await client.disconnect();
   });
 
-  test('listModels sends model/list and decodes input modalities', () async {
+  test('listModels sends model/list and decodes model metadata', () async {
     late _FakeCodexAppServerProcess process;
     process = _FakeCodexAppServerProcess(
       onClientMessage: (message) {
@@ -332,21 +332,38 @@ void main() {
               'result': <String, Object?>{
                 'data': <Object>[
                   <String, Object?>{
-                    'id': 'preset_text',
-                    'model': 'gpt-text-only',
-                    'displayName': 'GPT Text Only',
+                    'id': 'preset_gpt_54',
+                    'model': 'gpt-5.4',
+                    'upgrade': 'gpt-5.5',
+                    'upgradeInfo': <String, Object?>{
+                      'model': 'gpt-5.5',
+                      'upgradeCopy': 'Upgrade available',
+                      'modelLink': 'https://example.com/models/gpt-5.5',
+                      'migrationMarkdown': 'Use the newer model.',
+                    },
+                    'availabilityNux': <String, Object?>{
+                      'message': 'Enable billing to access this model.',
+                    },
+                    'displayName': 'GPT-5.4',
+                    'description': 'Latest frontier agentic coding model.',
                     'hidden': false,
+                    'supportedReasoningEfforts': <Object>[
+                      <String, Object?>{
+                        'reasoningEffort': 'medium',
+                        'description': 'Balanced default for general work.',
+                      },
+                      <String, Object?>{
+                        'reasoningEffort': 'high',
+                        'description': 'Spend more reasoning on harder tasks.',
+                      },
+                    ],
+                    'defaultReasoningEffort': 'medium',
                     'inputModalities': <Object>['text'],
-                  },
-                  <String, Object?>{
-                    'id': 'preset_vision',
-                    'model': 'gpt-vision',
-                    'displayName': 'GPT Vision',
-                    'hidden': false,
-                    'inputModalities': <Object>['text', 'image'],
+                    'supportsPersonality': true,
+                    'isDefault': true,
                   },
                 ],
-                'nextCursor': null,
+                'nextCursor': 'cursor_2',
               },
             });
         }
@@ -364,19 +381,49 @@ void main() {
       secrets: const ConnectionSecrets(password: 'secret'),
     );
 
-    final page = await client.listModels();
+    final page = await client.listModels(
+      cursor: 'cursor_1',
+      limit: 25,
+      includeHidden: true,
+    );
 
-    expect(page.nextCursor, isNull);
-    expect(page.models, hasLength(2));
-    expect(page.models.first.model, 'gpt-text-only');
-    expect(page.models.first.supportsImageInput, isFalse);
-    expect(page.models.last.model, 'gpt-vision');
-    expect(page.models.last.supportsImageInput, isTrue);
-
-    final modelListRequest = process.writtenMessages.firstWhere(
+    final request = process.writtenMessages.firstWhere(
       (message) => message['method'] == 'model/list',
     );
-    expect(modelListRequest['params'], isEmpty);
+    expect(request['params'], <String, Object?>{
+      'cursor': 'cursor_1',
+      'limit': 25,
+      'includeHidden': true,
+    });
+    expect(page.nextCursor, 'cursor_2');
+    expect(page.models, hasLength(1));
+
+    final model = page.models.single;
+    expect(model.id, 'preset_gpt_54');
+    expect(model.model, 'gpt-5.4');
+    expect(model.displayName, 'GPT-5.4');
+    expect(model.description, 'Latest frontier agentic coding model.');
+    expect(model.hidden, isFalse);
+    expect(model.defaultReasoningEffort, CodexReasoningEffort.medium);
+    expect(model.supportsPersonality, isTrue);
+    expect(model.isDefault, isTrue);
+    expect(model.inputModalities, <String>['text']);
+    expect(model.upgrade, 'gpt-5.5');
+    expect(model.upgradeInfo, isNotNull);
+    expect(model.upgradeInfo!.model, 'gpt-5.5');
+    expect(
+      model.availabilityNuxMessage,
+      'Enable billing to access this model.',
+    );
+    expect(
+      model.supportedReasoningEfforts
+          .map((option) => option.reasoningEffort)
+          .toList(growable: false),
+      <CodexReasoningEffort>[
+        CodexReasoningEffort.medium,
+        CodexReasoningEffort.high,
+      ],
+    );
 
     await client.disconnect();
   });

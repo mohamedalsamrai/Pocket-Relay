@@ -84,9 +84,12 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
   Future<void> _hydrateModelCatalog() async {
     _didAttemptModelCatalogHydration = true;
     String? cursor;
-    final models = <CodexAppServerModelDescription>[];
+    final models = <CodexAppServerModel>[];
     do {
-      final page = await appServerClient.listModels(cursor: cursor);
+      final page = await appServerClient.listModels(
+        cursor: cursor,
+        includeHidden: true,
+      );
       models.addAll(page.models);
       cursor = page.nextCursor?.trim();
       if (cursor != null && cursor.isEmpty) {
@@ -100,7 +103,7 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
     if (listEquals(_modelCatalog, models)) {
       return;
     }
-    _modelCatalog = List<CodexAppServerModelDescription>.unmodifiable(models);
+    _modelCatalog = List<CodexAppServerModel>.unmodifiable(models);
     _notifyListenersIfMounted();
   }
 

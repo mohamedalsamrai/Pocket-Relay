@@ -266,34 +266,105 @@ class CodexAppServerThreadListPage {
   final String? nextCursor;
 }
 
-enum CodexAppServerInputModality { text, image }
+class CodexAppServerModelUpgradeInfo {
+  const CodexAppServerModelUpgradeInfo({
+    required this.model,
+    this.upgradeCopy,
+    this.modelLink,
+    this.migrationMarkdown,
+  });
 
-class CodexAppServerModelDescription {
-  const CodexAppServerModelDescription({
+  final String model;
+  final String? upgradeCopy;
+  final String? modelLink;
+  final String? migrationMarkdown;
+
+  @override
+  bool operator ==(Object other) {
+    return other is CodexAppServerModelUpgradeInfo &&
+        other.model == model &&
+        other.upgradeCopy == upgradeCopy &&
+        other.modelLink == modelLink &&
+        other.migrationMarkdown == migrationMarkdown;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(model, upgradeCopy, modelLink, migrationMarkdown);
+}
+
+class CodexAppServerReasoningEffortOption {
+  const CodexAppServerReasoningEffortOption({
+    required this.reasoningEffort,
+    required this.description,
+  });
+
+  final CodexReasoningEffort reasoningEffort;
+  final String description;
+
+  @override
+  bool operator ==(Object other) {
+    return other is CodexAppServerReasoningEffortOption &&
+        other.reasoningEffort == reasoningEffort &&
+        other.description == description;
+  }
+
+  @override
+  int get hashCode => Object.hash(reasoningEffort, description);
+}
+
+class CodexAppServerModel {
+  const CodexAppServerModel({
     required this.id,
     required this.model,
     required this.displayName,
-    this.hidden = false,
-    this.inputModalities = const <CodexAppServerInputModality>[],
+    required this.description,
+    required this.hidden,
+    required this.supportedReasoningEfforts,
+    required this.defaultReasoningEffort,
+    required this.inputModalities,
+    required this.supportsPersonality,
+    required this.isDefault,
+    this.upgrade,
+    this.upgradeInfo,
+    this.availabilityNuxMessage,
   });
 
   final String id;
   final String model;
   final String displayName;
+  final String description;
   final bool hidden;
-  final List<CodexAppServerInputModality> inputModalities;
+  final List<CodexAppServerReasoningEffortOption> supportedReasoningEfforts;
+  final CodexReasoningEffort defaultReasoningEffort;
+  final List<String> inputModalities;
+  final bool supportsPersonality;
+  final bool isDefault;
+  final String? upgrade;
+  final CodexAppServerModelUpgradeInfo? upgradeInfo;
+  final String? availabilityNuxMessage;
 
-  bool get supportsImageInput =>
-      inputModalities.contains(CodexAppServerInputModality.image);
+  bool get supportsImageInput => inputModalities.contains('image');
 
   @override
   bool operator ==(Object other) {
-    return other is CodexAppServerModelDescription &&
+    return other is CodexAppServerModel &&
         other.id == id &&
         other.model == model &&
         other.displayName == displayName &&
+        other.description == description &&
         other.hidden == hidden &&
-        _listEquals(other.inputModalities, inputModalities);
+        _listEquals(
+          other.supportedReasoningEfforts,
+          supportedReasoningEfforts,
+        ) &&
+        other.defaultReasoningEffort == defaultReasoningEffort &&
+        _listEquals(other.inputModalities, inputModalities) &&
+        other.supportsPersonality == supportsPersonality &&
+        other.isDefault == isDefault &&
+        other.upgrade == upgrade &&
+        other.upgradeInfo == upgradeInfo &&
+        other.availabilityNuxMessage == availabilityNuxMessage;
   }
 
   @override
@@ -301,8 +372,16 @@ class CodexAppServerModelDescription {
     id,
     model,
     displayName,
+    description,
     hidden,
+    Object.hashAll(supportedReasoningEfforts),
+    defaultReasoningEffort,
     Object.hashAll(inputModalities),
+    supportsPersonality,
+    isDefault,
+    upgrade,
+    upgradeInfo,
+    availabilityNuxMessage,
   );
 }
 
@@ -312,7 +391,7 @@ class CodexAppServerModelListPage {
     required this.nextCursor,
   });
 
-  final List<CodexAppServerModelDescription> models;
+  final List<CodexAppServerModel> models;
   final String? nextCursor;
 }
 

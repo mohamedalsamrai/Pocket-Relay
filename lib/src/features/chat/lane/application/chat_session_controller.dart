@@ -74,7 +74,7 @@ class ChatSessionController extends ChangeNotifier {
   CodexSessionState _sessionState = CodexSessionState.initial();
   ChatConversationRecoveryState? _conversationRecoveryState;
   ChatHistoricalConversationRestoreState? _historicalConversationRestoreState;
-  List<CodexAppServerModelDescription>? _modelCatalog;
+  List<CodexAppServerModel>? _modelCatalog;
 
   bool _isLoading = true;
   bool _isDisposed = false;

@@ -4,6 +4,7 @@ import 'codex_app_server_connection.dart';
 import 'codex_app_server_models.dart';
 import 'codex_app_server_thread_read_decoder.dart';
 
+part 'codex_app_server_request_api_models.dart';
 part 'codex_app_server_request_api_session_thread.dart';
 part 'codex_app_server_request_api_turn_requests.dart';
 part 'codex_app_server_request_api_support.dart';
@@ -95,8 +96,14 @@ class CodexAppServerRequestApi {
     CodexAppServerConnection connection, {
     String? cursor,
     int? limit,
+    bool? includeHidden,
   }) {
-    return _listModels(this, connection, cursor: cursor, limit: limit);
+    return _listModels(
+      connection,
+      cursor: cursor,
+      limit: limit,
+      includeHidden: includeHidden,
+    );
   }
 
   Future<CodexAppServerTurn> sendUserMessage(

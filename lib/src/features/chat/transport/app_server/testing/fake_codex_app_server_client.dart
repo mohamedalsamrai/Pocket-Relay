@@ -63,8 +63,8 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       <({String threadId, int numTurns})>[];
   final List<({String? cursor, int? limit})> listThreadCalls =
       <({String? cursor, int? limit})>[];
-  final List<({String? cursor, int? limit})> listModelCalls =
-      <({String? cursor, int? limit})>[];
+  final List<({String? cursor, int? limit, bool? includeHidden})>
+  listModelCalls = <({String? cursor, int? limit, bool? includeHidden})>[];
   final List<String> sentMessages = <String>[];
   final List<
     ({
@@ -130,10 +130,12 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? sendUserMessageError;
   Object? readThreadWithTurnsError;
   Object? rollbackThreadError;
+  Object? listModelsError;
   String? startSessionModel;
   String? forkThreadId;
   String? startSessionReasoningEffort;
   String? startSessionCwd;
+  String? listModelsNextCursor;
   int disconnectCalls = 0;
   String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
@@ -147,8 +149,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
       <String, CodexAppServerThreadHistory>{};
   final List<CodexAppServerThreadSummary> listedThreads =
       <CodexAppServerThreadSummary>[];
-  final List<CodexAppServerModelDescription> listedModels =
-      <CodexAppServerModelDescription>[];
+  final List<CodexAppServerModel> listedModels = <CodexAppServerModel>[];
 
   bool _isConnected = false;
   String? _threadId;
@@ -363,11 +364,19 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Future<CodexAppServerModelListPage> listModels({
     String? cursor,
     int? limit,
+    bool? includeHidden,
   }) async {
-    listModelCalls.add((cursor: cursor, limit: limit));
+    if (listModelsError != null) {
+      throw listModelsError!;
+    }
+    listModelCalls.add((
+      cursor: cursor,
+      limit: limit,
+      includeHidden: includeHidden,
+    ));
     return CodexAppServerModelListPage(
-      models: List<CodexAppServerModelDescription>.from(listedModels),
-      nextCursor: null,
+      models: List<CodexAppServerModel>.from(listedModels),
+      nextCursor: listModelsNextCursor,
     );
   }
 

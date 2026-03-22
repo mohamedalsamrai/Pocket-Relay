@@ -62,6 +62,22 @@ String? _asString(Object? value) {
   return value is String ? value : null;
 }
 
+bool? _asBool(Object? value) {
+  return value is bool ? value : null;
+}
+
+List<String> _stringList(Object? value) {
+  if (value is! List) {
+    return const <String>[];
+  }
+
+  return value
+      .whereType<String>()
+      .map((entry) => entry.trim())
+      .where((entry) => entry.isNotEmpty)
+      .toList(growable: false);
+}
+
 CodexAppServerSession _sessionFromPayload(
   Map<String, dynamic> payload, {
   required CodexAppServerThreadSummary thread,
@@ -86,6 +102,90 @@ String? _responseReasoningEffort(Map<String, dynamic> payload) {
   return _asString(payload['reasoningEffort']) ??
       _asString(payload['reasoning_effort']) ??
       _asString(payload['effort']);
+}
+
+CodexAppServerModel? _asModel(Object? value) {
+  final model = _asObject(value);
+  final id = _asString(model?['id'])?.trim() ?? '';
+  final modelName = _asString(model?['model'])?.trim() ?? '';
+  final defaultReasoningEffort = codexReasoningEffortFromWireValue(
+    _asString(model?['defaultReasoningEffort']),
+  );
+  if (id.isEmpty || modelName.isEmpty || defaultReasoningEffort == null) {
+    return null;
+  }
+
+  final displayName = _asString(model?['displayName'])?.trim();
+  return CodexAppServerModel(
+    id: id,
+    model: modelName,
+    displayName: displayName == null || displayName.isEmpty
+        ? modelName
+        : displayName,
+    description: _asString(model?['description']) ?? '',
+    hidden: _asBool(model?['hidden']) ?? false,
+    supportedReasoningEfforts: _reasoningEffortOptions(
+      model?['supportedReasoningEfforts'],
+    ),
+    defaultReasoningEffort: defaultReasoningEffort,
+    inputModalities: _stringList(model?['inputModalities']),
+    supportsPersonality: _asBool(model?['supportsPersonality']) ?? false,
+    isDefault: _asBool(model?['isDefault']) ?? false,
+    upgrade: _asString(model?['upgrade']),
+    upgradeInfo: _asModelUpgradeInfo(model?['upgradeInfo']),
+    availabilityNuxMessage: _availabilityNuxMessage(model?['availabilityNux']),
+  );
+}
+
+List<CodexAppServerReasoningEffortOption> _reasoningEffortOptions(Object? raw) {
+  if (raw is! List) {
+    return const <CodexAppServerReasoningEffortOption>[];
+  }
+
+  return raw
+      .map(_asReasoningEffortOption)
+      .whereType<CodexAppServerReasoningEffortOption>()
+      .toList(growable: false);
+}
+
+CodexAppServerReasoningEffortOption? _asReasoningEffortOption(Object? value) {
+  final option = _asObject(value);
+  final reasoningEffort = codexReasoningEffortFromWireValue(
+    _asString(option?['reasoningEffort']) ??
+        _asString(option?['reasoning_effort']),
+  );
+  if (reasoningEffort == null) {
+    return null;
+  }
+
+  return CodexAppServerReasoningEffortOption(
+    reasoningEffort: reasoningEffort,
+    description: _asString(option?['description']) ?? '',
+  );
+}
+
+CodexAppServerModelUpgradeInfo? _asModelUpgradeInfo(Object? value) {
+  final upgradeInfo = _asObject(value);
+  final model = _asString(upgradeInfo?['model'])?.trim() ?? '';
+  if (model.isEmpty) {
+    return null;
+  }
+
+  return CodexAppServerModelUpgradeInfo(
+    model: model,
+    upgradeCopy: _asString(upgradeInfo?['upgradeCopy']),
+    modelLink: _asString(upgradeInfo?['modelLink']),
+    migrationMarkdown: _asString(upgradeInfo?['migrationMarkdown']),
+  );
+}
+
+String? _availabilityNuxMessage(Object? value) {
+  final availabilityNux = _asObject(value);
+  final message = _asString(availabilityNux?['message'])?.trim();
+  if (message == null || message.isEmpty) {
+    return null;
+  }
+  return message;
 }
 
 CodexAppServerThreadSummary _requireThreadSummary(Object? value, String label) {
@@ -167,48 +267,6 @@ int? _countUserPromptItems(Object? rawTurns) {
 
 int? _asInt(Object? value) {
   return value is num ? value.toInt() : null;
-}
-
-bool? _asBool(Object? value) {
-  return value is bool ? value : null;
-}
-
-CodexAppServerModelDescription? _asModelDescription(Object? value) {
-  final model = _asObject(value);
-  final modelName = _asString(model?['model']) ?? '';
-  if (modelName.isEmpty) {
-    return null;
-  }
-
-  final id = _asString(model?['id']) ?? modelName;
-  final displayName = _asString(model?['displayName']) ?? modelName;
-  return CodexAppServerModelDescription(
-    id: id,
-    model: modelName,
-    displayName: displayName,
-    hidden: _asBool(model?['hidden']) ?? false,
-    inputModalities: _inputModalitiesFromRaw(model?['inputModalities']),
-  );
-}
-
-List<CodexAppServerInputModality> _inputModalitiesFromRaw(Object? value) {
-  if (value is! List) {
-    return const <CodexAppServerInputModality>[];
-  }
-
-  return value
-      .map(_inputModalityFromRaw)
-      .whereType<CodexAppServerInputModality>()
-      .toList(growable: false);
-}
-
-CodexAppServerInputModality? _inputModalityFromRaw(Object? value) {
-  final normalized = _asString(value)?.trim().toLowerCase();
-  return switch (normalized) {
-    'text' => CodexAppServerInputModality.text,
-    'image' => CodexAppServerInputModality.image,
-    _ => null,
-  };
 }
 
 String _approvalPolicyFor(ConnectionProfile profile) {

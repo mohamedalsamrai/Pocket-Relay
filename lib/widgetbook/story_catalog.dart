@@ -12,6 +12,7 @@ import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer.dart';
+import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/approval_request_surface.dart';
@@ -620,7 +621,9 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.mobileBehavior,
                   contract: const ChatComposerContract(
-                    draftText: 'Summarize the latest session output.',
+                    draft: ChatComposerDraft(
+                      text: 'Summarize the latest session output.',
+                    ),
                     isSendActionEnabled: true,
                     placeholder: 'Ask Codex to continue',
                   ),
@@ -636,8 +639,10 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   contract: const ChatComposerContract(
-                    draftText:
-                        'Run the failing test file and explain the regression.',
+                    draft: ChatComposerDraft(
+                      text:
+                          'Run the failing test file and explain the regression.',
+                    ),
                     isSendActionEnabled: true,
                     placeholder: 'Message Pocket Relay',
                   ),
@@ -691,6 +696,9 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.remoteProfile,
                   initialSecrets: WidgetbookFixtures.passwordSecrets,
+                  availableModelCatalog: codexReferenceModelCatalog(
+                    connectionId: 'widgetbook-remote',
+                  ),
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   onCancel: () {},
                   onSubmit: (_) {},
@@ -710,6 +718,9 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.localProfile,
                   initialSecrets: const ConnectionSecrets(),
+                  availableModelCatalog: codexReferenceModelCatalog(
+                    connectionId: 'widgetbook-local',
+                  ),
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   onCancel: () {},
                   onSubmit: (_) {},
