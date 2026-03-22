@@ -143,7 +143,6 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     lastRecoveryOutcome,
   );
 }
-
 class ConnectionWorkspaceState {
   const ConnectionWorkspaceState({
     required this.isLoading,
