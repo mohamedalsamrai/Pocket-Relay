@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
@@ -41,6 +42,9 @@ class UserMessageSurface extends StatelessWidget {
       ),
     );
     final canContinueAction = canContinueFromHere && onContinueFromHere != null;
+    final attachmentSummaries = block.draft.localImageAttachments
+        .map(_attachmentSummary)
+        .toList(growable: false);
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
@@ -83,6 +87,35 @@ class UserMessageSurface extends StatelessWidget {
                         height: 1.35,
                       ),
                     ),
+                    if (attachmentSummaries.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ...attachmentSummaries.indexed.map(
+                        (entry) => Padding(
+                          padding: EdgeInsets.only(top: entry.$1 == 0 ? 0 : 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.image_outlined,
+                                size: 14,
+                                color: cards.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  entry.$2,
+                                  style: TextStyle(
+                                    color: cards.textSecondary,
+                                    fontSize: 12.5,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -205,3 +238,24 @@ class UserMessageSurface extends StatelessWidget {
 }
 
 enum _UserMessageSurfaceAction { copyPrompt, continueFromHere }
+
+String _attachmentSummary(ChatComposerLocalImageAttachment attachment) {
+  final fileName = _pathBasename(attachment.path.trim());
+  final placeholder = attachment.placeholder?.trim();
+  if (placeholder == null || placeholder.isEmpty) {
+    return fileName;
+  }
+  return '$placeholder $fileName';
+}
+
+String _pathBasename(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final segments = normalized.split('/');
+  for (var index = segments.length - 1; index >= 0; index -= 1) {
+    final segment = segments[index].trim();
+    if (segment.isNotEmpty) {
+      return segment;
+    }
+  }
+  return path;
+}
