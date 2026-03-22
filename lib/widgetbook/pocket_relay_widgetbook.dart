@@ -215,7 +215,9 @@ class _PocketRelayWidgetbookHome extends StatelessWidget {
                   Text(
                     'Preview real app-owned surfaces and backend-driven states.',
                     style: textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.72,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

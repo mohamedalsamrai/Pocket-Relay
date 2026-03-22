@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/utils/duration_utils.dart';
 import 'package:pocket_relay/src/core/utils/monotonic_clock.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
 class TurnElapsedFooter extends StatefulWidget {
   const TurnElapsedFooter({
@@ -61,7 +61,7 @@ class _TurnElapsedFooterState extends State<TurnElapsedFooter> {
 
   @override
   Widget build(BuildContext context) {
-    final cards = ConversationCardPalette.of(context);
+    final cards = TranscriptPalette.of(context);
     final accent = widget.accent ?? tealAccent(Theme.of(context).brightness);
     final elapsed = widget.turnTimer.elapsedAt(
       DateTime.now(),

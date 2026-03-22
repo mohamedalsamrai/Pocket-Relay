@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
 MarkdownStyleSheet buildConversationMarkdownStyle({
   required ThemeData theme,
-  required ConversationCardPalette cards,
+  required TranscriptPalette cards,
   required Color accent,
   bool isAssistant = false,
 }) {
@@ -42,7 +42,7 @@ MarkdownStyleSheet buildConversationMarkdownStyle({
 
 MarkdownStyleSheet buildPlanMarkdownStyle({
   required ThemeData theme,
-  required ConversationCardPalette cards,
+  required TranscriptPalette cards,
   required Color accent,
 }) {
   return MarkdownStyleSheet.fromTheme(theme).copyWith(
@@ -67,7 +67,7 @@ MarkdownStyleSheet buildPlanMarkdownStyle({
 
 TextStyle? _codeTextStyle(
   TextStyle? base, {
-  required ConversationCardPalette cards,
+  required TranscriptPalette cards,
   required double fontSize,
 }) {
   return base?.copyWith(
@@ -80,7 +80,7 @@ TextStyle? _codeTextStyle(
   );
 }
 
-BoxDecoration _codeBlockDecoration(ConversationCardPalette cards) {
+BoxDecoration _codeBlockDecoration(TranscriptPalette cards) {
   return BoxDecoration(
     color: cards.codeSurface,
     borderRadius: BorderRadius.circular(12),
