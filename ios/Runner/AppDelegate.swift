@@ -1,31 +1,21 @@
 import Flutter
 import UIKit
 
-@main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+private final class BackgroundExecutionCoordinator {
+  static let shared = BackgroundExecutionCoordinator()
+
+  private init() {}
+
   private var finiteBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+  private weak var flutterViewController: FlutterViewController?
   private var backgroundExecutionChannel: FlutterMethodChannel?
 
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    let didFinishLaunching = super.application(
-      application,
-      didFinishLaunchingWithOptions: launchOptions
-    )
-    registerBackgroundExecutionChannel()
-    return didFinishLaunching
-  }
-
-  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-  }
-
-  private func registerBackgroundExecutionChannel() {
-    guard let flutterViewController = window?.rootViewController as? FlutterViewController else {
+  func register(with flutterViewController: FlutterViewController) {
+    guard self.flutterViewController !== flutterViewController else {
       return
     }
+
+    backgroundExecutionChannel?.setMethodCallHandler(nil)
 
     let channel = FlutterMethodChannel(
       name: "me.vinch.pocketrelay/background_execution",
@@ -34,6 +24,8 @@ import UIKit
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handleBackgroundExecutionCall(call, result: result)
     }
+
+    self.flutterViewController = flutterViewController
     backgroundExecutionChannel = channel
   }
 
@@ -88,5 +80,12 @@ import UIKit
     let task = finiteBackgroundTask
     finiteBackgroundTask = .invalid
     UIApplication.shared.endBackgroundTask(task)
+  }
+}
+
+@main
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
 }
