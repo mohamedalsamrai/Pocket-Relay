@@ -1,11 +1,11 @@
 part of 'chat_empty_state_body.dart';
 
 extension on ChatEmptyStateBody {
-  Widget _buildCard(BuildContext context, Widget content) {
-    return _buildMaterialCard(context, content);
+  Widget _buildShell(BuildContext context, Widget content) {
+    return _buildPanelShell(context, content);
   }
 
-  Widget _buildMaterialCard(BuildContext context, Widget content) {
+  Widget _buildPanelShell(BuildContext context, Widget content) {
     final palette = context.pocketPalette;
 
     return PocketPanelSurface(

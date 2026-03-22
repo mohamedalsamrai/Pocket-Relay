@@ -44,8 +44,8 @@ class ChatEmptyStateBody extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: isDesktop
-                    ? _buildDesktopCard(context, constraints.maxWidth)
-                    : _buildMobileCard(context),
+                    ? _buildDesktopShell(context, constraints.maxWidth)
+                    : _buildMobileShell(context),
               ),
             ),
           ),

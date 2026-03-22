@@ -61,8 +61,8 @@ class _DormantConnectionsEmptyState extends StatelessWidget {
   }
 }
 
-class _DormantConnectionCard extends StatelessWidget {
-  const _DormantConnectionCard({
+class _DormantConnectionItem extends StatelessWidget {
+  const _DormantConnectionItem({
     required this.connectionId,
     required this.title,
     required this.subtitle,

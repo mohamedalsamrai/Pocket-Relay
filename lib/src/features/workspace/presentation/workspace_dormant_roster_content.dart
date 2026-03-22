@@ -12,7 +12,7 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 
-part 'workspace_dormant_roster_content_cards.dart';
+part 'workspace_dormant_roster_content_items.dart';
 part 'workspace_dormant_roster_content_shell.dart';
 
 class ConnectionWorkspaceDormantRosterContent extends StatefulWidget {

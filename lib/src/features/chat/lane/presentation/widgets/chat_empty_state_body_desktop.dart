@@ -1,7 +1,7 @@
 part of 'chat_empty_state_body.dart';
 
 extension on ChatEmptyStateBody {
-  Widget _buildDesktopCard(BuildContext context, double availableWidth) {
+  Widget _buildDesktopShell(BuildContext context, double availableWidth) {
     final supportsLocalConnectionMode =
         platformBehavior.supportsLocalConnectionMode;
     final content = Padding(
@@ -31,7 +31,7 @@ extension on ChatEmptyStateBody {
           ),
           const SizedBox(height: 24),
           if (isConfigured) ...[
-            _buildDesktopStatusCard(context),
+            _buildDesktopStatusSurface(context),
             const SizedBox(height: 16),
             _buildDetailsPanel(
               context,
@@ -54,11 +54,11 @@ extension on ChatEmptyStateBody {
       ),
     );
 
-    return _buildCard(context, content);
+    return _buildShell(context, content);
   }
 
   Widget _buildDesktopRoutePanel(BuildContext context, double availableWidth) {
-    final cardWidth = availableWidth >= 720 ? 320.0 : double.infinity;
+    final optionWidth = availableWidth >= 720 ? 320.0 : double.infinity;
 
     return Wrap(
       alignment: WrapAlignment.center,
@@ -66,8 +66,8 @@ extension on ChatEmptyStateBody {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: cardWidth,
-          child: _DesktopRouteCard(
+          width: optionWidth,
+          child: _DesktopRouteOption(
             title: 'Local',
             subtitle:
                 'Run `codex app-server` here and keep the repo and tools on this machine.',
@@ -78,8 +78,8 @@ extension on ChatEmptyStateBody {
           ),
         ),
         SizedBox(
-          width: cardWidth,
-          child: _DesktopRouteCard(
+          width: optionWidth,
+          child: _DesktopRouteOption(
             title: 'Remote',
             subtitle:
                 'SSH to a developer box, run Codex there, and stream the session back to this desktop.',
@@ -93,10 +93,10 @@ extension on ChatEmptyStateBody {
     );
   }
 
-  Widget _buildDesktopStatusCard(BuildContext context) {
+  Widget _buildDesktopStatusSurface(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 560),
-      child: _DesktopRouteCard(
+      child: _DesktopRouteOption(
         title: connectionMode == ConnectionMode.local
             ? 'Current route: Local'
             : 'Current route: Remote',
@@ -176,8 +176,8 @@ extension on ChatEmptyStateBody {
   }
 }
 
-class _DesktopRouteCard extends StatelessWidget {
-  const _DesktopRouteCard({
+class _DesktopRouteOption extends StatelessWidget {
+  const _DesktopRouteOption({
     required this.title,
     required this.subtitle,
     required this.isActive,
@@ -203,7 +203,7 @@ class _DesktopRouteCard extends StatelessWidget {
     );
 
     final indicatorColor = isActive ? titleColor : bodyColor;
-    final card = DecoratedBox(
+    final optionSurface = DecoratedBox(
       decoration: BoxDecoration(
         color: background,
         borderRadius: PocketRadii.circular(PocketRadii.lg),
@@ -246,7 +246,7 @@ class _DesktopRouteCard extends StatelessWidget {
     );
 
     if (onTap == null) {
-      return card;
+      return optionSurface;
     }
 
     return Semantics(
@@ -257,7 +257,7 @@ class _DesktopRouteCard extends StatelessWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
-          child: card,
+          child: optionSurface,
         ),
       ),
     );

@@ -672,7 +672,7 @@ void main() {
     },
   );
 
-  testWidgets('adding a dormant connection appends a new roster card', (
+  testWidgets('adding a dormant connection appends a new roster entry', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -738,7 +738,7 @@ void main() {
     ]);
   });
 
-  testWidgets('editing a dormant connection updates the roster card', (
+  testWidgets('editing a dormant connection updates the roster entry', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -902,26 +902,22 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
-    laneBindingFactory:
-        ({
-          required connectionId,
-          required connection,
-        }) {
-          final appServerClient = clientsById[connectionId]!;
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: resolvedRepository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+    laneBindingFactory: ({required connectionId, required connection}) {
+      final appServerClient = clientsById[connectionId]!;
+      return ConnectionLaneBinding(
+        connectionId: connectionId,
+        profileStore: ConnectionScopedProfileStore(
+          connectionId: connectionId,
+          connectionRepository: resolvedRepository,
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: connection.profile,
+          secrets: connection.secrets,
+        ),
+        ownsAppServerClient: false,
+      );
+    },
   );
 }
 
