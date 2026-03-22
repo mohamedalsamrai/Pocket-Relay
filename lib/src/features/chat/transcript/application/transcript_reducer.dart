@@ -6,6 +6,8 @@ import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_s
 part 'transcript_reducer_lifecycle.dart';
 part 'transcript_reducer_session.dart';
 part 'transcript_reducer_workspace.dart';
+part 'transcript_reducer_workspace_threads.dart';
+part 'transcript_reducer_workspace_timeline.dart';
 
 class TranscriptReducer {
   const TranscriptReducer({
