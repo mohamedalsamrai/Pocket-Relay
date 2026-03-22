@@ -174,16 +174,15 @@ class TranscriptTurnArtifactBuilder {
       );
       artifactId = last.id;
     } else {
-      final nextEntries = _retainChangedFilesEntryDiffs(
-        <CodexChangedFilesEntry>[entry],
-      );
+      final nextEntries = <CodexChangedFilesEntry>[entry];
+      final retainedEntries = _retainChangedFilesEntryDiffs(nextEntries);
       final nextArtifact = CodexTurnChangedFilesArtifact(
         id: 'changed_files_group_${item.entryId}',
         createdAt: item.createdAt,
         title: item.title ?? _blockFactory.defaultItemTitle(item.itemType),
         itemId: item.itemId,
         files: _mergeChangedFilesForEntries(nextEntries),
-        unifiedDiff: _mergedRetainedUnifiedDiff(nextEntries),
+        unifiedDiff: _mergedRetainedUnifiedDiff(retainedEntries),
         entries: nextEntries,
         isStreaming: item.isRunning,
       );
@@ -241,9 +240,9 @@ class TranscriptTurnArtifactBuilder {
       createdAt: artifact.createdAt,
       title: artifact.title,
       itemId: entry.itemId,
-      files: _mergeChangedFilesForEntries(retainedEntries),
+      files: _mergeChangedFilesForEntries(nextEntries),
       unifiedDiff: _mergedRetainedUnifiedDiff(retainedEntries),
-      entries: retainedEntries,
+      entries: nextEntries,
       isStreaming: entry.isRunning,
     );
   }

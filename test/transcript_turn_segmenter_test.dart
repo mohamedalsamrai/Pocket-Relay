@@ -166,30 +166,12 @@ $diffLines
       }
 
       final artifact = turn.artifacts.single as CodexTurnChangedFilesArtifact;
-      final retainedEntryDiffs = artifact.entries
-          .map((entry) => entry.unifiedDiff)
-          .whereType<String>()
-          .toList(growable: false);
-      final totalRetainedEntryChars = retainedEntryDiffs.fold<int>(
-        0,
-        (total, diff) => total + diff.length,
-      );
-      final totalRetainedEntryLines = retainedEntryDiffs.fold<int>(
-        0,
-        (total, diff) => total + countLines(diff),
-      );
 
       expect(artifact.entries, hasLength(entryCount));
-      expect(retainedEntryDiffs, isNotEmpty);
       expect(
-        totalRetainedEntryChars,
-        lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffChars),
+        artifact.entries.every((entry) => entry.unifiedDiff != null),
+        isTrue,
       );
-      expect(
-        totalRetainedEntryLines,
-        lessThanOrEqualTo(TranscriptMemoryBudget.maxUnifiedDiffLines),
-      );
-      expect(artifact.entries.first.unifiedDiff, isNull);
       expect(artifact.entries.last.unifiedDiff, isNotNull);
       expect(
         artifact.unifiedDiff!.length,
@@ -256,7 +238,6 @@ $diffLines
         'entry-b',
         'entry-a',
       ]);
-      expect(entriesById['entry-b']!.unifiedDiff, isNull);
       expect(entriesById['entry-a']!.unifiedDiff, isNotNull);
       expect(entriesById['entry-a']!.unifiedDiff, contains('entry a latest'));
       expect(artifact.unifiedDiff, contains('entry a latest'));
@@ -296,19 +277,71 @@ $diffLines
     );
 
     final artifact = turn.artifacts.single as CodexTurnChangedFilesArtifact;
-    final retainedEntryDiffs = artifact.entries
-        .map((entry) => entry.unifiedDiff)
-        .whereType<String>()
-        .toList(growable: false);
-
-    expect(retainedEntryDiffs, hasLength(2));
-    expect(retainedEntryDiffs.map(countLines).toList(growable: false), <int>[
-      retainedLinesPerEntry + unifiedDiffHeaderLineCount,
-      retainedLinesPerEntry + unifiedDiffHeaderLineCount,
-    ]);
+    expect(artifact.unifiedDiff, contains('entry 1 line 0'));
+    expect(artifact.unifiedDiff, contains('entry 2 line 0'));
     expect(
       countLines(artifact.unifiedDiff!),
       TranscriptMemoryBudget.maxUnifiedDiffLines,
     );
   });
+
+  test(
+    'restores older changed-file hunks when later entries shrink back under budget',
+    () {
+      var turn = initialTurn();
+      final largeEntryLines =
+          TranscriptMemoryBudget.maxUnifiedDiffLines -
+          unifiedDiffHeaderLineCount -
+          100;
+
+      turn = builder.upsertItem(
+        turn,
+        changedFilesItem(
+          itemId: 'item-a',
+          entryId: 'entry-a',
+          body: changedFilesBody(
+            fileName: 'file_a',
+            lineCount: largeEntryLines,
+            linePrefix: 'entry a large',
+          ),
+        ),
+      );
+      turn = builder.upsertItem(
+        turn,
+        changedFilesItem(
+          itemId: 'item-b',
+          entryId: 'entry-b',
+          body: changedFilesBody(
+            fileName: 'file_b',
+            lineCount: largeEntryLines,
+            linePrefix: 'entry b large',
+          ),
+        ),
+      );
+      turn = builder.upsertItem(
+        turn,
+        changedFilesItem(
+          itemId: 'item-b',
+          entryId: 'entry-b',
+          body: changedFilesBody(
+            fileName: 'file_b',
+            lineCount: 10,
+            linePrefix: 'entry b small',
+          ),
+        ),
+      );
+
+      final artifact = turn.artifacts.single as CodexTurnChangedFilesArtifact;
+      final entriesById = <String, CodexChangedFilesEntry>{
+        for (final entry in artifact.entries) entry.id: entry,
+      };
+
+      expect(
+        entriesById['entry-a']!.unifiedDiff,
+        contains('entry a large line 1000'),
+      );
+      expect(artifact.unifiedDiff, contains('entry a large line 1000'));
+      expect(artifact.unifiedDiff, contains('entry b small line 9'));
+    },
+  );
 }
