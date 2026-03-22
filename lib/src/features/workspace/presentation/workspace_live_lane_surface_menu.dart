@@ -50,7 +50,6 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
     final repository =
         widget.conversationHistoryRepository ??
         const CodexAppServerConversationHistoryRepository();
-    final sessionController = widget.laneBinding.sessionController;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -59,10 +58,14 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
           heightFactor: 0.82,
           child: ConnectionWorkspaceConversationHistorySheet(
             title: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
-            future: repository.loadWorkspaceConversations(
-              profile: sessionController.profile,
-              secrets: sessionController.secrets,
-            ),
+            future: _loadConversationHistory(repository),
+            onOpenConnectionSettings: () {
+              unawaited(
+                _openConversationHistoryConnectionSettings(
+                  Navigator.of(context),
+                ),
+              );
+            },
             onResumeConversation: (conversation) {
               unawaited(_resumeConversation(conversation));
             },
@@ -70,6 +73,47 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         );
       },
     );
+  }
+
+  Future<List<CodexWorkspaceConversationSummary>> _loadConversationHistory(
+    CodexWorkspaceConversationHistoryRepository repository,
+  ) async {
+    final connection = await _resolveConversationHistoryConnection();
+    return repository.loadWorkspaceConversations(
+      profile: connection.profile,
+      secrets: connection.secrets,
+    );
+  }
+
+  Future<void> _openConversationHistoryConnectionSettings(
+    NavigatorState navigator,
+  ) async {
+    navigator.pop();
+    final connection = await _resolveConversationHistoryConnection();
+    if (!mounted) {
+      return;
+    }
+
+    await _handleConnectionSettingsRequested(
+      ChatConnectionSettingsLaunchContract(
+        initialProfile: connection.profile,
+        initialSecrets: connection.secrets,
+      ),
+    );
+  }
+
+  Future<SavedConnection> _resolveConversationHistoryConnection() async {
+    final connectionId = widget.laneBinding.connectionId;
+    final sessionController = widget.laneBinding.sessionController;
+    if (!widget.workspaceController.state.requiresReconnect(connectionId)) {
+      return SavedConnection(
+        id: connectionId,
+        profile: sessionController.profile,
+        secrets: sessionController.secrets,
+      );
+    }
+
+    return widget.workspaceController.loadSavedConnection(connectionId);
   }
 
   Future<void> _resumeConversation(

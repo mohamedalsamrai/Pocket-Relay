@@ -80,6 +80,7 @@ class ChatSessionController extends ChangeNotifier {
   bool _isDisposed = false;
   bool _isTrackingSshBootstrapFailures = false;
   bool _sawTrackedSshBootstrapFailure = false;
+  bool _sawTrackedUnpinnedHostKeyFailure = false;
   bool _suppressTrackedThreadReuse = false;
   bool _didAttemptModelCatalogHydration = false;
   int _historicalConversationRestoreGeneration = 0;

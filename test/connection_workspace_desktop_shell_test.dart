@@ -329,6 +329,107 @@ void main() {
   });
 
   testWidgets(
+    'desktop conversation history can open connection settings for an unpinned host key',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate = FakeConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+          conversationHistoryRepository:
+              FakeCodexWorkspaceConversationHistoryRepository(
+                error:
+                    const CodexWorkspaceConversationHistoryUnpinnedHostKeyException(
+                      host: 'example.com',
+                      port: 22,
+                      keyType: 'ssh-ed25519',
+                      fingerprint: '7a:9f:d7:dc:2e:f2',
+                    ),
+              ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Conversation history'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host key not pinned'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('conversation_history_open_connection_settings'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(settingsOverlayDelegate.launchedSettings, hasLength(1));
+      expect(
+        settingsOverlayDelegate.launchedSettings.single.$1.host,
+        'primary.local',
+      );
+      expect(
+        settingsOverlayDelegate.launchedSettings.single.$2.password,
+        'secret-1',
+      );
+    },
+  );
+
+  testWidgets(
+    'desktop conversation history retries with saved connection edits when reconnect is required',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final repository = FakeCodexWorkspaceConversationHistoryRepository();
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Box', 'saved.primary.local').copyWith(
+          hostFingerprint: 'SHA256:saved',
+        ),
+        secrets: const ConnectionSecrets(password: 'saved-secret'),
+      );
+
+      await tester.pumpWidget(
+        _buildShell(
+          controller,
+          conversationHistoryRepository: repository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+
+      await tester.tap(find.byTooltip('More actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Conversation history'));
+      await tester.pumpAndSettle();
+
+      expect(repository.loadCalls, hasLength(1));
+      expect(repository.loadCalls.single.$1.host, 'saved.primary.local');
+      expect(
+        repository.loadCalls.single.$1.hostFingerprint,
+        'SHA256:saved',
+      );
+      expect(repository.loadCalls.single.$2.password, 'saved-secret');
+    },
+  );
+
+  testWidgets(
     'desktop conversation history row resumes the selected Codex thread',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -487,6 +588,7 @@ void main() {
         isTrue,
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(clientsById['conn_primary']!.startSessionCalls, 1);
       expect(
@@ -974,12 +1076,15 @@ class FakeCodexWorkspaceConversationHistoryRepository
 
   final List<CodexWorkspaceConversationSummary> conversations;
   final Object? error;
+  final List<(ConnectionProfile, ConnectionSecrets)> loadCalls =
+      <(ConnectionProfile, ConnectionSecrets)>[];
 
   @override
   Future<List<CodexWorkspaceConversationSummary>> loadWorkspaceConversations({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   }) async {
+    loadCalls.add((profile, secrets));
     if (error != null) {
       throw error!;
     }

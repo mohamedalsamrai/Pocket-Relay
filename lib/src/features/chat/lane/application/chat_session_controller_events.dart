@@ -18,6 +18,10 @@ void _handleChatSessionAppServerEvent(
       runtimeEvents.any(controller._isSshBootstrapFailureRuntimeEvent)) {
     controller._sawTrackedSshBootstrapFailure = true;
   }
+  if (controller._isTrackingSshBootstrapFailures &&
+      runtimeEvents.any((event) => event is CodexRuntimeUnpinnedHostKeyEvent)) {
+    controller._sawTrackedUnpinnedHostKeyFailure = true;
+  }
 
   for (final runtimeEvent in runtimeEvents) {
     _applyChatSessionRuntimeEvent(controller, runtimeEvent);

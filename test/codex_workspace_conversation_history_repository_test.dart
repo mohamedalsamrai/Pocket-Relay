@@ -139,4 +139,46 @@ void main() {
       'thread_old',
     ]);
   });
+
+  test(
+    'surfaces an actionable unpinned host key error when history loading hits an untrusted remote',
+    () async {
+      final client = FakeCodexAppServerClient()
+        ..connectEventsBeforeThrow.add(
+          const CodexAppServerUnpinnedHostKeyEvent(
+            host: 'example.com',
+            port: 22,
+            keyType: 'ssh-ed25519',
+            fingerprint: '7a:9f:d7:dc:2e:f2',
+          ),
+        )
+        ..connectError = StateError('Host key rejected');
+      addTearDown(client.close);
+
+      final repository = CodexAppServerConversationHistoryRepository(
+        clientFactory: () => client,
+      );
+
+      await expectLater(
+        repository.loadWorkspaceConversations(
+          profile: ConnectionProfile.defaults().copyWith(
+            host: 'example.com',
+            username: 'vince',
+            workspaceDir: '/workspace',
+          ),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+        throwsA(
+          isA<CodexWorkspaceConversationHistoryUnpinnedHostKeyException>()
+              .having((error) => error.host, 'host', 'example.com')
+              .having((error) => error.port, 'port', 22)
+              .having(
+                (error) => error.fingerprint,
+                'fingerprint',
+                '7a:9f:d7:dc:2e:f2',
+              ),
+        ),
+      );
+    },
+  );
 }
