@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
-import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_chrome_menu_action.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
@@ -33,7 +32,8 @@ class ConnectionWorkspaceLiveLaneSurface extends StatefulWidget {
   final ConnectionWorkspaceController workspaceController;
   final ConnectionLaneBinding laneBinding;
   final PocketPlatformPolicy platformPolicy;
-  final CodexWorkspaceConversationHistoryRepository? conversationHistoryRepository;
+  final CodexWorkspaceConversationHistoryRepository?
+  conversationHistoryRepository;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
   @override
@@ -69,22 +69,17 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       supplementalMenuActions: _supplementalMenuActionsFor(
         requiresReconnect: requiresReconnect,
       ),
+      laneRestartAction: requiresReconnect
+          ? ChatLaneRestartActionContract(
+              badgeLabel: ConnectionWorkspaceCopy.reconnectBadge,
+              label: _isApplyingSavedSettings
+                  ? ConnectionWorkspaceCopy.reconnectProgress
+                  : ConnectionWorkspaceCopy.reconnectAction,
+              isInProgress: _isApplyingSavedSettings,
+            )
+          : null,
+      onRestartLane: requiresReconnect ? _applySavedSettings : null,
     );
-    if (!requiresReconnect) {
-      return chatRoot;
-    }
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: _SavedSettingsNotice(
-            isApplying: _isApplyingSavedSettings,
-            onApply: _applySavedSettings,
-          ),
-        ),
-        Expanded(child: chatRoot),
-      ],
-    );
+    return chatRoot;
   }
 }

@@ -170,6 +170,18 @@ class ChatTurnIndicatorContract {
   final CodexSessionTurnTimer timer;
 }
 
+class ChatLaneRestartActionContract {
+  const ChatLaneRestartActionContract({
+    required this.badgeLabel,
+    required this.label,
+    this.isInProgress = false,
+  });
+
+  final String badgeLabel;
+  final String label;
+  final bool isInProgress;
+}
+
 class ChatConnectionSettingsLaunchContract {
   const ChatConnectionSettingsLaunchContract({
     required this.initialProfile,

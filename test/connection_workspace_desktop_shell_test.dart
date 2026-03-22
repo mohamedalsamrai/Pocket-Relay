@@ -678,8 +678,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
-      expect(find.text('Reconnect needed'), findsOneWidget);
-      expect(find.text('Saved settings are pending'), findsOneWidget);
+      expect(find.text('Restart needed'), findsNWidgets(2));
+      expect(find.text('Saved settings are pending'), findsNothing);
+      expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },
   );
@@ -850,26 +851,22 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
-    laneBindingFactory:
-        ({
-          required connectionId,
-          required connection,
-        }) {
-          final appServerClient = clientsById[connectionId]!;
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: resolvedRepository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+    laneBindingFactory: ({required connectionId, required connection}) {
+      final appServerClient = clientsById[connectionId]!;
+      return ConnectionLaneBinding(
+        connectionId: connectionId,
+        profileStore: ConnectionScopedProfileStore(
+          connectionId: connectionId,
+          connectionRepository: resolvedRepository,
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: connection.profile,
+          secrets: connection.secrets,
+        ),
+        ownsAppServerClient: false,
+      );
+    },
   );
 }
 

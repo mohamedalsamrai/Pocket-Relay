@@ -540,11 +540,9 @@ void main() {
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
-      expect(find.text('Saved settings are pending'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('apply_saved_settings')),
-        findsOneWidget,
-      );
+      expect(find.text('Saved settings are pending'), findsNothing);
+      expect(find.text('Restart needed'), findsOneWidget);
+      expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
     },
   );
 
@@ -622,12 +620,12 @@ void main() {
 
       await tester.tap(find.byTooltip('Connection settings'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('apply_saved_settings')));
+      await tester.tap(find.byKey(const ValueKey('restart_lane')));
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
       expect(clientsById['conn_primary']?.disconnectCalls, 1);
-      expect(find.text('Saved settings are pending'), findsNothing);
+      expect(find.text('Restart needed'), findsNothing);
       expect(find.text('Primary Renamed'), findsOneWidget);
       expect(find.text('primary.changed'), findsOneWidget);
     },
