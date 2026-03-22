@@ -691,6 +691,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.remoteProfile,
                   initialSecrets: WidgetbookFixtures.passwordSecrets,
+                  allowReferenceModelFallback: true,
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   onCancel: () {},
                   onSubmit: (_) {},
@@ -710,6 +711,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 child: ConnectionSettingsHost(
                   initialProfile: WidgetbookFixtures.localProfile,
                   initialSecrets: const ConnectionSecrets(),
+                  allowReferenceModelFallback: true,
                   platformBehavior: WidgetbookFixtures.desktopBehavior,
                   onCancel: () {},
                   onSubmit: (_) {},

@@ -20,7 +20,7 @@ class ConnectionSettingsHost extends StatefulWidget {
     required this.initialProfile,
     required this.initialSecrets,
     this.availableModelCatalog,
-    this.allowReferenceModelFallback = true,
+    this.allowReferenceModelFallback = false,
     this.onRefreshModelCatalog,
     required this.onCancel,
     required this.onSubmit,

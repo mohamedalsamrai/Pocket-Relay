@@ -14,7 +14,7 @@ abstract interface class ConnectionSettingsOverlayDelegate {
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
-    bool allowReferenceModelFallback = true,
+    bool allowReferenceModelFallback = false,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   });
@@ -31,7 +31,7 @@ class ModalConnectionSettingsOverlayDelegate
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
     ConnectionModelCatalog? availableModelCatalog,
-    bool allowReferenceModelFallback = true,
+    bool allowReferenceModelFallback = false,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
   }) {

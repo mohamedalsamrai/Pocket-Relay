@@ -121,6 +121,7 @@ void main() {
         initialProfile: initialProfile,
         initialSecrets: initialSecrets,
         formState: formState,
+        allowReferenceModelFallback: true,
         supportsLocalConnectionMode: true,
       );
       final payload = contract.saveAction.submitPayload;
@@ -167,6 +168,7 @@ void main() {
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
           formState: formState,
+          allowReferenceModelFallback: true,
         );
         final payload = contract.saveAction.submitPayload;
 
@@ -206,6 +208,7 @@ void main() {
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
           formState: formState,
+          allowReferenceModelFallback: true,
         );
         final payload = contract.saveAction.submitPayload;
 
@@ -239,6 +242,7 @@ void main() {
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
           formState: formState,
+          allowReferenceModelFallback: true,
         );
 
         expect(contract.modelSection.selectedModelId, 'gpt-5.1-codex-mini');

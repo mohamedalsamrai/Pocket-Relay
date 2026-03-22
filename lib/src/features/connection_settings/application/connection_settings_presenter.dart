@@ -13,7 +13,7 @@ class ConnectionSettingsPresenter {
     required ConnectionSecrets initialSecrets,
     required ConnectionSettingsFormState formState,
     ConnectionModelCatalog? availableModelCatalog,
-    bool allowReferenceModelFallback = true,
+    bool allowReferenceModelFallback = false,
     bool supportsModelCatalogRefresh = false,
     bool isRefreshingModelCatalog = false,
     bool supportsLocalConnectionMode = false,

@@ -229,7 +229,7 @@ class _ConnectionWorkspaceDormantRosterContentState
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
     ConnectionModelCatalog? availableModelCatalog,
-    bool allowReferenceModelFallback = true,
+    bool allowReferenceModelFallback = false,
   }) {
     return widget.settingsOverlayDelegate.openConnectionSettings(
       context: context,

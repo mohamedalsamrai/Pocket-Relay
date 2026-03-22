@@ -116,6 +116,7 @@ void main() {
 
       await tester.pumpWidget(
         _buildMaterialSettingsApp(
+          allowReferenceModelFallback: true,
           onSubmit: (payload) {
             materialPayload = payload;
           },
@@ -167,7 +168,12 @@ void main() {
   testWidgets(
     'reasoning effort dropdown follows the selected model picker entry',
     (tester) async {
-      await tester.pumpWidget(_buildMaterialSettingsApp(onSubmit: (_) {}));
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          allowReferenceModelFallback: true,
+        ),
+      );
 
       await tester.ensureVisible(
         find.byKey(const ValueKey<String>('connection_settings_model')),
@@ -388,7 +394,7 @@ Widget _buildMaterialSettingsApp({
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionProfile? initialProfile,
-  bool allowReferenceModelFallback = true,
+  bool allowReferenceModelFallback = false,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
 }) {
@@ -418,7 +424,7 @@ Widget _buildHost({
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionProfile? initialProfile,
-  bool allowReferenceModelFallback = true,
+  bool allowReferenceModelFallback = false,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
 }) {
