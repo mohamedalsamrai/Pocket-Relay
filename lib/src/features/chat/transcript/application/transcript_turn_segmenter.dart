@@ -179,13 +179,14 @@ class TranscriptTurnArtifactBuilder {
       artifactId = last.id;
     } else {
       final nextEntries = <CodexChangedFilesEntry>[entry];
+      final retainedEntries = _retainChangedFilesEntryDiffs(nextEntries);
       final nextArtifact = CodexTurnChangedFilesArtifact(
         id: 'changed_files_group_${item.entryId}',
         createdAt: item.createdAt,
         title: item.title ?? _blockFactory.defaultItemTitle(item.itemType),
         itemId: item.itemId,
         files: _mergeChangedFilesForEntries(nextEntries),
-        unifiedDiff: _mergedRetainedUnifiedDiff(nextEntries, _memoryBudget),
+        unifiedDiff: _mergedRetainedUnifiedDiff(retainedEntries),
         entries: nextEntries,
         isStreaming: item.isRunning,
       );
@@ -232,8 +233,11 @@ class TranscriptTurnArtifactBuilder {
     if (index == -1) {
       nextEntries.add(entry);
     } else {
-      nextEntries[index] = entry;
+      nextEntries
+        ..removeAt(index)
+        ..add(entry);
     }
+    final retainedEntries = _retainChangedFilesEntryDiffs(nextEntries);
 
     return CodexTurnChangedFilesArtifact(
       id: artifact.id,
@@ -241,7 +245,7 @@ class TranscriptTurnArtifactBuilder {
       title: artifact.title,
       itemId: entry.itemId,
       files: _mergeChangedFilesForEntries(nextEntries),
-      unifiedDiff: _mergedRetainedUnifiedDiff(nextEntries, _memoryBudget),
+      unifiedDiff: _mergedRetainedUnifiedDiff(retainedEntries),
       entries: nextEntries,
       isStreaming: entry.isRunning,
     );
@@ -341,14 +345,9 @@ List<CodexChangedFile> _mergeChangedFilesForEntries(
   return mergedByPath.values.toList(growable: false);
 }
 
-String? _mergedRetainedUnifiedDiff(
-  Iterable<CodexChangedFilesEntry> entries,
-  TranscriptMemoryBudget memoryBudget,
-) {
-  return memoryBudget.retainUnifiedDiff(
-    _joinUnifiedDiffFragments(
-      entries.map((entry) => entry.unifiedDiff).toList(growable: false),
-    ),
+String? _mergedRetainedUnifiedDiff(Iterable<CodexChangedFilesEntry> entries) {
+  return _joinUnifiedDiffFragments(
+    entries.map((entry) => entry.unifiedDiff).toList(growable: false),
   );
 }
 
@@ -363,3 +362,98 @@ String? _joinUnifiedDiffFragments(Iterable<String?> parts) {
   }
   return retainedParts.join('\n');
 }
+
+List<CodexChangedFilesEntry> _retainChangedFilesEntryDiffs(
+  List<CodexChangedFilesEntry> entries,
+) {
+  if (entries.isEmpty) {
+    return entries;
+  }
+
+  final retainedEntries = List<CodexChangedFilesEntry>.from(entries);
+  var remainingChars = TranscriptMemoryBudget.maxUnifiedDiffChars;
+  var remainingLines = TranscriptMemoryBudget.maxUnifiedDiffLines;
+  var hasRetainedLaterDiff = false;
+
+  for (var index = entries.length - 1; index >= 0; index -= 1) {
+    final entry = entries[index];
+    final separatorChars = hasRetainedLaterDiff ? 1 : 0;
+    final retainedDiff = _retainUnifiedDiffWithinBudget(
+      entry.unifiedDiff,
+      maxChars: remainingChars - separatorChars,
+      maxLines: remainingLines,
+    );
+
+    if (retainedDiff != entry.unifiedDiff) {
+      retainedEntries[index] = _changedFilesEntryWithUnifiedDiff(
+        entry,
+        retainedDiff,
+      );
+    }
+    if (retainedDiff == null) {
+      continue;
+    }
+
+    remainingChars -= retainedDiff.length + separatorChars;
+    remainingLines -= _lineCount(retainedDiff);
+    hasRetainedLaterDiff = true;
+  }
+
+  return retainedEntries;
+}
+
+String? _retainUnifiedDiffWithinBudget(
+  String? unifiedDiff, {
+  required int maxChars,
+  required int maxLines,
+}) {
+  final trimmed = unifiedDiff?.trim();
+  if (trimmed == null || trimmed.isEmpty || maxChars <= 0 || maxLines <= 0) {
+    return null;
+  }
+  if (trimmed.length <= maxChars) {
+    final lineCount = _lineCount(trimmed);
+    if (lineCount <= maxLines) {
+      return trimmed;
+    }
+  }
+
+  final lines = trimmed.split(RegExp(r'\r?\n'));
+  final buffer = StringBuffer();
+  var lineCount = 0;
+  var charCount = 0;
+
+  for (final line in lines) {
+    final additionalChars = (buffer.isEmpty ? 0 : 1) + line.length;
+    if (lineCount >= maxLines || charCount + additionalChars > maxChars) {
+      break;
+    }
+    if (buffer.isNotEmpty) {
+      buffer.writeln();
+      charCount += 1;
+    }
+    buffer.write(line);
+    charCount += line.length;
+    lineCount += 1;
+  }
+
+  final retained = buffer.toString().trim();
+  return retained.isEmpty ? null : retained;
+}
+
+CodexChangedFilesEntry _changedFilesEntryWithUnifiedDiff(
+  CodexChangedFilesEntry entry,
+  String? unifiedDiff,
+) {
+  return CodexChangedFilesEntry(
+    id: entry.id,
+    itemId: entry.itemId,
+    createdAt: entry.createdAt,
+    files: entry.files,
+    unifiedDiff: unifiedDiff,
+    isRunning: entry.isRunning,
+  );
+}
+
+int _lineCount(String value) =>
+    value.isEmpty ? 0 : '\n'.allMatches(value).length + 1;
