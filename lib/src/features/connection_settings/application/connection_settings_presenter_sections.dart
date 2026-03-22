@@ -169,63 +169,138 @@ ConnectionSettingsModelSectionContract _buildModelSection(
   _ConnectionSettingsPresentationState state,
 ) {
   final draft = state.draft;
+  final availableModelCatalog = state.availableModelCatalog;
   final selectedModelId = _selectedModelIdForDraft(draft);
-  final selectedModel = codexReferenceModelForId(selectedModelId);
-  final hasUnknownModel = selectedModelId != null && selectedModel == null;
-  final effectiveModel = codexEffectiveReferenceModelForId(selectedModelId);
+  final selectedCatalogModel = codexCatalogModelForModel(
+    availableModelCatalog,
+    selectedModelId,
+  );
+  final selectedVisibleCatalogModel = codexVisibleCatalogModelForModel(
+    availableModelCatalog,
+    selectedModelId,
+  );
+  final selectedReferenceModel = codexReferenceModelForId(selectedModelId);
+  final hasUnknownModel = availableModelCatalog == null
+      ? selectedModelId != null && selectedReferenceModel == null
+      : selectedModelId != null && selectedVisibleCatalogModel == null;
+  final effectiveCatalogModel = codexEffectiveCatalogModelForModel(
+    availableModelCatalog,
+    selectedModelId,
+  );
+  final effectiveReferenceModel = codexEffectiveReferenceModelForId(
+    selectedModelId,
+  );
   final selectedReasoningEffort = codexNormalizedReasoningEffortForModel(
     selectedModelId,
     draft.reasoningEffort,
+    availableModelCatalog: availableModelCatalog,
   );
+  final modelOptions = availableModelCatalog == null
+      ? <ConnectionSettingsModelOptionContract>[
+          const ConnectionSettingsModelOptionContract(
+            modelId: null,
+            label: 'Default',
+            description:
+                'Use the default Codex model from the reference catalog.',
+          ),
+          if (hasUnknownModel)
+            ConnectionSettingsModelOptionContract(
+              modelId: selectedModelId,
+              label: selectedModelId,
+              description:
+                  'Saved model outside the standard reference picker list.',
+            ),
+          ...codexReferenceVisibleModels.map(
+            (model) => ConnectionSettingsModelOptionContract(
+              modelId: model.id,
+              label: model.label,
+              description: model.description,
+            ),
+          ),
+        ]
+      : <ConnectionSettingsModelOptionContract>[
+          const ConnectionSettingsModelOptionContract(
+            modelId: null,
+            label: 'Default',
+            description: 'Use the default model from the backend catalog.',
+          ),
+          if (hasUnknownModel)
+            ConnectionSettingsModelOptionContract(
+              modelId: selectedModelId,
+              label: selectedCatalogModel == null
+                  ? selectedModelId!
+                  : _catalogModelLabel(selectedCatalogModel),
+              description: 'Saved model outside the available picker list.',
+            ),
+          ...availableModelCatalog.visibleModels.map(
+            (model) => ConnectionSettingsModelOptionContract(
+              modelId: model.model,
+              label: _catalogModelLabel(model),
+              description: model.description,
+            ),
+          ),
+        ];
+  final modelHelperText = availableModelCatalog == null
+      ? hasUnknownModel
+            ? 'Saved model outside the standard reference picker list.'
+            : selectedReferenceModel == null
+            ? 'Standard picker list only. Leave blank to use the default Codex model.'
+            : selectedReferenceModel.description
+      : hasUnknownModel
+      ? 'Saved model outside the available picker list.'
+      : selectedCatalogModel == null
+      ? 'Available models come from the backend catalog. Leave blank to use the backend default model.'
+      : selectedCatalogModel.description;
+  final reasoningEffortOptions = availableModelCatalog == null
+      ? <ConnectionSettingsReasoningEffortOptionContract>[
+          const ConnectionSettingsReasoningEffortOptionContract(
+            effort: null,
+            label: 'Default',
+            description: 'Use the selected model default effort.',
+          ),
+          ...effectiveReferenceModel.supportedReasoningEfforts.map(
+            (effort) => ConnectionSettingsReasoningEffortOptionContract(
+              effort: effort,
+              label: _reasoningEffortLabel(effort),
+              description: _reasoningEffortDescription(effort),
+            ),
+          ),
+        ]
+      : <ConnectionSettingsReasoningEffortOptionContract>[
+          const ConnectionSettingsReasoningEffortOptionContract(
+            effort: null,
+            label: 'Default',
+            description: 'Use the selected model default effort.',
+          ),
+          ...?effectiveCatalogModel?.supportedReasoningEfforts.map(
+            (option) => ConnectionSettingsReasoningEffortOptionContract(
+              effort: option.reasoningEffort,
+              label: _reasoningEffortLabel(option.reasoningEffort),
+              description: option.description.trim().isEmpty
+                  ? _reasoningEffortDescription(option.reasoningEffort)
+                  : option.description,
+            ),
+          ),
+        ];
+  final reasoningEffortHelperText = availableModelCatalog == null
+      ? hasUnknownModel
+            ? 'Available efforts use the fallback default-model list.'
+            : selectedReferenceModel == null
+            ? 'Available efforts follow the default model.'
+            : 'Available efforts follow ${effectiveReferenceModel.label}.'
+      : selectedCatalogModel != null
+      ? 'Available efforts follow ${_catalogModelLabel(selectedCatalogModel)}.'
+      : effectiveCatalogModel == null
+      ? 'Available efforts follow the backend default model.'
+      : 'Available efforts follow ${_catalogModelLabel(effectiveCatalogModel)}.';
   return ConnectionSettingsModelSectionContract(
     title: 'Model defaults',
     selectedModelId: selectedModelId,
-    modelOptions: <ConnectionSettingsModelOptionContract>[
-      const ConnectionSettingsModelOptionContract(
-        modelId: null,
-        label: 'Default',
-        description: 'Use the default Codex model from the reference catalog.',
-      ),
-      if (hasUnknownModel)
-        ConnectionSettingsModelOptionContract(
-          modelId: selectedModelId,
-          label: selectedModelId,
-          description:
-              'Saved model outside the standard reference picker list.',
-        ),
-      ...codexReferenceVisibleModels.map(
-        (model) => ConnectionSettingsModelOptionContract(
-          modelId: model.id,
-          label: model.label,
-          description: model.description,
-        ),
-      ),
-    ],
-    modelHelperText: hasUnknownModel
-        ? 'Saved model outside the standard reference picker list.'
-        : selectedModel == null
-        ? 'Standard picker list only. Leave blank to use the default Codex model.'
-        : selectedModel.description,
+    modelOptions: modelOptions,
+    modelHelperText: modelHelperText,
     selectedReasoningEffort: selectedReasoningEffort,
-    reasoningEffortOptions: <ConnectionSettingsReasoningEffortOptionContract>[
-      const ConnectionSettingsReasoningEffortOptionContract(
-        effort: null,
-        label: 'Default',
-        description: 'Use the selected model default effort.',
-      ),
-      ...effectiveModel.supportedReasoningEfforts.map(
-        (effort) => ConnectionSettingsReasoningEffortOptionContract(
-          effort: effort,
-          label: _reasoningEffortLabel(effort),
-          description: _reasoningEffortDescription(effort),
-        ),
-      ),
-    ],
-    reasoningEffortHelperText: hasUnknownModel
-        ? 'Available efforts use the fallback default-model list.'
-        : selectedModel == null
-        ? 'Available efforts follow the default model.'
-        : 'Available efforts follow ${effectiveModel.label}.',
+    reasoningEffortOptions: reasoningEffortOptions,
+    reasoningEffortHelperText: reasoningEffortHelperText,
   );
 }
 
@@ -276,6 +351,7 @@ ConnectionSettingsSubmitPayload _buildSubmitPayload({
       reasoningEffort: codexNormalizedReasoningEffortForModel(
         _selectedModelIdForDraft(draft),
         draft.reasoningEffort,
+        availableModelCatalog: state.availableModelCatalog,
       ),
       authMode: draft.authMode,
       hostFingerprint: draft.hostFingerprint.trim(),
@@ -288,4 +364,9 @@ ConnectionSettingsSubmitPayload _buildSubmitPayload({
       privateKeyPassphrase: draft.privateKeyPassphrase,
     ),
   );
+}
+
+String _catalogModelLabel(ConnectionAvailableModel model) {
+  final displayName = model.displayName.trim();
+  return displayName.isEmpty ? model.model : displayName;
 }

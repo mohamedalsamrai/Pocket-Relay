@@ -43,6 +43,7 @@ class FlutterChatRootOverlayDelegate implements ChatRootOverlayDelegate {
       initialProfile: connectionSettings.initialProfile,
       initialSecrets: connectionSettings.initialSecrets,
       platformBehavior: platformBehavior,
+      availableModelCatalog: null,
     );
   }
 

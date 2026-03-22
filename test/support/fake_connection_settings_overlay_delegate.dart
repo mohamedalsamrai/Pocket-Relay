@@ -14,6 +14,8 @@ class FakeConnectionSettingsOverlayDelegate
   final List<ConnectionSettingsSubmitPayload?> _results;
   final List<(ConnectionProfile, ConnectionSecrets)> launchedSettings =
       <(ConnectionProfile, ConnectionSecrets)>[];
+  final List<ConnectionModelCatalog?> launchedModelCatalogs =
+      <ConnectionModelCatalog?>[];
 
   @override
   Future<ConnectionSettingsSubmitPayload?> openConnectionSettings({
@@ -21,8 +23,10 @@ class FakeConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionModelCatalog? availableModelCatalog,
   }) async {
     launchedSettings.add((initialProfile, initialSecrets));
+    launchedModelCatalogs.add(availableModelCatalog);
     if (_results.isEmpty) {
       return null;
     }

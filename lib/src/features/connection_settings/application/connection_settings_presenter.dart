@@ -12,12 +12,14 @@ class ConnectionSettingsPresenter {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required ConnectionSettingsFormState formState,
+    ConnectionModelCatalog? availableModelCatalog,
     bool supportsLocalConnectionMode = false,
   }) {
     final presentationState = _ConnectionSettingsPresentationState.fromForm(
       initialProfile: initialProfile,
       initialSecrets: initialSecrets,
       formState: formState,
+      availableModelCatalog: availableModelCatalog,
     );
 
     return ConnectionSettingsContract(

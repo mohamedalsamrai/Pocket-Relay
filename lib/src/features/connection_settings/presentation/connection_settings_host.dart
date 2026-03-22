@@ -17,6 +17,7 @@ class ConnectionSettingsHost extends StatefulWidget {
     super.key,
     required this.initialProfile,
     required this.initialSecrets,
+    this.availableModelCatalog,
     required this.onCancel,
     required this.onSubmit,
     required this.builder,
@@ -25,6 +26,7 @@ class ConnectionSettingsHost extends StatefulWidget {
 
   final ConnectionProfile initialProfile;
   final ConnectionSecrets initialSecrets;
+  final ConnectionModelCatalog? availableModelCatalog;
   final VoidCallback onCancel;
   final ValueChanged<ConnectionSettingsSubmitPayload> onSubmit;
   final ConnectionSettingsHostBuilder builder;
@@ -90,6 +92,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       initialProfile: widget.initialProfile,
       initialSecrets: widget.initialSecrets,
       formState: formState ?? _formState,
+      availableModelCatalog: widget.availableModelCatalog,
       supportsLocalConnectionMode:
           widget.platformBehavior.supportsLocalConnectionMode,
     );
@@ -140,6 +143,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
     final nextEffort = codexNormalizedReasoningEffortForModel(
       normalizedModel.isEmpty ? null : normalizedModel,
       _formState.draft.reasoningEffort,
+      availableModelCatalog: widget.availableModelCatalog,
     );
     setState(() {
       _formState = _formState.copyWith(

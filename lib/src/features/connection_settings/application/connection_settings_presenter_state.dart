@@ -3,6 +3,7 @@ part of 'connection_settings_presenter.dart';
 class _ConnectionSettingsPresentationState {
   const _ConnectionSettingsPresentationState({
     required this.draft,
+    required this.availableModelCatalog,
     required this.isRemote,
     required this.hasChanges,
     required this.canSubmit,
@@ -20,6 +21,7 @@ class _ConnectionSettingsPresentationState {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required ConnectionSettingsFormState formState,
+    ConnectionModelCatalog? availableModelCatalog,
   }) {
     final draft = formState.draft;
     final isRemote = draft.connectionMode == ConnectionMode.remote;
@@ -91,6 +93,7 @@ class _ConnectionSettingsPresentationState {
 
     return _ConnectionSettingsPresentationState(
       draft: draft,
+      availableModelCatalog: availableModelCatalog,
       isRemote: isRemote,
       hasChanges: hasChanges,
       canSubmit: !hasChanges || !hasValidationErrors,
@@ -106,6 +109,7 @@ class _ConnectionSettingsPresentationState {
   }
 
   final ConnectionSettingsDraft draft;
+  final ConnectionModelCatalog? availableModelCatalog;
   final bool isRemote;
   final bool hasChanges;
   final bool canSubmit;

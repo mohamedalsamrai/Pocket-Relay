@@ -6,10 +6,12 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
+import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
@@ -155,6 +157,90 @@ void main() {
   });
 
   testWidgets(
+    'live lane settings fetch the backend model catalog and cache it before opening settings',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
+      client.listedModels.add(
+        const CodexAppServerModel(
+          id: 'preset_gpt_live_default',
+          model: 'gpt-live-default',
+          displayName: 'GPT Live Default',
+          description: 'Live backend default.',
+          hidden: false,
+          supportedReasoningEfforts: <CodexAppServerReasoningEffortOption>[
+            CodexAppServerReasoningEffortOption(
+              reasoningEffort: CodexReasoningEffort.low,
+              description: 'Fastest available lane setting.',
+            ),
+            CodexAppServerReasoningEffortOption(
+              reasoningEffort: CodexReasoningEffort.xhigh,
+              description: 'Deepest live lane setting.',
+            ),
+          ],
+          defaultReasoningEffort: CodexReasoningEffort.xhigh,
+          inputModalities: <String>['text'],
+          supportsPersonality: false,
+          isDefault: true,
+        ),
+      );
+      await client.connect(
+        profile: _profile('Primary Box', 'primary.local'),
+        secrets: const ConnectionSecrets(password: 'secret-1'),
+      );
+
+      final modelCatalogStore = MemoryConnectionModelCatalogStore();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        modelCatalogStore: modelCatalogStore,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+      final launchedCatalog =
+          settingsOverlayDelegate.launchedModelCatalogs.single;
+      expect(launchedCatalog, isNotNull);
+      expect(launchedCatalog!.connectionId, 'conn_primary');
+      expect(launchedCatalog.visibleModels, hasLength(1));
+      expect(launchedCatalog.visibleModels.single.model, 'gpt-live-default');
+      expect(
+        launchedCatalog.visibleModels.single.displayName,
+        'GPT Live Default',
+      );
+      expect(client.listModelCalls, hasLength(1));
+      expect(client.listModelCalls.single.includeHidden, isTrue);
+
+      final cachedCatalog = await controller.loadConnectionModelCatalog(
+        'conn_primary',
+      );
+      expect(cachedCatalog, launchedCatalog);
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'live lane ignores connection settings results after the surface unmounts',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
@@ -213,6 +299,84 @@ void main() {
       expect(controller.state.liveConnectionIds, <String>['conn_primary']);
     },
   );
+
+  testWidgets(
+    'live lane settings reuse the cached model catalog when staged edits require reconnect',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
+      final modelCatalogStore = MemoryConnectionModelCatalogStore();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        modelCatalogStore: modelCatalogStore,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      final cachedCatalog = ConnectionModelCatalog(
+        connectionId: 'conn_primary',
+        fetchedAt: DateTime.utc(2026, 3, 22),
+        models: const <ConnectionAvailableModel>[
+          ConnectionAvailableModel(
+            id: 'preset_cached_default',
+            model: 'gpt-cached-default',
+            displayName: 'GPT Cached Default',
+            description: 'Cached backend default.',
+            hidden: false,
+            supportedReasoningEfforts:
+                <ConnectionAvailableModelReasoningEffortOption>[
+                  ConnectionAvailableModelReasoningEffortOption(
+                    reasoningEffort: CodexReasoningEffort.high,
+                    description: 'Cached deep reasoning mode.',
+                  ),
+                ],
+            defaultReasoningEffort: CodexReasoningEffort.high,
+            inputModalities: <String>['text'],
+            supportsPersonality: false,
+            isDefault: true,
+          ),
+        ],
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.saveConnectionModelCatalog(cachedCatalog);
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Updated', 'changed.local'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+      expect(
+        settingsOverlayDelegate.launchedSettings.single.$1.host,
+        'changed.local',
+      );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogs.single,
+        cachedCatalog,
+      );
+      expect(client.listModelCalls, isEmpty);
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
 }
 
 Widget _buildDormantRosterApp(
@@ -258,6 +422,7 @@ Widget _buildLiveLaneApp(
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   CodexConnectionRepository? repository,
+  ConnectionModelCatalogStore? modelCatalogStore,
 }) {
   final resolvedRepository =
       repository ??
@@ -277,6 +442,7 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
+    modelCatalogStore: modelCatalogStore,
     laneBindingFactory: ({required connectionId, required connection}) {
       return ConnectionLaneBinding(
         connectionId: connectionId,
@@ -332,6 +498,8 @@ class _DeferredConnectionSettingsOverlayDelegate
   int launchCount = 0;
   final List<(ConnectionProfile, ConnectionSecrets)> launchedSettings =
       <(ConnectionProfile, ConnectionSecrets)>[];
+  final List<ConnectionModelCatalog?> launchedModelCatalogs =
+      <ConnectionModelCatalog?>[];
   Completer<ConnectionSettingsSubmitPayload?> _completer =
       Completer<ConnectionSettingsSubmitPayload?>();
 
@@ -341,9 +509,11 @@ class _DeferredConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionModelCatalog? availableModelCatalog,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
+    launchedModelCatalogs.add(availableModelCatalog);
     return _completer.future;
   }
 

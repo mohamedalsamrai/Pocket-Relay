@@ -191,12 +191,65 @@ void main() {
       expect(find.text('XHigh'), findsNothing);
     },
   );
+
+  testWidgets(
+    'shared host uses the provided backend model catalog for model and effort options',
+    (tester) async {
+      ConnectionSettingsSubmitPayload? payload;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (nextPayload) {
+            payload = nextPayload;
+          },
+          availableModelCatalog: _backendAvailableModelCatalog(),
+        ),
+      );
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_model')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('GPT Live Default').last, findsOneWidget);
+      expect(find.text('gpt-5.4'), findsNothing);
+
+      await tester.tap(find.text('GPT Live Default').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('connection_settings_reasoning_effort'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Minimal').last, findsOneWidget);
+      expect(find.text('XHigh').last, findsOneWidget);
+      expect(find.text('Medium'), findsNothing);
+
+      await tester.tap(find.text('Minimal').last);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(payload, isNotNull);
+      expect(payload!.profile.model, 'gpt-live-default');
+      expect(payload!.profile.reasoningEffort, CodexReasoningEffort.minimal);
+    },
+  );
 }
 
 Widget _buildMaterialSettingsApp({
   Brightness brightness = Brightness.light,
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionModelCatalog? availableModelCatalog,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(brightness),
@@ -206,6 +259,7 @@ Widget _buildMaterialSettingsApp({
       body: _buildHost(
         onSubmit: onSubmit,
         platformBehavior: platformBehavior,
+        availableModelCatalog: availableModelCatalog,
         builder: (context, viewModel, actions) {
           return ConnectionSheet(viewModel: viewModel, actions: actions);
         },
@@ -218,10 +272,12 @@ Widget _buildHost({
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   required ConnectionSettingsHostBuilder builder,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionModelCatalog? availableModelCatalog,
 }) {
   return ConnectionSettingsHost(
     initialProfile: _configuredProfile(),
     initialSecrets: const ConnectionSecrets(password: 'secret'),
+    availableModelCatalog: availableModelCatalog,
     platformBehavior: platformBehavior,
     onCancel: () {},
     onSubmit: onSubmit,
@@ -261,6 +317,37 @@ ConnectionProfile _configuredProfile() {
     username: 'vince',
     workspaceDir: '/workspace',
     codexPath: 'codex',
+  );
+}
+
+ConnectionModelCatalog _backendAvailableModelCatalog() {
+  return ConnectionModelCatalog(
+    connectionId: 'conn_primary',
+    fetchedAt: DateTime.utc(2026, 3, 22),
+    models: const <ConnectionAvailableModel>[
+      ConnectionAvailableModel(
+        id: 'preset_gpt_live_default',
+        model: 'gpt-live-default',
+        displayName: 'GPT Live Default',
+        description: 'Live backend default.',
+        hidden: false,
+        supportedReasoningEfforts:
+            <ConnectionAvailableModelReasoningEffortOption>[
+              ConnectionAvailableModelReasoningEffortOption(
+                reasoningEffort: CodexReasoningEffort.minimal,
+                description: 'Fastest backend lane mode.',
+              ),
+              ConnectionAvailableModelReasoningEffortOption(
+                reasoningEffort: CodexReasoningEffort.xhigh,
+                description: 'Deepest backend lane mode.',
+              ),
+            ],
+        defaultReasoningEffort: CodexReasoningEffort.xhigh,
+        inputModalities: <String>['text'],
+        supportsPersonality: false,
+        isDefault: true,
+      ),
+    ],
   );
 }
 

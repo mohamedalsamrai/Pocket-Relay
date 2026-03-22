@@ -12,6 +12,7 @@ abstract interface class ConnectionSettingsOverlayDelegate {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionModelCatalog? availableModelCatalog,
   });
 }
 
@@ -25,6 +26,7 @@ class ModalConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionModelCatalog? availableModelCatalog,
   }) {
     return showModalBottomSheet<ConnectionSettingsSubmitPayload>(
       context: context,
@@ -35,6 +37,7 @@ class ModalConnectionSettingsOverlayDelegate
         return ConnectionSettingsHost(
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
+          availableModelCatalog: availableModelCatalog,
           platformBehavior: platformBehavior,
           onCancel: () => Navigator.of(sheetContext).pop(),
           onSubmit: (payload) {

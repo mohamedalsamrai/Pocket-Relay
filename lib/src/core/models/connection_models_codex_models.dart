@@ -116,12 +116,95 @@ CodexReferenceModel codexEffectiveReferenceModelForId(String? modelId) {
   return codexReferenceModelForId(modelId) ?? codexDefaultReferenceModel;
 }
 
+ConnectionAvailableModel? codexCatalogModelForModel(
+  ConnectionModelCatalog? availableModelCatalog,
+  String? modelId, {
+  bool includeHidden = true,
+}) {
+  final normalized = modelId?.trim();
+  if (availableModelCatalog == null ||
+      normalized == null ||
+      normalized.isEmpty) {
+    return null;
+  }
+
+  for (final model in availableModelCatalog.models) {
+    if (!includeHidden && model.hidden) {
+      continue;
+    }
+    if (model.model == normalized) {
+      return model;
+    }
+  }
+
+  return null;
+}
+
+ConnectionAvailableModel? codexVisibleCatalogModelForModel(
+  ConnectionModelCatalog? availableModelCatalog,
+  String? modelId,
+) {
+  return codexCatalogModelForModel(
+    availableModelCatalog,
+    modelId,
+    includeHidden: false,
+  );
+}
+
+ConnectionAvailableModel? codexDefaultCatalogModel(
+  ConnectionModelCatalog? availableModelCatalog,
+) {
+  if (availableModelCatalog == null) {
+    return null;
+  }
+
+  final defaultModel = availableModelCatalog.defaultModel;
+  if (defaultModel != null) {
+    return defaultModel;
+  }
+
+  final visibleModels = availableModelCatalog.visibleModels;
+  if (visibleModels.isNotEmpty) {
+    return visibleModels.first;
+  }
+
+  final models = availableModelCatalog.models;
+  if (models.isNotEmpty) {
+    return models.first;
+  }
+
+  return null;
+}
+
+ConnectionAvailableModel? codexEffectiveCatalogModelForModel(
+  ConnectionModelCatalog? availableModelCatalog,
+  String? modelId,
+) {
+  return codexCatalogModelForModel(availableModelCatalog, modelId) ??
+      codexDefaultCatalogModel(availableModelCatalog);
+}
+
 CodexReasoningEffort? codexNormalizedReasoningEffortForModel(
   String? modelId,
-  CodexReasoningEffort? effort,
-) {
+  CodexReasoningEffort? effort, {
+  ConnectionModelCatalog? availableModelCatalog,
+}) {
   if (effort == null) {
     return null;
+  }
+
+  final availableModel = codexEffectiveCatalogModelForModel(
+    availableModelCatalog,
+    modelId,
+  );
+  if (availableModel != null) {
+    for (final option in availableModel.supportedReasoningEfforts) {
+      if (option.reasoningEffort == effort) {
+        return effort;
+      }
+    }
+
+    return availableModel.defaultReasoningEffort;
   }
 
   final model = codexEffectiveReferenceModelForId(modelId);
