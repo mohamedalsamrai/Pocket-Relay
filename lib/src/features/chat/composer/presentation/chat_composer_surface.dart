@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
 
 class ChatComposerSurface extends StatefulWidget {
@@ -13,12 +15,14 @@ class ChatComposerSurface extends StatefulWidget {
     required this.contract,
     required this.onChanged,
     required this.onSend,
+    this.localImagePicker,
   });
 
   final PocketPlatformBehavior platformBehavior;
   final ChatComposerContract contract;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<ChatComposerDraft> onChanged;
   final Future<void> Function() onSend;
+  final Future<String?> Function()? localImagePicker;
 
   @override
   State<ChatComposerSurface> createState() => _ChatComposerSurfaceState();
@@ -35,26 +39,32 @@ class _DesktopInsertNewlineIntent extends Intent {
 class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   static const _desktopSendIntent = _DesktopSendIntent();
   static const _desktopInsertNewlineIntent = _DesktopInsertNewlineIntent();
+  static const _imageTypeGroup = XTypeGroup(
+    label: 'images',
+    extensions: <String>['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic'],
+  );
   late final TextEditingController _controller;
+  late ChatComposerDraft _draft;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.contract.draftText);
+    _draft = widget.contract.draft.normalized();
+    _controller = TextEditingController(text: _draft.text);
   }
 
   @override
   void didUpdateWidget(covariant ChatComposerSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_controller.text == widget.contract.draftText) {
+    final nextDraft = widget.contract.draft.normalized();
+    _draft = nextDraft;
+    if (_controller.text == nextDraft.text) {
       return;
     }
 
     _controller.value = _controller.value.copyWith(
-      text: widget.contract.draftText,
-      selection: TextSelection.collapsed(
-        offset: widget.contract.draftText.length,
-      ),
+      text: nextDraft.text,
+      selection: TextSelection.collapsed(offset: nextDraft.text.length),
       composing: TextRange.empty,
     );
   }
@@ -89,6 +99,19 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
         child: _buildContent(
+          leadingAction: _showsLocalImageAttachmentAction
+              ? SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    key: const ValueKey('attach_local_image'),
+                    tooltip: 'Attach image',
+                    onPressed: _handleAttachLocalImageTriggered,
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                  ),
+                )
+              : null,
           input: _wrapInputWithKeyboardSubmit(
             context,
             TextField(
@@ -127,6 +150,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   }
 
   Widget _buildContent({
+    Widget? leadingAction,
     required Widget input,
     required Widget primaryAction,
     CrossAxisAlignment crossAxisAlignment = CrossAxisAlignment.end,
@@ -135,6 +159,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       key: const ValueKey('chat_composer_content_row'),
       crossAxisAlignment: crossAxisAlignment,
       children: [
+        if (leadingAction != null) ...[leadingAction, const SizedBox(width: 8)],
         Expanded(child: input),
         const SizedBox(width: 10),
         AnimatedSwitcher(
@@ -188,19 +213,48 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
     return _isSendActionEnabled;
   }
 
+  bool get _showsLocalImageAttachmentAction {
+    return widget.contract.allowsLocalImageAttachment &&
+        widget.platformBehavior.supportsLocalConnectionMode;
+  }
+
   bool get _isSendActionEnabled {
     return widget.contract.isSendActionEnabled &&
         _controller.text.trim().isNotEmpty;
   }
 
   void _handleChanged(String value) {
+    _draft = _draft.copyWith(text: value).normalized();
     setState(() {});
-    widget.onChanged(value);
+    widget.onChanged(_draft);
   }
 
   Future<void> _handleSendTriggered() async {
     _dismissKeyboard();
     await widget.onSend();
+  }
+
+  Future<void> _handleAttachLocalImageTriggered() async {
+    final imagePath = await _pickLocalImagePath();
+    if (!mounted || imagePath == null || imagePath.trim().isEmpty) {
+      return;
+    }
+
+    _draft = _draft.copyWith(text: _controller.text).normalized();
+    final currentSelection = _controller.selection;
+    final insertion = _draft.insertLocalImage(
+      path: imagePath.trim(),
+      selectionStart: currentSelection.start,
+      selectionEnd: currentSelection.end,
+    );
+    _draft = insertion.draft;
+    _controller.value = _controller.value.copyWith(
+      text: _draft.text,
+      selection: TextSelection.collapsed(offset: insertion.selectionOffset),
+      composing: TextRange.empty,
+    );
+    setState(() {});
+    widget.onChanged(_draft);
   }
 
   void _dismissKeyboard() {
@@ -225,6 +279,18 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       selection: TextSelection.collapsed(offset: nextOffset),
       composing: TextRange.empty,
     );
-    widget.onChanged(nextText);
+    _draft = _draft.copyWith(text: nextText).normalized();
+    widget.onChanged(_draft);
+  }
+
+  Future<String?> _pickLocalImagePath() async {
+    if (widget.localImagePicker case final picker?) {
+      return picker();
+    }
+
+    final file = await openFile(
+      acceptedTypeGroups: const <XTypeGroup>[_imageTypeGroup],
+    );
+    return file?.path;
   }
 }

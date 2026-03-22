@@ -64,6 +64,7 @@ void main() {
         );
         expect(contract.composer.draftText, isEmpty);
         expect(contract.composer.isSendActionEnabled, isTrue);
+        expect(contract.composer.allowsLocalImageAttachment, isFalse);
         expect(contract.connectionSettings.initialProfile, same(profile));
         expect(contract.connectionSettings.initialSecrets, same(secrets));
         expect(
@@ -72,6 +73,22 @@ void main() {
         );
       },
     );
+
+    test('enables local image attachment only for local Codex lanes', () {
+      final contract = presenter.present(
+        isLoading: false,
+        profile: _configuredProfile().copyWith(
+          connectionMode: ConnectionMode.local,
+        ),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        sessionState: CodexSessionState.initial(),
+        conversationRecoveryState: null,
+        composerDraft: const ChatComposerDraft(),
+        transcriptFollow: _defaultTranscriptFollowContract,
+      );
+
+      expect(contract.composer.allowsLocalImageAttachment, isTrue);
+    });
 
     test('uses profile title and live Codex subtitle metadata', () {
       final sessionState = CodexSessionState.initial().copyWith(

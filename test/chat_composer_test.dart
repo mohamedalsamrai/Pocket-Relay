@@ -8,6 +8,22 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_con
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer.dart';
 
 void main() {
+  test('local image text elements use UTF-8 byte offsets', () {
+    final draft = const ChatComposerDraft(
+      text: 'é [Image #1]',
+      localImageAttachments: <ChatComposerLocalImageAttachment>[
+        ChatComposerLocalImageAttachment(
+          path: '/tmp/reference.png',
+          placeholder: '[Image #1]',
+        ),
+      ],
+    ).normalized();
+
+    expect(draft.textElements, const <ChatComposerTextElement>[
+      ChatComposerTextElement(start: 3, end: 13, placeholder: '[Image #1]'),
+    ]);
+  });
+
   testWidgets('resyncs displayed text from the composer contract', (
     tester,
   ) async {
@@ -33,20 +49,72 @@ void main() {
   testWidgets('forwards text changes without owning draft state', (
     tester,
   ) async {
-    String? latestValue;
+    ChatComposerDraft? latestDraft;
 
     await tester.pumpWidget(
       _buildComposerApp(
         contract: _composerContract(),
-        onChanged: (value) {
-          latestValue = value;
+        onChanged: (draft) {
+          latestDraft = draft;
         },
       ),
     );
 
     await tester.enterText(find.byType(TextField), 'Composer draft');
 
-    expect(latestValue, 'Composer draft');
+    expect(latestDraft?.text, 'Composer draft');
+  });
+
+  testWidgets(
+    'local attach inserts an image placeholder at the current caret position',
+    (tester) async {
+      ChatComposerDraft? latestDraft;
+
+      await tester.pumpWidget(
+        _buildComposerApp(
+          platform: TargetPlatform.macOS,
+          contract: _composerContract(allowsLocalImageAttachment: true),
+          onChanged: (draft) {
+            latestDraft = draft;
+          },
+          localImagePicker: () async => '/tmp/reference.png',
+        ),
+      );
+
+      final fieldFinder = find.byType(TextField);
+      await tester.enterText(fieldFinder, 'See  for details');
+      await tester.pump();
+
+      final controller = tester.widget<TextField>(fieldFinder).controller!;
+      controller.selection = const TextSelection.collapsed(offset: 4);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('attach_local_image')));
+      await tester.pump();
+
+      expect(controller.text, 'See [Image #1] for details');
+      expect(latestDraft?.text, 'See [Image #1] for details');
+      expect(
+        latestDraft?.localImageAttachments,
+        const <ChatComposerLocalImageAttachment>[
+          ChatComposerLocalImageAttachment(
+            path: '/tmp/reference.png',
+            placeholder: '[Image #1]',
+          ),
+        ],
+      );
+      expect(latestDraft?.textElements, const <ChatComposerTextElement>[
+        ChatComposerTextElement(start: 4, end: 14, placeholder: '[Image #1]'),
+      ]);
+    },
+  );
+
+  testWidgets('remote composer does not expose the local image attach action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_buildComposerApp(contract: _composerContract()));
+
+    expect(find.byKey(const ValueKey('attach_local_image')), findsNothing);
   });
 
   testWidgets('desktop enter sends the draft', (tester) async {
@@ -270,8 +338,9 @@ void main() {
 Widget _buildComposerApp({
   required ChatComposerContract contract,
   TargetPlatform platform = TargetPlatform.android,
-  ValueChanged<String>? onChanged,
+  ValueChanged<ChatComposerDraft>? onChanged,
   Future<void> Function()? onSend,
+  Future<String?> Function()? localImagePicker,
   bool includeOutsideTapTarget = false,
 }) {
   return MaterialApp(
@@ -293,6 +362,7 @@ Widget _buildComposerApp({
             contract: contract,
             onChanged: onChanged ?? (_) {},
             onSend: onSend ?? () async {},
+            localImagePicker: localImagePicker,
           ),
         ],
       ),
@@ -303,10 +373,12 @@ Widget _buildComposerApp({
 ChatComposerContract _composerContract({
   String draftText = '',
   bool isSendActionEnabled = true,
+  bool allowsLocalImageAttachment = false,
 }) {
   return ChatComposerContract(
     draft: ChatComposerDraft(text: draftText),
     isSendActionEnabled: isSendActionEnabled,
+    allowsLocalImageAttachment: allowsLocalImageAttachment,
     placeholder: 'Message Codex',
   );
 }

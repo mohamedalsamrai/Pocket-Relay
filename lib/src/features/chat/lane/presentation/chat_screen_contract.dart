@@ -163,16 +163,17 @@ class ChatComposerContract {
   const ChatComposerContract({
     this.draft = const ChatComposerDraft(),
     required this.isSendActionEnabled,
+    this.allowsLocalImageAttachment = false,
     required this.placeholder,
   });
 
   final ChatComposerDraft draft;
   final bool isSendActionEnabled;
+  final bool allowsLocalImageAttachment;
   final String placeholder;
 
   String get draftText => draft.text;
-  bool get hasStructuredDraft =>
-      draft.hasTextElements || draft.hasLocalImageAttachments;
+  bool get hasStructuredDraft => draft.hasStructuredDraft;
 }
 
 class ChatTurnIndicatorContract {

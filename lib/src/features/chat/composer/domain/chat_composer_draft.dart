@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ChatComposerDraft {
   const ChatComposerDraft({
     this.text = '',
@@ -11,6 +13,7 @@ class ChatComposerDraft {
 
   bool get hasTextElements => textElements.isNotEmpty;
   bool get hasLocalImageAttachments => localImageAttachments.isNotEmpty;
+  bool get hasStructuredDraft => hasTextElements || hasLocalImageAttachments;
   bool get isEmpty => text.isEmpty && !hasLocalImageAttachments;
 
   ChatComposerDraft copyWith({
@@ -24,6 +27,93 @@ class ChatComposerDraft {
       localImageAttachments:
           localImageAttachments ?? this.localImageAttachments,
     );
+  }
+
+  ChatComposerDraft normalized() {
+    if (localImageAttachments.isEmpty) {
+      if (textElements.isEmpty) {
+        return this;
+      }
+      return copyWith(textElements: const <ChatComposerTextElement>[]);
+    }
+
+    final nextAttachments = <ChatComposerLocalImageAttachment>[];
+    final nextTextElements = <ChatComposerTextElement>[];
+    var searchStart = 0;
+    for (final attachment in localImageAttachments) {
+      final placeholder = attachment.placeholder?.trim();
+      if (placeholder == null || placeholder.isEmpty) {
+        continue;
+      }
+
+      final startOffset = text.indexOf(placeholder, searchStart);
+      if (startOffset < 0) {
+        continue;
+      }
+
+      final endOffset = startOffset + placeholder.length;
+      nextAttachments.add(attachment);
+      nextTextElements.add(
+        ChatComposerTextElement(
+          start: _utf8ByteOffset(text, startOffset),
+          end: _utf8ByteOffset(text, endOffset),
+          placeholder: placeholder,
+        ),
+      );
+      searchStart = endOffset;
+    }
+
+    if (_listEquals(nextAttachments, localImageAttachments) &&
+        _listEquals(nextTextElements, textElements)) {
+      return this;
+    }
+
+    return copyWith(
+      textElements: nextTextElements,
+      localImageAttachments: nextAttachments,
+    );
+  }
+
+  ChatComposerDraftInsertion insertLocalImage({
+    required String path,
+    required int selectionStart,
+    required int selectionEnd,
+  }) {
+    final normalizedDraft = normalized();
+    final safeStart = _clampOffset(selectionStart, normalizedDraft.text.length);
+    final safeEnd = _clampOffset(selectionEnd, normalizedDraft.text.length);
+    final rangeStart = safeStart <= safeEnd ? safeStart : safeEnd;
+    final rangeEnd = safeStart <= safeEnd ? safeEnd : safeStart;
+    final nextNumber = normalizedDraft.nextLocalImagePlaceholderNumber();
+    final placeholder = localImagePlaceholder(nextNumber);
+    final nextText = normalizedDraft.text.replaceRange(
+      rangeStart,
+      rangeEnd,
+      placeholder,
+    );
+    final nextDraft = ChatComposerDraft(
+      text: nextText,
+      localImageAttachments: <ChatComposerLocalImageAttachment>[
+        ...normalizedDraft.localImageAttachments,
+        ChatComposerLocalImageAttachment(path: path, placeholder: placeholder),
+      ],
+    ).normalized();
+
+    return ChatComposerDraftInsertion(
+      draft: nextDraft,
+      selectionOffset: rangeStart + placeholder.length,
+    );
+  }
+
+  int nextLocalImagePlaceholderNumber() {
+    var maxNumber = 0;
+    for (final attachment in localImageAttachments) {
+      final placeholderNumber = _placeholderNumber(attachment.placeholder);
+      if (placeholderNumber > maxNumber) {
+        maxNumber = placeholderNumber;
+      }
+    }
+    return maxNumber + 1;
   }
 
   @override
@@ -83,6 +173,42 @@ class ChatComposerLocalImageAttachment {
 
   @override
   int get hashCode => Object.hash(path, placeholder);
+}
+
+class ChatComposerDraftInsertion {
+  const ChatComposerDraftInsertion({
+    required this.draft,
+    required this.selectionOffset,
+  });
+
+  final ChatComposerDraft draft;
+  final int selectionOffset;
+}
+
+String localImagePlaceholder(int number) => '[Image #$number]';
+
+int _utf8ByteOffset(String text, int codeUnitOffset) {
+  final safeOffset = _clampOffset(codeUnitOffset, text.length);
+  return utf8.encode(text.substring(0, safeOffset)).length;
+}
+
+int _clampOffset(int offset, int textLength) {
+  if (offset < 0) {
+    return 0;
+  }
+  if (offset > textLength) {
+    return textLength;
+  }
+  return offset;
+}
+
+int _placeholderNumber(String? placeholder) {
+  if (placeholder == null) {
+    return 0;
+  }
+
+  final match = RegExp(r'^\[Image #(\d+)\]$').firstMatch(placeholder.trim());
+  return int.tryParse(match?.group(1) ?? '') ?? 0;
 }
 
 bool _listEquals<T>(List<T> left, List<T> right) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
+import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
@@ -79,6 +80,72 @@ void main() {
       'Steer the agent',
     ]);
   });
+
+  test(
+    'sendDraft forwards structured local image input to the app server',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final profile = _configuredProfile().copyWith(
+        connectionMode: ConnectionMode.local,
+      );
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: profile,
+            secrets: const ConnectionSecrets(),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: profile,
+          secrets: const ConnectionSecrets(),
+        ),
+        supportsLocalConnectionMode: true,
+      );
+      addTearDown(controller.dispose);
+
+      final sent = await controller.sendDraft(
+        const ChatComposerDraft(
+          text: 'See [Image #1]',
+          textElements: <ChatComposerTextElement>[
+            ChatComposerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          localImageAttachments: <ChatComposerLocalImageAttachment>[
+            ChatComposerLocalImageAttachment(
+              path: '/tmp/reference.png',
+              placeholder: '[Image #1]',
+            ),
+          ],
+        ),
+      );
+
+      expect(sent, isTrue);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentTurns.single, (
+        threadId: 'thread_123',
+        input: const CodexAppServerTurnInput(
+          text: 'See [Image #1]',
+          textElements: <CodexAppServerTextElement>[
+            CodexAppServerTextElement(
+              start: 4,
+              end: 14,
+              placeholder: '[Image #1]',
+            ),
+          ],
+          localImagePaths: <String>['/tmp/reference.png'],
+        ),
+        text: 'See [Image #1]',
+        model: null,
+        effort: null,
+      ));
+    },
+  );
 
   test(
     'sendPrompt starts a fresh conversation after controller restart until history is explicitly picked',

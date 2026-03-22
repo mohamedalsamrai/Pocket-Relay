@@ -213,7 +213,7 @@ void main() {
   testWidgets('forwards composer interactions through composer region', (
     tester,
   ) async {
-    final draftValues = <String>[];
+    final draftValues = <ChatComposerDraft>[];
     var sendCalls = 0;
 
     await tester.pumpWidget(
@@ -241,7 +241,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('send')));
     await tester.pumpAndSettle();
 
-    expect(draftValues, <String>['Plan phase 6']);
+    expect(
+      draftValues.map((draft) => draft.text).toList(growable: false),
+      <String>['Plan phase 6'],
+    );
     expect(sendCalls, 1);
   });
 

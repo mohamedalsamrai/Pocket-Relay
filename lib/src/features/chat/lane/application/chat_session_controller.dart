@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
+import 'package:pocket_relay/src/features/chat/composer/domain/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_recovery_policy.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
@@ -111,6 +112,10 @@ class ChatSessionController extends ChangeNotifier {
 
   Future<bool> sendPrompt(String prompt) {
     return _ChatSessionControllerPromptFlow(this).sendPrompt(prompt);
+  }
+
+  Future<bool> sendDraft(ChatComposerDraft draft) {
+    return _ChatSessionControllerPromptFlow(this).sendDraft(draft);
   }
 
   Future<void> stopActiveTurn() {
@@ -259,6 +264,10 @@ class ChatSessionController extends ChangeNotifier {
     return _sendPromptWithAppServerForController(this, prompt);
   }
 
+  Future<bool> _sendDraftWithAppServer(ChatComposerDraft draft) async {
+    return _sendDraftWithAppServerForController(this, draft);
+  }
+
   String? _selectedModelOverride() {
     final model = _profile.model.trim();
     return model.isEmpty ? null : model;
@@ -298,5 +307,4 @@ class ChatSessionController extends ChangeNotifier {
   bool _isCurrentHistoricalConversationRestore(int generation) {
     return _historicalConversationRestoreGeneration == generation;
   }
-
 }

@@ -110,6 +110,8 @@ class ChatScreenPresenter {
       composer: ChatComposerContract(
         draft: composerDraft,
         isSendActionEnabled: canSend,
+        allowsLocalImageAttachment:
+            profile.connectionMode == ConnectionMode.local,
         placeholder: 'Message Codex',
       ),
       connectionSettings: ChatConnectionSettingsLaunchContract(

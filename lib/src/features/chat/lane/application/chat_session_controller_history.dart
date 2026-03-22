@@ -92,6 +92,38 @@ Future<bool> _sendPromptWithAppServerForController(
   ChatSessionController controller,
   String prompt,
 ) async {
+  return _sendTurnInputWithAppServerForController(controller, text: prompt);
+}
+
+Future<bool> _sendDraftWithAppServerForController(
+  ChatSessionController controller,
+  ChatComposerDraft draft,
+) async {
+  return _sendTurnInputWithAppServerForController(
+    controller,
+    input: CodexAppServerTurnInput(
+      text: draft.text,
+      textElements: draft.textElements
+          .map(
+            (element) => CodexAppServerTextElement(
+              start: element.start,
+              end: element.end,
+              placeholder: element.placeholder,
+            ),
+          )
+          .toList(growable: false),
+      localImagePaths: draft.localImageAttachments
+          .map((attachment) => attachment.path)
+          .toList(growable: false),
+    ),
+  );
+}
+
+Future<bool> _sendTurnInputWithAppServerForController(
+  ChatSessionController controller, {
+  String? text,
+  CodexAppServerTurnInput? input,
+}) async {
   controller._isTrackingSshBootstrapFailures = true;
   controller._sawTrackedSshBootstrapFailure = false;
   try {
@@ -104,7 +136,8 @@ Future<bool> _sendPromptWithAppServerForController(
     );
     final turn = await controller.appServerClient.sendUserMessage(
       threadId: threadId,
-      text: prompt,
+      text: text,
+      input: input,
       model: controller._selectedModelOverride(),
       effort: controller._profile.reasoningEffort,
     );
@@ -179,10 +212,10 @@ Future<String> _ensureChatSessionAppServerThread(
   _applyChatSessionRuntimeEvent(
     controller,
     CodexRuntimeThreadStartedEvent(
-        createdAt: DateTime.now(),
-        threadId: session.threadId,
-        providerThreadId: session.threadId,
-        rawMethod: activeThreadId == null
+      createdAt: DateTime.now(),
+      threadId: session.threadId,
+      providerThreadId: session.threadId,
+      rawMethod: activeThreadId == null
           ? 'thread/start(response)'
           : 'thread/resume(response)',
       threadName: session.thread?.name,
