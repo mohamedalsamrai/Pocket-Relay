@@ -6,7 +6,7 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
-import 'package:pocket_relay/src/core/ui/primitives/pocket_meta_card.dart';
+import 'package:pocket_relay/src/core/ui/primitives/pocket_meta_surface.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
@@ -14,32 +14,32 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_con
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/empty_state.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/approval_request_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/assistant_message_card.dart';
-import 'package:pocket_relay/src/features/chat/worklog/presentation/widgets/changed_files_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/error_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/plan_update_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/proposed_plan_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/reasoning_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_auth_failed_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_connect_failed_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_host_key_mismatch_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_remote_launch_failed_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/ssh/ssh_unpinned_host_key_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/status_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/turn_boundary_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/usage_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/user_input_request_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/cards/user_message_card.dart';
-import 'package:pocket_relay/src/features/chat/worklog/presentation/widgets/work_log_group_card.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/conversation_card_palette.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/approval_request_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/assistant_message_surface.dart';
+import 'package:pocket_relay/src/features/chat/worklog/presentation/widgets/changed_files_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/error_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/plan_update_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/proposed_plan_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/reasoning_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_auth_failed_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_connect_failed_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_host_key_mismatch_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_remote_launch_failed_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/ssh/ssh_unpinned_host_key_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/status_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/turn_boundary_marker.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/usage_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/user_input_request_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/user_message_surface.dart';
+import 'package:pocket_relay/src/features/chat/worklog/presentation/widgets/work_log_group_surface.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_sheet.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 import 'package:pocket_relay/widgetbook/support/widgetbook_fixtures.dart';
 import 'package:widgetbook/widgetbook.dart';
 
-Widget _storyCard({
+Widget _storyCanvas({
   required Widget child,
   double maxWidth = 860,
   AlignmentGeometry alignment = Alignment.centerLeft,
@@ -99,7 +99,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               builder: (context) {
                 final theme = Theme.of(context);
                 final palette = theme.extension<PocketPalette>()!;
-                return _storyCard(
+                return _storyCanvas(
                   child: PocketPanelSurface(
                     padding: const EdgeInsets.all(PocketSpacing.md),
                     radius: PocketRadii.lg,
@@ -142,9 +142,9 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               name: 'Default',
               builder: (context) {
                 final theme = Theme.of(context);
-                final cards = ConversationCardPalette.of(context);
+                final cards = TranscriptPalette.of(context);
                 final accent = blueAccent(theme.brightness);
-                return _storyCard(
+                return _storyCanvas(
                   child: PocketTranscriptFrame(
                     backgroundColor: cards.tintedSurface(accent),
                     borderColor: cards.accentBorder(accent),
@@ -162,7 +162,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                         ),
                         const SizedBox(height: PocketSpacing.xs),
                         Text(
-                          'Transcript cards use this shared shell for width, radius, border, and elevation behavior.',
+                          'Transcript items use this shared shell for width, radius, border, and elevation behavior.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: cards.textSecondary,
                           ),
@@ -182,7 +182,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               name: 'Variants',
               builder: (context) {
                 final theme = Theme.of(context);
-                return _storyCard(
+                return _storyCanvas(
                   child: Wrap(
                     spacing: PocketSpacing.sm,
                     runSpacing: PocketSpacing.sm,
@@ -212,12 +212,12 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
           ],
         ),
         WidgetbookComponent(
-          name: 'Meta Card',
+          name: 'Meta Surface',
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
               name: 'Default',
-              builder: (context) => _storyCard(
-                child: PocketMetaCard(
+              builder: (context) => _storyCanvas(
+                child: PocketMetaSurface(
                   title: 'Session attached',
                   body:
                       'Pocket Relay resumed the existing Codex conversation without losing transcript context.',
@@ -242,7 +242,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 WidgetbookUseCase(
                   name: 'Desktop Filled Lane',
                   builder: (_) {
-                    final screen = WidgetbookFixtures.denseTranscriptLaneScreen();
+                    final screen =
+                        WidgetbookFixtures.denseTranscriptLaneScreen();
                     return FlutterChatScreenRenderer(
                       screen: screen,
                       appChrome: FlutterChatAppChrome(
@@ -283,16 +284,16 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Final',
-                  builder: (_) => _storyCard(
-                    child: AssistantMessageCard(
+                  builder: (_) => _storyCanvas(
+                    child: AssistantMessageSurface(
                       block: WidgetbookFixtures.assistantMessage(),
                     ),
                   ),
                 ),
                 WidgetbookUseCase(
                   name: 'Streaming',
-                  builder: (_) => _storyCard(
-                    child: AssistantMessageCard(
+                  builder: (_) => _storyCanvas(
+                    child: AssistantMessageSurface(
                       block: WidgetbookFixtures.assistantMessage(
                         isRunning: true,
                       ),
@@ -306,16 +307,16 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Running',
-                  builder: (_) => _storyCard(
-                    child: ReasoningCard(
+                  builder: (_) => _storyCanvas(
+                    child: ReasoningSurface(
                       block: WidgetbookFixtures.reasoningBlock(isRunning: true),
                     ),
                   ),
                 ),
                 WidgetbookUseCase(
                   name: 'Complete',
-                  builder: (_) => _storyCard(
-                    child: ReasoningCard(
+                  builder: (_) => _storyCanvas(
+                    child: ReasoningSurface(
                       block: WidgetbookFixtures.reasoningBlock(
                         isRunning: false,
                       ),
@@ -329,18 +330,18 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Sent',
-                  builder: (_) => _storyCard(
+                  builder: (_) => _storyCanvas(
                     alignment: Alignment.centerRight,
-                    child: UserMessageCard(
+                    child: UserMessageSurface(
                       block: WidgetbookFixtures.userMessage(),
                     ),
                   ),
                 ),
                 WidgetbookUseCase(
                   name: 'Local Echo',
-                  builder: (_) => _storyCard(
+                  builder: (_) => _storyCanvas(
                     alignment: Alignment.centerRight,
-                    child: UserMessageCard(
+                    child: UserMessageSurface(
                       block: WidgetbookFixtures.userMessage(
                         deliveryState: CodexUserMessageDeliveryState.localEcho,
                       ),
@@ -354,8 +355,10 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: StatusCard(block: WidgetbookFixtures.statusBlock()),
+                  builder: (_) => _storyCanvas(
+                    child: StatusSurface(
+                      block: WidgetbookFixtures.statusBlock(),
+                    ),
                   ),
                 ),
               ],
@@ -365,8 +368,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: ErrorCard(block: WidgetbookFixtures.errorBlock()),
+                  builder: (_) => _storyCanvas(
+                    child: ErrorSurface(block: WidgetbookFixtures.errorBlock()),
                   ),
                 ),
               ],
@@ -376,8 +379,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Pending',
-                  builder: (_) => _storyCard(
-                    child: ApprovalRequestCard(
+                  builder: (_) => _storyCanvas(
+                    child: ApprovalRequestSurface(
                       request: WidgetbookFixtures.approvalRequest(),
                       onApprove: (_) async {},
                       onDeny: (_) async {},
@@ -386,8 +389,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Resolved',
-                  builder: (_) => _storyCard(
-                    child: ApprovalRequestCard(
+                  builder: (_) => _storyCanvas(
+                    child: ApprovalRequestSurface(
                       request: WidgetbookFixtures.approvalRequest(
                         isResolved: true,
                       ),
@@ -401,8 +404,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: PlanUpdateCard(
+                  builder: (_) => _storyCanvas(
+                    child: PlanUpdateSurface(
                       block: WidgetbookFixtures.planUpdateBlock(),
                     ),
                   ),
@@ -414,16 +417,16 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Final',
-                  builder: (_) => _storyCard(
-                    child: ProposedPlanCard(
+                  builder: (_) => _storyCanvas(
+                    child: ProposedPlanSurface(
                       block: WidgetbookFixtures.proposedPlanBlock(),
                     ),
                   ),
                 ),
                 WidgetbookUseCase(
                   name: 'Streaming Long',
-                  builder: (_) => _storyCard(
-                    child: ProposedPlanCard(
+                  builder: (_) => _storyCanvas(
+                    child: ProposedPlanSurface(
                       block: WidgetbookFixtures.proposedPlanBlock(
                         isStreaming: true,
                         isLong: true,
@@ -438,16 +441,16 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Mixed',
-                  builder: (_) => _storyCard(
-                    child: ChangedFilesCard(
+                  builder: (_) => _storyCanvas(
+                    child: ChangedFilesSurface(
                       item: WidgetbookFixtures.changedFilesItem(),
                     ),
                   ),
                 ),
                 WidgetbookUseCase(
                   name: 'Created',
-                  builder: (_) => _storyCard(
-                    child: ChangedFilesCard(
+                  builder: (_) => _storyCanvas(
+                    child: ChangedFilesSurface(
                       item: WidgetbookFixtures.changedFilesItem(
                         variant: 'created',
                       ),
@@ -456,8 +459,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Deleted',
-                  builder: (_) => _storyCard(
-                    child: ChangedFilesCard(
+                  builder: (_) => _storyCanvas(
+                    child: ChangedFilesSurface(
                       item: WidgetbookFixtures.changedFilesItem(
                         variant: 'deleted',
                       ),
@@ -466,8 +469,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Running',
-                  builder: (_) => _storyCard(
-                    child: ChangedFilesCard(
+                  builder: (_) => _storyCanvas(
+                    child: ChangedFilesSurface(
                       item: WidgetbookFixtures.changedFilesItem(
                         isRunning: true,
                       ),
@@ -481,8 +484,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: WorkLogGroupCard(
+                  builder: (_) => _storyCanvas(
+                    child: WorkLogGroupSurface(
                       item: WidgetbookFixtures.workLogGroupItem(),
                     ),
                   ),
@@ -494,8 +497,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Pending',
-                  builder: (_) => _storyCard(
-                    child: UserInputRequestCard(
+                  builder: (_) => _storyCanvas(
+                    child: UserInputRequestSurface(
                       contract: WidgetbookFixtures.pendingUserInput(),
                       onFieldChanged: (_, value) {},
                       onSubmit: () async {},
@@ -504,8 +507,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Resolved',
-                  builder: (_) => _storyCard(
-                    child: UserInputRequestCard(
+                  builder: (_) => _storyCanvas(
+                    child: UserInputRequestSurface(
                       contract: WidgetbookFixtures.pendingUserInput(
                         resolved: true,
                       ),
@@ -519,8 +522,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: UsageCard(block: WidgetbookFixtures.usageBlock()),
+                  builder: (_) => _storyCanvas(
+                    child: UsageSurface(block: WidgetbookFixtures.usageBlock()),
                   ),
                 ),
               ],
@@ -530,8 +533,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Default',
-                  builder: (_) => _storyCard(
-                    child: TurnBoundaryCard(
+                  builder: (_) => _storyCanvas(
+                    child: TurnBoundaryMarker(
                       block: WidgetbookFixtures.turnBoundaryBlock(),
                     ),
                   ),
@@ -543,8 +546,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Unpinned',
-                  builder: (_) => _storyCard(
-                    child: SshUnpinnedHostKeyCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshUnpinnedHostKeySurface(
                       block: WidgetbookFixtures.sshUnpinnedHostKey(),
                       onSaveFingerprint: (_) async {},
                       onOpenConnectionSettings: () {},
@@ -553,8 +556,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Saved',
-                  builder: (_) => _storyCard(
-                    child: SshUnpinnedHostKeyCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshUnpinnedHostKeySurface(
                       block: WidgetbookFixtures.sshUnpinnedHostKey(
                         isSaved: true,
                       ),
@@ -569,8 +572,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
               useCases: <WidgetbookUseCase>[
                 WidgetbookUseCase(
                   name: 'Connect Failed',
-                  builder: (_) => _storyCard(
-                    child: SshConnectFailedCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshConnectFailedSurface(
                       block: WidgetbookFixtures.sshConnectFailedBlock(),
                       onOpenConnectionSettings: () {},
                     ),
@@ -578,8 +581,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Host Key Mismatch',
-                  builder: (_) => _storyCard(
-                    child: SshHostKeyMismatchCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshHostKeyMismatchSurface(
                       block: WidgetbookFixtures.sshHostKeyMismatchBlock(),
                       onOpenConnectionSettings: () {},
                     ),
@@ -587,8 +590,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Authentication Failed',
-                  builder: (_) => _storyCard(
-                    child: SshAuthFailedCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshAuthFailedSurface(
                       block: WidgetbookFixtures.sshAuthenticationFailedBlock(),
                       onOpenConnectionSettings: () {},
                     ),
@@ -596,8 +599,8 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
                 ),
                 WidgetbookUseCase(
                   name: 'Remote Launch Failed',
-                  builder: (_) => _storyCard(
-                    child: SshRemoteLaunchFailedCard(
+                  builder: (_) => _storyCanvas(
+                    child: SshRemoteLaunchFailedSurface(
                       block: WidgetbookFixtures.sshRemoteLaunchFailedBlock(),
                       onOpenConnectionSettings: () {},
                     ),
@@ -612,7 +615,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
           useCases: <WidgetbookUseCase>[
             WidgetbookUseCase(
               name: 'Mobile',
-              builder: (_) => _storyCard(
+              builder: (_) => _storyCanvas(
                 maxWidth: 720,
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.mobileBehavior,
@@ -628,7 +631,7 @@ List<WidgetbookNode> buildPocketRelayWidgetbookCatalog() {
             ),
             WidgetbookUseCase(
               name: 'Desktop',
-              builder: (_) => _storyCard(
+              builder: (_) => _storyCanvas(
                 maxWidth: 920,
                 child: ChatComposer(
                   platformBehavior: WidgetbookFixtures.desktopBehavior,

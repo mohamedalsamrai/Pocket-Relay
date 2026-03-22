@@ -25,6 +25,8 @@ class ChatRootAdapter extends StatefulWidget {
     required this.onConnectionSettingsRequested,
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
     this.supplementalMenuActions = const <ChatChromeMenuAction>[],
+    this.laneRestartAction,
+    this.onRestartLane,
   });
 
   final ConnectionLaneBinding laneBinding;
@@ -33,6 +35,8 @@ class ChatRootAdapter extends StatefulWidget {
   onConnectionSettingsRequested;
   final ChatRootOverlayDelegate overlayDelegate;
   final List<ChatChromeMenuAction> supplementalMenuActions;
+  final ChatLaneRestartActionContract? laneRestartAction;
+  final Future<void> Function()? onRestartLane;
 
   @override
   State<ChatRootAdapter> createState() => _ChatRootAdapterState();
@@ -86,6 +90,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
           transcriptRegion: _buildTranscriptRegion(screen),
           composerRegion: _buildComposerRegion(screen),
           onStopActiveTurn: _stopActiveTurn,
+          laneRestartAction: widget.laneRestartAction,
+          onRestartLane: widget.onRestartLane,
         );
       },
     );

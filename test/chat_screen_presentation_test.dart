@@ -1134,7 +1134,8 @@ void main() {
             id: 'entry_sed_chain',
             createdAt: DateTime(2026, 3, 15, 12),
             entryKind: CodexWorkLogEntryKind.commandExecution,
-            title: "sed -n '1,120p' lib/src/app/pocket_relay_app.dart && rg Pocket Relay",
+            title:
+                "sed -n '1,120p' lib/src/app/pocket_relay_app.dart && rg Pocket Relay",
           ),
         ],
       );
@@ -1566,7 +1567,7 @@ void main() {
       expect(entry.primaryLabel, 'list');
     });
 
-    test('projects completed MCP tool calls into MCP work-log entries', () {
+    test('keeps completed MCP tool calls inside grouped work-log entries', () {
       final groupBlock = CodexWorkLogGroupBlock(
         id: 'worklog_mcp_completed',
         createdAt: DateTime(2026, 3, 15, 12),
@@ -1595,8 +1596,9 @@ void main() {
         ],
       );
 
-      final item = projector.project(groupBlock) as ChatMcpToolCallItemContract;
-      final entry = item.entry;
+      final item =
+          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+      final entry = item.entries.single as ChatMcpToolCallWorkLogEntryContract;
 
       expect(entry.status, ChatMcpToolCallStatus.completed);
       expect(entry.toolName, 'read_file');
@@ -1608,7 +1610,7 @@ void main() {
       expect(entry.outcomeLabel, 'completed · README first lines · 42 ms');
     });
 
-    test('projects failed MCP tool calls into MCP work-log entries', () {
+    test('keeps failed MCP tool calls inside grouped work-log entries', () {
       final groupBlock = CodexWorkLogGroupBlock(
         id: 'worklog_mcp_failed',
         createdAt: DateTime(2026, 3, 15, 12),
@@ -1630,8 +1632,9 @@ void main() {
         ],
       );
 
-      final item = projector.project(groupBlock) as ChatMcpToolCallItemContract;
-      final entry = item.entry;
+      final item =
+          projector.project(groupBlock) as ChatWorkLogGroupItemContract;
+      final entry = item.entries.single as ChatMcpToolCallWorkLogEntryContract;
 
       expect(entry.status, ChatMcpToolCallStatus.failed);
       expect(entry.identityLabel, 'filesystem.write_file');

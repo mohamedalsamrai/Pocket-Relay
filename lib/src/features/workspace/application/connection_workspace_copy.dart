@@ -23,14 +23,11 @@ abstract final class ConnectionWorkspaceCopy {
   static const String deleteProgress = 'Deleting…';
   static const String returnToOpenLaneAction = 'Return to open lane';
   static const String closeLaneAction = 'Close lane';
-  static const String reconnectNoticeTitle = 'Saved settings are pending';
-  static const String reconnectNoticeBody =
-      'Apply the saved connection settings to reconnect this lane.';
-  static const String reconnectBadge = 'Reconnect needed';
-  static const String reconnectAction = 'Apply';
-  static const String reconnectProgress = 'Applying…';
-  static const String reconnectMenuAction = 'Apply saved settings';
-  static const String reconnectMenuProgress = 'Applying saved settings…';
+  static const String reconnectBadge = 'Restart needed';
+  static const String reconnectAction = 'Restart';
+  static const String reconnectProgress = 'Restarting…';
+  static const String reconnectMenuAction = 'Restart lane';
+  static const String reconnectMenuProgress = 'Restarting lane…';
   static const String collapseSidebarAction = 'Collapse sidebar';
   static const String expandSidebarAction = 'Expand sidebar';
   static const String workspaceNotSet = 'Workspace not set';

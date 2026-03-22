@@ -293,6 +293,7 @@ void main() {
     tester,
   ) async {
     var stopCalls = 0;
+    var restartCalls = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -312,17 +313,63 @@ void main() {
           onStopActiveTurn: () async {
             stopCalls += 1;
           },
+          laneRestartAction: const ChatLaneRestartActionContract(
+            badgeLabel: 'Restart needed',
+            label: 'Restart',
+          ),
+          onRestartLane: () async {
+            restartCalls += 1;
+          },
         ),
       ),
     );
 
     expect(find.textContaining('Elapsed'), findsOneWidget);
+    expect(find.text('Restart needed'), findsOneWidget);
     expect(find.byKey(const ValueKey('stop_active_turn')), findsOneWidget);
+    expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('stop_active_turn')));
+    await tester.tap(find.byKey(const ValueKey('restart_lane')));
     await tester.pumpAndSettle();
 
     expect(stopCalls, 1);
+    expect(restartCalls, 1);
+  });
+
+  testWidgets('renders an inline restart footer without an active turn', (
+    tester,
+  ) async {
+    var restartCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: FlutterChatScreenRenderer(
+          screen: _screenContract(),
+          appChrome: const _TestAppChrome(),
+          transcriptRegion: const Center(child: Text('Transcript region')),
+          composerRegion: const Text('Composer region'),
+          onStopActiveTurn: () async {},
+          laneRestartAction: const ChatLaneRestartActionContract(
+            badgeLabel: 'Restart needed',
+            label: 'Restart',
+          ),
+          onRestartLane: () async {
+            restartCalls += 1;
+          },
+        ),
+      ),
+    );
+
+    expect(find.text('Restart needed'), findsOneWidget);
+    expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop_active_turn')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('restart_lane')));
+    await tester.pumpAndSettle();
+
+    expect(restartCalls, 1);
   });
 }
 

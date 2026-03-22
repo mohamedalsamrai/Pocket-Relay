@@ -276,9 +276,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        _buildCatalogApp(
-          appServerClient: appServerClient,
-        ),
+        _buildCatalogApp(appServerClient: appServerClient),
       );
 
       await _pumpAppReady(tester);
@@ -383,7 +381,7 @@ void main() {
   });
 
   testWidgets(
-    'renders an actionable host fingerprint card and saves it into connection settings',
+    'renders an actionable host fingerprint surface and saves it into connection settings',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -449,7 +447,7 @@ void main() {
   );
 
   testWidgets(
-    'renders SSH host key mismatch as a dedicated settings-oriented card',
+    'renders SSH host key mismatch as a dedicated settings-oriented surface',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -489,7 +487,7 @@ void main() {
   );
 
   testWidgets(
-    'renders SSH authentication failure as a dedicated settings-oriented card',
+    'renders SSH authentication failure as a dedicated settings-oriented surface',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -523,7 +521,7 @@ void main() {
   );
 
   testWidgets(
-    'renders SSH remote launch failure as a dedicated settings-oriented card',
+    'renders SSH remote launch failure as a dedicated settings-oriented surface',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -556,7 +554,7 @@ void main() {
   );
 
   testWidgets(
-    'reuses the current SSH failure card when the same connect failure repeats',
+    'reuses the current SSH failure surface when the same connect failure repeats',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -587,7 +585,7 @@ void main() {
       expect(find.text('Connection refused'), findsNothing);
       expect(find.text('Timed out'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('ssh_connect_failed_card')),
+        find.byKey(const ValueKey('ssh_connect_failed_surface')),
         findsOneWidget,
       );
     },
@@ -650,7 +648,7 @@ void main() {
   });
 
   testWidgets(
-    'renders one grouped changed-files card for a multi-file file-change item',
+    'renders one grouped changed-files surface for a multi-file file-change item',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -881,7 +879,7 @@ void main() {
     },
   );
 
-  testWidgets('renders consecutive work items in one grouped work card', (
+  testWidgets('renders consecutive work items in one grouped work surface', (
     tester,
   ) async {
     final appServerClient = FakeCodexAppServerClient();
@@ -1231,7 +1229,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Work log'), findsNothing);
+    expect(find.text('Work log'), findsOneWidget);
     expect(find.text('filesystem.read_file'), findsOneWidget);
     expect(find.text('args: path: README.md'), findsOneWidget);
     expect(
@@ -1465,7 +1463,7 @@ void main() {
   );
 
   testWidgets(
-    'consolidates sequential distinct file-change items into one changed-files card',
+    'consolidates sequential distinct file-change items into one changed-files surface',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -1538,7 +1536,7 @@ void main() {
   );
 
   testWidgets(
-    'starts a new changed-files card when the same file-change item resumes after a warning',
+    'starts a new changed-files surface when the same file-change item resumes after a warning',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -1631,7 +1629,7 @@ void main() {
   );
 
   testWidgets(
-    'starts a new changed-files card when the same file-change item resumes after approval',
+    'starts a new changed-files surface when the same file-change item resumes after approval',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
@@ -1789,7 +1787,7 @@ void main() {
     );
   });
 
-  testWidgets('freezes a running assistant card when approval opens', (
+  testWidgets('freezes a running assistant surface when approval opens', (
     tester,
   ) async {
     final appServerClient = FakeCodexAppServerClient();
@@ -2473,7 +2471,7 @@ void main() {
   );
 
   testWidgets(
-    'keeps the richer user-input transcript card when a generic resolved event arrives later',
+    'keeps the richer user-input transcript surface when a generic resolved event arrives later',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
       addTearDown(appServerClient.close);
