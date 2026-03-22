@@ -432,6 +432,17 @@ class ConnectionWorkspaceController extends ChangeNotifier {
                 connectionId,
               },
             ),
+        transportRecoveryPhasesByConnectionId:
+            _sanitizeWorkspaceTransportRecoveryPhases(
+              catalog: _state.catalog,
+              liveConnectionIds: _state.liveConnectionIds,
+              transportRecoveryPhasesByConnectionId:
+                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
+                    ..._state.transportRecoveryPhasesByConnectionId,
+                    connectionId:
+                        ConnectionWorkspaceTransportRecoveryPhase.lost,
+                  },
+            ),
       ),
     );
   }
@@ -453,6 +464,45 @@ class ConnectionWorkspaceController extends ChangeNotifier {
                   if (reconnectConnectionId != connectionId)
                     reconnectConnectionId,
               },
+            ),
+        transportRecoveryPhasesByConnectionId:
+            _sanitizeWorkspaceTransportRecoveryPhases(
+              catalog: _state.catalog,
+              liveConnectionIds: _state.liveConnectionIds,
+              transportRecoveryPhasesByConnectionId:
+                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
+                    for (final entry
+                        in _state.transportRecoveryPhasesByConnectionId.entries)
+                      if (entry.key != connectionId) entry.key: entry.value,
+                  },
+            ),
+      ),
+    );
+  }
+
+  void _setTransportRecoveryPhase(
+    String connectionId,
+    ConnectionWorkspaceTransportRecoveryPhase phase,
+  ) {
+    if (_isDisposed || !_state.isConnectionLive(connectionId)) {
+      return;
+    }
+
+    if (_state.transportRecoveryPhaseFor(connectionId) == phase) {
+      return;
+    }
+
+    _applyState(
+      _state.copyWith(
+        transportRecoveryPhasesByConnectionId:
+            _sanitizeWorkspaceTransportRecoveryPhases(
+              catalog: _state.catalog,
+              liveConnectionIds: _state.liveConnectionIds,
+              transportRecoveryPhasesByConnectionId:
+                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
+                    ..._state.transportRecoveryPhasesByConnectionId,
+                    connectionId: phase,
+                  },
             ),
       ),
     );

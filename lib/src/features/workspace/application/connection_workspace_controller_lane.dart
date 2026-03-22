@@ -146,6 +146,13 @@ void _terminateWorkspaceConnection(
             reconnectRequiredConnectionIds:
                 controller._state.transportReconnectRequiredConnectionIds,
           ),
+      transportRecoveryPhasesByConnectionId:
+          _sanitizeWorkspaceTransportRecoveryPhases(
+            catalog: controller._state.catalog,
+            liveConnectionIds: nextLiveConnectionIds,
+            transportRecoveryPhasesByConnectionId:
+                controller._state.transportRecoveryPhasesByConnectionId,
+          ),
     ),
   );
 }

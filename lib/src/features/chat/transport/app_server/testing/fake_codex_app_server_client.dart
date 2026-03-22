@@ -125,6 +125,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   final List<CodexAppServerEvent> connectEventsBeforeThrow =
       <CodexAppServerEvent>[];
   Object? connectError;
+  Completer<void>? connectGate;
   Object? startSessionError;
   Object? forkThreadError;
   Object? sendUserMessageError;
@@ -177,6 +178,10 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
         emit(event);
       }
       throw connectError!;
+    }
+    final gate = connectGate;
+    if (gate != null) {
+      await gate.future;
     }
     connectCalls += 1;
     _isConnected = true;

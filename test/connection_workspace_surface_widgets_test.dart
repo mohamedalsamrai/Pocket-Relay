@@ -15,6 +15,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
@@ -798,6 +799,181 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets(
+    'live lane shows transport-loss and reconnecting notices during empty-lane recovery',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final reconnectGate = Completer<void>();
+      final queuedClientsByConnectionId =
+          <String, List<FakeCodexAppServerClient>>{
+            'conn_primary': <FakeCodexAppServerClient>[
+              FakeCodexAppServerClient(),
+              FakeCodexAppServerClient()..connectGate = reconnectGate,
+            ],
+          };
+      final createdClientsByConnectionId =
+          <String, List<FakeCodexAppServerClient>>{
+            'conn_primary': <FakeCodexAppServerClient>[],
+          };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = queuedClientsByConnectionId[connectionId]!
+              .removeAt(0);
+          createdClientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(createdClientsByConnectionId);
+      });
+
+      await controller.initialize();
+      await createdClientsByConnectionId['conn_primary']!.first.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Live transport lost'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+
+      unawaited(controller.reconnectConnection('conn_primary'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
+      );
+      expect(find.text('Reconnecting to remote session'), findsOneWidget);
+      expect(find.text('Reconnecting…'), findsOneWidget);
+
+      reconnectGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Live transport lost'), findsNothing);
+      expect(find.text('Reconnecting to remote session'), findsNothing);
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows remote-session-unavailable notice when transport reconnect fails',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final queuedClientsByConnectionId =
+          <String, List<FakeCodexAppServerClient>>{
+            'conn_primary': <FakeCodexAppServerClient>[
+              FakeCodexAppServerClient(),
+              FakeCodexAppServerClient()
+                ..connectError = const CodexAppServerException(
+                  'connect failed',
+                ),
+            ],
+          };
+      final createdClientsByConnectionId =
+          <String, List<FakeCodexAppServerClient>>{
+            'conn_primary': <FakeCodexAppServerClient>[],
+          };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = queuedClientsByConnectionId[connectionId]!
+              .removeAt(0);
+          createdClientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(createdClientsByConnectionId);
+      });
+
+      await controller.initialize();
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await createdClientsByConnectionId['conn_primary']!.first.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote session unavailable'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+    },
+  );
 }
 
 Widget _buildDormantRosterApp(
@@ -836,6 +1012,35 @@ Widget _buildLiveLaneApp(
         ),
         settingsOverlayDelegate: settingsOverlayDelegate,
       ),
+    ),
+  );
+}
+
+Widget _buildWorkspaceDrivenLiveLaneApp(
+  ConnectionWorkspaceController controller, {
+  required ConnectionSettingsOverlayDelegate settingsOverlayDelegate,
+}) {
+  return MaterialApp(
+    theme: buildPocketTheme(Brightness.light),
+    home: AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final laneBinding = controller.selectedLaneBinding;
+        if (laneBinding == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Scaffold(
+          body: ConnectionWorkspaceLiveLaneSurface(
+            workspaceController: controller,
+            laneBinding: laneBinding,
+            platformPolicy: PocketPlatformPolicy.resolve(
+              platform: TargetPlatform.android,
+            ),
+            settingsOverlayDelegate: settingsOverlayDelegate,
+          ),
+        );
+      },
     ),
   );
 }
@@ -911,6 +1116,16 @@ Future<void> _closeClients(
 ) async {
   for (final client in clientsById.values) {
     await client.close();
+  }
+}
+
+Future<void> _closeClientLists(
+  Map<String, List<FakeCodexAppServerClient>> clientsByConnectionId,
+) async {
+  for (final clients in clientsByConnectionId.values) {
+    for (final client in clients) {
+      await client.close();
+    }
   }
 }
 

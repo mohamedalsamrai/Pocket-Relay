@@ -9,6 +9,12 @@ enum ConnectionWorkspaceReconnectRequirement {
   transportWithSavedSettings,
 }
 
+enum ConnectionWorkspaceTransportRecoveryPhase {
+  lost,
+  reconnecting,
+  unavailable,
+}
+
 class ConnectionWorkspaceState {
   const ConnectionWorkspaceState({
     required this.isLoading,
@@ -18,6 +24,7 @@ class ConnectionWorkspaceState {
     required this.viewport,
     required this.savedSettingsReconnectRequiredConnectionIds,
     required this.transportReconnectRequiredConnectionIds,
+    required this.transportRecoveryPhasesByConnectionId,
   });
 
   const ConnectionWorkspaceState.initial()
@@ -27,7 +34,9 @@ class ConnectionWorkspaceState {
       selectedConnectionId = null,
       viewport = ConnectionWorkspaceViewport.liveLane,
       savedSettingsReconnectRequiredConnectionIds = const <String>{},
-      transportReconnectRequiredConnectionIds = const <String>{};
+      transportReconnectRequiredConnectionIds = const <String>{},
+      transportRecoveryPhasesByConnectionId =
+          const <String, ConnectionWorkspaceTransportRecoveryPhase>{};
 
   final bool isLoading;
   final ConnectionCatalogState catalog;
@@ -36,6 +45,8 @@ class ConnectionWorkspaceState {
   final ConnectionWorkspaceViewport viewport;
   final Set<String> savedSettingsReconnectRequiredConnectionIds;
   final Set<String> transportReconnectRequiredConnectionIds;
+  final Map<String, ConnectionWorkspaceTransportRecoveryPhase>
+  transportRecoveryPhasesByConnectionId;
 
   Set<String> get reconnectRequiredConnectionIds => <String>{
     ...savedSettingsReconnectRequiredConnectionIds,
@@ -64,6 +75,12 @@ class ConnectionWorkspaceState {
 
   bool requiresTransportReconnect(String connectionId) {
     return transportReconnectRequiredConnectionIds.contains(connectionId);
+  }
+
+  ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhaseFor(
+    String connectionId,
+  ) {
+    return transportRecoveryPhasesByConnectionId[connectionId];
   }
 
   ConnectionWorkspaceReconnectRequirement? reconnectRequirementFor(
@@ -98,6 +115,8 @@ class ConnectionWorkspaceState {
     ConnectionWorkspaceViewport? viewport,
     Set<String>? savedSettingsReconnectRequiredConnectionIds,
     Set<String>? transportReconnectRequiredConnectionIds,
+    Map<String, ConnectionWorkspaceTransportRecoveryPhase>?
+    transportRecoveryPhasesByConnectionId,
     bool clearSelectedConnectionId = false,
   }) {
     return ConnectionWorkspaceState(
@@ -114,6 +133,9 @@ class ConnectionWorkspaceState {
       transportReconnectRequiredConnectionIds:
           transportReconnectRequiredConnectionIds ??
           this.transportReconnectRequiredConnectionIds,
+      transportRecoveryPhasesByConnectionId:
+          transportRecoveryPhasesByConnectionId ??
+          this.transportRecoveryPhasesByConnectionId,
     );
   }
 
@@ -132,6 +154,10 @@ class ConnectionWorkspaceState {
         setEquals(
           other.transportReconnectRequiredConnectionIds,
           transportReconnectRequiredConnectionIds,
+        ) &&
+        mapEquals(
+          other.transportRecoveryPhasesByConnectionId,
+          transportRecoveryPhasesByConnectionId,
         );
   }
 
@@ -144,5 +170,10 @@ class ConnectionWorkspaceState {
     viewport,
     Object.hashAllUnordered(savedSettingsReconnectRequiredConnectionIds),
     Object.hashAllUnordered(transportReconnectRequiredConnectionIds),
+    Object.hashAllUnordered(
+      transportRecoveryPhasesByConnectionId.entries.map(
+        (entry) => Object.hash(entry.key, entry.value),
+      ),
+    ),
   );
 }

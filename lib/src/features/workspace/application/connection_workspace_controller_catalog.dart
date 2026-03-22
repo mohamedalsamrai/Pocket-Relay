@@ -45,6 +45,13 @@ Future<String> _createWorkspaceConnection(
             reconnectRequiredConnectionIds:
                 controller._state.transportReconnectRequiredConnectionIds,
           ),
+      transportRecoveryPhasesByConnectionId:
+          _sanitizeWorkspaceTransportRecoveryPhases(
+            catalog: nextCatalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            transportRecoveryPhasesByConnectionId:
+                controller._state.transportRecoveryPhasesByConnectionId,
+          ),
     ),
   );
   return connection.id;
@@ -96,6 +103,13 @@ Future<void> _saveWorkspaceDormantConnection(
             liveConnectionIds: controller._state.liveConnectionIds,
             reconnectRequiredConnectionIds:
                 controller._state.transportReconnectRequiredConnectionIds,
+          ),
+      transportRecoveryPhasesByConnectionId:
+          _sanitizeWorkspaceTransportRecoveryPhases(
+            catalog: nextCatalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            transportRecoveryPhasesByConnectionId:
+                controller._state.transportRecoveryPhasesByConnectionId,
           ),
     ),
   );
@@ -158,6 +172,13 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
             liveConnectionIds: controller._state.liveConnectionIds,
             reconnectRequiredConnectionIds:
                 controller._state.transportReconnectRequiredConnectionIds,
+          ),
+      transportRecoveryPhasesByConnectionId:
+          _sanitizeWorkspaceTransportRecoveryPhases(
+            catalog: nextCatalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            transportRecoveryPhasesByConnectionId:
+                controller._state.transportRecoveryPhasesByConnectionId,
           ),
     ),
   );
@@ -264,5 +285,21 @@ Set<String> _sanitizeWorkspaceReconnectRequiredIds({
       if (catalog.connectionForId(connectionId) != null &&
           liveConnectionIdSet.contains(connectionId))
         connectionId,
+  };
+}
+
+Map<String, ConnectionWorkspaceTransportRecoveryPhase>
+_sanitizeWorkspaceTransportRecoveryPhases({
+  required ConnectionCatalogState catalog,
+  required List<String> liveConnectionIds,
+  required Map<String, ConnectionWorkspaceTransportRecoveryPhase>
+  transportRecoveryPhasesByConnectionId,
+}) {
+  final liveConnectionIdSet = liveConnectionIds.toSet();
+  return <String, ConnectionWorkspaceTransportRecoveryPhase>{
+    for (final entry in transportRecoveryPhasesByConnectionId.entries)
+      if (catalog.connectionForId(entry.key) != null &&
+          liveConnectionIdSet.contains(entry.key))
+        entry.key: entry.value,
   };
 }

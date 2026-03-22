@@ -4,6 +4,7 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
   List<ChatChromeMenuAction> _supplementalMenuActionsFor({
     required ConnectionWorkspaceReconnectRequirement? reconnectRequirement,
     required bool isLaneBusy,
+    required bool isRestartInProgress,
   }) {
     final hasWorkspaceHistoryScope = widget
         .laneBinding
@@ -26,13 +27,13 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
       ),
       if (reconnectRequirement case final requirement?)
         ChatChromeMenuAction(
-          label: _isRestartingLane
+          label: isRestartInProgress
               ? ConnectionWorkspaceCopy.reconnectMenuProgressFor(requirement)
               : ConnectionWorkspaceCopy.reconnectMenuActionFor(requirement),
           onSelected: () {
             unawaited(_restartLane());
           },
-          isEnabled: !_isRestartingLane && !isLaneBusy,
+          isEnabled: !isRestartInProgress && !isLaneBusy,
         ),
       ChatChromeMenuAction(
         label: ConnectionWorkspaceCopy.closeLaneAction,

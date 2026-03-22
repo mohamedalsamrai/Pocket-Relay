@@ -35,6 +35,17 @@ abstract final class ConnectionWorkspaceCopy {
   static const String transportReconnectProgress = 'Reconnecting…';
   static const String transportReconnectMenuAction = 'Reconnect lane';
   static const String transportReconnectMenuProgress = 'Reconnecting lane…';
+  static const String transportLostNoticeTitle = 'Live transport lost';
+  static const String transportLostNoticeMessage =
+      'Pocket Relay lost the live connection to Codex. Your draft is preserved below until the lane reconnects.';
+  static const String reconnectingNoticeTitle =
+      'Reconnecting to remote session';
+  static const String reconnectingNoticeMessage =
+      'Pocket Relay is reconnecting this lane to Codex before it can continue. Your draft is preserved below.';
+  static const String transportUnavailableNoticeTitle =
+      'Remote session unavailable';
+  static const String transportUnavailableNoticeMessage =
+      'Pocket Relay could not reconnect this lane to Codex. Your draft is preserved below. Try reconnecting again.';
   static const String collapseSidebarAction = 'Collapse sidebar';
   static const String expandSidebarAction = 'Expand sidebar';
   static const String workspaceNotSet = 'Workspace not set';

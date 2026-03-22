@@ -64,9 +64,19 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    final reconnectRequirement = widget.workspaceController.state
-        .reconnectRequirementFor(widget.laneBinding.connectionId);
+    final workspaceState = widget.workspaceController.state;
+    final reconnectRequirement = workspaceState.reconnectRequirementFor(
+      widget.laneBinding.connectionId,
+    );
+    final transportRecoveryPhase = workspaceState.transportRecoveryPhaseFor(
+      widget.laneBinding.connectionId,
+    );
     final isLaneBusy = widget.laneBinding.sessionController.sessionState.isBusy;
+    final isTransportReconnectInProgress =
+        transportRecoveryPhase ==
+        ConnectionWorkspaceTransportRecoveryPhase.reconnecting;
+    final isRestartInProgress =
+        _isRestartingLane || isTransportReconnectInProgress;
     final chatRoot = ChatRootAdapter(
       laneBinding: widget.laneBinding,
       platformPolicy: widget.platformPolicy,
@@ -74,26 +84,136 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       supplementalMenuActions: _supplementalMenuActionsFor(
         reconnectRequirement: reconnectRequirement,
         isLaneBusy: isLaneBusy,
+        isRestartInProgress: isRestartInProgress,
+      ),
+      supplementalComposerNotice: _transportRecoveryNoticeFor(
+        transportRecoveryPhase,
       ),
       laneRestartAction: reconnectRequirement != null
           ? ChatLaneRestartActionContract(
               badgeLabel: ConnectionWorkspaceCopy.reconnectBadgeFor(
                 reconnectRequirement,
               ),
-              label: _isRestartingLane
+              label: isRestartInProgress
                   ? ConnectionWorkspaceCopy.reconnectProgressFor(
                       reconnectRequirement,
                     )
                   : ConnectionWorkspaceCopy.reconnectActionFor(
                       reconnectRequirement,
                     ),
-              isInProgress: _isRestartingLane,
+              isInProgress: isRestartInProgress,
             )
           : null,
-      onRestartLane: reconnectRequirement != null && !isLaneBusy
+      onRestartLane:
+          reconnectRequirement != null && !isLaneBusy && !isRestartInProgress
           ? _restartLane
           : null,
     );
     return chatRoot;
+  }
+
+  Widget? _transportRecoveryNoticeFor(
+    ConnectionWorkspaceTransportRecoveryPhase? phase,
+  ) {
+    final sessionController = widget.laneBinding.sessionController;
+    if (phase == null ||
+        sessionController.historicalConversationRestoreState != null ||
+        sessionController.conversationRecoveryState != null) {
+      return null;
+    }
+
+    final (title, message, isLoading) = switch (phase) {
+      ConnectionWorkspaceTransportRecoveryPhase.lost => (
+        ConnectionWorkspaceCopy.transportLostNoticeTitle,
+        ConnectionWorkspaceCopy.transportLostNoticeMessage,
+        false,
+      ),
+      ConnectionWorkspaceTransportRecoveryPhase.reconnecting => (
+        ConnectionWorkspaceCopy.reconnectingNoticeTitle,
+        ConnectionWorkspaceCopy.reconnectingNoticeMessage,
+        true,
+      ),
+      ConnectionWorkspaceTransportRecoveryPhase.unavailable => (
+        ConnectionWorkspaceCopy.transportUnavailableNoticeTitle,
+        ConnectionWorkspaceCopy.transportUnavailableNoticeMessage,
+        false,
+      ),
+    };
+    return _WorkspaceLaneTransportNotice(
+      title: title,
+      message: message,
+      isLoading: isLoading,
+    );
+  }
+}
+
+class _WorkspaceLaneTransportNotice extends StatelessWidget {
+  const _WorkspaceLaneTransportNotice({
+    required this.title,
+    required this.message,
+    required this.isLoading,
+  });
+
+  final String title;
+  final String message;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foregroundColor = theme.colorScheme.onSecondaryContainer;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.secondary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: foregroundColor,
+                ),
+              )
+            else
+              Icon(Icons.portable_wifi_off_rounded, color: foregroundColor),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: foregroundColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: foregroundColor.withValues(alpha: 0.88),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
