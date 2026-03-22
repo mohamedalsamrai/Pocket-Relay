@@ -14,7 +14,8 @@ Future<void> _initializeWorkspaceController(
         liveConnectionIds: <String>[],
         selectedConnectionId: null,
         viewport: ConnectionWorkspaceViewport.dormantRoster,
-        reconnectRequiredConnectionIds: <String>{},
+        savedSettingsReconnectRequiredConnectionIds: <String>{},
+        transportReconnectRequiredConnectionIds: <String>{},
       ),
     );
     return;
@@ -47,7 +48,8 @@ Future<void> _initializeWorkspaceController(
       liveConnectionIds: <String>[firstConnectionId],
       selectedConnectionId: firstConnectionId,
       viewport: ConnectionWorkspaceViewport.liveLane,
-      reconnectRequiredConnectionIds: const <String>{},
+      savedSettingsReconnectRequiredConnectionIds: const <String>{},
+      transportReconnectRequiredConnectionIds: const <String>{},
     ),
   );
   await firstBinding.sessionController.initialize();
@@ -83,12 +85,20 @@ Future<void> _instantiateWorkspaceConnection(
       liveConnectionIds: nextLiveConnectionIds,
       selectedConnectionId: connectionId,
       viewport: ConnectionWorkspaceViewport.liveLane,
-      reconnectRequiredConnectionIds: _sanitizeWorkspaceReconnectRequiredIds(
-        catalog: controller._state.catalog,
-        liveConnectionIds: nextLiveConnectionIds,
-        reconnectRequiredConnectionIds:
-            controller._state.reconnectRequiredConnectionIds,
-      ),
+      savedSettingsReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: controller._state.catalog,
+            liveConnectionIds: nextLiveConnectionIds,
+            reconnectRequiredConnectionIds:
+                controller._state.savedSettingsReconnectRequiredConnectionIds,
+          ),
+      transportReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: controller._state.catalog,
+            liveConnectionIds: nextLiveConnectionIds,
+            reconnectRequiredConnectionIds:
+                controller._state.transportReconnectRequiredConnectionIds,
+          ),
     ),
   );
   await binding.sessionController.initialize();
@@ -126,15 +136,30 @@ Future<void> _reconnectWorkspaceConnection(
   previousBinding.dispose();
   controller._applyState(
     controller._state.copyWith(
-      reconnectRequiredConnectionIds: _sanitizeWorkspaceReconnectRequiredIds(
-        catalog: controller._state.catalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        reconnectRequiredConnectionIds: <String>{
-          for (final reconnectConnectionId
-              in controller._state.reconnectRequiredConnectionIds)
-            if (reconnectConnectionId != connectionId) reconnectConnectionId,
-        },
-      ),
+      savedSettingsReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: controller._state.catalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            reconnectRequiredConnectionIds: <String>{
+              for (final reconnectConnectionId
+                  in controller
+                      ._state
+                      .savedSettingsReconnectRequiredConnectionIds)
+                if (reconnectConnectionId != connectionId)
+                  reconnectConnectionId,
+            },
+          ),
+      transportReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: controller._state.catalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            reconnectRequiredConnectionIds: <String>{
+              for (final reconnectConnectionId
+                  in controller._state.transportReconnectRequiredConnectionIds)
+                if (reconnectConnectionId != connectionId)
+                  reconnectConnectionId,
+            },
+          ),
     ),
   );
   await nextBinding.sessionController.initialize();
@@ -179,15 +204,32 @@ Future<void> _resumeWorkspaceConversation(
       controller._state.copyWith(
         selectedConnectionId: connectionId,
         viewport: ConnectionWorkspaceViewport.liveLane,
-        reconnectRequiredConnectionIds: _sanitizeWorkspaceReconnectRequiredIds(
-          catalog: controller._state.catalog,
-          liveConnectionIds: controller._state.liveConnectionIds,
-          reconnectRequiredConnectionIds: <String>{
-            for (final reconnectConnectionId
-                in controller._state.reconnectRequiredConnectionIds)
-              if (reconnectConnectionId != connectionId) reconnectConnectionId,
-          },
-        ),
+        savedSettingsReconnectRequiredConnectionIds:
+            _sanitizeWorkspaceReconnectRequiredIds(
+              catalog: controller._state.catalog,
+              liveConnectionIds: controller._state.liveConnectionIds,
+              reconnectRequiredConnectionIds: <String>{
+                for (final reconnectConnectionId
+                    in controller
+                        ._state
+                        .savedSettingsReconnectRequiredConnectionIds)
+                  if (reconnectConnectionId != connectionId)
+                    reconnectConnectionId,
+              },
+            ),
+        transportReconnectRequiredConnectionIds:
+            _sanitizeWorkspaceReconnectRequiredIds(
+              catalog: controller._state.catalog,
+              liveConnectionIds: controller._state.liveConnectionIds,
+              reconnectRequiredConnectionIds: <String>{
+                for (final reconnectConnectionId
+                    in controller
+                        ._state
+                        .transportReconnectRequiredConnectionIds)
+                  if (reconnectConnectionId != connectionId)
+                    reconnectConnectionId,
+              },
+            ),
       ),
     );
     previousBinding.dispose();
@@ -230,12 +272,20 @@ Future<void> _deleteDormantWorkspaceConnection(
     controller._state.copyWith(
       isLoading: false,
       catalog: nextCatalog,
-      reconnectRequiredConnectionIds: _sanitizeWorkspaceReconnectRequiredIds(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        reconnectRequiredConnectionIds:
-            controller._state.reconnectRequiredConnectionIds,
-      ),
+      savedSettingsReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: nextCatalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            reconnectRequiredConnectionIds:
+                controller._state.savedSettingsReconnectRequiredConnectionIds,
+          ),
+      transportReconnectRequiredConnectionIds:
+          _sanitizeWorkspaceReconnectRequiredIds(
+            catalog: nextCatalog,
+            liveConnectionIds: controller._state.liveConnectionIds,
+            reconnectRequiredConnectionIds:
+                controller._state.transportReconnectRequiredConnectionIds,
+          ),
     ),
   );
 }
@@ -274,6 +324,23 @@ Future<void> _handleWorkspaceAppLifecycleState(
       );
       return;
     case AppLifecycleState.resumed:
+      final selectedConnectionId = controller._state.selectedConnectionId;
+      if (selectedConnectionId == null ||
+          !controller._state.isConnectionLive(selectedConnectionId) ||
+          !controller._state.requiresTransportReconnect(selectedConnectionId) ||
+          controller._state.requiresSavedSettingsReconnect(
+            selectedConnectionId,
+          )) {
+        return;
+      }
+
+      final binding =
+          controller._liveBindingsByConnectionId[selectedConnectionId];
+      if (binding == null || binding.sessionController.sessionState.isBusy) {
+        return;
+      }
+
+      await _reconnectWorkspaceConnection(controller, selectedConnectionId);
       return;
     case AppLifecycleState.detached:
       return;

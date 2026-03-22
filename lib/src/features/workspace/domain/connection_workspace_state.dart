@@ -3,6 +3,12 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 
 enum ConnectionWorkspaceViewport { liveLane, dormantRoster }
 
+enum ConnectionWorkspaceReconnectRequirement {
+  savedSettings,
+  transport,
+  transportWithSavedSettings,
+}
+
 class ConnectionWorkspaceState {
   const ConnectionWorkspaceState({
     required this.isLoading,
@@ -10,7 +16,8 @@ class ConnectionWorkspaceState {
     required this.liveConnectionIds,
     required this.selectedConnectionId,
     required this.viewport,
-    required this.reconnectRequiredConnectionIds,
+    required this.savedSettingsReconnectRequiredConnectionIds,
+    required this.transportReconnectRequiredConnectionIds,
   });
 
   const ConnectionWorkspaceState.initial()
@@ -19,14 +26,21 @@ class ConnectionWorkspaceState {
       liveConnectionIds = const <String>[],
       selectedConnectionId = null,
       viewport = ConnectionWorkspaceViewport.liveLane,
-      reconnectRequiredConnectionIds = const <String>{};
+      savedSettingsReconnectRequiredConnectionIds = const <String>{},
+      transportReconnectRequiredConnectionIds = const <String>{};
 
   final bool isLoading;
   final ConnectionCatalogState catalog;
   final List<String> liveConnectionIds;
   final String? selectedConnectionId;
   final ConnectionWorkspaceViewport viewport;
-  final Set<String> reconnectRequiredConnectionIds;
+  final Set<String> savedSettingsReconnectRequiredConnectionIds;
+  final Set<String> transportReconnectRequiredConnectionIds;
+
+  Set<String> get reconnectRequiredConnectionIds => <String>{
+    ...savedSettingsReconnectRequiredConnectionIds,
+    ...transportReconnectRequiredConnectionIds,
+  };
 
   List<String> get dormantConnectionIds {
     return <String>[
@@ -40,7 +54,32 @@ class ConnectionWorkspaceState {
   }
 
   bool requiresReconnect(String connectionId) {
-    return reconnectRequiredConnectionIds.contains(connectionId);
+    return requiresSavedSettingsReconnect(connectionId) ||
+        requiresTransportReconnect(connectionId);
+  }
+
+  bool requiresSavedSettingsReconnect(String connectionId) {
+    return savedSettingsReconnectRequiredConnectionIds.contains(connectionId);
+  }
+
+  bool requiresTransportReconnect(String connectionId) {
+    return transportReconnectRequiredConnectionIds.contains(connectionId);
+  }
+
+  ConnectionWorkspaceReconnectRequirement? reconnectRequirementFor(
+    String connectionId,
+  ) {
+    final requiresSavedSettings = requiresSavedSettingsReconnect(connectionId);
+    final requiresTransport = requiresTransportReconnect(connectionId);
+    if (requiresTransport) {
+      return requiresSavedSettings
+          ? ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings
+          : ConnectionWorkspaceReconnectRequirement.transport;
+    }
+    if (requiresSavedSettings) {
+      return ConnectionWorkspaceReconnectRequirement.savedSettings;
+    }
+    return null;
   }
 
   bool get isEmptyWorkspace => catalog.isEmpty;
@@ -57,7 +96,8 @@ class ConnectionWorkspaceState {
     List<String>? liveConnectionIds,
     String? selectedConnectionId,
     ConnectionWorkspaceViewport? viewport,
-    Set<String>? reconnectRequiredConnectionIds,
+    Set<String>? savedSettingsReconnectRequiredConnectionIds,
+    Set<String>? transportReconnectRequiredConnectionIds,
     bool clearSelectedConnectionId = false,
   }) {
     return ConnectionWorkspaceState(
@@ -68,8 +108,12 @@ class ConnectionWorkspaceState {
           ? null
           : (selectedConnectionId ?? this.selectedConnectionId),
       viewport: viewport ?? this.viewport,
-      reconnectRequiredConnectionIds:
-          reconnectRequiredConnectionIds ?? this.reconnectRequiredConnectionIds,
+      savedSettingsReconnectRequiredConnectionIds:
+          savedSettingsReconnectRequiredConnectionIds ??
+          this.savedSettingsReconnectRequiredConnectionIds,
+      transportReconnectRequiredConnectionIds:
+          transportReconnectRequiredConnectionIds ??
+          this.transportReconnectRequiredConnectionIds,
     );
   }
 
@@ -82,8 +126,12 @@ class ConnectionWorkspaceState {
         other.selectedConnectionId == selectedConnectionId &&
         other.viewport == viewport &&
         setEquals(
-          other.reconnectRequiredConnectionIds,
-          reconnectRequiredConnectionIds,
+          other.savedSettingsReconnectRequiredConnectionIds,
+          savedSettingsReconnectRequiredConnectionIds,
+        ) &&
+        setEquals(
+          other.transportReconnectRequiredConnectionIds,
+          transportReconnectRequiredConnectionIds,
         );
   }
 
@@ -94,6 +142,7 @@ class ConnectionWorkspaceState {
     Object.hashAll(liveConnectionIds),
     selectedConnectionId,
     viewport,
-    Object.hashAllUnordered(reconnectRequiredConnectionIds),
+    Object.hashAllUnordered(savedSettingsReconnectRequiredConnectionIds),
+    Object.hashAllUnordered(transportReconnectRequiredConnectionIds),
   );
 }

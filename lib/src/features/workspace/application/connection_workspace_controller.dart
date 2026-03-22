@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -48,9 +49,23 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
       <String, ConnectionLaneBinding>{};
-  final Map<String, ({ConnectionLaneBinding binding, VoidCallback listener})>
+  final Map<
+    String,
+    ({
+      ConnectionLaneBinding binding,
+      VoidCallback listener,
+      StreamSubscription<CodexAppServerEvent> appServerEventSubscription,
+    })
+  >
   _bindingRecoveryRegistrationsByConnectionId =
-      <String, ({ConnectionLaneBinding binding, VoidCallback listener})>{};
+      <
+        String,
+        ({
+          ConnectionLaneBinding binding,
+          VoidCallback listener,
+          StreamSubscription<CodexAppServerEvent> appServerEventSubscription,
+        })
+      >{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
@@ -238,6 +253,20 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _bindingRecoveryRegistrationsByConnectionId[connectionId] = (
       binding: binding,
       listener: listener,
+      appServerEventSubscription: binding.appServerClient.events.listen((
+        event,
+      ) {
+        switch (event) {
+          case CodexAppServerDisconnectedEvent():
+            _markTransportReconnectRequired(connectionId);
+            break;
+          case CodexAppServerConnectedEvent():
+            _clearTransportReconnectRequired(connectionId);
+            break;
+          default:
+            break;
+        }
+      }),
     );
     binding.sessionController.addListener(listener);
     binding.composerDraftHost.addListener(listener);
@@ -257,6 +286,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     registration.binding.composerDraftHost.removeListener(
       registration.listener,
     );
+    unawaited(registration.appServerEventSubscription.cancel());
   }
 
   void _scheduleRecoveryPersistence() {
@@ -381,6 +411,50 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       selectedThreadId: selectedThreadId,
       draftText: binding.composerDraftHost.draft.text,
       backgroundedAt: backgroundedAt,
+    );
+  }
+
+  void _markTransportReconnectRequired(String connectionId) {
+    if (_isDisposed ||
+        !_state.isConnectionLive(connectionId) ||
+        _state.requiresTransportReconnect(connectionId)) {
+      return;
+    }
+
+    _applyState(
+      _state.copyWith(
+        transportReconnectRequiredConnectionIds:
+            _sanitizeWorkspaceReconnectRequiredIds(
+              catalog: _state.catalog,
+              liveConnectionIds: _state.liveConnectionIds,
+              reconnectRequiredConnectionIds: <String>{
+                ..._state.transportReconnectRequiredConnectionIds,
+                connectionId,
+              },
+            ),
+      ),
+    );
+  }
+
+  void _clearTransportReconnectRequired(String connectionId) {
+    if (_isDisposed || !_state.requiresTransportReconnect(connectionId)) {
+      return;
+    }
+
+    _applyState(
+      _state.copyWith(
+        transportReconnectRequiredConnectionIds:
+            _sanitizeWorkspaceReconnectRequiredIds(
+              catalog: _state.catalog,
+              liveConnectionIds: _state.liveConnectionIds,
+              reconnectRequiredConnectionIds: <String>{
+                for (final reconnectConnectionId
+                    in _state.transportReconnectRequiredConnectionIds)
+                  if (reconnectConnectionId != connectionId)
+                    reconnectConnectionId,
+              },
+            ),
+      ),
     );
   }
 }

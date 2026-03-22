@@ -13,10 +13,10 @@ import 'package:pocket_relay/src/features/connection_settings/domain/connection_
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
+import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
-import 'workspace_live_lane_menu_actions.dart';
 import 'workspace_conversation_history_sheet.dart';
 
 part 'workspace_live_lane_surface_menu.dart';
@@ -48,7 +48,7 @@ class ConnectionWorkspaceLiveLaneSurface extends StatefulWidget {
 class _ConnectionWorkspaceLiveLaneSurfaceState
     extends State<ConnectionWorkspaceLiveLaneSurface> {
   bool _isOpeningConnectionSettings = false;
-  bool _isApplyingSavedSettings = false;
+  bool _isRestartingLane = false;
 
   void _setOpeningConnectionSettings(bool value) {
     setState(() {
@@ -56,36 +56,42 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     });
   }
 
-  void _setApplyingSavedSettings(bool value) {
+  void _setRestartingLane(bool value) {
     setState(() {
-      _isApplyingSavedSettings = value;
+      _isRestartingLane = value;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final requiresReconnect = widget.workspaceController.state
-        .requiresReconnect(widget.laneBinding.connectionId);
+    final reconnectRequirement = widget.workspaceController.state
+        .reconnectRequirementFor(widget.laneBinding.connectionId);
     final isLaneBusy = widget.laneBinding.sessionController.sessionState.isBusy;
     final chatRoot = ChatRootAdapter(
       laneBinding: widget.laneBinding,
       platformPolicy: widget.platformPolicy,
       onConnectionSettingsRequested: _handleConnectionSettingsRequested,
       supplementalMenuActions: _supplementalMenuActionsFor(
-        requiresReconnect: requiresReconnect,
+        reconnectRequirement: reconnectRequirement,
         isLaneBusy: isLaneBusy,
       ),
-      laneRestartAction: requiresReconnect
+      laneRestartAction: reconnectRequirement != null
           ? ChatLaneRestartActionContract(
-              badgeLabel: ConnectionWorkspaceCopy.reconnectBadge,
-              label: _isApplyingSavedSettings
-                  ? ConnectionWorkspaceCopy.reconnectProgress
-                  : ConnectionWorkspaceCopy.reconnectAction,
-              isInProgress: _isApplyingSavedSettings,
+              badgeLabel: ConnectionWorkspaceCopy.reconnectBadgeFor(
+                reconnectRequirement,
+              ),
+              label: _isRestartingLane
+                  ? ConnectionWorkspaceCopy.reconnectProgressFor(
+                      reconnectRequirement,
+                    )
+                  : ConnectionWorkspaceCopy.reconnectActionFor(
+                      reconnectRequirement,
+                    ),
+              isInProgress: _isRestartingLane,
             )
           : null,
-      onRestartLane: requiresReconnect && !isLaneBusy
-          ? _applySavedSettings
+      onRestartLane: reconnectRequirement != null && !isLaneBusy
+          ? _restartLane
           : null,
     );
     return chatRoot;

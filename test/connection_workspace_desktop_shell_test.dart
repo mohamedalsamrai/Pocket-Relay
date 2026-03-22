@@ -680,8 +680,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
-      expect(find.text('Restart needed'), findsNWidgets(2));
-      expect(find.text('Saved settings are pending'), findsNothing);
+      expect(find.text('Changes pending'), findsNWidgets(2));
+      expect(find.text('Apply changes'), findsOneWidget);
       expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },

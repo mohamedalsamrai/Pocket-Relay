@@ -2,7 +2,7 @@ part of 'workspace_live_lane_surface.dart';
 
 extension on _ConnectionWorkspaceLiveLaneSurfaceState {
   List<ChatChromeMenuAction> _supplementalMenuActionsFor({
-    required bool requiresReconnect,
+    required ConnectionWorkspaceReconnectRequirement? reconnectRequirement,
     required bool isLaneBusy,
   }) {
     final hasWorkspaceHistoryScope = widget
@@ -12,22 +12,37 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         .workspaceDir
         .trim()
         .isNotEmpty;
-    return buildWorkspaceLiveLaneMenuActions(
-      hasWorkspaceHistoryScope: hasWorkspaceHistoryScope,
-      requiresReconnect: requiresReconnect,
-      isLaneBusy: isLaneBusy,
-      isApplyingSavedSettings: _isApplyingSavedSettings,
-      onShowConversationHistory: () {
-        unawaited(_showConversationHistory());
-      },
-      onShowDormantRoster: widget.workspaceController.showDormantRoster,
-      onReconnect: () {
-        unawaited(_applySavedSettings());
-      },
-      onCloseLane: () => widget.workspaceController.terminateConnection(
-        widget.laneBinding.connectionId,
+    return <ChatChromeMenuAction>[
+      ChatChromeMenuAction(
+        label: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
+        onSelected: () {
+          unawaited(_showConversationHistory());
+        },
+        isEnabled: hasWorkspaceHistoryScope && !isLaneBusy,
       ),
-    );
+      ChatChromeMenuAction(
+        label: ConnectionWorkspaceCopy.savedConnectionsMenuLabel,
+        onSelected: widget.workspaceController.showDormantRoster,
+      ),
+      if (reconnectRequirement case final requirement?)
+        ChatChromeMenuAction(
+          label: _isRestartingLane
+              ? ConnectionWorkspaceCopy.reconnectMenuProgressFor(requirement)
+              : ConnectionWorkspaceCopy.reconnectMenuActionFor(requirement),
+          onSelected: () {
+            unawaited(_restartLane());
+          },
+          isEnabled: !_isRestartingLane && !isLaneBusy,
+        ),
+      ChatChromeMenuAction(
+        label: ConnectionWorkspaceCopy.closeLaneAction,
+        onSelected: () => widget.workspaceController.terminateConnection(
+          widget.laneBinding.connectionId,
+        ),
+        isDestructive: true,
+        isEnabled: hasWorkspaceHistoryScope && !isLaneBusy,
+      ),
+    ];
   }
 
   Future<void> _showConversationHistory() {

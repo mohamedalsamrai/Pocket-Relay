@@ -348,7 +348,10 @@ void main() {
 
       expect(settingsOverlayDelegate.launchCount, 1);
       expect(settingsOverlayDelegate.launchedModelCatalogs.single, isNull);
-      expect(settingsOverlayDelegate.launchedModelCatalogSources.single, isNull);
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        isNull,
+      );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
 
       settingsOverlayDelegate.complete(null);
@@ -718,6 +721,83 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets(
+    'transport reconnect keeps last-known model catalog fallback available in live settings',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final lastKnownCatalog = ConnectionModelCatalog(
+        connectionId: 'conn_primary',
+        fetchedAt: DateTime.utc(2026, 3, 22),
+        models: const <ConnectionAvailableModel>[
+          ConnectionAvailableModel(
+            id: 'preset_global_default',
+            model: 'gpt-global-default',
+            displayName: 'GPT Global Default',
+            description: 'Last known backend default.',
+            hidden: false,
+            supportedReasoningEfforts:
+                <ConnectionAvailableModelReasoningEffortOption>[
+                  ConnectionAvailableModelReasoningEffortOption(
+                    reasoningEffort: CodexReasoningEffort.medium,
+                    description: 'Balanced global mode.',
+                  ),
+                ],
+            defaultReasoningEffort: CodexReasoningEffort.medium,
+            inputModalities: <String>['text'],
+            supportsPersonality: false,
+            isDefault: true,
+          ),
+        ],
+      );
+      final modelCatalogStore = MemoryConnectionModelCatalogStore(
+        initialLastKnownCatalog: lastKnownCatalog,
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        modelCatalogStore: modelCatalogStore,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final laneBinding = controller.selectedLaneBinding!;
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await clientsById['conn_primary']!.disconnect();
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogs.single,
+        lastKnownCatalog,
+      );
+      expect(
+        settingsOverlayDelegate.launchedModelCatalogSources.single,
+        ConnectionSettingsModelCatalogSource.lastKnownCache,
+      );
+      expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
 }
 
 Widget _buildDormantRosterApp(
@@ -841,8 +921,8 @@ class _DeferredConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
-  final List<ConnectionSettingsModelCatalogSource?> launchedModelCatalogSources =
-      <ConnectionSettingsModelCatalogSource?>[];
+  final List<ConnectionSettingsModelCatalogSource?>
+  launchedModelCatalogSources = <ConnectionSettingsModelCatalogSource?>[];
   final List<
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   >

@@ -476,6 +476,14 @@ void main() {
       );
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
       expect(controller.state.reconnectRequiredConnectionIds, <String>{
         'conn_primary',
       });
@@ -522,6 +530,90 @@ void main() {
         'primary.local',
       );
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'unexpected transport disconnect stages transport reconnect without replacing the live lane',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      clientsById['conn_primary']!.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isFalse,
+      );
+      expect(controller.state.reconnectRequiredConnectionIds, <String>{
+        'conn_primary',
+      });
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'transport reconnect state clears when the live lane reconnects through the existing binding',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      clientsById['conn_primary']!.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+      expect(clientsById['conn_primary']?.connectCalls, 2);
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
     },
   );
 
@@ -768,6 +860,137 @@ void main() {
       expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 0);
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
       expect(controller.state.requiresReconnect('conn_secondary'), isFalse);
+    },
+  );
+
+  test(
+    'resumed auto-reconnects the selected lane after confirmed transport loss',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+        'conn_secondary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..threadHistoriesById['thread_123'] = _savedConversationThread(
+              threadId: 'thread_123',
+            );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+      firstBinding.restoreComposerDraft('Recover me');
+      await _startBusyTurn(
+        firstBinding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clientsByConnectionId['conn_primary']!.first.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final nextBinding = controller.bindingForConnectionId('conn_primary');
+      expect(nextBinding, isNotNull);
+      expect(nextBinding, isNot(same(firstBinding)));
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(clientsByConnectionId['conn_primary'], hasLength(2));
+      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
+      expect(
+        clientsByConnectionId['conn_primary']!.last.readThreadCalls,
+        <String>['thread_123'],
+      );
+      expect(nextBinding!.composerDraftHost.draft.text, 'Recover me');
+      expect(
+        nextBinding.sessionController.sessionState.rootThreadId,
+        'thread_123',
+      );
+    },
+  );
+
+  test(
+    'resumed does not auto-reconnect when only saved settings are pending',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(firstBinding),
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },
   );
 
