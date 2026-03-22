@@ -206,7 +206,7 @@ void main() {
   );
 
   test(
-    'suppresses the provider echo while keeping the local prompt card stable at the tail',
+    'suppresses the provider echo while keeping the local prompt surface stable at the tail',
     () {
       final reducer = TranscriptReducer();
       final now = DateTime(2026, 3, 14, 12);
@@ -542,7 +542,7 @@ void main() {
   });
 
   test(
-    'starts a new assistant card when the same item resumes after an intervening warning',
+    'starts a new assistant surface when the same item resumes after an intervening warning',
     () {
       final reducer = TranscriptReducer();
       var state = CodexSessionState.initial();
@@ -2813,7 +2813,7 @@ void main() {
   });
 
   test(
-    'starts a new changed-files card when the same file-change item resumes after an intervening warning',
+    'starts a new changed-files surface when the same file-change item resumes after an intervening warning',
     () {
       final reducer = TranscriptReducer();
       final now = DateTime(2026, 3, 14, 12);
@@ -2893,7 +2893,7 @@ void main() {
   );
 
   test(
-    'starts a new changed-files card when the same file-change item resumes after an approval request',
+    'starts a new changed-files surface when the same file-change item resumes after an approval request',
     () {
       final reducer = TranscriptReducer();
       final now = DateTime(2026, 3, 14, 12);
