@@ -1,5 +1,6 @@
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_changed_files_parser.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_block_factory.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_support.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_runtime_event.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
@@ -10,11 +11,14 @@ class TranscriptTurnArtifactBuilder {
         const TranscriptItemBlockFactory(),
     TranscriptChangedFilesParser changedFilesParser =
         const TranscriptChangedFilesParser(),
+    TranscriptItemSupport itemSupport = const TranscriptItemSupport(),
   }) : _blockFactory = blockFactory,
-       _changedFilesParser = changedFilesParser;
+       _changedFilesParser = changedFilesParser,
+       _itemSupport = itemSupport;
 
   final TranscriptItemBlockFactory _blockFactory;
   final TranscriptChangedFilesParser _changedFilesParser;
+  final TranscriptItemSupport _itemSupport;
 
   CodexActiveTurnState upsertItem(
     CodexActiveTurnState turn,
@@ -232,15 +236,24 @@ class TranscriptTurnArtifactBuilder {
   CodexTurnArtifact? _artifactFromItem(CodexSessionActiveItem item) {
     final title = item.title ?? _blockFactory.defaultItemTitle(item.itemType);
     final artifactId = item.entryId;
+    final structuredUserDraft =
+        item.itemType == CodexCanonicalItemType.userMessage
+        ? _itemSupport.extractStructuredUserMessageDraft(item.snapshot)
+        : null;
+    final effectiveUserMessageText = structuredUserDraft?.text ?? item.body;
 
     return switch (item.blockKind) {
-      CodexUiBlockKind.userMessage when item.body.trim().isEmpty => null,
+      CodexUiBlockKind.userMessage
+          when effectiveUserMessageText.trim().isEmpty &&
+              (structuredUserDraft == null || structuredUserDraft.isEmpty) =>
+        null,
       CodexUiBlockKind.userMessage => CodexTurnBlockArtifact(
         block: CodexUserMessageBlock(
           id: artifactId,
           createdAt: item.createdAt,
-          text: item.body,
+          text: effectiveUserMessageText,
           deliveryState: CodexUserMessageDeliveryState.sent,
+          structuredDraft: structuredUserDraft,
           providerItemId: item.itemId,
         ),
       ),
