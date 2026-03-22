@@ -115,7 +115,7 @@ widgetbook:
 
 alias wb := widgetbook
 
-# Boot the standard iPhone 15 simulator if needed and run Widgetbook on it.
+# Boot the standard iPhone 15 simulator if needed and run Widgetbook as its own app.
 [no-exit-message]
 [script]
 widgetbook-ios:

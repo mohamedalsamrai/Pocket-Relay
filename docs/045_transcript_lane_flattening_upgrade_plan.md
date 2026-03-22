@@ -1030,3 +1030,169 @@ emphasis.
 That is the correct direction if the goal is to make the lane feel flatter,
 calmer, and more professional without disconnecting it from the real Codex
 runtime semantics.
+
+## 2026-03-22 Anti-Card Cleanup Follow-Up
+
+The recent regressions confirmed that the codebase still has two separate
+problems:
+
+1. boxed transcript primitives are still easy to reuse for new or refactored
+   transcript states
+2. card-oriented naming still biases future edits toward reintroducing boxed
+   surfaces even after a flattening pass
+
+This follow-up records the concrete cleanup sequence that should now replace ad
+hoc fixes.
+
+### Immediate principles
+
+- semantic distinction is allowed without boxed card chrome
+- a dedicated transcript item does not automatically earn a container
+- preserving a non-card transcript lane is part of correctness
+- file/class naming must stop inviting card regressions
+
+### Existing non-card transcript identity to preserve
+
+The reference visual language is not hypothetical. It already exists in the
+current transcript code and should be treated as the canonical non-card pattern
+unless the user explicitly asks for something else.
+
+That pattern is `TranscriptAnnotation`:
+
+- left-aligned content in the lane
+- a thin vertical accent rail on the left edge
+- optional inline header with icon, label, and compact trailing status
+- no boxed panel, tinted card shell, framed section, or bordered container
+
+Relevant current references:
+
+- [`TranscriptAnnotation`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_item_primitives.dart)
+- [`ReasoningCard`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/widgets/transcript/cards/reasoning_card.dart)
+- [`StatusCard`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/widgets/transcript/cards/status_card.dart)
+
+For transcript stateful/supporting items, the left-side vertical rail is the
+primary grouping and identity signal. Future flattening work should preserve and
+reuse that treatment instead of inventing a new non-card style.
+
+This means:
+
+- if an item is not truly blocking, default to the left-rail annotation pattern
+- do not replace the rail with a box, panel, pill stack, or tinted wrapper
+- do not treat "non-card" as permission to invent a different grouping system
+- when in doubt, match the existing annotation rhythm before introducing any
+  new primitive
+
+### Confirmed regression triggers
+
+The recent regressions did not happen because the user asked for broader visual
+change. They happened because implementation work widened scope and reused
+existing boxed primitives.
+
+Observed triggers:
+
+- changed-files work widened from drawer/code-view work into a full surface
+  redesign
+- context compaction was swept into a status-surface refactor and moved onto
+  `TranscriptBlocker`
+- command activity was split into dedicated command surfaces that also reused
+  `TranscriptBlocker`
+- widget/file names containing `Card` reinforced the wrong visual abstraction
+
+### Active primitives to remove or constrain
+
+#### 1. `TranscriptBlocker`
+
+[`TranscriptBlocker`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_item_primitives.dart)
+is the strongest current source of transcript card regressions.
+
+Current callsites observed during the audit:
+
+- approval request
+- approval decision
+- alert/warning surfaces
+- session status surfaces
+- exec command / exec wait surfaces
+- tool activity surfaces
+
+As long as this primitive remains available as a normal styling option, future
+refactors will continue to containerize transcript states that should stay flat.
+
+Recommended action:
+
+1. migrate remaining justified users onto flat transcript primitives or a much
+   narrower non-card blocking treatment
+2. delete `TranscriptBlocker`
+3. let compile failures reveal every remaining regression path
+
+#### 2. `PocketMetaCard`
+
+[`PocketMetaCard`](/Users/vince/Projects/Pocket-Relay/lib/src/core/ui/primitives/pocket_meta_card.dart)
+should not remain as a transcript-friendly fallback primitive. If it is still
+unused after the flattening work, delete it. If it still has real use outside
+the transcript, rename it so it no longer sounds like a safe default for
+transcript/system surfaces.
+
+### Immediate implementation order
+
+The recommended execution order is now:
+
+1. remove boxed treatment from the highest-churn transcript/worklog surfaces
+2. rename card-oriented files/classes to neutral functional names
+3. delete `TranscriptBlocker`
+4. audit any remaining `card` naming and justify each survivor
+
+### First-pass surface list
+
+These surfaces should be flattened before any broader rename sweep:
+
+- command execution surface
+- command wait surface
+- tool activity surfaces
+- compaction surface
+- changed-files outer transcript surface
+- approval request and decision surfaces
+- alert/warning surfaces
+
+The recent fixes already started this work for:
+
+- compacted context
+- changed-files outer transcript surface
+- command execution / command wait
+
+### Naming cleanup plan
+
+Card-oriented naming should be replaced with functional naming. Suggested
+examples:
+
+- `conversation_entry_card.dart` -> `conversation_entry_renderer.dart`
+- `session_status_card.dart` -> `session_status_surface.dart`
+- `exec_command_card.dart` -> `exec_command_surface.dart`
+- `tool_activity_card.dart` -> `tool_activity_surface.dart`
+- `changed_files_card.dart` -> `changed_files_surface.dart`
+- `ConversationCardPalette` -> `TranscriptPalette`
+
+The goal is not cosmetic churn. The goal is to remove naming that repeatedly
+pulls future edits back toward boxed/card-based UI.
+
+### Verification additions
+
+In addition to the earlier verification strategy, future anti-card work should
+also verify:
+
+- no new transcript/worklog surface reintroduces `TranscriptBlocker`
+- no scoped UI fix widens into neighboring surface redesign
+- Widgetbook transcript lane stories include representative non-card transcript
+  states, including compaction and dedicated command activity
+- the lane still reads as one surface rather than a stack of separate cards
+
+### Practical outcome target
+
+The transcript lane should end up with:
+
+- one calm lane rhythm
+- fewer boxed containers
+- semantic distinction through typography, spacing, the existing left-side
+  accent rail, and restrained badges
+- dedicated behavior where needed without defaulting to card shells
+- file/class naming that matches ownership and function rather than visual card
+  treatment

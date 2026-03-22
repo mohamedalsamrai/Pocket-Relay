@@ -30,6 +30,16 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "surface"
+    productFlavors {
+        create("widgetbook") {
+            dimension = "surface"
+            applicationIdSuffix = ".widgetbook"
+            versionNameSuffix = "-widgetbook"
+            resValue("string", "app_name", "Pocket Relay Widgetbook")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

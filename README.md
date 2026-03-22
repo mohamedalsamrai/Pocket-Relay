@@ -154,7 +154,9 @@ just widgetbook-ios
 Or directly:
 
 ```bash
-flutter run -t lib/widgetbook/main.dart
+flutter run --flavor widgetbook -d ios
+flutter run --flavor widgetbook -d android -t lib/widgetbook/main.dart
+flutter run -d macos -t lib/widgetbook/main.dart
 ```
 
 Important:

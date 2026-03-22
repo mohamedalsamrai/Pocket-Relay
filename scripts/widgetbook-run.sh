@@ -40,4 +40,9 @@ for path in "${target_files[@]}"; do
   fi
 done
 
-flutter run -d "$device" -t lib/widgetbook/main.dart
+if [ "$device" = "macos" ]; then
+  flutter run -d "$device" -t lib/widgetbook/main.dart
+  exit 0
+fi
+
+flutter run -d "$device" --flavor widgetbook

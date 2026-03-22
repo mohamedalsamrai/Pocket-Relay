@@ -1,0 +1,4 @@
+#include "Release.xcconfig"
+APP_DISPLAY_NAME=Pocket Relay Widgetbook
+APP_PRODUCT_BUNDLE_IDENTIFIER=me.vinch.pocketrelay.widgetbook
+FLUTTER_TARGET=lib/widgetbook/main.dart
