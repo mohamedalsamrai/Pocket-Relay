@@ -236,8 +236,7 @@ Future<ConnectionLaneBinding> _loadWorkspaceLaneBinding(
   ConnectionWorkspaceController controller,
   String connectionId, {
   String? initialDraftText,
-}
-) async {
+}) async {
   final binding = controller._laneBindingFactory(
     connectionId: connectionId,
     connection: await controller._connectionRepository.loadConnection(
@@ -257,7 +256,7 @@ Future<void> _handleWorkspaceAppLifecycleState(
   switch (state) {
     case AppLifecycleState.inactive:
       await controller._enqueueRecoveryPersistence(
-        backgroundedAt: DateTime.now(),
+        backgroundedAt: controller._now(),
       );
       return;
     case AppLifecycleState.hidden:
@@ -265,7 +264,7 @@ Future<void> _handleWorkspaceAppLifecycleState(
       controller._backgroundReconnectPending =
           controller.selectedLaneBinding != null;
       await controller._enqueueRecoveryPersistence(
-        backgroundedAt: DateTime.now(),
+        backgroundedAt: controller._now(),
       );
       return;
     case AppLifecycleState.resumed:
@@ -317,7 +316,10 @@ Future<void> _restoreWorkspaceAfterBackground(
     threadId: _normalizedWorkspaceThreadId(
       binding.sessionController.sessionState.currentThreadId ??
           binding.sessionController.sessionState.rootThreadId ??
-          binding.sessionController.historicalConversationRestoreState?.threadId,
+          binding
+              .sessionController
+              .historicalConversationRestoreState
+              ?.threadId,
     ),
     draftText: binding.composerDraftHost.draft.text,
   );

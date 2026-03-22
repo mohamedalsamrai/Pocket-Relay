@@ -7,7 +7,7 @@ This handoff covers the active work on branch:
 - `fix/ios-background-restore`
 
 The target issue is the one described in
-[`docs/052_ios_background_ssh_resilience_plan.md`](/Users/vince/Projects/Pocket-Relay/docs/052_ios_background_ssh_resilience_plan.md):
+[`docs/052_ios_background_ssh_resilience_plan.md`](../docs/052_ios_background_ssh_resilience_plan.md):
 
 - iPhone may suspend the app shortly after backgrounding
 - iPhone may later kill the suspended process for memory/resource management
@@ -23,7 +23,7 @@ This work intentionally does not add app-local transcript history caching.
 
 Added a real app-owned recovery store in:
 
-- [`connection_workspace_recovery_store.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)
+- [`connection_workspace_recovery_store.dart`](../lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)
 
 It persists the minimum recovery state for the active selected lane:
 
@@ -42,9 +42,9 @@ Available implementations:
 
 Extended:
 
-- [`connection_workspace_controller.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller.dart)
-- [`connection_workspace_controller_lifecycle.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
-- [`connection_workspace_controller_lane.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller_lane.dart)
+- [`connection_workspace_controller.dart`](../lib/src/features/workspace/application/connection_workspace_controller.dart)
+- [`connection_workspace_controller_lifecycle.dart`](../lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
+- [`connection_workspace_controller_lane.dart`](../lib/src/features/workspace/application/connection_workspace_controller_lane.dart)
 
 New behavior:
 
@@ -69,11 +69,11 @@ New behavior:
 
 Added:
 
-- [`workspace_app_lifecycle_host.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart)
+- [`workspace_app_lifecycle_host.dart`](../lib/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart)
 
 Wired it into bootstrap in:
 
-- [`pocket_relay_bootstrap.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_bootstrap.dart)
+- [`pocket_relay_bootstrap.dart`](../lib/src/app/pocket_relay_bootstrap.dart)
 
 This keeps lifecycle observation above lane/session controllers, which matches
 the ownership requirement in the plan.
@@ -82,8 +82,8 @@ the ownership requirement in the plan.
 
 Updated:
 
-- [`pocket_relay_dependencies.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_dependencies.dart)
-- [`pocket_relay_app.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_app.dart)
+- [`pocket_relay_dependencies.dart`](../lib/src/app/pocket_relay_dependencies.dart)
+- [`pocket_relay_app.dart`](../lib/src/app/pocket_relay_app.dart)
 
 The default app dependency path now uses:
 
@@ -99,7 +99,7 @@ For app/test entry points:
 
 Updated:
 
-- [`connection_lane_binding.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/lane/presentation/connection_lane_binding.dart)
+- [`connection_lane_binding.dart`](../lib/src/features/chat/lane/presentation/connection_lane_binding.dart)
 
 Added `restoreComposerDraft(String text)` so recreated bindings can restore the
 draft without moving draft ownership into Widgetbook/UI glue.
@@ -108,8 +108,8 @@ draft without moving draft ownership into Widgetbook/UI glue.
 
 Updated:
 
-- [`connection_workspace_controller_test.dart`](/Users/vince/Projects/Pocket-Relay/test/connection_workspace_controller_test.dart)
-- [`workspace_app_lifecycle_host_test.dart`](/Users/vince/Projects/Pocket-Relay/test/workspace_app_lifecycle_host_test.dart)
+- [`connection_workspace_controller_test.dart`](../test/connection_workspace_controller_test.dart)
+- [`workspace_app_lifecycle_host_test.dart`](../test/workspace_app_lifecycle_host_test.dart)
 
 New coverage proves:
 
@@ -210,25 +210,25 @@ If changed, keep the scope narrow and do not redesign the surrounding surface.
 
 ## Files Changed On This Branch
 
-- [`pocket_relay_bootstrap.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_bootstrap.dart)
-- [`pocket_relay_app.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_app.dart)
-- [`pocket_relay_dependencies.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/app/pocket_relay_dependencies.dart)
-- [`connection_lane_binding.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/lane/presentation/connection_lane_binding.dart)
-- [`connection_workspace_controller.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller.dart)
-- [`connection_workspace_controller_lane.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller_lane.dart)
-- [`connection_workspace_controller_lifecycle.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
-- [`connection_workspace_recovery_store.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)
-- [`workspace_app_lifecycle_host.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart)
-- [`connection_workspace_controller_test.dart`](/Users/vince/Projects/Pocket-Relay/test/connection_workspace_controller_test.dart)
-- [`widget_test.dart`](/Users/vince/Projects/Pocket-Relay/test/widget_test.dart)
-- [`chat_screen_app_server_test.dart`](/Users/vince/Projects/Pocket-Relay/test/chat_screen_app_server_test.dart)
-- [`workspace_app_lifecycle_host_test.dart`](/Users/vince/Projects/Pocket-Relay/test/workspace_app_lifecycle_host_test.dart)
+- [`pocket_relay_bootstrap.dart`](../lib/src/app/pocket_relay_bootstrap.dart)
+- [`pocket_relay_app.dart`](../lib/src/app/pocket_relay_app.dart)
+- [`pocket_relay_dependencies.dart`](../lib/src/app/pocket_relay_dependencies.dart)
+- [`connection_lane_binding.dart`](../lib/src/features/chat/lane/presentation/connection_lane_binding.dart)
+- [`connection_workspace_controller.dart`](../lib/src/features/workspace/application/connection_workspace_controller.dart)
+- [`connection_workspace_controller_lane.dart`](../lib/src/features/workspace/application/connection_workspace_controller_lane.dart)
+- [`connection_workspace_controller_lifecycle.dart`](../lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
+- [`connection_workspace_recovery_store.dart`](../lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)
+- [`workspace_app_lifecycle_host.dart`](../lib/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart)
+- [`connection_workspace_controller_test.dart`](../test/connection_workspace_controller_test.dart)
+- [`widget_test.dart`](../test/widget_test.dart)
+- [`chat_screen_app_server_test.dart`](../test/chat_screen_app_server_test.dart)
+- [`workspace_app_lifecycle_host_test.dart`](../test/workspace_app_lifecycle_host_test.dart)
 
 ## Recommended Restart Context
 
 If another agent picks this up, start here:
 
-1. [`docs/052_ios_background_ssh_resilience_plan.md`](/Users/vince/Projects/Pocket-Relay/docs/052_ios_background_ssh_resilience_plan.md)
-2. [`docs/053_ios_background_restore_handoff.md`](/Users/vince/Projects/Pocket-Relay/docs/053_ios_background_restore_handoff.md)
-3. [`connection_workspace_controller_lifecycle.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
-4. [`connection_workspace_recovery_store.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)
+1. [`docs/052_ios_background_ssh_resilience_plan.md`](../docs/052_ios_background_ssh_resilience_plan.md)
+2. [`docs/053_ios_background_restore_handoff.md`](../docs/053_ios_background_restore_handoff.md)
+3. [`connection_workspace_controller_lifecycle.dart`](../lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart)
+4. [`connection_workspace_recovery_store.dart`](../lib/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart)

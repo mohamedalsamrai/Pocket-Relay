@@ -17,26 +17,27 @@ typedef ConnectionLaneBindingFactory =
       required String connectionId,
       required SavedConnection connection,
     });
+typedef WorkspaceNow = DateTime Function();
 
 class ConnectionWorkspaceController extends ChangeNotifier {
   ConnectionWorkspaceController({
     required CodexConnectionRepository connectionRepository,
     required ConnectionLaneBindingFactory laneBindingFactory,
     ConnectionWorkspaceRecoveryStore? recoveryStore,
+    WorkspaceNow? now,
   }) : _connectionRepository = connectionRepository,
        _laneBindingFactory = laneBindingFactory,
        _recoveryStore =
-           recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore();
+           recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
+       _now = now ?? DateTime.now;
 
   final CodexConnectionRepository _connectionRepository;
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
+  final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
       <String, ConnectionLaneBinding>{};
-  final Map<
-    String,
-    ({ConnectionLaneBinding binding, VoidCallback listener})
-  >
+  final Map<String, ({ConnectionLaneBinding binding, VoidCallback listener})>
   _bindingRecoveryRegistrationsByConnectionId =
       <String, ({ConnectionLaneBinding binding, VoidCallback listener})>{};
 
@@ -72,11 +73,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   }) {
-    return _createWorkspaceConnection(
-      this,
-      profile: profile,
-      secrets: secrets,
-    );
+    return _createWorkspaceConnection(this, profile: profile, secrets: secrets);
   }
 
   Future<void> saveDormantConnection({
@@ -184,11 +181,15 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     unawaited(_enqueueRecoveryPersistence());
   }
 
-  void _registerLiveBinding(String connectionId, ConnectionLaneBinding binding) {
+  void _registerLiveBinding(
+    String connectionId,
+    ConnectionLaneBinding binding,
+  ) {
     _unregisterLiveBinding(connectionId);
     void listener() {
       unawaited(_enqueueRecoveryPersistence());
     }
+
     _bindingRecoveryRegistrationsByConnectionId[connectionId] = (
       binding: binding,
       listener: listener,
@@ -205,21 +206,25 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       return;
     }
 
-    registration.binding.sessionController.removeListener(registration.listener);
-    registration.binding.composerDraftHost.removeListener(registration.listener);
+    registration.binding.sessionController.removeListener(
+      registration.listener,
+    );
+    registration.binding.composerDraftHost.removeListener(
+      registration.listener,
+    );
   }
 
-  Future<void> _enqueueRecoveryPersistence({
-    DateTime? backgroundedAt,
-  }) {
-    _recoveryPersistence = _recoveryPersistence.then((_) async {
-      if (_isDisposed) {
-        return;
-      }
-      await _recoveryStore.save(
-        _selectedRecoveryStateSnapshot(backgroundedAt: backgroundedAt),
-      );
-    }).catchError((_) {});
+  Future<void> _enqueueRecoveryPersistence({DateTime? backgroundedAt}) {
+    _recoveryPersistence = _recoveryPersistence
+        .then((_) async {
+          if (_isDisposed) {
+            return;
+          }
+          await _recoveryStore.save(
+            _selectedRecoveryStateSnapshot(backgroundedAt: backgroundedAt),
+          );
+        })
+        .catchError((_) {});
     return _recoveryPersistence;
   }
 
@@ -227,7 +232,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     DateTime? backgroundedAt,
   }) {
     final selectedConnectionId = _state.selectedConnectionId;
-    if (selectedConnectionId == null || !_state.isConnectionLive(selectedConnectionId)) {
+    if (selectedConnectionId == null ||
+        !_state.isConnectionLive(selectedConnectionId)) {
       return null;
     }
 
@@ -239,7 +245,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     final selectedThreadId = _normalizedWorkspaceThreadId(
       binding.sessionController.sessionState.currentThreadId ??
           binding.sessionController.sessionState.rootThreadId ??
-          binding.sessionController.historicalConversationRestoreState?.threadId,
+          binding
+              .sessionController
+              .historicalConversationRestoreState
+              ?.threadId,
     );
 
     return ConnectionWorkspaceRecoveryState(

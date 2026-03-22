@@ -16,15 +16,15 @@ void main() {
   testWidgets(
     'workspace app lifecycle host snapshots the selected lane state on pause',
     (tester) async {
-      final clientsById = _buildClientsById(
-        firstConnectionId: 'conn_primary',
-      );
+      final clientsById = _buildClientsById(firstConnectionId: 'conn_primary');
+      final snapshotTime = DateTime(2026, 3, 22, 14, 10);
       clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
           _savedConversationThread(threadId: 'thread_saved');
       final recoveryStore = MemoryConnectionWorkspaceRecoveryStore();
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
         recoveryStore: recoveryStore,
+        now: () => snapshotTime,
       );
       addTearDown(() async {
         controller.dispose();
@@ -36,7 +36,9 @@ void main() {
         connectionId: 'conn_primary',
         threadId: 'thread_saved',
       );
-      controller.selectedLaneBinding!.restoreComposerDraft('Recover this draft');
+      controller.selectedLaneBinding!.restoreComposerDraft(
+        'Recover this draft',
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -56,7 +58,7 @@ void main() {
       expect(recoveryState!.connectionId, 'conn_primary');
       expect(recoveryState.selectedThreadId, 'thread_saved');
       expect(recoveryState.draftText, 'Recover this draft');
-      expect(recoveryState.backgroundedAt, isNotNull);
+      expect(recoveryState.backgroundedAt, snapshotTime);
     },
   );
 
@@ -84,27 +86,23 @@ void main() {
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
         recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-        laneBindingFactory:
-            ({
-              required connectionId,
-              required connection,
-            }) {
-              final appServerClient = FakeCodexAppServerClient();
-              clientsByConnectionId[connectionId]!.add(appServerClient);
-              return ConnectionLaneBinding(
-                connectionId: connectionId,
-                profileStore: ConnectionScopedProfileStore(
-                  connectionId: connectionId,
-                  connectionRepository: repository,
-                ),
-                appServerClient: appServerClient,
-                initialSavedProfile: SavedProfile(
-                  profile: connection.profile,
-                  secrets: connection.secrets,
-                ),
-                ownsAppServerClient: false,
-              );
-            },
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient();
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
       );
       addTearDown(() async {
         controller.dispose();
@@ -135,7 +133,10 @@ void main() {
       final nextBinding = controller.bindingForConnectionId('conn_primary');
       expect(nextBinding, isNotNull);
       expect(nextBinding, isNot(same(firstBinding)));
-      expect(nextBinding!.composerDraftHost.draft.text, 'Persist across resume');
+      expect(
+        nextBinding!.composerDraftHost.draft.text,
+        'Persist across resume',
+      );
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
       expect(controller.state.requiresReconnect('conn_secondary'), isTrue);
       expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
@@ -172,6 +173,7 @@ void main() {
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   required ConnectionWorkspaceRecoveryStore recoveryStore,
+  WorkspaceNow? now,
 }) {
   final repository = MemoryCodexConnectionRepository(
     initialConnections: <SavedConnection>[
@@ -185,26 +187,23 @@ ConnectionWorkspaceController _buildWorkspaceController({
   return ConnectionWorkspaceController(
     connectionRepository: repository,
     recoveryStore: recoveryStore,
-    laneBindingFactory:
-        ({
-          required connectionId,
-          required connection,
-        }) {
-          final appServerClient = clientsById[connectionId]!;
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+    now: now,
+    laneBindingFactory: ({required connectionId, required connection}) {
+      final appServerClient = clientsById[connectionId]!;
+      return ConnectionLaneBinding(
+        connectionId: connectionId,
+        profileStore: ConnectionScopedProfileStore(
+          connectionId: connectionId,
+          connectionRepository: repository,
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: connection.profile,
+          secrets: connection.secrets,
+        ),
+        ownsAppServerClient: false,
+      );
+    },
   );
 }
 

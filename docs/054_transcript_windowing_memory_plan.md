@@ -14,7 +14,7 @@ change we should make before considering deeper eviction or pruning work.
 
 This plan follows the constraints already laid out in:
 
-- [`docs/052_ios_background_ssh_resilience_plan.md`](/Users/vince/Projects/Pocket-Relay/docs/052_ios_background_ssh_resilience_plan.md)
+- [`docs/052_ios_background_ssh_resilience_plan.md`](../docs/052_ios_background_ssh_resilience_plan.md)
 
 ## Problem
 
@@ -23,10 +23,10 @@ items for the selected lane.
 
 Relevant current code:
 
-- [`chat_transcript_surface_projector.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart)
-- [`chat_screen_contract.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/lane/presentation/chat_screen_contract.dart)
-- [`chat_screen_presenter.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/lane/presentation/chat_screen_presenter.dart)
-- [`transcript_list.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/widgets/transcript/transcript_list.dart)
+- [`chat_transcript_surface_projector.dart`](../lib/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart)
+- [`chat_screen_contract.dart`](../lib/src/features/chat/lane/presentation/chat_screen_contract.dart)
+- [`chat_screen_presenter.dart`](../lib/src/features/chat/lane/presentation/chat_screen_presenter.dart)
+- [`transcript_list.dart`](../lib/src/features/chat/transcript/presentation/widgets/transcript/transcript_list.dart)
 
 That means:
 
@@ -72,7 +72,7 @@ This phase must not:
 
 Full transcript state continues to live in:
 
-- [`codex_session_state_session.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/domain/codex_session_state_session.dart)
+- [`codex_session_state_session.dart`](../lib/src/features/chat/transcript/domain/codex_session_state_session.dart)
 
 Do not mutate transcript truth just to save memory in phase 1.
 
@@ -100,7 +100,7 @@ This keeps the first memory limit:
 
 Extend:
 
-- [`chat_screen_contract.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/lane/presentation/chat_screen_contract.dart)
+- [`chat_screen_contract.dart`](../lib/src/features/chat/lane/presentation/chat_screen_contract.dart)
 
 Add bounded transcript metadata such as:
 
@@ -114,7 +114,7 @@ real conversation entry.
 
 Extend:
 
-- [`chat_transcript_surface_projector.dart`](/Users/vince/Projects/Pocket-Relay/lib/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart)
+- [`chat_transcript_surface_projector.dart`](../lib/src/features/chat/transcript/presentation/chat_transcript_surface_projector.dart)
 
 The projector should:
 
