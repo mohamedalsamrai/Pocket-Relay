@@ -16,6 +16,12 @@ abstract interface class ForegroundServiceController {
   Future<void> setEnabled(bool enabled);
 }
 
+abstract interface class NotificationPermissionController {
+  Future<bool> isGranted();
+
+  Future<bool> requestPermission();
+}
+
 class MethodChannelForegroundServiceController
     implements ForegroundServiceController {
   const MethodChannelForegroundServiceController({
@@ -35,6 +41,33 @@ class MethodChannelForegroundServiceController
   }
 }
 
+class MethodChannelNotificationPermissionController
+    implements NotificationPermissionController {
+  const MethodChannelNotificationPermissionController({
+    MethodChannel methodChannel = const MethodChannel(
+      'me.vinch.pocketrelay/background_execution',
+    ),
+  }) : _methodChannel = methodChannel;
+
+  final MethodChannel _methodChannel;
+
+  @override
+  Future<bool> isGranted() async {
+    return await _methodChannel.invokeMethod<bool>(
+          'notificationsPermissionGranted',
+        ) ??
+        true;
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    return await _methodChannel.invokeMethod<bool>(
+          'requestNotificationPermission',
+        ) ??
+        false;
+  }
+}
+
 class ForegroundServiceHost extends StatefulWidget {
   const ForegroundServiceHost({
     super.key,
@@ -42,12 +75,15 @@ class ForegroundServiceHost extends StatefulWidget {
     this.keepForegroundServiceRunning = true,
     this.foregroundServiceController =
         const MethodChannelForegroundServiceController(),
+    this.notificationPermissionController =
+        const MethodChannelNotificationPermissionController(),
     this.supportsForegroundService,
   });
 
   final Widget child;
   final bool keepForegroundServiceRunning;
   final ForegroundServiceController foregroundServiceController;
+  final NotificationPermissionController notificationPermissionController;
   final bool? supportsForegroundService;
 
   @override
@@ -56,6 +92,9 @@ class ForegroundServiceHost extends StatefulWidget {
 
 class _ForegroundServiceHostState extends State<ForegroundServiceHost> {
   bool _requestedForegroundServiceEnabled = false;
+  bool _isRequestingNotificationPermission = false;
+  bool _notificationPermissionDeniedForCurrentRequest = false;
+  int _notificationPermissionRequestEpoch = 0;
 
   bool get _supportsForegroundService {
     return widget.supportsForegroundService ??
@@ -83,6 +122,12 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost> {
       );
       _requestedForegroundServiceEnabled = false;
     }
+    if (oldWidget.notificationPermissionController !=
+        widget.notificationPermissionController) {
+      _notificationPermissionRequestEpoch += 1;
+      _isRequestingNotificationPermission = false;
+      _notificationPermissionDeniedForCurrentRequest = false;
+    }
     _syncForegroundService();
   }
 
@@ -100,17 +145,60 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost> {
 
   void _syncForegroundService() {
     final shouldEnableForegroundService = _shouldEnableForegroundService;
-    if (shouldEnableForegroundService == _requestedForegroundServiceEnabled) {
+    if (!shouldEnableForegroundService) {
+      _notificationPermissionRequestEpoch += 1;
+      _isRequestingNotificationPermission = false;
+      _notificationPermissionDeniedForCurrentRequest = false;
+      if (!_requestedForegroundServiceEnabled) {
+        return;
+      }
+
+      _requestedForegroundServiceEnabled = false;
+      unawaited(_setEnabledSafely(widget.foregroundServiceController, false));
       return;
     }
 
-    _requestedForegroundServiceEnabled = shouldEnableForegroundService;
-    unawaited(
-      _setEnabledSafely(
-        widget.foregroundServiceController,
-        shouldEnableForegroundService,
-      ),
-    );
+    if (_requestedForegroundServiceEnabled ||
+        _isRequestingNotificationPermission ||
+        _notificationPermissionDeniedForCurrentRequest) {
+      return;
+    }
+
+    _isRequestingNotificationPermission = true;
+    final requestEpoch = ++_notificationPermissionRequestEpoch;
+    unawaited(_requestNotificationPermissionAndEnable(requestEpoch));
+  }
+
+  Future<void> _requestNotificationPermissionAndEnable(int requestEpoch) async {
+    try {
+      var notificationPermissionGranted = await widget
+          .notificationPermissionController
+          .isGranted();
+      if (!notificationPermissionGranted) {
+        notificationPermissionGranted = await widget
+            .notificationPermissionController
+            .requestPermission();
+      }
+
+      if (!mounted || requestEpoch != _notificationPermissionRequestEpoch) {
+        return;
+      }
+      if (!notificationPermissionGranted) {
+        _notificationPermissionDeniedForCurrentRequest = true;
+        return;
+      }
+      if (_requestedForegroundServiceEnabled ||
+          !_shouldEnableForegroundService) {
+        return;
+      }
+
+      _requestedForegroundServiceEnabled = true;
+      await _setEnabledSafely(widget.foregroundServiceController, true);
+    } finally {
+      if (mounted && requestEpoch == _notificationPermissionRequestEpoch) {
+        _isRequestingNotificationPermission = false;
+      }
+    }
   }
 
   Future<void> _setEnabledSafely(

@@ -19,6 +19,8 @@ void main() {
         clientsById: clientsById,
       );
       final foregroundServiceController = _FakeForegroundServiceController();
+      final notificationPermissionController =
+          _FakeNotificationPermissionController();
       addTearDown(() async {
         workspaceController.dispose();
         await _closeClients(clientsById);
@@ -31,6 +33,7 @@ void main() {
           home: WorkspaceTurnForegroundServiceHost(
             workspaceController: workspaceController,
             foregroundServiceController: foregroundServiceController,
+            notificationPermissionController: notificationPermissionController,
             supportsForegroundService: true,
             child: const SizedBox(),
           ),
@@ -132,4 +135,13 @@ class _FakeForegroundServiceController implements ForegroundServiceController {
   Future<void> setEnabled(bool enabled) async {
     enabledStates.add(enabled);
   }
+}
+
+class _FakeNotificationPermissionController
+    implements NotificationPermissionController {
+  @override
+  Future<bool> isGranted() async => true;
+
+  @override
+  Future<bool> requestPermission() async => true;
 }

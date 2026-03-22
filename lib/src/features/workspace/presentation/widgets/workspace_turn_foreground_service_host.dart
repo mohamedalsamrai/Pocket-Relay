@@ -10,12 +10,15 @@ class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
     required this.child,
     this.foregroundServiceController =
         const MethodChannelForegroundServiceController(),
+    this.notificationPermissionController =
+        const MethodChannelNotificationPermissionController(),
     this.supportsForegroundService,
   });
 
   final ConnectionWorkspaceController workspaceController;
   final Widget child;
   final ForegroundServiceController foregroundServiceController;
+  final NotificationPermissionController notificationPermissionController;
   final bool? supportsForegroundService;
 
   @override
@@ -25,6 +28,7 @@ class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
       builder: (context, hasTickingTurn) {
         return ForegroundServiceHost(
           foregroundServiceController: foregroundServiceController,
+          notificationPermissionController: notificationPermissionController,
           supportsForegroundService: supportsForegroundService,
           keepForegroundServiceRunning: hasTickingTurn,
           child: child,
