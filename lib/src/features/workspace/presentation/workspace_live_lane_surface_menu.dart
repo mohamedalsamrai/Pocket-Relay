@@ -50,10 +50,34 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
     final repository =
         widget.conversationHistoryRepository ??
         const CodexAppServerConversationHistoryRepository();
+    if (widget.platformPolicy.behavior.isDesktopExperience) {
+      return showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return ConnectionWorkspaceConversationHistorySheet(
+            title: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
+            presentation:
+                ConnectionWorkspaceConversationHistoryPresentation.desktop,
+            future: _loadConversationHistory(repository),
+            onOpenConnectionSettings: () {
+              unawaited(
+                _openConversationHistoryConnectionSettings(
+                  Navigator.of(dialogContext),
+                ),
+              );
+            },
+            onResumeConversation: (conversation) {
+              unawaited(_resumeConversation(conversation));
+            },
+          );
+        },
+      );
+    }
+
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (sheetContext) {
         return FractionallySizedBox(
           heightFactor: 0.82,
           child: ConnectionWorkspaceConversationHistorySheet(
@@ -62,7 +86,7 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
             onOpenConnectionSettings: () {
               unawaited(
                 _openConversationHistoryConnectionSettings(
-                  Navigator.of(context),
+                  Navigator.of(sheetContext),
                 ),
               );
             },

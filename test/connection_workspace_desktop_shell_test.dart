@@ -219,6 +219,13 @@ void main() {
       await tester.tap(find.text('Conversation history'));
       await tester.pumpAndSettle();
 
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(
+        find.byKey(
+          const ValueKey<String>('desktop_conversation_history_surface'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Saved backend thread'), findsOneWidget);
     },
   );
@@ -398,17 +405,15 @@ void main() {
       await controller.initialize();
       await controller.saveLiveConnectionEdits(
         connectionId: 'conn_primary',
-        profile: _profile('Primary Box', 'saved.primary.local').copyWith(
-          hostFingerprint: 'SHA256:saved',
-        ),
+        profile: _profile(
+          'Primary Box',
+          'saved.primary.local',
+        ).copyWith(hostFingerprint: 'SHA256:saved'),
         secrets: const ConnectionSecrets(password: 'saved-secret'),
       );
 
       await tester.pumpWidget(
-        _buildShell(
-          controller,
-          conversationHistoryRepository: repository,
-        ),
+        _buildShell(controller, conversationHistoryRepository: repository),
       );
       await tester.pumpAndSettle();
 
@@ -421,10 +426,7 @@ void main() {
 
       expect(repository.loadCalls, hasLength(1));
       expect(repository.loadCalls.single.$1.host, 'saved.primary.local');
-      expect(
-        repository.loadCalls.single.$1.hostFingerprint,
-        'SHA256:saved',
-      );
+      expect(repository.loadCalls.single.$1.hostFingerprint, 'SHA256:saved');
       expect(repository.loadCalls.single.$2.password, 'saved-secret');
     },
   );
