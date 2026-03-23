@@ -13,15 +13,19 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.actions,
+    this.isDesktopPresentation = false,
   });
 
   final ConnectionSettingsHostViewModel viewModel;
   final ConnectionSettingsHostActions actions;
+  final bool isDesktopPresentation;
 
   @override
   Widget build(BuildContext context) {
     final contract = viewModel.contract;
-    return _buildMaterialSurface(context, contract);
+    return isDesktopPresentation
+        ? _buildDesktopSurface(context, contract)
+        : _buildMaterialSurface(context, contract);
   }
 
   Widget _buildMaterialSurface(
@@ -29,8 +33,60 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     ConnectionSettingsContract contract,
   ) {
     return ModalSheetScaffold(
-      header: _buildStickyHeader(context, contract),
-      body: _buildScrollableContent(context, contract),
+      header: _buildSheetHeader(context, contract),
+      body: _buildScrollableContent(context, contract, includeIntro: true),
+    );
+  }
+
+  Widget _buildDesktopSurface(
+    BuildContext context,
+    ConnectionSettingsContract contract,
+  ) {
+    final palette = context.pocketPalette;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 880,
+            maxHeight: MediaQuery.sizeOf(context).height - 48,
+          ),
+          child: Material(
+            key: const ValueKey<String>('desktop_connection_settings_surface'),
+            color: palette.sheetBackground,
+            elevation: 18,
+            shadowColor: palette.shadowColor.withValues(alpha: 0.32),
+            borderRadius: BorderRadius.circular(32),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                  child: _buildDesktopHeader(context, contract),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 20,
+                      bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+                    ),
+                    child: _buildScrollableContent(
+                      context,
+                      contract,
+                      includeIntro: false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -273,7 +329,7 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     );
   }
 
-  Widget _buildStickyHeader(
+  Widget _buildSheetHeader(
     BuildContext context,
     ConnectionSettingsContract contract,
   ) {
@@ -305,17 +361,58 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     );
   }
 
-  Widget _buildScrollableContent(
+  Widget _buildDesktopHeader(
     BuildContext context,
     ConnectionSettingsContract contract,
   ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(contract.title, style: _titleStyle(context)),
+              const SizedBox(height: 8),
+              Text(contract.description, style: _descriptionStyle(context)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton(
+              key: const ValueKey<String>('connection_settings_cancel_top'),
+              onPressed: actions.onCancel,
+              child: const Text('Cancel'),
+            ),
+            const SizedBox(width: 12),
+            FilledButton(
+              key: const ValueKey<String>('connection_settings_save_top'),
+              onPressed: actions.onSave,
+              child: Text(contract.saveAction.label),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScrollableContent(
+    BuildContext context,
+    ConnectionSettingsContract contract, {
+    required bool includeIntro,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(contract.title, style: _titleStyle(context)),
-        const SizedBox(height: 8),
-        Text(contract.description, style: _descriptionStyle(context)),
-        const SizedBox(height: 20),
+        if (includeIntro) ...[
+          Text(contract.title, style: _titleStyle(context)),
+          const SizedBox(height: 8),
+          Text(contract.description, style: _descriptionStyle(context)),
+          const SizedBox(height: 20),
+        ],
         _buildSection(
           context,
           title: contract.profileSection.title,
