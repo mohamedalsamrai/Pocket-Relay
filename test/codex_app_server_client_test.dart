@@ -7,6 +7,47 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('connect supports a transport opener without process streams', () async {
+    late _FakeCodexAppServerTransport transport;
+    transport = _FakeCodexAppServerTransport(
+      onClientLine: (line) {
+        final message = jsonDecode(line) as Map<String, dynamic>;
+        if (message['method'] == 'initialize') {
+          transport.sendProtocolMessage(<String, Object?>{
+            'id': message['id'],
+            'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+          });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      transportOpener:
+          ({required profile, required secrets, required emitEvent}) async =>
+              transport,
+    );
+    final events = <CodexAppServerEvent>[];
+    final subscription = client.events.listen(events.add);
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transport.writtenLines, hasLength(2));
+    expect(
+      jsonDecode(transport.writtenLines[1]) as Map<String, dynamic>,
+      <String, Object?>{'method': 'initialized'},
+    );
+
+    final connected = events.whereType<CodexAppServerConnectedEvent>().single;
+    expect(connected.userAgent, 'codex-app-server-test');
+
+    await subscription.cancel();
+    await client.disconnect();
+  });
+
   test(
     'connect performs initialize handshake and emits connected event',
     () async {
@@ -1763,5 +1804,58 @@ class _FakeCodexAppServerProcess implements CodexAppServerProcess {
     await _stdinController.close();
     await _stdoutController.close();
     await _stderrController.close();
+  }
+}
+
+class _FakeCodexAppServerTransport implements CodexAppServerTransport {
+  _FakeCodexAppServerTransport({
+    this.onClientLine,
+    this.termination = const CodexAppServerTransportTermination(exitCode: 0),
+  });
+
+  final void Function(String line)? onClientLine;
+  @override
+  final CodexAppServerTransportTermination? termination;
+  final List<String> writtenLines = <String>[];
+
+  final _protocolMessagesController = StreamController<String>.broadcast();
+  final _diagnosticsController = StreamController<String>.broadcast();
+  final _doneCompleter = Completer<void>();
+  bool _isClosed = false;
+
+  @override
+  Stream<String> get protocolMessages => _protocolMessagesController.stream;
+
+  @override
+  Stream<String> get diagnostics => _diagnosticsController.stream;
+
+  @override
+  Future<void> get done => _doneCompleter.future;
+
+  void sendProtocolMessage(Map<String, Object?> payload) {
+    _protocolMessagesController.add(jsonEncode(payload));
+  }
+
+  void sendDiagnostic(String message) {
+    _diagnosticsController.add(message);
+  }
+
+  @override
+  void sendLine(String line) {
+    writtenLines.add(line);
+    onClientLine?.call(line);
+  }
+
+  @override
+  Future<void> close() async {
+    if (_isClosed) {
+      return;
+    }
+    _isClosed = true;
+    if (!_doneCompleter.isCompleted) {
+      _doneCompleter.complete();
+    }
+    await _protocolMessagesController.close();
+    await _diagnosticsController.close();
   }
 }

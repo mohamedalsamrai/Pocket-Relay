@@ -532,6 +532,29 @@ class CodexAppServerException implements Exception {
   }
 }
 
+class CodexAppServerTransportTermination {
+  const CodexAppServerTransportTermination({this.exitCode, this.reason});
+
+  final int? exitCode;
+  final String? reason;
+}
+
+abstract interface class CodexAppServerTransport {
+  Stream<String> get protocolMessages;
+  Stream<String> get diagnostics;
+  void sendLine(String line);
+  Future<void> get done;
+  CodexAppServerTransportTermination? get termination;
+  Future<void> close();
+}
+
+typedef CodexAppServerTransportOpener =
+    Future<CodexAppServerTransport> Function({
+      required ConnectionProfile profile,
+      required ConnectionSecrets secrets,
+      required void Function(CodexAppServerEvent event) emitEvent,
+    });
+
 abstract interface class CodexAppServerProcess {
   Stream<Uint8List> get stdout;
   Stream<Uint8List> get stderr;

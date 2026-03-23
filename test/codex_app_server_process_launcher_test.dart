@@ -54,6 +54,64 @@ void main() {
     expect(remoteCalls, 0);
     expect(localCalls, 1);
   });
+
+  test(
+    'opens a transport that delegates remote mode to the remote launcher',
+    () async {
+      var remoteCalls = 0;
+      var localCalls = 0;
+
+      final transport = await openCodexAppServerTransport(
+        profile: _profile(ConnectionMode.remote),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        emitEvent: (_) {},
+        remoteLauncher:
+            ({required profile, required secrets, required emitEvent}) async {
+              remoteCalls += 1;
+              return _FakeProcess();
+            },
+        localLauncher:
+            ({required profile, required secrets, required emitEvent}) {
+              localCalls += 1;
+              throw StateError('should not use local launcher');
+            },
+      );
+
+      expect(transport, isA<CodexAppServerTransport>());
+      expect(remoteCalls, 1);
+      expect(localCalls, 0);
+      await transport.close();
+    },
+  );
+
+  test(
+    'opens a transport that delegates local mode to the local launcher',
+    () async {
+      var remoteCalls = 0;
+      var localCalls = 0;
+
+      final transport = await openCodexAppServerTransport(
+        profile: _profile(ConnectionMode.local),
+        secrets: const ConnectionSecrets(),
+        emitEvent: (_) {},
+        remoteLauncher:
+            ({required profile, required secrets, required emitEvent}) {
+              remoteCalls += 1;
+              throw StateError('should not use remote launcher');
+            },
+        localLauncher:
+            ({required profile, required secrets, required emitEvent}) async {
+              localCalls += 1;
+              return _FakeProcess();
+            },
+      );
+
+      expect(transport, isA<CodexAppServerTransport>());
+      expect(remoteCalls, 0);
+      expect(localCalls, 1);
+      await transport.close();
+    },
+  );
 }
 
 ConnectionProfile _profile(ConnectionMode mode) {
@@ -88,7 +146,7 @@ final class _FakeProcess implements CodexAppServerProcess {
 
   @override
   Future<void> close() async {
-    await _stdinController.close();
+    unawaited(_stdinController.close());
     await _stdoutController.close();
     await _stderrController.close();
   }

@@ -6,18 +6,39 @@ import 'codex_app_server_connection.dart';
 import 'codex_app_server_models.dart';
 import 'codex_app_server_process_launcher.dart';
 import 'codex_app_server_request_api.dart';
+import 'codex_app_server_stdio_transport.dart';
 import 'codex_json_rpc_codec.dart';
 
 class CodexAppServerClient {
   CodexAppServerClient({
+    CodexAppServerTransportOpener? transportOpener,
     CodexAppServerProcessLauncher? processLauncher,
     CodexJsonRpcCodec? jsonRpcCodec,
     CodexJsonRpcRequestTracker? requestTracker,
     CodexJsonRpcInboundRequestStore? inboundRequestStore,
     this.clientName = 'pocket_relay',
     this.clientVersion = '1.0.0',
-  }) : _connection = CodexAppServerConnection(
-         processLauncher: processLauncher ?? openCodexAppServerProcess,
+  }) : assert(
+         transportOpener == null || processLauncher == null,
+         'Provide either transportOpener or processLauncher, not both.',
+       ),
+       _connection = CodexAppServerConnection(
+         transportOpener:
+             transportOpener ??
+             (processLauncher == null
+                 ? openCodexAppServerTransport
+                 : ({
+                     required profile,
+                     required secrets,
+                     required emitEvent,
+                   }) async {
+                     final process = await processLauncher(
+                       profile: profile,
+                       secrets: secrets,
+                       emitEvent: emitEvent,
+                     );
+                     return CodexAppServerStdioTransport(process);
+                   }),
          jsonRpcCodec: jsonRpcCodec ?? const CodexJsonRpcCodec(),
          requestTracker: requestTracker ?? CodexJsonRpcRequestTracker(),
          inboundRequestStore:

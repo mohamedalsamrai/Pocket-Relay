@@ -7,10 +7,10 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 class FakeCodexAppServerClient extends CodexAppServerClient {
   FakeCodexAppServerClient()
     : super(
-        processLauncher:
+        transportOpener:
             ({required profile, required secrets, required emitEvent}) async {
               throw UnimplementedError(
-                'The fake app-server client never launches a process.',
+                'The fake app-server client never opens a transport.',
               );
             },
       );
