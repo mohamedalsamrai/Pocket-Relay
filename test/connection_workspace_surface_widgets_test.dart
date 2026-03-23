@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
+import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
@@ -481,6 +482,10 @@ void main() {
       );
       expect(
         settingsOverlayDelegate.launchedRefreshCallbacks.single,
+        isNotNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRemoteRuntimeCallbacks.single,
         isNotNull,
       );
       expect(client.listModelCalls, isEmpty);
@@ -1022,6 +1027,10 @@ void main() {
       );
       expect(client.listModelCalls, isEmpty);
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
+      expect(
+        settingsOverlayDelegate.launchedRemoteRuntimeCallbacks.single,
+        isNotNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -1504,6 +1513,9 @@ class _DeferredConnectionSettingsOverlayDelegate
       <
         Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
       >[];
+  final List<ConnectionSettingsRemoteRuntimeRefresher?>
+  launchedRemoteRuntimeCallbacks =
+      <ConnectionSettingsRemoteRuntimeRefresher?>[];
   Completer<ConnectionSettingsSubmitPayload?> _completer =
       Completer<ConnectionSettingsSubmitPayload?>();
 
@@ -1517,12 +1529,14 @@ class _DeferredConnectionSettingsOverlayDelegate
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
+    ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
+    launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
     return _completer.future;
   }
 

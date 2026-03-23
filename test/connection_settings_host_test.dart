@@ -493,6 +493,76 @@ void main() {
       expect(find.text('GPT Live Default').last, findsOneWidget);
     },
   );
+
+  testWidgets(
+    'shared host probes remote runtime on open and exposes the result through the contract',
+    (tester) async {
+      final probePayloads = <ConnectionSettingsSubmitPayload>[];
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          onRefreshRemoteRuntime: (payload) async {
+            probePayloads.add(payload);
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.unknown(),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(probePayloads, hasLength(1));
+      expect(probePayloads.single.profile.host, 'devbox.local');
+      expect(probePayloads.single.profile.workspaceDir, '/workspace');
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.supported,
+      );
+    },
+  );
+
+  testWidgets(
+    'shared host records probe failures separately from unsupported capability results',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          onRefreshRemoteRuntime: (payload) async {
+            throw StateError('ssh failed');
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.probeFailed,
+      );
+      expect(
+        remoteRuntimeStates.last!.hostCapability.detail,
+        contains('ssh failed'),
+      );
+    },
+  );
 }
 
 Widget _buildMaterialSettingsApp({
@@ -504,6 +574,8 @@ Widget _buildMaterialSettingsApp({
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
+  ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+  ConnectionSettingsHostBuilder? builder,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(brightness),
@@ -517,9 +589,12 @@ Widget _buildMaterialSettingsApp({
         availableModelCatalogSource: availableModelCatalogSource,
         initialProfile: initialProfile,
         onRefreshModelCatalog: onRefreshModelCatalog,
-        builder: (context, viewModel, actions) {
-          return ConnectionSheet(viewModel: viewModel, actions: actions);
-        },
+        onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+        builder:
+            builder ??
+            (context, viewModel, actions) {
+              return ConnectionSheet(viewModel: viewModel, actions: actions);
+            },
       ),
     ),
   );
@@ -534,6 +609,7 @@ Widget _buildHost({
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
+  ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
 }) {
   return ConnectionSettingsHost(
     initialProfile: initialProfile ?? _configuredProfile(),
@@ -541,6 +617,7 @@ Widget _buildHost({
     availableModelCatalog: availableModelCatalog,
     availableModelCatalogSource: availableModelCatalogSource,
     onRefreshModelCatalog: onRefreshModelCatalog,
+    onRefreshRemoteRuntime: onRefreshRemoteRuntime,
     platformBehavior: platformBehavior,
     onCancel: () {},
     onSubmit: onSubmit,

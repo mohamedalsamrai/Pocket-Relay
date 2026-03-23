@@ -1,14 +1,12 @@
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 
-enum CodexRemoteAppServerCapabilityIssue { tmuxMissing, codexMissing }
-
 class CodexRemoteAppServerHostCapabilities {
   const CodexRemoteAppServerHostCapabilities({
-    this.issues = const <CodexRemoteAppServerCapabilityIssue>{},
+    this.issues = const <ConnectionRemoteHostCapabilityIssue>{},
     this.detail,
   });
 
-  final Set<CodexRemoteAppServerCapabilityIssue> issues;
+  final Set<ConnectionRemoteHostCapabilityIssue> issues;
   final String? detail;
 
   bool get supportsContinuity => issues.isEmpty;
@@ -46,12 +44,28 @@ class CodexRemoteAppServerOwnerSnapshot {
       status == CodexRemoteAppServerOwnerStatus.running && endpoint != null;
 }
 
-abstract interface class CodexRemoteAppServerOwnerControl {
+extension CodexRemoteAppServerHostCapabilitiesMapping
+    on CodexRemoteAppServerHostCapabilities {
+  ConnectionRemoteHostCapabilityState toConnectionState() {
+    if (issues.isEmpty) {
+      return ConnectionRemoteHostCapabilityState.supported(detail: detail);
+    }
+    return ConnectionRemoteHostCapabilityState.unsupported(
+      issues: issues,
+      detail: detail,
+    );
+  }
+}
+
+abstract interface class CodexRemoteAppServerHostProbe {
   Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   });
+}
 
+abstract interface class CodexRemoteAppServerOwnerControl
+    implements CodexRemoteAppServerHostProbe {
   Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,

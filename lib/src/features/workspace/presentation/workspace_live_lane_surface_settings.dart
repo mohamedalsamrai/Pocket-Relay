@@ -64,6 +64,9 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         availableModelCatalog: availableModelCatalog.$1,
         availableModelCatalogSource: availableModelCatalog.$2,
         onRefreshModelCatalog: onRefreshModelCatalog,
+        onRefreshRemoteRuntime: (payload) {
+          return probeConnectionSettingsRemoteRuntime(payload: payload);
+        },
       );
       if (!_matchesLiveRequestContext(
             workspaceController: workspaceController,

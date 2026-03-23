@@ -3,6 +3,7 @@ part of 'connection_models.dart';
 enum ConnectionRemoteHostCapabilityStatus {
   unknown,
   checking,
+  probeFailed,
   supported,
   unsupported,
 }
@@ -27,6 +28,10 @@ class ConnectionRemoteHostCapabilityState {
       issues = const <ConnectionRemoteHostCapabilityIssue>{},
       detail = null;
 
+  const ConnectionRemoteHostCapabilityState.probeFailed({this.detail})
+    : status = ConnectionRemoteHostCapabilityStatus.probeFailed,
+      issues = const <ConnectionRemoteHostCapabilityIssue>{};
+
   const ConnectionRemoteHostCapabilityState.supported({this.detail})
     : status = ConnectionRemoteHostCapabilityStatus.supported,
       issues = const <ConnectionRemoteHostCapabilityIssue>{};
@@ -45,6 +50,9 @@ class ConnectionRemoteHostCapabilityState {
 
   bool get isUnsupported =>
       status == ConnectionRemoteHostCapabilityStatus.unsupported;
+
+  bool get didProbeFail =>
+      status == ConnectionRemoteHostCapabilityStatus.probeFailed;
 
   @override
   bool operator ==(Object other) {

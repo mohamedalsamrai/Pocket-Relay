@@ -17,8 +17,8 @@ class FakeConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
-  final List<ConnectionSettingsModelCatalogSource?> launchedModelCatalogSources =
-      <ConnectionSettingsModelCatalogSource?>[];
+  final List<ConnectionSettingsModelCatalogSource?>
+  launchedModelCatalogSources = <ConnectionSettingsModelCatalogSource?>[];
   final List<
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   >
@@ -26,6 +26,9 @@ class FakeConnectionSettingsOverlayDelegate
       <
         Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
       >[];
+  final List<ConnectionSettingsRemoteRuntimeRefresher?>
+  launchedRemoteRuntimeCallbacks =
+      <ConnectionSettingsRemoteRuntimeRefresher?>[];
 
   @override
   Future<ConnectionSettingsSubmitPayload?> openConnectionSettings({
@@ -37,11 +40,13 @@ class FakeConnectionSettingsOverlayDelegate
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
+    ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
   }) async {
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
+    launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
     if (_results.isEmpty) {
       return null;
     }

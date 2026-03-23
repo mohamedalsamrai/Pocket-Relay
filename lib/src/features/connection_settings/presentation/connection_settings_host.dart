@@ -14,6 +14,11 @@ typedef ConnectionSettingsHostBuilder =
       ConnectionSettingsHostActions actions,
     );
 
+typedef ConnectionSettingsRemoteRuntimeRefresher =
+    Future<ConnectionRemoteRuntimeState> Function(
+      ConnectionSettingsSubmitPayload payload,
+    );
+
 class ConnectionSettingsHost extends StatefulWidget {
   const ConnectionSettingsHost({
     super.key,
@@ -22,6 +27,7 @@ class ConnectionSettingsHost extends StatefulWidget {
     this.availableModelCatalog,
     this.availableModelCatalogSource,
     this.onRefreshModelCatalog,
+    this.onRefreshRemoteRuntime,
     required this.onCancel,
     required this.onSubmit,
     required this.builder,
@@ -34,6 +40,7 @@ class ConnectionSettingsHost extends StatefulWidget {
   final ConnectionSettingsModelCatalogSource? availableModelCatalogSource;
   final Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog;
+  final ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime;
   final VoidCallback onCancel;
   final ValueChanged<ConnectionSettingsSubmitPayload> onSubmit;
   final ConnectionSettingsHostBuilder builder;
@@ -51,6 +58,9 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   ConnectionSettingsModelCatalogSource? _availableModelCatalogSource;
   bool _didModelCatalogRefreshFail = false;
   bool _isRefreshingModelCatalog = false;
+  ConnectionRemoteRuntimeState? _remoteRuntime;
+  Timer? _remoteRuntimeRefreshDebounce;
+  int _remoteRuntimeRefreshToken = 0;
 
   @override
   void initState() {
@@ -66,10 +76,12 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       for (final fieldId in ConnectionSettingsFieldId.values)
         fieldId: TextEditingController(text: draft.valueForField(fieldId)),
     };
+    _scheduleRemoteRuntimeRefresh(immediate: true);
   }
 
   @override
   void dispose() {
+    _remoteRuntimeRefreshDebounce?.cancel();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -106,6 +118,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       initialProfile: widget.initialProfile,
       initialSecrets: widget.initialSecrets,
       formState: formState ?? _formState,
+      remoteRuntime: _remoteRuntime,
       availableModelCatalog: _availableModelCatalog,
       availableModelCatalogSource: _availableModelCatalogSource,
       didModelCatalogRefreshFail: _didModelCatalogRefreshFail,
@@ -122,6 +135,9 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         draft: _formState.draft.copyWithField(fieldId, value),
       );
     });
+    if (_shouldRefreshRemoteRuntimeForField(fieldId)) {
+      _scheduleRemoteRuntimeRefresh();
+    }
   }
 
   void _updateConnectionMode(ConnectionMode connectionMode) {
@@ -130,6 +146,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         draft: _formState.draft.copyWithConnectionMode(connectionMode),
       );
     });
+    _scheduleRemoteRuntimeRefresh();
   }
 
   void _updateAuthMode(AuthMode authMode) {
@@ -138,6 +155,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         draft: _formState.draft.copyWith(authMode: authMode),
       );
     });
+    _scheduleRemoteRuntimeRefresh();
   }
 
   void _updateToggle(ConnectionSettingsToggleId toggleId, bool value) {
@@ -171,6 +189,101 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         ),
       );
     });
+  }
+
+  bool _shouldRefreshRemoteRuntimeForField(ConnectionSettingsFieldId fieldId) {
+    return switch (fieldId) {
+      ConnectionSettingsFieldId.host ||
+      ConnectionSettingsFieldId.port ||
+      ConnectionSettingsFieldId.username ||
+      ConnectionSettingsFieldId.workspaceDir ||
+      ConnectionSettingsFieldId.codexPath ||
+      ConnectionSettingsFieldId.hostFingerprint ||
+      ConnectionSettingsFieldId.password ||
+      ConnectionSettingsFieldId.privateKeyPem ||
+      ConnectionSettingsFieldId.privateKeyPassphrase => true,
+      _ => false,
+    };
+  }
+
+  void _scheduleRemoteRuntimeRefresh({bool immediate = false}) {
+    _remoteRuntimeRefreshDebounce?.cancel();
+    final onRefreshRemoteRuntime = widget.onRefreshRemoteRuntime;
+    if (onRefreshRemoteRuntime == null) {
+      if (_remoteRuntime != null) {
+        setState(() {
+          _remoteRuntime = null;
+        });
+      }
+      return;
+    }
+
+    if (_formState.draft.connectionMode != ConnectionMode.remote) {
+      if (_remoteRuntime != null) {
+        setState(() {
+          _remoteRuntime = null;
+        });
+      }
+      return;
+    }
+
+    final probePayload = _buildContract().saveAction.submitPayload;
+    if (probePayload == null) {
+      const nextRuntime = ConnectionRemoteRuntimeState.unknown();
+      if (_remoteRuntime != nextRuntime) {
+        setState(() {
+          _remoteRuntime = nextRuntime;
+        });
+      }
+      return;
+    }
+
+    const checkingRuntime = ConnectionRemoteRuntimeState(
+      hostCapability: ConnectionRemoteHostCapabilityState.checking(),
+      server: ConnectionRemoteServerState.unknown(),
+    );
+    if (_remoteRuntime != checkingRuntime) {
+      setState(() {
+        _remoteRuntime = checkingRuntime;
+      });
+    }
+
+    final refreshToken = ++_remoteRuntimeRefreshToken;
+    Future<void> runProbe() async {
+      try {
+        final remoteRuntime = await onRefreshRemoteRuntime(probePayload);
+        if (!mounted || refreshToken != _remoteRuntimeRefreshToken) {
+          return;
+        }
+        setState(() {
+          _remoteRuntime = remoteRuntime;
+        });
+      } catch (error) {
+        if (!mounted || refreshToken != _remoteRuntimeRefreshToken) {
+          return;
+        }
+        setState(() {
+          _remoteRuntime = ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.probeFailed(
+              detail: '$error',
+            ),
+            server: const ConnectionRemoteServerState.unknown(),
+          );
+        });
+      }
+    }
+
+    if (immediate) {
+      unawaited(runProbe());
+      return;
+    }
+
+    _remoteRuntimeRefreshDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        unawaited(runProbe());
+      },
+    );
   }
 
   Future<void> _refreshModelCatalog() async {

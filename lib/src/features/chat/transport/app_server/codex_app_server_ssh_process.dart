@@ -12,7 +12,7 @@ Future<CodexAppServerProcess> openSshCodexAppServerProcess({
   required ConnectionSecrets secrets,
   required void Function(CodexAppServerEvent event) emitEvent,
   @visibleForTesting
-  CodexSshProcessBootstrap sshBootstrap = _connectSshBootstrap,
+  CodexSshProcessBootstrap sshBootstrap = connectSshBootstrapClient,
 }) async {
   final host = profile.host.trim();
   final username = profile.username.trim();
@@ -198,7 +198,7 @@ String buildSshCodexAppServerCommand({required ConnectionProfile profile}) {
   return 'bash -lc ${shellEscape(command)}';
 }
 
-Future<CodexSshBootstrapClient> _connectSshBootstrap({
+Future<CodexSshBootstrapClient> connectSshBootstrapClient({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
   required bool Function(String keyType, String actualFingerprint)
