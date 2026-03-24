@@ -1642,6 +1642,15 @@ class _DeferredConnectionSettingsOverlayDelegate
   final List<ConnectionSettingsRemoteRuntimeRefresher?>
   launchedRemoteRuntimeCallbacks =
       <ConnectionSettingsRemoteRuntimeRefresher?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStopRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedRestartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
   Completer<ConnectionSettingsSubmitPayload?> _completer =
       Completer<ConnectionSettingsSubmitPayload?>();
 
@@ -1657,6 +1666,9 @@ class _DeferredConnectionSettingsOverlayDelegate
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
     ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
@@ -1665,6 +1677,9 @@ class _DeferredConnectionSettingsOverlayDelegate
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
+    launchedStartRemoteServerCallbacks.add(onStartRemoteServer);
+    launchedStopRemoteServerCallbacks.add(onStopRemoteServer);
+    launchedRestartRemoteServerCallbacks.add(onRestartRemoteServer);
     return _completer.future;
   }
 

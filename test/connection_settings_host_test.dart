@@ -598,6 +598,65 @@ void main() {
       expect(remoteRuntimeStates.last!.server.port, 4100);
     },
   );
+
+  testWidgets(
+    'shared host runs explicit remote server actions and updates the contract runtime',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+      var startCalls = 0;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.notRunning(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay:conn_primary',
+            ),
+          ),
+          onStartRemoteServer: () async {
+            startCalls += 1;
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.running(
+                ownerId: 'conn_primary',
+                sessionName: 'pocket-relay:conn_primary',
+                port: 4100,
+              ),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.start,
+                );
+              },
+              child: const Text('start'),
+            );
+          },
+        ),
+      );
+
+      await tester.tap(find.text('start'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(startCalls, 1);
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+      expect(remoteRuntimeStates.last!.server.port, 4100);
+    },
+  );
 }
 
 Widget _buildMaterialSettingsApp({
@@ -611,6 +670,9 @@ Widget _buildMaterialSettingsApp({
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
   ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+  ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   ConnectionSettingsHostBuilder? builder,
 }) {
   return MaterialApp(
@@ -627,6 +689,9 @@ Widget _buildMaterialSettingsApp({
         initialProfile: initialProfile,
         onRefreshModelCatalog: onRefreshModelCatalog,
         onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+        onStartRemoteServer: onStartRemoteServer,
+        onStopRemoteServer: onStopRemoteServer,
+        onRestartRemoteServer: onRestartRemoteServer,
         builder:
             builder ??
             (context, viewModel, actions) {
@@ -648,6 +713,9 @@ Widget _buildHost({
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
   ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+  ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
 }) {
   return ConnectionSettingsHost(
     initialProfile: initialProfile ?? _configuredProfile(),
@@ -657,6 +725,9 @@ Widget _buildHost({
     availableModelCatalogSource: availableModelCatalogSource,
     onRefreshModelCatalog: onRefreshModelCatalog,
     onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+    onStartRemoteServer: onStartRemoteServer,
+    onStopRemoteServer: onStopRemoteServer,
+    onRestartRemoteServer: onRestartRemoteServer,
     platformBehavior: platformBehavior,
     onCancel: () {},
     onSubmit: onSubmit,

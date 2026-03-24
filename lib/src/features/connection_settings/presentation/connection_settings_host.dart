@@ -19,6 +19,9 @@ typedef ConnectionSettingsRemoteRuntimeRefresher =
       ConnectionSettingsSubmitPayload payload,
     );
 
+typedef ConnectionSettingsRemoteServerActionRunner =
+    Future<ConnectionRemoteRuntimeState> Function();
+
 class ConnectionSettingsHost extends StatefulWidget {
   const ConnectionSettingsHost({
     super.key,
@@ -29,6 +32,9 @@ class ConnectionSettingsHost extends StatefulWidget {
     this.availableModelCatalogSource,
     this.onRefreshModelCatalog,
     this.onRefreshRemoteRuntime,
+    this.onStartRemoteServer,
+    this.onStopRemoteServer,
+    this.onRestartRemoteServer,
     required this.onCancel,
     required this.onSubmit,
     required this.builder,
@@ -43,6 +49,9 @@ class ConnectionSettingsHost extends StatefulWidget {
   final Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog;
   final ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime;
+  final ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer;
+  final ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer;
+  final ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer;
   final VoidCallback onCancel;
   final ValueChanged<ConnectionSettingsSubmitPayload> onSubmit;
   final ConnectionSettingsHostBuilder builder;
@@ -61,6 +70,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   bool _didModelCatalogRefreshFail = false;
   bool _isRefreshingModelCatalog = false;
   ConnectionRemoteRuntimeState? _remoteRuntime;
+  ConnectionSettingsRemoteServerActionId? _activeRemoteServerAction;
   Timer? _remoteRuntimeRefreshDebounce;
   int _remoteRuntimeRefreshToken = 0;
 
@@ -107,6 +117,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         onAuthModeChanged: _updateAuthMode,
         onReasoningEffortChanged: _updateReasoningEffort,
         onRefreshModelCatalog: _refreshModelCatalog,
+        onRemoteServerAction: _runRemoteServerAction,
         onToggleChanged: _updateToggle,
         onCancel: widget.onCancel,
         onSave: _save,
@@ -122,6 +133,10 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       initialSecrets: widget.initialSecrets,
       formState: formState ?? _formState,
       remoteRuntime: _remoteRuntime,
+      supportsRemoteServerStart: widget.onStartRemoteServer != null,
+      supportsRemoteServerStop: widget.onStopRemoteServer != null,
+      supportsRemoteServerRestart: widget.onRestartRemoteServer != null,
+      activeRemoteServerAction: _activeRemoteServerAction,
       availableModelCatalog: _availableModelCatalog,
       availableModelCatalogSource: _availableModelCatalogSource,
       didModelCatalogRefreshFail: _didModelCatalogRefreshFail,
@@ -345,6 +360,74 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
     }
   }
 
+  Future<void> _runRemoteServerAction(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) async {
+    if (_activeRemoteServerAction != null) {
+      return;
+    }
+
+    final runner = switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start =>
+        widget.onStartRemoteServer,
+      ConnectionSettingsRemoteServerActionId.stop => widget.onStopRemoteServer,
+      ConnectionSettingsRemoteServerActionId.restart =>
+        widget.onRestartRemoteServer,
+    };
+    final currentRuntime = _remoteRuntime;
+    if (runner == null || currentRuntime == null) {
+      return;
+    }
+
+    setState(() {
+      _activeRemoteServerAction = actionId;
+      _remoteRuntime = currentRuntime.copyWith(
+        server: ConnectionRemoteServerState.checking(
+          ownerId: currentRuntime.server.ownerId,
+          sessionName: currentRuntime.server.sessionName,
+          detail: switch (actionId) {
+            ConnectionSettingsRemoteServerActionId.start =>
+              'Starting remote Pocket Relay server…',
+            ConnectionSettingsRemoteServerActionId.stop =>
+              'Stopping remote Pocket Relay server…',
+            ConnectionSettingsRemoteServerActionId.restart =>
+              'Restarting remote Pocket Relay server…',
+          },
+        ),
+      );
+    });
+
+    try {
+      final nextRuntime = await runner();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _remoteRuntime = nextRuntime;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _remoteRuntime = currentRuntime.copyWith(
+          server: ConnectionRemoteServerState.unhealthy(
+            ownerId: currentRuntime.server.ownerId,
+            sessionName: currentRuntime.server.sessionName,
+            port: currentRuntime.server.port,
+            detail: '$error',
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _activeRemoteServerAction = null;
+        });
+      }
+    }
+  }
+
   void _save() {
     final nextState = _formState.revealValidationErrors();
     final contract = _buildContract(nextState);
@@ -391,6 +474,7 @@ class ConnectionSettingsHostActions {
     required this.onAuthModeChanged,
     required this.onReasoningEffortChanged,
     required this.onRefreshModelCatalog,
+    required this.onRemoteServerAction,
     required this.onToggleChanged,
     required this.onCancel,
     required this.onSave,
@@ -403,6 +487,8 @@ class ConnectionSettingsHostActions {
   final ValueChanged<AuthMode> onAuthModeChanged;
   final ValueChanged<CodexReasoningEffort?> onReasoningEffortChanged;
   final Future<void> Function() onRefreshModelCatalog;
+  final Future<void> Function(ConnectionSettingsRemoteServerActionId actionId)
+  onRemoteServerAction;
   final void Function(ConnectionSettingsToggleId toggleId, bool value)
   onToggleChanged;
   final VoidCallback onCancel;

@@ -32,6 +32,15 @@ class FakeConnectionSettingsOverlayDelegate
   final List<ConnectionSettingsRemoteRuntimeRefresher?>
   launchedRemoteRuntimeCallbacks =
       <ConnectionSettingsRemoteRuntimeRefresher?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStopRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedRestartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
 
   @override
   Future<ConnectionSettingsSubmitPayload?> openConnectionSettings({
@@ -45,6 +54,9 @@ class FakeConnectionSettingsOverlayDelegate
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
     ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   }) async {
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
@@ -52,6 +64,9 @@ class FakeConnectionSettingsOverlayDelegate
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
+    launchedStartRemoteServerCallbacks.add(onStartRemoteServer);
+    launchedStopRemoteServerCallbacks.add(onStopRemoteServer);
+    launchedRestartRemoteServerCallbacks.add(onRestartRemoteServer);
     if (_results.isEmpty) {
       return null;
     }

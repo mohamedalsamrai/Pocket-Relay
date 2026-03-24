@@ -262,6 +262,27 @@ class _ConnectionWorkspaceDormantRosterContentState
           secrets: payload.secrets,
         );
       },
+      onStartRemoteServer: connectionId == null
+          ? null
+          : () {
+              return widget.workspaceController.startRemoteServer(
+                connectionId: connectionId,
+              );
+            },
+      onStopRemoteServer: connectionId == null
+          ? null
+          : () {
+              return widget.workspaceController.stopRemoteServer(
+                connectionId: connectionId,
+              );
+            },
+      onRestartRemoteServer: connectionId == null
+          ? null
+          : () {
+              return widget.workspaceController.restartRemoteServer(
+                connectionId: connectionId,
+              );
+            },
     );
   }
 }

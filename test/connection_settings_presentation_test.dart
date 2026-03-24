@@ -264,6 +264,8 @@ void main() {
         contract.remoteRuntime!.server.status,
         ConnectionRemoteServerStatus.notRunning,
       );
+      expect(contract.remoteServerSection, isNotNull);
+      expect(contract.remoteServerSection!.statusLabel, 'Host unsupported');
     });
 
     test('drops remote runtime state for local settings contracts', () {
@@ -293,7 +295,95 @@ void main() {
       );
 
       expect(contract.remoteRuntime, isNull);
+      expect(contract.remoteServerSection, isNull);
     });
+
+    test(
+      'enables explicit remote server controls only for saved, unchanged remote connections',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState = ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        );
+        const remoteRuntime = ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(),
+          server: ConnectionRemoteServerState.notRunning(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay:conn_primary',
+          ),
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          remoteRuntime: remoteRuntime,
+          supportsRemoteServerStart: true,
+          supportsRemoteServerStop: true,
+          supportsRemoteServerRestart: true,
+        );
+
+        expect(contract.remoteServerSection, isNotNull);
+        final startAction = contract.remoteServerSection!.actions.firstWhere(
+          (action) => action.id == ConnectionSettingsRemoteServerActionId.start,
+        );
+        final stopAction = contract.remoteServerSection!.actions.firstWhere(
+          (action) => action.id == ConnectionSettingsRemoteServerActionId.stop,
+        );
+        expect(startAction.isEnabled, isTrue);
+        expect(stopAction.isEnabled, isFalse);
+      },
+    );
+
+    test(
+      'disables remote server controls while the sheet has unsaved changes',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState =
+            ConnectionSettingsFormState.initial(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(
+              draft: ConnectionSettingsDraft.fromConnection(
+                profile: initialProfile,
+                secrets: initialSecrets,
+              ).copyWithField(ConnectionSettingsFieldId.host, 'new-host.local'),
+            );
+        const remoteRuntime = ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(),
+          server: ConnectionRemoteServerState.running(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay:conn_primary',
+            port: 4100,
+          ),
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          remoteRuntime: remoteRuntime,
+          supportsRemoteServerStart: true,
+          supportsRemoteServerStop: true,
+          supportsRemoteServerRestart: true,
+        );
+
+        expect(contract.remoteServerSection, isNotNull);
+        expect(
+          contract.remoteServerSection!.detail,
+          contains('Save or discard staged connection edits'),
+        );
+        expect(
+          contract.remoteServerSection!.actions.every(
+            (action) => !action.isEnabled,
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test(
       'filters reasoning effort options to the selected reference model',
