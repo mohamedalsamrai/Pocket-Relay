@@ -167,6 +167,41 @@ List<CodexRuntimeEvent>? _mapTransportRuntimeEvent(
           rawMethod: 'transport/ssh/remoteProcessStarted',
         ),
       ];
+    case CodexAppServerSshPortForwardStartedEvent(
+      :final host,
+      :final port,
+      :final username,
+      :final remoteHost,
+      :final remotePort,
+      :final localPort,
+    ):
+      return <CodexRuntimeEvent>[
+        CodexRuntimeWarningEvent(
+          createdAt: now,
+          summary:
+              'SSH forwarding ready for $username@$host:$port to $remoteHost:$remotePort on localhost:$localPort.',
+          rawMethod: 'transport/ssh/portForwardStarted',
+        ),
+      ];
+    case CodexAppServerSshPortForwardFailedEvent(
+      :final host,
+      :final port,
+      :final username,
+      :final remoteHost,
+      :final remotePort,
+      :final message,
+      :final detail,
+    ):
+      return <CodexRuntimeEvent>[
+        CodexRuntimeErrorEvent(
+          createdAt: now,
+          message:
+              'SSH forwarding failed for $username@$host:$port to $remoteHost:$remotePort: $message',
+          detail: detail,
+          errorClass: CodexRuntimeErrorClass.transportError,
+          rawMethod: 'transport/ssh/portForwardFailed',
+        ),
+      ];
     case CodexAppServerRequestEvent() || CodexAppServerNotificationEvent():
       return null;
   }
