@@ -379,6 +379,11 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       return;
     }
 
+    _remoteRuntimeRefreshDebounce?.cancel();
+    // Invalidate any in-flight probe so a stale refresh cannot overwrite the
+    // explicit user-owned lifecycle action that is about to run.
+    _remoteRuntimeRefreshToken += 1;
+
     setState(() {
       _activeRemoteServerAction = actionId;
       _remoteRuntime = currentRuntime.copyWith(

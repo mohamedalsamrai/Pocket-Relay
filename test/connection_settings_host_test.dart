@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -655,6 +657,85 @@ void main() {
         ConnectionRemoteServerStatus.running,
       );
       expect(remoteRuntimeStates.last!.server.port, 4100);
+    },
+  );
+
+  testWidgets(
+    'shared host ignores stale remote probes after an explicit server action',
+    (tester) async {
+      final staleProbeCompleter = Completer<ConnectionRemoteRuntimeState>();
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+      var stopCalls = 0;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.running(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay:conn_primary',
+              port: 4100,
+            ),
+          ),
+          onRefreshRemoteRuntime: (payload) {
+            return staleProbeCompleter.future;
+          },
+          onStopRemoteServer: () async {
+            stopCalls += 1;
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.notRunning(
+                ownerId: 'conn_primary',
+                sessionName: 'pocket-relay:conn_primary',
+                detail:
+                    'No Pocket Relay server is running for this connection.',
+              ),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.stop,
+                );
+              },
+              child: const Text('stop'),
+            );
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('stop'));
+      await tester.pump();
+
+      staleProbeCompleter.complete(
+        const ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(
+            detail: 'ready',
+          ),
+          server: ConnectionRemoteServerState.running(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay:conn_primary',
+            port: 4100,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(stopCalls, 1);
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
     },
   );
 }
