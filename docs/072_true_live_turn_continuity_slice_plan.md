@@ -10,7 +10,8 @@ Current implementation progress as of 2026-03-24:
 - complete: Phase 0
 - complete: Phase 1
 - complete: Phase 2
-- next planned slice: Phase 3 Slice 3.1
+- complete: Phase 3
+- next planned slice: Phase 4 Slice 4.1
 
 The remaining-work view that starts from the current branch state lives in:
 

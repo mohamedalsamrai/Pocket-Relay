@@ -11,6 +11,7 @@ for the unfinished work after:
 - Phase 0 completed
 - Phase 1 completed
 - Phase 2 completed
+- Phase 3 completed
 
 It is derived from:
 
@@ -39,10 +40,15 @@ The branch already has these foundations:
   - server running and connectable
 - owner discovery state is wired into workspace/runtime surfaces using the real
   connection owner identity
+- explicit user-owned `Start server`, `Stop server`, and `Restart server`
+  actions exist in the workspace/application layer
+- real SSH-backed `tmux` owner control exists for explicit start/stop/restart
+- connection settings can surface truthful remote server state and real saved
+  connection lifecycle controls without mixing that lifecycle into staged draft
+  edits
 
 The branch does not have these yet:
 
-- explicit user-owned `Start server`, `Stop server`, and `Restart server`
 - websocket transport and SSH forwarding to an already-running server
 - reconnect-time `thread/resume` live reattach
 - deletion of the old SSH stdio remote model
@@ -51,7 +57,6 @@ The branch does not have these yet:
 
 | Remaining phase | Outcome | Remaining slices |
 | --- | --- | --- |
-| 3 | Remote server lifetime becomes explicit user action | 4 |
 | 4 | Pocket Relay connects to existing `tmux`-owned websocket servers | 4 |
 | 5 | Reconnect becomes live reattach | 5 |
 | 6 | Old remote model is deleted and hardened | 5 |
@@ -72,104 +77,6 @@ Every remaining phase must continue to obey these constraints:
 
 If a remaining slice requires one of those shortcuts to pass, the slice is
 wrong or the phase order is wrong.
-
-## Remaining Phase 3
-
-### Purpose
-
-Make remote server lifetime explicit user action instead of reconnect policy.
-
-### Slice 3.1: Define Explicit Server Lifecycle Actions
-
-Goal:
-
-- add application-level actions for `Start server`, `Stop server`, and
-  `Restart server`
-
-Required work:
-
-- introduce explicit workspace/application actions
-- define success/failure runtime transitions
-- keep lifecycle ownership out of transport-layer abstractions
-
-Must not do:
-
-- do not bury server lifecycle under generic reconnect or refresh actions
-- do not let settings widgets own the lifecycle decisions
-
-Exit criteria:
-
-- app layer can intentionally request start, stop, and restart
-
-### Slice 3.2: Implement `Start server`
-
-Goal:
-
-- intentionally create the expected `tmux` owner and launch a websocket
-  app-server
-
-Required work:
-
-- define the exact `tmux` session naming contract used for start/inspect
-- define the initial websocket endpoint contract
-- launch the server only on explicit user action
-- verify the result through the same discovery/health path from Phase 2
-
-Must not do:
-
-- do not auto-run start on connect, reconnect, or lane open
-- do not claim success without discovery seeing the same healthy owner
-
-Exit criteria:
-
-- explicit start creates a healthy owner
-- later discovery sees the same owner as running and connectable
-
-### Slice 3.3: Implement `Stop server` And `Restart server`
-
-Goal:
-
-- complete the explicit user-owned lifecycle loop
-
-Required work:
-
-- stop tears down only the expected owner
-- restart is explicit replacement of that same owner id
-- runtime state updates truthfully through stop/restart transitions
-
-Must not do:
-
-- do not treat reconnect failure as permission to restart
-- do not stop on disconnect/backgrounding
-- do not implement restart as a bespoke lifecycle path instead of explicit
-  stop-plus-start for the same owner identity
-
-Exit criteria:
-
-- user can intentionally stop or restart the owner
-- runtime state reflects the action honestly afterward
-
-### Slice 3.4: Wire Real UI Controls
-
-Goal:
-
-- surface explicit lifecycle controls only after the actions are real
-
-Required work:
-
-- expose truthful action affordances in the appropriate workspace/settings
-  surfaces
-- disable or hide actions when prerequisite/runtime state does not allow them
-
-Must not do:
-
-- do not land UI-only buttons ahead of real behavior
-- do not present lifecycle controls on unsupported hosts as if they could work
-
-Exit criteria:
-
-- lifecycle controls are real, not placeholders
-- reconnect is no longer the hidden owner of server lifetime
 
 ## Remaining Phase 4
 
@@ -498,9 +405,11 @@ Exit criteria:
 
 The next correct slice is Phase 3 Slice 3.1.
 
-That slice should land before any `Start server` implementation because server
-lifecycle must become explicit in the application layer before remote
-start/stop behavior is wired into SSH control helpers or UI surfaces.
+The next correct slice is Phase 4 Slice 4.1.
+
+That slice should land before SSH forwarding or remote connect-flow rewiring so
+the websocket transport exists as a real transport peer under the Phase 1 seam
+before any attach path starts depending on it.
 
 ## Definition Of Remaining Completion
 
