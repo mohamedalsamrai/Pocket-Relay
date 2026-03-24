@@ -81,6 +81,51 @@ void main() {
   );
 
   testWidgets(
+    'live lane settings receive explicit remote server action callbacks for saved connections',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNotNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNotNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNotNull,
+      );
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'dormant roster add action launches settings only once while pending',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -230,6 +275,18 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogSources.single,
         ConnectionSettingsModelCatalogSource.connectionCache,
       );
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNotNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNotNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNotNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -300,6 +357,18 @@ void main() {
         ConnectionSettingsModelCatalogSource.lastKnownCache,
       );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -1182,31 +1251,17 @@ void main() {
           ),
         ],
       );
-      final reconnectGate = Completer<void>();
-      final queuedClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[
-              FakeCodexAppServerClient(),
-              FakeCodexAppServerClient()..connectGate = reconnectGate,
-            ],
-          };
-      final createdClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[],
-          };
+      final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
         laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = queuedClientsByConnectionId[connectionId]!
-              .removeAt(0);
-          createdClientsByConnectionId[connectionId]!.add(appServerClient);
           return ConnectionLaneBinding(
             connectionId: connectionId,
             profileStore: ConnectionScopedProfileStore(
               connectionId: connectionId,
               connectionRepository: repository,
             ),
-            appServerClient: appServerClient,
+            appServerClient: client,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,
               secrets: connection.secrets,
@@ -1217,15 +1272,15 @@ void main() {
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClientLists(createdClientsByConnectionId);
+        await client.dispose();
       });
 
       await controller.initialize();
-      await createdClientsByConnectionId['conn_primary']!.first.connect(
+      await client.connect(
         profile: ConnectionProfile.defaults(),
         secrets: const ConnectionSecrets(),
       );
-      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+      await client.disconnect();
 
       await tester.pumpWidget(
         _buildWorkspaceDrivenLiveLaneApp(
@@ -1238,6 +1293,8 @@ void main() {
       expect(find.text('Live transport lost'), findsOneWidget);
       expect(find.text('Reconnect'), findsOneWidget);
 
+      final reconnectGate = Completer<void>();
+      client.connectGate = reconnectGate;
       unawaited(controller.reconnectConnection('conn_primary'));
       await tester.pump();
       await tester.pump();
@@ -1273,33 +1330,17 @@ void main() {
           ),
         ],
       );
-      final queuedClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[
-              FakeCodexAppServerClient(),
-              FakeCodexAppServerClient()
-                ..connectError = const CodexAppServerException(
-                  'connect failed',
-                ),
-            ],
-          };
-      final createdClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[],
-          };
+      final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
         laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = queuedClientsByConnectionId[connectionId]!
-              .removeAt(0);
-          createdClientsByConnectionId[connectionId]!.add(appServerClient);
           return ConnectionLaneBinding(
             connectionId: connectionId,
             profileStore: ConnectionScopedProfileStore(
               connectionId: connectionId,
               connectionRepository: repository,
             ),
-            appServerClient: appServerClient,
+            appServerClient: client,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,
               secrets: connection.secrets,
@@ -1310,16 +1351,16 @@ void main() {
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClientLists(createdClientsByConnectionId);
+        await client.dispose();
       });
 
       await controller.initialize();
       controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
-      await createdClientsByConnectionId['conn_primary']!.first.connect(
+      await client.connect(
         profile: ConnectionProfile.defaults(),
         secrets: const ConnectionSecrets(),
       );
-      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+      await client.disconnect();
 
       await tester.pumpWidget(
         _buildWorkspaceDrivenLiveLaneApp(
@@ -1329,6 +1370,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      client.connectError = const CodexAppServerException('connect failed');
       await controller.reconnectConnection('conn_primary');
       await tester.pumpAndSettle();
 
