@@ -133,6 +133,20 @@ void main() {
     },
   );
 
+  test('buildPocketRelayRemoteOwnerPortCandidates are deterministic', () {
+    final first = buildPocketRelayRemoteOwnerPortCandidates(
+      ownerId: 'remote-1',
+    );
+    final second = buildPocketRelayRemoteOwnerPortCandidates(
+      ownerId: 'remote-1',
+    );
+
+    expect(first, second);
+    expect(first, hasLength(8));
+    expect(first.toSet(), hasLength(8));
+    expect(first.every((port) => port >= 42000 && port < 62000), isTrue);
+  });
+
   test('buildSshRemoteOwnerInspectCommand checks tmux and readyz', () {
     final command = buildSshRemoteOwnerInspectCommand(
       sessionName: 'pocket-relay:remote-1',
@@ -141,6 +155,28 @@ void main() {
 
     expect(command, contains('tmux has-session'));
     expect(command, contains('/readyz'));
+    expect(command, contains('pocket-relay:remote-1'));
+  });
+
+  test('buildSshRemoteOwnerStartCommand starts a tmux websocket owner', () {
+    final command = buildSshRemoteOwnerStartCommand(
+      sessionName: 'pocket-relay:remote-1',
+      workspaceDir: '/workspace',
+      codexPath: 'codex',
+      port: 45123,
+    );
+
+    expect(command, contains('tmux new-session'));
+    expect(command, contains('ws://127.0.0.1:45123'));
+    expect(command, contains('pocket-relay:remote-1'));
+  });
+
+  test('buildSshRemoteOwnerStopCommand kills the expected tmux session', () {
+    final command = buildSshRemoteOwnerStopCommand(
+      sessionName: 'pocket-relay:remote-1',
+    );
+
+    expect(command, contains('tmux kill-session'));
     expect(command, contains('pocket-relay:remote-1'));
   });
 
@@ -254,6 +290,165 @@ void main() {
     expect(snapshot.endpoint!.port, 4100);
     expect(snapshot.isConnectable, isTrue);
   });
+
+  test('startOwner creates a new tmux-managed server when missing', () async {
+    final inspectOutputs = <_FakeCodexAppServerProcess>[
+      _ownerProcess(
+        '__pocket_relay_owner__ status=missing pid= host= port= detail=session_missing',
+      ),
+      _ownerProcess(
+        '__pocket_relay_owner__ status=running pid=2041 host=127.0.0.1 port=45123 detail=ready',
+      ),
+    ];
+    final launchedCommands = <String>[];
+    final control = CodexSshRemoteAppServerOwnerControl(
+      sshBootstrap:
+          ({required profile, required secrets, required verifyHostKey}) async {
+            return _ScriptedSshBootstrapClient(
+              onLaunch: (command) async {
+                launchedCommands.add(command);
+                if (command.contains('__pocket_relay_owner__')) {
+                  return inspectOutputs.removeAt(0);
+                }
+                return _FakeCodexAppServerProcess();
+              },
+            );
+          },
+    );
+
+    final snapshot = await control.startOwner(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+      ownerId: 'remote-1',
+      workspaceDir: '/workspace',
+    );
+
+    expect(snapshot.status, CodexRemoteAppServerOwnerStatus.running);
+    expect(snapshot.endpoint?.port, 45123);
+    expect(
+      launchedCommands.any((command) => command.contains('tmux new-session')),
+      isTrue,
+    );
+  });
+
+  test(
+    'startOwner returns the existing running owner without relaunch',
+    () async {
+      final launchedCommands = <String>[];
+      final control = CodexSshRemoteAppServerOwnerControl(
+        sshBootstrap:
+            ({
+              required profile,
+              required secrets,
+              required verifyHostKey,
+            }) async {
+              return _ScriptedSshBootstrapClient(
+                onLaunch: (command) async {
+                  launchedCommands.add(command);
+                  return _ownerProcess(
+                    '__pocket_relay_owner__ status=running pid=2041 host=127.0.0.1 port=4100 detail=ready',
+                  );
+                },
+              );
+            },
+      );
+
+      final snapshot = await control.startOwner(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        ownerId: 'remote-1',
+        workspaceDir: '/workspace',
+      );
+
+      expect(snapshot.status, CodexRemoteAppServerOwnerStatus.running);
+      expect(
+        launchedCommands.any((command) => command.contains('tmux new-session')),
+        isFalse,
+      );
+    },
+  );
+
+  test('stopOwner kills the tmux owner and returns the missing state', () async {
+    final inspectOutputs = <_FakeCodexAppServerProcess>[
+      _ownerProcess(
+        '__pocket_relay_owner__ status=missing pid= host= port= detail=session_missing',
+      ),
+    ];
+    final launchedCommands = <String>[];
+    final control = CodexSshRemoteAppServerOwnerControl(
+      sshBootstrap:
+          ({required profile, required secrets, required verifyHostKey}) async {
+            return _ScriptedSshBootstrapClient(
+              onLaunch: (command) async {
+                launchedCommands.add(command);
+                if (command.contains('__pocket_relay_owner__')) {
+                  return inspectOutputs.removeAt(0);
+                }
+                return _FakeCodexAppServerProcess();
+              },
+            );
+          },
+    );
+
+    final snapshot = await control.stopOwner(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+      ownerId: 'remote-1',
+      workspaceDir: '/workspace',
+    );
+
+    expect(snapshot.status, CodexRemoteAppServerOwnerStatus.missing);
+    expect(
+      launchedCommands.any((command) => command.contains('tmux kill-session')),
+      isTrue,
+    );
+  });
+
+  test('restartOwner is explicit stop plus start', () async {
+    final inspectOutputs = <_FakeCodexAppServerProcess>[
+      _ownerProcess(
+        '__pocket_relay_owner__ status=missing pid= host= port= detail=session_missing',
+      ),
+      _ownerProcess(
+        '__pocket_relay_owner__ status=missing pid= host= port= detail=session_missing',
+      ),
+      _ownerProcess(
+        '__pocket_relay_owner__ status=running pid=2041 host=127.0.0.1 port=45123 detail=ready',
+      ),
+    ];
+    final launchedCommands = <String>[];
+    final control = CodexSshRemoteAppServerOwnerControl(
+      sshBootstrap:
+          ({required profile, required secrets, required verifyHostKey}) async {
+            return _ScriptedSshBootstrapClient(
+              onLaunch: (command) async {
+                launchedCommands.add(command);
+                if (command.contains('__pocket_relay_owner__')) {
+                  return inspectOutputs.removeAt(0);
+                }
+                return _FakeCodexAppServerProcess();
+              },
+            );
+          },
+    );
+
+    final snapshot = await control.restartOwner(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+      ownerId: 'remote-1',
+      workspaceDir: '/workspace',
+    );
+
+    expect(snapshot.status, CodexRemoteAppServerOwnerStatus.running);
+    final killIndex = launchedCommands.indexWhere(
+      (command) => command.contains('tmux kill-session'),
+    );
+    final startIndex = launchedCommands.indexWhere(
+      (command) => command.contains('tmux new-session'),
+    );
+    expect(killIndex, isNonNegative);
+    expect(startIndex, greaterThan(killIndex));
+  });
 }
 
 ConnectionProfile _profile() {
@@ -286,6 +481,29 @@ final class _FakeSshBootstrapClient implements CodexSshBootstrapClient {
 
   @override
   void close() {}
+}
+
+typedef _LaunchHandler = Future<CodexAppServerProcess> Function(String command);
+
+final class _ScriptedSshBootstrapClient implements CodexSshBootstrapClient {
+  _ScriptedSshBootstrapClient({required this.onLaunch});
+
+  final _LaunchHandler onLaunch;
+
+  @override
+  Future<void> authenticate() async {}
+
+  @override
+  Future<CodexAppServerProcess> launchProcess(String command) {
+    return onLaunch(command);
+  }
+
+  @override
+  void close() {}
+}
+
+_FakeCodexAppServerProcess _ownerProcess(String line) {
+  return _FakeCodexAppServerProcess(stdoutLines: <String>[line]);
 }
 
 final class _FakeCodexAppServerProcess implements CodexAppServerProcess {

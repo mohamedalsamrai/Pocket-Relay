@@ -18,6 +18,7 @@ import '../domain/connection_workspace_state.dart';
 part 'connection_workspace_controller_catalog.dart';
 part 'connection_workspace_controller_lane.dart';
 part 'connection_workspace_controller_lifecycle.dart';
+part 'connection_workspace_controller_remote_owner.dart';
 
 typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
@@ -36,6 +37,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
         const CodexSshRemoteAppServerHostProbe(),
     CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
         const CodexSshRemoteAppServerOwnerInspector(),
+    CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+        const CodexSshRemoteAppServerOwnerControl(),
     Duration recoveryPersistenceDebounceDuration = const Duration(
       milliseconds: 250,
     ),
@@ -48,6 +51,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
            recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
        _remoteAppServerHostProbe = remoteAppServerHostProbe,
        _remoteAppServerOwnerInspector = remoteAppServerOwnerInspector,
+       _remoteAppServerOwnerControl = remoteAppServerOwnerControl,
        _recoveryPersistenceDebounceDuration =
            recoveryPersistenceDebounceDuration,
        _now = now ?? DateTime.now;
@@ -58,6 +62,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
   final CodexRemoteAppServerHostProbe _remoteAppServerHostProbe;
   final CodexRemoteAppServerOwnerInspector _remoteAppServerOwnerInspector;
+  final CodexRemoteAppServerOwnerControl _remoteAppServerOwnerControl;
   final Duration _recoveryPersistenceDebounceDuration;
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
@@ -181,6 +186,24 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       profile: profile,
       secrets: secrets,
     );
+  }
+
+  Future<ConnectionRemoteRuntimeState> startRemoteServer({
+    required String connectionId,
+  }) {
+    return _startWorkspaceRemoteServer(this, connectionId: connectionId);
+  }
+
+  Future<ConnectionRemoteRuntimeState> stopRemoteServer({
+    required String connectionId,
+  }) {
+    return _stopWorkspaceRemoteServer(this, connectionId: connectionId);
+  }
+
+  Future<ConnectionRemoteRuntimeState> restartRemoteServer({
+    required String connectionId,
+  }) {
+    return _restartWorkspaceRemoteServer(this, connectionId: connectionId);
   }
 
   Future<void> handleAppLifecycleStateChanged(AppLifecycleState state) {

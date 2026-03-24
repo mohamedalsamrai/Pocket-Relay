@@ -84,6 +84,167 @@ class CodexSshRemoteAppServerOwnerInspector
   }
 }
 
+class CodexSshRemoteAppServerOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const CodexSshRemoteAppServerOwnerControl({
+    this.sshBootstrap = connectSshBootstrapClient,
+  });
+
+  final CodexSshProcessBootstrap sshBootstrap;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) {
+    return CodexSshRemoteAppServerHostProbe(
+      sshBootstrap: sshBootstrap,
+    ).probeHostCapabilities(profile: profile, secrets: secrets);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) {
+    return CodexSshRemoteAppServerOwnerInspector(
+      sshBootstrap: sshBootstrap,
+    ).inspectOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    final existingSnapshot = await inspectOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+    switch (existingSnapshot.status) {
+      case CodexRemoteAppServerOwnerStatus.running:
+        return existingSnapshot;
+      case CodexRemoteAppServerOwnerStatus.unhealthy:
+        return existingSnapshot;
+      case CodexRemoteAppServerOwnerStatus.stopped:
+        await stopOwner(
+          profile: profile,
+          secrets: secrets,
+          ownerId: ownerId,
+          workspaceDir: workspaceDir,
+        );
+      case CodexRemoteAppServerOwnerStatus.missing:
+        break;
+    }
+
+    final sessionName = buildPocketRelayRemoteOwnerSessionName(
+      ownerId: ownerId,
+    );
+    CodexRemoteAppServerOwnerSnapshot? lastSnapshot;
+    for (final port in buildPocketRelayRemoteOwnerPortCandidates(
+      ownerId: ownerId,
+    )) {
+      await _runRemoteControlCommand(
+        profile: profile,
+        secrets: secrets,
+        sshBootstrap: sshBootstrap,
+        command: buildSshRemoteOwnerStartCommand(
+          sessionName: sessionName,
+          workspaceDir: workspaceDir,
+          codexPath: profile.codexPath,
+          port: port,
+        ),
+      );
+      lastSnapshot = await _waitForOwnerReady(
+        profile: profile,
+        secrets: secrets,
+        ownerId: ownerId,
+        workspaceDir: workspaceDir,
+        sshBootstrap: sshBootstrap,
+      );
+      if (lastSnapshot.status == CodexRemoteAppServerOwnerStatus.running) {
+        return lastSnapshot;
+      }
+      if (!_shouldRetryRemoteOwnerStart(lastSnapshot)) {
+        return lastSnapshot;
+      }
+      await _runRemoteControlCommand(
+        profile: profile,
+        secrets: secrets,
+        sshBootstrap: sshBootstrap,
+        command: buildSshRemoteOwnerStopCommand(sessionName: sessionName),
+      );
+    }
+
+    if (lastSnapshot != null) {
+      return lastSnapshot;
+    }
+    return inspectOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    final sessionName = buildPocketRelayRemoteOwnerSessionName(
+      ownerId: ownerId,
+    );
+    await _runRemoteControlCommand(
+      profile: profile,
+      secrets: secrets,
+      sshBootstrap: sshBootstrap,
+      command: buildSshRemoteOwnerStopCommand(sessionName: sessionName),
+    );
+    return _waitForOwnerStopped(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      sshBootstrap: sshBootstrap,
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    await stopOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+    return startOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+  }
+}
+
 @visibleForTesting
 String buildSshRemoteHostCapabilityProbeCommand({
   required ConnectionProfile profile,
@@ -115,6 +276,50 @@ String buildPocketRelayRemoteOwnerSessionName({required String ownerId}) {
       .replaceAll(RegExp(r'^-+|-+$'), '');
   final suffix = sanitized.isEmpty ? 'owner' : sanitized;
   return 'pocket-relay:$suffix';
+}
+
+@visibleForTesting
+List<int> buildPocketRelayRemoteOwnerPortCandidates({
+  required String ownerId,
+  int candidateCount = 8,
+}) {
+  final normalized = ownerId.trim();
+  if (normalized.isEmpty) {
+    throw ArgumentError.value(ownerId, 'ownerId', 'must not be empty');
+  }
+  if (candidateCount <= 0) {
+    throw ArgumentError.value(
+      candidateCount,
+      'candidateCount',
+      'must be greater than zero',
+    );
+  }
+
+  const minPort = 42000;
+  const portRange = 20000;
+  final basePort = minPort + (_fnv1a32(normalized) % portRange);
+  final seenPorts = <int>{};
+  final ports = <int>[];
+  var offset = 0;
+  while (ports.length < candidateCount) {
+    final port = minPort + ((basePort - minPort + offset) % portRange);
+    if (seenPorts.add(port)) {
+      ports.add(port);
+    }
+    offset += 1;
+  }
+  return ports;
+}
+
+int _fnv1a32(String value) {
+  const offsetBasis = 0x811C9DC5;
+  const prime = 0x01000193;
+  var hash = offsetBasis;
+  for (final codeUnit in value.codeUnits) {
+    hash ^= codeUnit;
+    hash = (hash * prime) & 0xFFFFFFFF;
+  }
+  return hash & 0x7FFFFFFF;
 }
 
 @visibleForTesting
@@ -205,6 +410,49 @@ fi
   return 'bash -lc ${shellEscape(command)}';
 }
 
+@visibleForTesting
+String buildSshRemoteOwnerStartCommand({
+  required String sessionName,
+  required String workspaceDir,
+  required String codexPath,
+  required int port,
+}) {
+  final command =
+      '''
+session_name=${shellEscape(sessionName)}
+workspace_dir=${shellEscape(workspaceDir.trim())}
+launch_command=${shellEscape('${codexPath.trim()} app-server --listen ws://127.0.0.1:$port')}
+
+if ! command -v tmux >/dev/null 2>&1; then
+  echo 'tmux is not available on the remote host.' >&2
+  exit 1
+fi
+
+if tmux has-session -t "\$session_name" 2>/dev/null; then
+  echo "Pocket Relay tmux owner already exists: \$session_name" >&2
+  exit 2
+fi
+
+tmux new-session -d -s "\$session_name" -c "\$workspace_dir" "\$launch_command"
+''';
+  return 'bash -lc ${shellEscape(command)}';
+}
+
+@visibleForTesting
+String buildSshRemoteOwnerStopCommand({required String sessionName}) {
+  final command =
+      '''
+session_name=${shellEscape(sessionName)}
+if ! command -v tmux >/dev/null 2>&1; then
+  exit 0
+fi
+if tmux has-session -t "\$session_name" 2>/dev/null; then
+  tmux kill-session -t "\$session_name"
+fi
+''';
+  return 'bash -lc ${shellEscape(command)}';
+}
+
 Future<_RemoteProbeCommandResult> _runRemoteProbeCommand({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
@@ -243,6 +491,34 @@ Future<_RemoteProbeCommandResult> _runRemoteProbeCommand({
     client.close();
     rethrow;
   }
+}
+
+Future<void> _runRemoteControlCommand({
+  required ConnectionProfile profile,
+  required ConnectionSecrets secrets,
+  required CodexSshProcessBootstrap sshBootstrap,
+  required String command,
+}) async {
+  final result = await _runRemoteProbeCommand(
+    profile: profile,
+    secrets: secrets,
+    sshBootstrap: sshBootstrap,
+    command: command,
+  );
+  final exitCode = result.exitCode ?? 0;
+  if (exitCode == 0) {
+    return;
+  }
+  final detail = [
+    'exit $exitCode',
+    if (result.stderr.trim().isNotEmpty) result.stderr.trim(),
+    if (result.stdout.trim().isNotEmpty) result.stdout.trim(),
+  ].join(' | ');
+  throw StateError(
+    detail.isEmpty
+        ? 'Remote owner control command failed.'
+        : 'Remote owner control command failed: $detail',
+  );
 }
 
 Future<String> _readProcessStream(Stream<List<int>> stream) async {
@@ -378,6 +654,86 @@ String? _ownerDetailForCode(String? code) {
     'tmux_unavailable' => 'tmux is not available on the remote host.',
     _ => code,
   };
+}
+
+bool _shouldRetryRemoteOwnerStart(CodexRemoteAppServerOwnerSnapshot snapshot) {
+  return switch (snapshot.status) {
+    CodexRemoteAppServerOwnerStatus.stopped => true,
+    _ => false,
+  };
+}
+
+Future<CodexRemoteAppServerOwnerSnapshot> _waitForOwnerReady({
+  required ConnectionProfile profile,
+  required ConnectionSecrets secrets,
+  required String ownerId,
+  required String workspaceDir,
+  required CodexSshProcessBootstrap sshBootstrap,
+}) async {
+  CodexRemoteAppServerOwnerSnapshot? lastSnapshot;
+  for (var attempt = 0; attempt < 20; attempt += 1) {
+    lastSnapshot =
+        await CodexSshRemoteAppServerOwnerInspector(
+          sshBootstrap: sshBootstrap,
+        ).inspectOwner(
+          profile: profile,
+          secrets: secrets,
+          ownerId: ownerId,
+          workspaceDir: workspaceDir,
+        );
+    if (lastSnapshot.status == CodexRemoteAppServerOwnerStatus.running) {
+      return lastSnapshot;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+  }
+  if (lastSnapshot != null) {
+    return lastSnapshot;
+  }
+  return CodexSshRemoteAppServerOwnerInspector(
+    sshBootstrap: sshBootstrap,
+  ).inspectOwner(
+    profile: profile,
+    secrets: secrets,
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+  );
+}
+
+Future<CodexRemoteAppServerOwnerSnapshot> _waitForOwnerStopped({
+  required ConnectionProfile profile,
+  required ConnectionSecrets secrets,
+  required String ownerId,
+  required String workspaceDir,
+  required CodexSshProcessBootstrap sshBootstrap,
+}) async {
+  CodexRemoteAppServerOwnerSnapshot? lastSnapshot;
+  for (var attempt = 0; attempt < 10; attempt += 1) {
+    lastSnapshot =
+        await CodexSshRemoteAppServerOwnerInspector(
+          sshBootstrap: sshBootstrap,
+        ).inspectOwner(
+          profile: profile,
+          secrets: secrets,
+          ownerId: ownerId,
+          workspaceDir: workspaceDir,
+        );
+    if (lastSnapshot.status == CodexRemoteAppServerOwnerStatus.missing ||
+        lastSnapshot.status == CodexRemoteAppServerOwnerStatus.stopped) {
+      return lastSnapshot;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+  if (lastSnapshot != null) {
+    return lastSnapshot;
+  }
+  return CodexSshRemoteAppServerOwnerInspector(
+    sshBootstrap: sshBootstrap,
+  ).inspectOwner(
+    profile: profile,
+    secrets: secrets,
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+  );
 }
 
 final class _RemoteProbeCommandResult {

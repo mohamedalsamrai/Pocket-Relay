@@ -129,6 +129,109 @@ void main() {
     },
   );
 
+  test(
+    'startRemoteServer refreshes controller runtime after an explicit start action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.missing,
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.startRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.startCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'stopRemoteServer refreshes controller runtime after an explicit stop action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.running,
+          sessionName: 'pocket-relay:conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.stopRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.stopCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.notRunning);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'restartRemoteServer refreshes controller runtime after an explicit restart action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.running,
+          sessionName: 'pocket-relay:conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.restartRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.restartCalls, 1);
+      expect(ownerControl.stopCalls, 1);
+      expect(ownerControl.startCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
+    },
+  );
+
   test('initializes one live lane and keeps the rest dormant', () async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
     final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -2474,6 +2577,8 @@ ConnectionWorkspaceController _buildWorkspaceController({
       const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
   CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
       const _ThrowingRemoteOwnerInspector(),
+  CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+      const _ThrowingRemoteOwnerControl(),
   Duration? recoveryPersistenceDebounceDuration,
   WorkspaceNow? now,
 }) {
@@ -2499,6 +2604,7 @@ ConnectionWorkspaceController _buildWorkspaceController({
     recoveryStore: recoveryStore,
     remoteAppServerHostProbe: remoteAppServerHostProbe,
     remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
+    remoteAppServerOwnerControl: remoteAppServerOwnerControl,
     recoveryPersistenceDebounceDuration:
         recoveryPersistenceDebounceDuration ??
         const Duration(milliseconds: 250),
@@ -2581,6 +2687,153 @@ final class _ThrowingRemoteOwnerInspector
     required ConnectionSecrets secrets,
   }) async {
     return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _ThrowingRemoteOwnerControl();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+}
+
+final class _MutableRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  _MutableRemoteOwnerControl({
+    required CodexRemoteAppServerOwnerSnapshot snapshot,
+    this.hostCapabilities = const CodexRemoteAppServerHostCapabilities(),
+  }) : _snapshot = snapshot;
+
+  final CodexRemoteAppServerHostCapabilities hostCapabilities;
+  CodexRemoteAppServerOwnerSnapshot _snapshot;
+  int startCalls = 0;
+  int stopCalls = 0;
+  int restartCalls = 0;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return hostCapabilities;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    restartCalls += 1;
+    await stopOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+    return startOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls += 1;
+    _snapshot = CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.running,
+      sessionName: 'pocket-relay:$ownerId',
+      endpoint: const CodexRemoteAppServerEndpoint(
+        host: '127.0.0.1',
+        port: 4100,
+      ),
+      detail: 'Remote Pocket Relay server is ready.',
+    );
+    return _snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    stopCalls += 1;
+    _snapshot = CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.missing,
+      sessionName: 'pocket-relay:$ownerId',
+      detail: 'No Pocket Relay server is running for this connection.',
+    );
+    return _snapshot;
   }
 }
 
