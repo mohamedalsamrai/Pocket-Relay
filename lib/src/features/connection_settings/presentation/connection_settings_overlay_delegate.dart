@@ -13,6 +13,7 @@ abstract interface class ConnectionSettingsOverlayDelegate {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
@@ -31,6 +32,7 @@ class ModalConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
@@ -46,6 +48,7 @@ class ModalConnectionSettingsOverlayDelegate
         return ConnectionSettingsHost(
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
+          initialRemoteRuntime: initialRemoteRuntime,
           availableModelCatalog: availableModelCatalog,
           availableModelCatalogSource: availableModelCatalogSource,
           onRefreshModelCatalog: onRefreshModelCatalog,

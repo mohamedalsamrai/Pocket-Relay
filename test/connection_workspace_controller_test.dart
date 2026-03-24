@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
@@ -44,6 +45,87 @@ void main() {
         ConnectionWorkspaceViewport.dormantRoster,
       );
       expect(controller.selectedLaneBinding, isNull);
+    },
+  );
+
+  test(
+    'refreshRemoteRuntime stores inspected remote server state on the workspace controller',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_primary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay:conn_primary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4100,
+            ),
+            detail: 'Remote Pocket Relay server is ready.',
+          ),
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.refreshRemoteRuntime(
+        connectionId: 'conn_primary',
+      );
+
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'saveDormantConnection clears cached remote runtime when the connection becomes local',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_secondary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay:conn_secondary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4101,
+            ),
+          ),
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.refreshRemoteRuntime(connectionId: 'conn_secondary');
+      expect(controller.state.remoteRuntimeFor('conn_secondary'), isNotNull);
+
+      await controller.saveDormantConnection(
+        connectionId: 'conn_secondary',
+        profile: _profile(
+          'Secondary Box',
+          'secondary.local',
+        ).copyWith(connectionMode: ConnectionMode.local),
+        secrets: const ConnectionSecrets(password: 'secret-2'),
+      );
+
+      expect(controller.state.remoteRuntimeFor('conn_secondary'), isNull);
     },
   );
 
@@ -2388,6 +2470,10 @@ ConnectionWorkspaceController _buildWorkspaceController({
   MemoryCodexConnectionRepository? repository,
   ConnectionModelCatalogStore? modelCatalogStore,
   ConnectionWorkspaceRecoveryStore? recoveryStore,
+  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+      const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
+  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+      const _ThrowingRemoteOwnerInspector(),
   Duration? recoveryPersistenceDebounceDuration,
   WorkspaceNow? now,
 }) {
@@ -2411,6 +2497,8 @@ ConnectionWorkspaceController _buildWorkspaceController({
     connectionRepository: resolvedRepository,
     modelCatalogStore: modelCatalogStore,
     recoveryStore: recoveryStore,
+    remoteAppServerHostProbe: remoteAppServerHostProbe,
+    remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
     recoveryPersistenceDebounceDuration:
         recoveryPersistenceDebounceDuration ??
         const Duration(milliseconds: 250),
@@ -2432,6 +2520,68 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _FakeRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _FakeRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _ThrowingRemoteOwnerInspector();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('owner inspection should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
 }
 
 class _RecordingConnectionWorkspaceRecoveryStore

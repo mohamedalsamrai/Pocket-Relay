@@ -12,6 +12,7 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_host.dart';
@@ -24,6 +25,61 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 
 void main() {
+  testWidgets(
+    'live lane settings receive the controller-owned initial remote runtime for the selected connection',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_primary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay:conn_primary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4100,
+            ),
+          ),
+        ),
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(
+        settingsOverlayDelegate.launchedInitialRemoteRuntimes.single,
+        controller.state.remoteRuntimeFor('conn_primary'),
+      );
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets(
     'dormant roster add action launches settings only once while pending',
     (tester) async {
@@ -1363,6 +1419,10 @@ ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   CodexConnectionRepository? repository,
   ConnectionModelCatalogStore? modelCatalogStore,
+  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+      const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
+  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+      const _ThrowingRemoteOwnerInspector(),
 }) {
   final resolvedRepository =
       repository ??
@@ -1383,6 +1443,8 @@ ConnectionWorkspaceController _buildWorkspaceController({
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
     modelCatalogStore: modelCatalogStore,
+    remoteAppServerHostProbe: remoteAppServerHostProbe,
+    remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
     laneBindingFactory: ({required connectionId, required connection}) {
       return ConnectionLaneBinding(
         connectionId: connectionId,
@@ -1399,6 +1461,68 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _FakeRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _FakeRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _ThrowingRemoteOwnerInspector();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('owner inspection should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
 }
 
 ConnectionProfile _profile(String label, String host) {
@@ -1504,6 +1628,8 @@ class _DeferredConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
+  final List<ConnectionRemoteRuntimeState?> launchedInitialRemoteRuntimes =
+      <ConnectionRemoteRuntimeState?>[];
   final List<ConnectionSettingsModelCatalogSource?>
   launchedModelCatalogSources = <ConnectionSettingsModelCatalogSource?>[];
   final List<
@@ -1525,6 +1651,7 @@ class _DeferredConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
@@ -1534,6 +1661,7 @@ class _DeferredConnectionSettingsOverlayDelegate
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
+    launchedInitialRemoteRuntimes.add(initialRemoteRuntime);
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);

@@ -24,6 +24,7 @@ class ConnectionSettingsHost extends StatefulWidget {
     super.key,
     required this.initialProfile,
     required this.initialSecrets,
+    this.initialRemoteRuntime,
     this.availableModelCatalog,
     this.availableModelCatalogSource,
     this.onRefreshModelCatalog,
@@ -36,6 +37,7 @@ class ConnectionSettingsHost extends StatefulWidget {
 
   final ConnectionProfile initialProfile;
   final ConnectionSecrets initialSecrets;
+  final ConnectionRemoteRuntimeState? initialRemoteRuntime;
   final ConnectionModelCatalog? availableModelCatalog;
   final ConnectionSettingsModelCatalogSource? availableModelCatalogSource;
   final Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
@@ -69,6 +71,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       profile: widget.initialProfile,
       secrets: widget.initialSecrets,
     );
+    _remoteRuntime = widget.initialRemoteRuntime;
     _availableModelCatalog = widget.availableModelCatalog;
     _availableModelCatalogSource = widget.availableModelCatalogSource;
     final draft = _formState.draft;
@@ -210,9 +213,9 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
     _remoteRuntimeRefreshDebounce?.cancel();
     final onRefreshRemoteRuntime = widget.onRefreshRemoteRuntime;
     if (onRefreshRemoteRuntime == null) {
-      if (_remoteRuntime != null) {
+      if (_remoteRuntime != widget.initialRemoteRuntime) {
         setState(() {
-          _remoteRuntime = null;
+          _remoteRuntime = widget.initialRemoteRuntime;
         });
       }
       return;
@@ -242,7 +245,8 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       hostCapability: ConnectionRemoteHostCapabilityState.checking(),
       server: ConnectionRemoteServerState.unknown(),
     );
-    if (_remoteRuntime != checkingRuntime) {
+    if ((!immediate || _remoteRuntime == null) &&
+        _remoteRuntime != checkingRuntime) {
       setState(() {
         _remoteRuntime = checkingRuntime;
       });

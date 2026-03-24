@@ -177,6 +177,7 @@ class _ConnectionWorkspaceDormantRosterContentState
       }
 
       final payload = await _openConnectionSettings(
+        connectionId: connectionId,
         profile: savedConnection.profile,
         secrets: savedConnection.secrets,
         availableModelCatalog: cachedModelCatalog ?? lastKnownModelCatalog,
@@ -235,6 +236,7 @@ class _ConnectionWorkspaceDormantRosterContentState
   }
 
   Future<ConnectionSettingsSubmitPayload?> _openConnectionSettings({
+    String? connectionId,
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
     ConnectionModelCatalog? availableModelCatalog,
@@ -245,10 +247,20 @@ class _ConnectionWorkspaceDormantRosterContentState
       initialProfile: profile,
       initialSecrets: secrets,
       platformBehavior: widget.platformBehavior,
+      initialRemoteRuntime: connectionId == null
+          ? null
+          : widget.workspaceController.state.remoteRuntimeFor(connectionId),
       availableModelCatalog: availableModelCatalog,
       availableModelCatalogSource: availableModelCatalogSource,
       onRefreshRemoteRuntime: (payload) {
-        return probeConnectionSettingsRemoteRuntime(payload: payload);
+        if (connectionId == null) {
+          return probeConnectionSettingsRemoteRuntime(payload: payload);
+        }
+        return widget.workspaceController.refreshRemoteRuntime(
+          connectionId: connectionId,
+          profile: payload.profile,
+          secrets: payload.secrets,
+        );
       },
     );
   }

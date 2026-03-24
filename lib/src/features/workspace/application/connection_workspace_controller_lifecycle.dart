@@ -494,6 +494,7 @@ Future<void> _deleteDormantWorkspaceConnection(
 ) async {
   await controller._connectionRepository.deleteConnection(connectionId);
   await controller._modelCatalogStore.delete(connectionId);
+  controller._remoteRuntimeRefreshGenerationByConnectionId.remove(connectionId);
   final nextCatalog = await controller._connectionRepository.loadCatalog();
   if (controller._isDisposed) {
     return;
@@ -529,6 +530,11 @@ Future<void> _deleteDormantWorkspaceConnection(
         liveConnectionIds: controller._state.liveConnectionIds,
         recoveryDiagnosticsByConnectionId:
             controller._state.recoveryDiagnosticsByConnectionId,
+      ),
+      remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
+        catalog: nextCatalog,
+        remoteRuntimeByConnectionId:
+            controller._state.remoteRuntimeByConnectionId,
       ),
     ),
   );

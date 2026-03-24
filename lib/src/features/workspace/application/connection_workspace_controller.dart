@@ -4,9 +4,13 @@ import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_remote_runtime_probe.dart';
+import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -28,6 +32,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     required ConnectionLaneBindingFactory laneBindingFactory,
     ConnectionModelCatalogStore? modelCatalogStore,
     ConnectionWorkspaceRecoveryStore? recoveryStore,
+    CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+        const CodexSshRemoteAppServerHostProbe(),
+    CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+        const CodexSshRemoteAppServerOwnerInspector(),
     Duration recoveryPersistenceDebounceDuration = const Duration(
       milliseconds: 250,
     ),
@@ -38,6 +46,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
            modelCatalogStore ?? const NoopConnectionModelCatalogStore(),
        _recoveryStore =
            recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
+       _remoteAppServerHostProbe = remoteAppServerHostProbe,
+       _remoteAppServerOwnerInspector = remoteAppServerOwnerInspector,
        _recoveryPersistenceDebounceDuration =
            recoveryPersistenceDebounceDuration,
        _now = now ?? DateTime.now;
@@ -46,6 +56,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionModelCatalogStore _modelCatalogStore;
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
+  final CodexRemoteAppServerHostProbe _remoteAppServerHostProbe;
+  final CodexRemoteAppServerOwnerInspector _remoteAppServerOwnerInspector;
   final Duration _recoveryPersistenceDebounceDuration;
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
@@ -67,6 +79,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
           StreamSubscription<CodexAppServerEvent> appServerEventSubscription,
         })
       >{};
+  final Map<String, int> _remoteRuntimeRefreshGenerationByConnectionId =
+      <String, int>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
@@ -154,6 +168,19 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   Future<void> reconnectConnection(String connectionId) {
     return _reconnectWorkspaceLane(this, connectionId);
+  }
+
+  Future<ConnectionRemoteRuntimeState> refreshRemoteRuntime({
+    required String connectionId,
+    ConnectionProfile? profile,
+    ConnectionSecrets? secrets,
+  }) {
+    return _refreshWorkspaceRemoteRuntime(
+      this,
+      connectionId,
+      profile: profile,
+      secrets: secrets,
+    );
   }
 
   Future<void> handleAppLifecycleStateChanged(AppLifecycleState state) {

@@ -563,12 +563,48 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'shared host exposes an initial remote runtime when no refresh callback is provided',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.running(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay:conn_primary',
+              port: 4100,
+            ),
+          ),
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+      expect(remoteRuntimeStates.last!.server.port, 4100);
+    },
+  );
 }
 
 Widget _buildMaterialSettingsApp({
   Brightness brightness = Brightness.light,
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionRemoteRuntimeState? initialRemoteRuntime,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
@@ -585,6 +621,7 @@ Widget _buildMaterialSettingsApp({
       body: _buildHost(
         onSubmit: onSubmit,
         platformBehavior: platformBehavior,
+        initialRemoteRuntime: initialRemoteRuntime,
         availableModelCatalog: availableModelCatalog,
         availableModelCatalogSource: availableModelCatalogSource,
         initialProfile: initialProfile,
@@ -604,6 +641,7 @@ Widget _buildHost({
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   required ConnectionSettingsHostBuilder builder,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionRemoteRuntimeState? initialRemoteRuntime,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
@@ -614,6 +652,7 @@ Widget _buildHost({
   return ConnectionSettingsHost(
     initialProfile: initialProfile ?? _configuredProfile(),
     initialSecrets: const ConnectionSecrets(password: 'secret'),
+    initialRemoteRuntime: initialRemoteRuntime,
     availableModelCatalog: availableModelCatalog,
     availableModelCatalogSource: availableModelCatalogSource,
     onRefreshModelCatalog: onRefreshModelCatalog,
