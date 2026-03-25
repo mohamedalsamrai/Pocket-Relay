@@ -27,6 +27,7 @@ enum ConnectionWorkspaceTransportLossReason {
 enum ConnectionWorkspaceRecoveryOutcome {
   transportRestored,
   transportUnavailable,
+  liveReattached,
   conversationRestored,
   conversationUnavailable,
   conversationRestoreFailed,

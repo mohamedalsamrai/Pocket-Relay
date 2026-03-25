@@ -277,6 +277,7 @@ Future<void> _reconnectWorkspaceConnection(
           ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings;
 
   if (!shouldReplaceBinding) {
+    final preservedLaneState = _preservedWorkspaceLaneState(previousBinding);
     controller._applyState(
       controller._state.copyWith(
         transportRecoveryPhasesByConnectionId: shouldReconnectTransport
@@ -345,6 +346,7 @@ Future<void> _reconnectWorkspaceConnection(
           outcome: ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
         );
       }
+      return;
     } catch (_) {
       if (!controller._isDisposed) {
         controller._recordFallbackTransportConnectFailure(
@@ -361,7 +363,18 @@ Future<void> _reconnectWorkspaceConnection(
           outcome: ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
         );
       }
+      return;
     }
+    if (controller._isDisposed || preservedLaneState.threadId == null) {
+      return;
+    }
+
+    await _recoverWorkspaceConversationAfterTransportReconnect(
+      controller,
+      connectionId,
+      previousBinding,
+      threadId: preservedLaneState.threadId!,
+    );
     return;
   }
 
@@ -440,7 +453,9 @@ Future<void> _reconnectWorkspaceConnection(
               liveReattachPhasesByConnectionId:
                   <String, ConnectionWorkspaceLiveReattachPhase>{
                     for (final entry
-                        in controller._state.liveReattachPhasesByConnectionId
+                        in controller
+                            ._state
+                            .liveReattachPhasesByConnectionId
                             .entries)
                       if (entry.key != connectionId) entry.key: entry.value,
                   },
@@ -627,7 +642,9 @@ Future<void> _resumeWorkspaceConversation(
                 liveReattachPhasesByConnectionId:
                     <String, ConnectionWorkspaceLiveReattachPhase>{
                       for (final entry
-                          in controller._state.liveReattachPhasesByConnectionId
+                          in controller
+                              ._state
+                              .liveReattachPhasesByConnectionId
                               .entries)
                         if (entry.key != connectionId) entry.key: entry.value,
                     },
@@ -864,6 +881,48 @@ Future<void> _connectWorkspaceBindingTransport(ConnectionLaneBinding binding) {
     profile: binding.sessionController.profile,
     secrets: binding.sessionController.secrets,
   );
+}
+
+Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding, {
+  required String threadId,
+}) async {
+  try {
+    await binding.sessionController.reattachConversation(threadId);
+    if (controller._isDisposed) {
+      return;
+    }
+
+    controller._clearTransportReconnectRequired(connectionId);
+    controller._setLiveReattachPhase(
+      connectionId,
+      ConnectionWorkspaceLiveReattachPhase.liveReattached,
+    );
+    controller._completeLiveReattachRecoveryAttempt(
+      connectionId,
+      completedAt: controller._now(),
+    );
+  } catch (_) {
+    if (controller._isDisposed) {
+      return;
+    }
+
+    controller._clearTransportReconnectRequired(connectionId);
+    controller._setLiveReattachPhase(
+      connectionId,
+      ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+    );
+    await binding.sessionController.selectConversationForResume(threadId);
+    if (!controller._isDisposed) {
+      controller._completeConversationRecoveryAttempt(
+        connectionId,
+        binding,
+        completedAt: controller._now(),
+      );
+    }
+  }
 }
 
 Map<String, ConnectionWorkspaceRecoveryDiagnostics>

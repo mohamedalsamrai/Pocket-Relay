@@ -1317,6 +1317,105 @@ void main() {
   );
 
   test(
+    'reconnectConnection live-reattaches the selected thread on the existing binding before using history fallback',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.readThreadCalls.clear();
+      clientsById['conn_primary']!.startSessionCalls = 0;
+      clientsById['conn_primary']!.startSessionRequests.clear();
+
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(clientsById['conn_primary']!.startSessionCalls, 1);
+      expect(
+        clientsById['conn_primary']!.startSessionRequests.single.resumeThreadId,
+        'thread_saved',
+      );
+      expect(clientsById['conn_primary']!.readThreadCalls, isEmpty);
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.liveReattached,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+    },
+  );
+
+  test(
+    'reconnectConnection falls back to history restore only after live reattach fails on the existing binding',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.readThreadCalls.clear();
+      clientsById['conn_primary']!.startSessionCalls = 0;
+      clientsById['conn_primary']!.startSessionRequests.clear();
+      clientsById['conn_primary']!.startSessionError =
+          const CodexAppServerException('resume failed');
+
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(clientsById['conn_primary']!.startSessionCalls, 0);
+      expect(clientsById['conn_primary']!.readThreadCalls, <String>[
+        'thread_saved',
+      ]);
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+    },
+  );
+
+  test(
     'reconnectConnection replaces the targeted live binding and clears reconnect-required state',
     () async {
       final repository = MemoryCodexConnectionRepository(
@@ -1660,11 +1759,20 @@ void main() {
       );
       expect(
         resumedDiagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.transportRestored,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
       expect(clientsByConnectionId['conn_primary'], hasLength(1));
       expect(clientsByConnectionId['conn_primary']!.first.connectCalls, 1);
       expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 0);
+      expect(clientsByConnectionId['conn_primary']!.first.startSessionCalls, 1);
+      expect(
+        clientsByConnectionId['conn_primary']!
+            .first
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_123',
+      );
       expect(
         clientsByConnectionId['conn_primary']!.first.readThreadCalls,
         <String>['thread_123'],
@@ -1856,21 +1964,19 @@ void main() {
         firstBinding,
         clientsByConnectionId['conn_primary']!.first,
       );
-      clientsByConnectionId['conn_primary']!.first.connectError =
-          const CodexRemoteAppServerAttachException(
-            snapshot: CodexRemoteAppServerOwnerSnapshot(
-              ownerId: 'conn_primary',
-              workspaceDir: '/workspace',
-              status: CodexRemoteAppServerOwnerStatus.unhealthy,
-              sessionName: 'pocket-relay:conn_primary',
-              endpoint: CodexRemoteAppServerEndpoint(
-                host: '127.0.0.1',
-                port: 4100,
-              ),
-              detail: 'readyz failed',
-            ),
-            message: 'readyz failed',
-          );
+      clientsByConnectionId['conn_primary']!
+          .first
+          .connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+          sessionName: 'pocket-relay:conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+          detail: 'readyz failed',
+        ),
+        message: 'readyz failed',
+      );
 
       await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       clientsByConnectionId['conn_primary']!.first.emit(
@@ -1898,7 +2004,8 @@ void main() {
         ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy,
       );
       expect(
-        controller.state.recoveryDiagnosticsFor('conn_primary')!
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
             .lastRecoveryOutcome,
         ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
       );

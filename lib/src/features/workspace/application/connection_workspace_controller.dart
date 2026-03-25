@@ -329,30 +329,30 @@ class ConnectionWorkspaceController extends ChangeNotifier {
             final wasRecovering = _state.requiresTransportReconnect(
               connectionId,
             );
-            _clearTransportReconnectRequired(connectionId);
             if (wasRecovering) {
               final hasConversationIdentity =
                   binding.sessionController.sessionState.currentThreadId
-                      ?.trim()
-                      .isNotEmpty ==
-                  true ||
+                          ?.trim()
+                          .isNotEmpty ==
+                      true ||
                   binding.sessionController.sessionState.rootThreadId
-                      ?.trim()
-                      .isNotEmpty ==
-                  true;
+                          ?.trim()
+                          .isNotEmpty ==
+                      true;
               if (hasConversationIdentity) {
                 _setLiveReattachPhase(
                   connectionId,
-                  ConnectionWorkspaceLiveReattachPhase.liveReattached,
+                  ConnectionWorkspaceLiveReattachPhase.reconnecting,
                 );
               } else {
+                _clearTransportReconnectRequired(connectionId);
                 _clearLiveReattachPhase(connectionId);
+                _completeRecoveryAttempt(
+                  connectionId,
+                  completedAt: _now(),
+                  outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
+                );
               }
-              _completeRecoveryAttempt(
-                connectionId,
-                completedAt: _now(),
-                outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
-              );
             }
             break;
           case CodexAppServerSshConnectFailedEvent():
@@ -455,7 +455,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
           liveConnectionIds: _state.liveConnectionIds,
           liveReattachPhasesByConnectionId:
               <String, ConnectionWorkspaceLiveReattachPhase>{
-                for (final entry in _state.liveReattachPhasesByConnectionId.entries)
+                for (final entry
+                    in _state.liveReattachPhasesByConnectionId.entries)
                   if (entry.key != connectionId) entry.key: entry.value,
               },
         ),
@@ -795,6 +796,17 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       connectionId,
       completedAt: completedAt,
       outcome: outcome,
+    );
+  }
+
+  void _completeLiveReattachRecoveryAttempt(
+    String connectionId, {
+    required DateTime completedAt,
+  }) {
+    _completeRecoveryAttempt(
+      connectionId,
+      completedAt: completedAt,
+      outcome: ConnectionWorkspaceRecoveryOutcome.liveReattached,
     );
   }
 
