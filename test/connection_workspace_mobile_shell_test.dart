@@ -446,7 +446,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.liveConnectionIds, isEmpty);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_primary',
       'conn_secondary',
     ]);
@@ -767,7 +767,7 @@ void main() {
       'conn_secondary',
       'conn_created',
     ]);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_secondary',
       'conn_created',
     ]);

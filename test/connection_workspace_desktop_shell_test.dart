@@ -733,7 +733,9 @@ void main() {
 
     expect(controller.state.liveConnectionIds, <String>['conn_secondary']);
     expect(controller.state.selectedConnectionId, 'conn_secondary');
-    expect(controller.state.dormantConnectionIds, <String>['conn_primary']);
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
+      'conn_primary',
+    ]);
     expect(
       find.byKey(const ValueKey('desktop_live_conn_primary')),
       findsNothing,

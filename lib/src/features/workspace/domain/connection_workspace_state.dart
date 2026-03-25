@@ -207,7 +207,7 @@ class ConnectionWorkspaceState {
 
   List<String> get savedConnectionIds => catalog.orderedConnectionIds;
 
-  List<String> get dormantConnectionIds {
+  List<String> get nonLiveSavedConnectionIds {
     return <String>[
       for (final connectionId in catalog.orderedConnectionIds)
         if (!liveConnectionIds.contains(connectionId)) connectionId,

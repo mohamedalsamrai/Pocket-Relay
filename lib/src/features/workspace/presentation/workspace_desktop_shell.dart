@@ -10,7 +10,7 @@ import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspa
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/workspace_saved_connections_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_lane_surface.dart';
 
 part 'workspace_desktop_shell_sidebar.dart';

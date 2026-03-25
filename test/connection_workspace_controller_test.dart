@@ -38,7 +38,7 @@ void main() {
       expect(controller.state.isLoading, isFalse);
       expect(controller.state.catalog, const ConnectionCatalogState.empty());
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, isNull);
       expect(
         controller.state.viewport,
@@ -244,7 +244,9 @@ void main() {
 
     expect(controller.state.isLoading, isFalse);
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>['conn_secondary']);
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
+      'conn_secondary',
+    ]);
     expect(controller.state.selectedConnectionId, 'conn_primary');
     expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
     expect(controller.selectedLaneBinding?.connectionId, 'conn_primary');
@@ -660,10 +662,7 @@ void main() {
         controller.state.transportRecoveryPhaseFor('conn_secondary'),
         ConnectionWorkspaceTransportRecoveryPhase.unavailable,
       );
-      expect(
-        controller.state.liveReattachPhaseFor('conn_secondary'),
-        isNull,
-      );
+      expect(controller.state.liveReattachPhaseFor('conn_secondary'), isNull);
       final unavailableDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
       );
@@ -846,7 +845,7 @@ void main() {
         'conn_primary',
         'conn_secondary',
       ]);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, 'conn_secondary');
       expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
       expect(
@@ -884,7 +883,9 @@ void main() {
     controller.terminateConnection('conn_secondary');
 
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>['conn_secondary']);
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
+      'conn_secondary',
+    ]);
     expect(controller.state.selectedConnectionId, 'conn_primary');
     expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
     expect(controller.bindingForConnectionId('conn_secondary'), isNull);
@@ -907,7 +908,7 @@ void main() {
       controller.terminateConnection('conn_primary');
 
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, <String>[
+      expect(controller.state.nonLiveSavedConnectionIds, <String>[
         'conn_primary',
         'conn_secondary',
       ]);
@@ -1022,7 +1023,7 @@ void main() {
       'conn_created',
     ]);
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_secondary',
       'conn_created',
     ]);
@@ -2305,18 +2306,17 @@ void main() {
         firstBinding,
         clientsByConnectionId['conn_primary']!.first,
       );
-      clientsByConnectionId['conn_primary']!
-          .first
-          .connectError = const CodexRemoteAppServerAttachException(
-        snapshot: CodexRemoteAppServerOwnerSnapshot(
-          ownerId: 'conn_primary',
-          workspaceDir: '/workspace',
-          status: CodexRemoteAppServerOwnerStatus.stopped,
-          sessionName: 'pocket-relay:conn_primary',
-          detail: 'Remote Pocket Relay server is not running.',
-        ),
-        message: 'Remote Pocket Relay server is not running.',
-      );
+      clientsByConnectionId['conn_primary']!.first.connectError =
+          const CodexRemoteAppServerAttachException(
+            snapshot: CodexRemoteAppServerOwnerSnapshot(
+              ownerId: 'conn_primary',
+              workspaceDir: '/workspace',
+              status: CodexRemoteAppServerOwnerStatus.stopped,
+              sessionName: 'pocket-relay:conn_primary',
+              detail: 'Remote Pocket Relay server is not running.',
+            ),
+            message: 'Remote Pocket Relay server is not running.',
+          );
 
       await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       clientsByConnectionId['conn_primary']!.first.emit(
@@ -2973,7 +2973,7 @@ void main() {
     expect(controller.state.catalog.orderedConnectionIds, <String>[
       'conn_primary',
     ]);
-    expect(controller.state.dormantConnectionIds, isEmpty);
+    expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
     expect(await modelCatalogStore.load('conn_secondary'), isNull);
   });
 
@@ -3326,7 +3326,7 @@ void main() {
 
       expect(controller.state.catalog, const ConnectionCatalogState.empty());
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, isNull);
       expect(
         controller.state.viewport,

@@ -18,7 +18,7 @@ import 'package:pocket_relay/src/features/connection_settings/domain/connection_
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/workspace_saved_connections_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
@@ -257,7 +257,10 @@ void main() {
         controller.state.catalog.connectionForId('conn_primary')?.profile.host,
         'primary.changed',
       );
-      expect(controller.bindingForConnectionId('conn_primary'), originalBinding);
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        originalBinding,
+      );
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },
   );
