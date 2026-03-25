@@ -1610,6 +1610,86 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'live lane shows remote-server-unhealthy notice when transport reconnect cannot attach to an unhealthy managed owner',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+          sessionName: 'pocket-relay:conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+          detail: 'readyz failed',
+        ),
+        message: 'readyz failed',
+      );
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote server unhealthy'), findsOneWidget);
+      expect(find.text('readyz failed'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+    },
+  );
 }
 
 Widget _buildDormantRosterApp(

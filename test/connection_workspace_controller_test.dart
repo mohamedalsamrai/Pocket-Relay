@@ -662,7 +662,7 @@ void main() {
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_secondary'),
-        ConnectionWorkspaceLiveReattachPhase.reconnecting,
+        isNull,
       );
       final unavailableDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
@@ -2201,6 +2201,127 @@ void main() {
       expect(
         clientsByConnectionId['conn_primary']!.first.readThreadCalls,
         <String>['thread_123'],
+      );
+    },
+  );
+
+  test(
+    'resumed auto-reconnect stores remote stopped runtime when attach to the managed owner fails',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+        'conn_secondary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..connectError =
+                clientsByConnectionId[connectionId]!.isEmpty &&
+                    connectionId == 'conn_primary'
+                ? null
+                : const CodexRemoteAppServerAttachException(
+                    snapshot: CodexRemoteAppServerOwnerSnapshot(
+                      ownerId: 'conn_primary',
+                      workspaceDir: '/workspace',
+                      status: CodexRemoteAppServerOwnerStatus.stopped,
+                      sessionName: 'pocket-relay:conn_primary',
+                      detail: 'Remote Pocket Relay server is not running.',
+                    ),
+                    message: 'Remote Pocket Relay server is not running.',
+                  );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+      firstBinding.restoreComposerDraft('Recover me');
+      await _startBusyTurn(
+        firstBinding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+      clientsByConnectionId['conn_primary']!
+          .first
+          .connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.stopped,
+          sessionName: 'pocket-relay:conn_primary',
+          detail: 'Remote Pocket Relay server is not running.',
+        ),
+        message: 'Remote Pocket Relay server is not running.',
+      );
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clientsByConnectionId['conn_primary']!.first.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final remoteRuntime = controller.state.remoteRuntimeFor('conn_primary');
+      expect(remoteRuntime, isNotNull);
+      expect(
+        remoteRuntime!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+      expect(
+        remoteRuntime.server.detail,
+        'Remote Pocket Relay server is not running.',
+      );
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.ownerMissing,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
+      );
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(firstBinding),
       );
     },
   );
