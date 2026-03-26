@@ -815,6 +815,19 @@ session_dir() {
   printf '%s/%s' "\${session_root}" "\${safe_name}"
 }
 
+session_dir_for_pane() {
+  local pane_id="\$1"
+  local target_dir
+  for target_dir in "\${session_root}"/*; do
+    [ -d "\${target_dir}" ] || continue
+    if [ -f "\${target_dir}/pane_id" ] && [ "\$(cat "\${target_dir}/pane_id")" = "\${pane_id}" ]; then
+      printf '%s' "\${target_dir}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 command_name="\${1-}"
 shift || true
 
@@ -838,7 +851,7 @@ case "\${command_name}" in
   new-session)
     session_name=
     workspace_dir=
-    print_pane_id=false
+    print_pane_id=0
     pane_format=
     while [ \$# -gt 0 ]; do
       case "\$1" in
@@ -846,7 +859,7 @@ case "\${command_name}" in
           shift
           ;;
         -P)
-          print_pane_id=true
+          print_pane_id=1
           shift
           ;;
         -F)
@@ -877,6 +890,8 @@ case "\${command_name}" in
     mkdir -p "\${target_dir}"
 
     printf '%s' "\${workspace_dir}" > "\${target_dir}/cwd"
+    pane_id="%\$(printf '%s' "\${session_name}" | tr '/:' '__')"
+    printf '%s' "\${pane_id}" > "\${target_dir}/pane_id"
     if [ -n "\${launch_command}" ]; then
       printf '%s' "\${launch_command}" > "\${target_dir}/command"
       (
@@ -886,23 +901,24 @@ case "\${command_name}" in
       pane_pid=\$!
       printf '%s' "\${pane_pid}" > "\${target_dir}/pid"
     fi
-    if [ "\${print_pane_id}" = true ]; then
+
+    if [ "\${print_pane_id}" = "1" ]; then
       if [ "\${pane_format}" = '#{pane_id}' ] || [ -z "\${pane_format}" ]; then
-        printf '%s\n' "\${session_name}"
+        printf '%s\n' "\${pane_id}"
       else
         exit 64
       fi
     fi
     ;;
   respawn-pane)
-    target=
+    pane_target=
     while [ \$# -gt 0 ]; do
       case "\$1" in
         -k)
           shift
           ;;
         -t)
-          target="\$2"
+          pane_target="\$2"
           shift 2
           ;;
         *)
@@ -911,16 +927,16 @@ case "\${command_name}" in
       esac
     done
     launch_command="\${1-}"
-    [ -n "\${target}" ] || exit 64
+    [ -n "\${pane_target}" ] || exit 64
     [ -n "\${launch_command}" ] || exit 64
-    target_dir="\$(session_dir "\${target}")"
-    [ -d "\${target_dir}" ] || exit 1
-    workspace_dir=\$(cat "\${target_dir}/cwd")
-    printf '%s' "\${launch_command}" > "\${target_dir}/command"
+
+    target_dir="\$(session_dir_for_pane "\${pane_target}")" || exit 1
+    workspace_dir="\$(cat "\${target_dir}/cwd")"
     if [ -f "\${target_dir}/pid" ]; then
       pane_pid=\$(cat "\${target_dir}/pid")
       kill "\${pane_pid}" 2>/dev/null || true
     fi
+    printf '%s' "\${launch_command}" > "\${target_dir}/command"
     (
       cd "\${workspace_dir}" || exit 1
       exec /bin/bash -lc "\${launch_command}"

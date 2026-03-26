@@ -82,7 +82,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane status strip starts the remote server for the selected lane',
+    'live empty lane connect action starts the remote server for the selected lane',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
       final ownerControl = _RecordingRemoteOwnerControl();
@@ -117,11 +117,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Server stopped'), findsOneWidget);
+      expect(find.textContaining('Server stopped.'), findsNothing);
       await tester.tap(
-        find.byKey(
-          const ValueKey<String>('lane_connection_action_start_server'),
-        ),
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
       );
       await tester.pumpAndSettle();
 
@@ -131,7 +129,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane explains that opening a remote lane does not connect automatically',
+    'live empty lane shows workspace controls inside the placeholder instead of the strip',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
       final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -153,14 +151,86 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Host status unknown'), findsOneWidget);
       expect(
-        find.textContaining('Open lane does not connect automatically.'),
-        findsOneWidget,
+        find.byKey(const ValueKey<String>('lane_connection_status_strip')),
+        findsNothing,
       );
       expect(
-        find.byKey(const ValueKey<String>('lane_connection_action_history')),
+        find.byKey(const ValueKey<String>('lane_empty_state_workspace_path')),
         findsOneWidget,
+      );
+      expect(find.text('/workspace'), findsOneWidget);
+      expect(find.text('Workspace'), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'live empty local lane keeps the recovery strip when placeholder controls are unavailable',
+    (tester) async {
+      final profile = _profile(
+        'Primary Box',
+        'primary.local',
+      ).copyWith(connectionMode: ConnectionMode.local, host: '', username: '');
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: profile,
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await client.connect(
+        profile: profile,
+        secrets: const ConnectionSecrets(password: 'secret-1'),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_strip')),
+        findsOneWidget,
+      );
+      expect(find.text('Live transport lost'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('lane_empty_state_workspace_path')),
+        findsNothing,
       );
     },
   );
@@ -348,7 +418,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane shows a disconnected status and connect action when the remote server is running',
+    'live empty lane shows a disconnected status and connect action when the remote server is running',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
       final controller = _buildWorkspaceController(
@@ -380,7 +450,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Disconnected'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_strip')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_label')),
+        findsNothing,
+      );
+      expect(find.textContaining('Disconnected.'), findsNothing);
       expect(find.text('Connect'), findsOneWidget);
       expect(
         find.byKey(const ValueKey<String>('lane_connection_action_connect')),
@@ -390,7 +468,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane connect action hides steady-state connection chrome and exposes connected-lane controls in overflow',
+    'live empty lane connect action keeps the placeholder clean and exposes connected-lane controls in overflow',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
       final client = clientsById['conn_primary']!;
@@ -433,11 +511,63 @@ void main() {
         find.byKey(const ValueKey<String>('lane_connection_status_strip')),
         findsNothing,
       );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
+        findsNothing,
+      );
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
       expect(find.text('Conversation history'), findsOneWidget);
       expect(find.text('Disconnect'), findsOneWidget);
+      await controller.flushRecoveryPersistence();
+    },
+  );
+
+  testWidgets(
+    'live empty lane connect action can start the remote server and attach in one click',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final remoteOwnerRuntime = _StatefulRemoteOwnerRuntime(
+        statusesByOwnerId: <String, CodexRemoteAppServerOwnerStatus>{
+          'conn_primary': CodexRemoteAppServerOwnerStatus.stopped,
+        },
+      );
+      final client = clientsById['conn_primary']!;
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: remoteOwnerRuntime,
+        remoteAppServerOwnerControl: remoteOwnerRuntime,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(remoteOwnerRuntime.startCalls, hasLength(1));
+      expect(remoteOwnerRuntime.startCalls.single.ownerId, 'conn_primary');
+      expect(client.connectCalls, 1);
       await controller.flushRecoveryPersistence();
     },
   );
@@ -493,7 +623,7 @@ void main() {
         find.textContaining('Underlying error: connect failed'),
         findsOneWidget,
       );
-      expect(find.text('Disconnected'), findsOneWidget);
+      expect(find.textContaining('Disconnected.'), findsNothing);
     },
   );
 
@@ -1563,7 +1693,8 @@ void main() {
         ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
       );
       expect(find.text('Reconnecting to remote session'), findsOneWidget);
-      expect(find.text('Reconnecting…'), findsOneWidget);
+      expect(find.text('Reconnecting…'), findsNothing);
+      expect(find.text('Reconnect'), findsOneWidget);
 
       reconnectGate.complete();
       await tester.pumpAndSettle();
@@ -2267,6 +2398,122 @@ final class _RecordingRemoteOwnerControl
       workspaceDir: workspaceDir,
     ));
     return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+}
+
+final class _StatefulRemoteOwnerRuntime
+    implements
+        CodexRemoteAppServerOwnerInspector,
+        CodexRemoteAppServerOwnerControl {
+  _StatefulRemoteOwnerRuntime({
+    Map<String, CodexRemoteAppServerOwnerStatus>? statusesByOwnerId,
+  }) : _statusesByOwnerId = Map<String, CodexRemoteAppServerOwnerStatus>.from(
+         statusesByOwnerId ?? const <String, CodexRemoteAppServerOwnerStatus>{},
+       );
+
+  final Map<String, CodexRemoteAppServerOwnerStatus> _statusesByOwnerId;
+  final List<_RemoteOwnerControlCall> startCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> stopCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> restartCalls =
+      <_RemoteOwnerControlCall>[];
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _snapshotFor(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    _statusesByOwnerId[ownerId] = CodexRemoteAppServerOwnerStatus.running;
+    return _snapshotFor(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    stopCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    _statusesByOwnerId[ownerId] = CodexRemoteAppServerOwnerStatus.stopped;
+    return _snapshotFor(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    restartCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    _statusesByOwnerId[ownerId] = CodexRemoteAppServerOwnerStatus.running;
+    return _snapshotFor(ownerId, workspaceDir: workspaceDir);
+  }
+
+  CodexRemoteAppServerOwnerSnapshot _snapshotFor(
+    String ownerId, {
+    required String workspaceDir,
+  }) {
+    return switch (_statusesByOwnerId[ownerId] ??
+        CodexRemoteAppServerOwnerStatus.stopped) {
+      CodexRemoteAppServerOwnerStatus.running => _runningOwnerSnapshot(
+        ownerId,
+        workspaceDir: workspaceDir,
+      ),
+      CodexRemoteAppServerOwnerStatus.unhealthy =>
+        CodexRemoteAppServerOwnerSnapshot(
+          ownerId: ownerId,
+          workspaceDir: workspaceDir,
+          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+          sessionName: 'pocket-relay-$ownerId',
+          endpoint: const CodexRemoteAppServerEndpoint(
+            host: '127.0.0.1',
+            port: 4100,
+          ),
+          detail: 'readyz failed',
+        ),
+      CodexRemoteAppServerOwnerStatus.missing ||
+      CodexRemoteAppServerOwnerStatus.stopped => _notRunningOwnerSnapshot(
+        ownerId,
+        workspaceDir: workspaceDir,
+      ),
+    };
   }
 }
 

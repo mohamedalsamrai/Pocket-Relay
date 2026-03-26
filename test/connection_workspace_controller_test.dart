@@ -423,7 +423,6 @@ void main() {
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
         'thread_saved',
-        'thread_saved',
       ]);
       expect(clientsById['conn_secondary']!.connectCalls, 1);
       expect(
@@ -436,7 +435,7 @@ void main() {
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_secondary'),
-        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+        ConnectionWorkspaceLiveReattachPhase.liveReattached,
       );
       final diagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
@@ -453,7 +452,7 @@ void main() {
       );
       expect(
         diagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
     },
   );
@@ -523,7 +522,7 @@ void main() {
         binding.sessionController.transcriptBlocks
             .whereType<CodexTextBlock>()
             .map((block) => block.body),
-        isNot(contains('Restored answer')),
+        contains('Restored answer'),
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_secondary'),
@@ -616,7 +615,7 @@ void main() {
       expect(restoredDiagnostics, isNotNull);
       expect(
         restoredDiagnostics!.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
       expect(restoredDiagnostics.lastRecoveryCompletedAt, isNotNull);
     },
@@ -809,7 +808,6 @@ void main() {
         'thread_saved',
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
-        'thread_saved',
         'thread_saved',
       ]);
       expect(

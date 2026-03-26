@@ -59,22 +59,24 @@ class ChatHistoricalConversationRestorer {
         );
       }
 
-      nextState = _reducer.reduceRuntimeEvent(
-        nextState,
-        CodexRuntimeTurnCompletedEvent(
-          createdAt: turn.completedAt,
-          threadId: turn.threadId,
-          turnId: turn.id,
-          rawMethod: 'thread/read(turn)',
-          rawPayload: turn.snapshot,
-          state: turn.state,
-          stopReason: turn.stopReason,
-          usage: turn.usage,
-          modelUsage: turn.modelUsage,
-          totalCostUsd: turn.totalCostUsd,
-          errorMessage: turn.errorMessage,
-        ),
-      );
+      if (turn.isCompleted) {
+        nextState = _reducer.reduceRuntimeEvent(
+          nextState,
+          CodexRuntimeTurnCompletedEvent(
+            createdAt: turn.completedAt!,
+            threadId: turn.threadId,
+            turnId: turn.id,
+            rawMethod: 'thread/read(turn)',
+            rawPayload: turn.snapshot,
+            state: turn.state!,
+            stopReason: turn.stopReason,
+            usage: turn.usage,
+            modelUsage: turn.modelUsage,
+            totalCostUsd: turn.totalCostUsd,
+            errorMessage: turn.errorMessage,
+          ),
+        );
+      }
     }
 
     return nextState;

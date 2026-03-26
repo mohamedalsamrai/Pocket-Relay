@@ -83,9 +83,18 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
 
     _invalidateHistoricalConversationRestore();
     _clearHistoricalConversationRestoreState();
+    if (!_hasVisibleConversationState()) {
+      await _reattachConversationWithHistoryBaseline(normalizedThreadId);
+      return;
+    }
+
+    await _resumeConversationThread(normalizedThreadId);
+  }
+
+  Future<void> _resumeConversationThread(String threadId) async {
     await _ensureChatSessionAppServerConnected(this);
     final session = await appServerClient.resumeThread(
-      threadId: normalizedThreadId,
+      threadId: threadId,
       model: _selectedModelOverride(),
       reasoningEffort: _profile.reasoningEffort,
     );
@@ -105,6 +114,45 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
         agentRole: session.thread?.agentRole,
       ),
     );
+  }
+
+  Future<void> _reattachConversationWithHistoryBaseline(String threadId) async {
+    Object? historyRestoreError;
+    StackTrace? historyRestoreStackTrace;
+    CodexSessionState? restoredState;
+
+    _startBufferingRuntimeEvents();
+    try {
+      await _resumeConversationThread(threadId);
+      try {
+        final thread = await appServerClient.readThreadWithTurns(
+          threadId: threadId,
+        );
+        restoredState = _restoredChatSessionStateFromHistory(this, thread);
+      } catch (error, stackTrace) {
+        historyRestoreError = error;
+        historyRestoreStackTrace = stackTrace;
+      }
+    } finally {
+      final bufferedEvents = _stopBufferingRuntimeEvents();
+      if (restoredState != null) {
+        _applySessionState(restoredState!);
+      }
+      for (final bufferedEvent in bufferedEvents) {
+        _applyChatSessionRuntimeEvent(this, bufferedEvent);
+      }
+    }
+
+    if (restoredState != null || _hasVisibleConversationState()) {
+      return;
+    }
+
+    if (historyRestoreError != null) {
+      Error.throwWithStackTrace(
+        historyRestoreError!,
+        historyRestoreStackTrace!,
+      );
+    }
   }
 
   Future<void> retryHistoricalConversationRestore() async {

@@ -103,6 +103,26 @@ extension on ChatSessionController {
     };
   }
 
+  bool _hasVisibleConversationState([CodexSessionState? state]) {
+    final effectiveState = state ?? _sessionState;
+    return effectiveState.activeTurn != null ||
+        effectiveState.pendingApprovalRequests.isNotEmpty ||
+        effectiveState.pendingUserInputRequests.isNotEmpty ||
+        effectiveState.transcriptBlocks.isNotEmpty;
+  }
+
+  void _startBufferingRuntimeEvents() {
+    _bufferedRuntimeEvents.clear();
+    _isBufferingRuntimeEvents = true;
+  }
+
+  List<CodexRuntimeEvent> _stopBufferingRuntimeEvents() {
+    _isBufferingRuntimeEvents = false;
+    final bufferedEvents = List<CodexRuntimeEvent>.from(_bufferedRuntimeEvents);
+    _bufferedRuntimeEvents.clear();
+    return bufferedEvents;
+  }
+
   void _emitSnackBar(String message) {
     if (_isDisposed || _snackBarMessagesController.isClosed) {
       return;
