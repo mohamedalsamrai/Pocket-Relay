@@ -2,8 +2,14 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 
-part 'connection_settings_presenter_sections.dart';
 part 'connection_settings_presenter_state.dart';
+part 'presenter/helper_text.dart';
+part 'presenter/section_authentication.dart';
+part 'presenter/section_codex.dart';
+part 'presenter/section_model.dart';
+part 'presenter/section_profile.dart';
+part 'presenter/section_remote_server.dart';
+part 'presenter/submit_payload.dart';
 
 class ConnectionSettingsPresenter {
   const ConnectionSettingsPresenter();
