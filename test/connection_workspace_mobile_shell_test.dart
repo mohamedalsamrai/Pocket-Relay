@@ -231,44 +231,43 @@ void main() {
     },
   );
 
+  testWidgets('lane strip shows a generic conversation history backend error', (
+    tester,
+  ) async {
+    final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+    final controller = _buildWorkspaceController(clientsById: clientsById);
+    addTearDown(() async {
+      controller.dispose();
+      await _closeClients(clientsById);
+    });
+
+    await controller.initialize();
+    await tester.pumpWidget(
+      _buildShell(
+        controller,
+        conversationHistoryRepository:
+            FakeCodexWorkspaceConversationHistoryRepository(
+              error: StateError('history backend unavailable'),
+            ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('lane_connection_action_history')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load conversations'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+      ),
+      findsOneWidget,
+    );
+  });
   testWidgets(
-    'overflow menu shows a generic conversation history backend error',
-    (tester) async {
-      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final controller = _buildWorkspaceController(clientsById: clientsById);
-      addTearDown(() async {
-        controller.dispose();
-        await _closeClients(clientsById);
-      });
-
-      await controller.initialize();
-      await tester.pumpWidget(
-        _buildShell(
-          controller,
-          conversationHistoryRepository:
-              FakeCodexWorkspaceConversationHistoryRepository(
-                error: StateError('history backend unavailable'),
-              ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const ValueKey('lane_connection_action_history')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Could not load conversations'), findsOneWidget);
-      expect(
-        find.textContaining(
-          '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
-        ),
-        findsOneWidget,
-      );
-    },
-  );
-  testWidgets(
-    'overflow menu disables non-roster actions when the active lane has no workspace',
+    'when the active lane has no workspace, the lane strip disables history and the overflow keeps only roster actions',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final repository = MemoryCodexConnectionRepository(
