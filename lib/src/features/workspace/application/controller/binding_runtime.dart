@@ -35,6 +35,13 @@ void _registerWorkspaceLiveBinding(
     appServerEventSubscription: binding.appServerClient.events.listen((event) {
       switch (event) {
         case CodexAppServerDisconnectedEvent(:final exitCode):
+          if (controller._intentionalTransportDisconnectConnectionIds.remove(
+            connectionId,
+          )) {
+            controller._clearTransportReconnectRequired(connectionId);
+            controller._clearLiveReattachPhase(connectionId);
+            break;
+          }
           controller._recordTransportLoss(
             connectionId,
             occurredAt: controller._now(),

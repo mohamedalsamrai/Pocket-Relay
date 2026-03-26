@@ -96,6 +96,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       >{};
   final Map<String, int> _remoteRuntimeRefreshGenerationByConnectionId =
       <String, int>{};
+  final Set<String> _intentionalTransportDisconnectConnectionIds = <String>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
@@ -183,6 +184,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   Future<void> reconnectConnection(String connectionId) {
     return _reconnectWorkspaceLane(this, connectionId);
+  }
+
+  Future<void> disconnectConnection(String connectionId) {
+    return _disconnectWorkspaceConnection(this, connectionId);
   }
 
   Future<ConnectionRemoteRuntimeState> refreshRemoteRuntime({

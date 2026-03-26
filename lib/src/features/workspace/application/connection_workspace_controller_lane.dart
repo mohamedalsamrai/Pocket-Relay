@@ -14,6 +14,41 @@ Future<void> _reconnectWorkspaceLane(
   await _reconnectWorkspaceConnection(controller, normalizedConnectionId);
 }
 
+Future<void> _disconnectWorkspaceConnection(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+) async {
+  final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
+  await controller.initialize();
+  final binding =
+      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  if (binding == null ||
+      binding.sessionController.sessionState.isBusy ||
+      !binding.appServerClient.isConnected) {
+    return;
+  }
+
+  controller._intentionalTransportDisconnectConnectionIds.add(
+    normalizedConnectionId,
+  );
+  try {
+    await binding.appServerClient.disconnect();
+  } catch (_) {
+    controller._intentionalTransportDisconnectConnectionIds.remove(
+      normalizedConnectionId,
+    );
+    rethrow;
+  } finally {
+    controller._intentionalTransportDisconnectConnectionIds.remove(
+      normalizedConnectionId,
+    );
+    if (!binding.appServerClient.isConnected) {
+      controller._clearTransportReconnectRequired(normalizedConnectionId);
+      controller._clearLiveReattachPhase(normalizedConnectionId);
+    }
+  }
+}
+
 Future<void> _resumeWorkspaceConversationSelection(
   ConnectionWorkspaceController controller, {
   required String connectionId,
