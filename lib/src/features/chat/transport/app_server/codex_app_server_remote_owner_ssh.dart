@@ -371,14 +371,7 @@ resolve_requested_codex() {
     return 0
   fi
 
-  for candidate in
-    "\$HOME/.local/bin/\$requested_codex"
-    "\$HOME/bin/\$requested_codex"
-    "/usr/local/bin/\$requested_codex"
-    "/opt/homebrew/bin/\$requested_codex"
-    "/usr/bin/\$requested_codex"
-    "/bin/\$requested_codex"
-  do
+  for candidate in "\$HOME/.local/bin/\$requested_codex" "\$HOME/bin/\$requested_codex" "/usr/local/bin/\$requested_codex" "/opt/homebrew/bin/\$requested_codex" "/usr/bin/\$requested_codex" "/bin/\$requested_codex"; do
     if [ -x "\$candidate" ]; then
       printf '%s' "\$candidate"
       return 0

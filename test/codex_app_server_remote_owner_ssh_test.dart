@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,55 @@ void main() {
     expect(command, contains(r'$HOME/.local/bin/$requested_codex'));
     expect(command, contains('/workspace'));
   });
+
+  test(
+    'capability probe command executes successfully for a plain codex binary',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'pocket_relay_capability_probe_',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final workspaceDir = Directory('${tempDir.path}/workspace')..createSync();
+      final localBinDir = Directory('${tempDir.path}/.local/bin')
+        ..createSync(recursive: true);
+      final codexFile = File('${localBinDir.path}/codex');
+      codexFile.writeAsStringSync('''
+#!/bin/bash
+if [ "\$1" = "app-server" ] && [ "\$2" = "--help" ]; then
+  exit 0
+fi
+exit 1
+''');
+      await Process.run('/bin/chmod', <String>['+x', codexFile.path]);
+
+      final command = buildSshRemoteHostCapabilityProbeCommand(
+        profile: _profile().copyWith(
+          codexPath: 'codex',
+          workspaceDir: workspaceDir.path,
+        ),
+      );
+
+      final result = await Process.run(
+        '/bin/bash',
+        <String>['-c', command],
+        environment: <String, String>{
+          'HOME': tempDir.path,
+          'PATH': Platform.environment['PATH'] ?? '',
+        },
+      );
+
+      expect(result.exitCode, 0, reason: result.stderr.toString());
+      expect(
+        result.stdout.toString(),
+        contains('__pocket_relay_capabilities__ tmux='),
+      );
+    },
+  );
 
   test(
     'builds a capability probe command for a launch command with spaces',

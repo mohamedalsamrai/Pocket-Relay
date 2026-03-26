@@ -54,7 +54,7 @@ void main() {
     expect(capabilities.issues, isEmpty);
     expect(
       capabilities.detail,
-      'Remote host supports Pocket Relay continuity.',
+      'Remote host supports continuity and can run the managed remote app-server.',
     );
   });
 
