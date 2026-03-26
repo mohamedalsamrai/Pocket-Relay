@@ -49,10 +49,13 @@ class _SavedConnectionItem extends StatelessWidget {
     required this.subtitle,
     required this.statusBadges,
     required this.remoteStatusSummary,
+    required this.remoteServerActions,
+    required this.onRemoteServerAction,
     required this.isLive,
     required this.isOpening,
     required this.isEditing,
     required this.isDeleting,
+    this.activeRemoteServerAction,
     required this.onOpen,
     required this.onEdit,
     this.onDelete,
@@ -63,10 +66,14 @@ class _SavedConnectionItem extends StatelessWidget {
   final String subtitle;
   final List<Widget> statusBadges;
   final String? remoteStatusSummary;
+  final List<ConnectionSettingsRemoteServerActionId> remoteServerActions;
+  final Future<void> Function(ConnectionSettingsRemoteServerActionId actionId)
+  onRemoteServerAction;
   final bool isLive;
   final bool isOpening;
   final bool isEditing;
   final bool isDeleting;
+  final ConnectionSettingsRemoteServerActionId? activeRemoteServerAction;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
   final VoidCallback? onDelete;
@@ -75,7 +82,11 @@ class _SavedConnectionItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.pocketPalette;
     final theme = Theme.of(context);
-    final isBusy = isOpening || isEditing || isDeleting;
+    final isBusy =
+        isOpening ||
+        isEditing ||
+        isDeleting ||
+        activeRemoteServerAction != null;
 
     return PocketPanelSurface(
       key: ValueKey<String>('saved_connection_$connectionId'),
@@ -117,6 +128,44 @@ class _SavedConnectionItem extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
+            ),
+          ],
+          if (remoteServerActions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: remoteServerActions
+                  .map((actionId) {
+                    final isInProgress = activeRemoteServerAction == actionId;
+                    return OutlinedButton.icon(
+                      key: ValueKey<String>(
+                        'saved_connection_remote_server_${actionId.name}_$connectionId',
+                      ),
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              onRemoteServerAction(actionId);
+                            },
+                      icon: isInProgress
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(_remoteServerActionIcon(actionId)),
+                      label: Text(
+                        isInProgress
+                            ? ConnectionWorkspaceCopy.remoteServerActionProgressLabel(
+                                actionId,
+                              )
+                            : ConnectionWorkspaceCopy.remoteServerActionLabel(
+                                actionId,
+                              ),
+                      ),
+                    );
+                  })
+                  .toList(growable: false),
             ),
           ],
           const SizedBox(height: 16),
@@ -162,5 +211,13 @@ class _SavedConnectionItem extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  IconData _remoteServerActionIcon(ConnectionSettingsRemoteServerActionId id) {
+    return switch (id) {
+      ConnectionSettingsRemoteServerActionId.start => Icons.play_arrow_outlined,
+      ConnectionSettingsRemoteServerActionId.stop => Icons.stop_outlined,
+      ConnectionSettingsRemoteServerActionId.restart => Icons.refresh_outlined,
+    };
   }
 }

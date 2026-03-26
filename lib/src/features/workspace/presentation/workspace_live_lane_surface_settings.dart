@@ -74,21 +74,6 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
             secrets: payload.secrets,
           );
         },
-        onStartRemoteServer: () {
-          return workspaceController.startRemoteServer(
-            connectionId: connectionId,
-          );
-        },
-        onStopRemoteServer: () {
-          return workspaceController.stopRemoteServer(
-            connectionId: connectionId,
-          );
-        },
-        onRestartRemoteServer: () {
-          return workspaceController.restartRemoteServer(
-            connectionId: connectionId,
-          );
-        },
       );
       if (!_matchesLiveRequestContext(
             workspaceController: workspaceController,

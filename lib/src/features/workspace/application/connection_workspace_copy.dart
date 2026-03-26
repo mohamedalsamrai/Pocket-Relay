@@ -1,4 +1,5 @@
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 
 abstract final class ConnectionWorkspaceCopy {
@@ -23,6 +24,12 @@ abstract final class ConnectionWorkspaceCopy {
   static const String saveProgress = 'Saving…';
   static const String deleteAction = 'Delete';
   static const String deleteProgress = 'Deleting…';
+  static const String startServerAction = 'Start server';
+  static const String startServerProgress = 'Starting…';
+  static const String stopServerAction = 'Stop server';
+  static const String stopServerProgress = 'Stopping…';
+  static const String restartServerAction = 'Restart server';
+  static const String restartServerProgress = 'Restarting…';
   static const String closeLaneAction = 'Close lane';
   static const String openConnectionBadge = 'Open';
   static const String currentConnectionBadge = 'Current';
@@ -54,11 +61,11 @@ abstract final class ConnectionWorkspaceCopy {
       'This host does not currently satisfy Pocket Relay continuity requirements. Verify SSH access, tmux, and codex, then reconnect this lane.';
   static const String remoteServerStoppedNoticeTitle = 'Remote server stopped';
   static const String remoteServerStoppedNoticeMessage =
-      'The Pocket Relay server for this connection is not running. Start it from connection settings, then reconnect this lane.';
+      'The Pocket Relay server for this connection is not running. Start it from saved connections, then reconnect this lane.';
   static const String remoteServerUnhealthyNoticeTitle =
       'Remote server unhealthy';
   static const String remoteServerUnhealthyNoticeMessage =
-      'The Pocket Relay server exists but is not healthy enough to accept connections. Restart it from connection settings, then reconnect this lane.';
+      'The Pocket Relay server exists but is not healthy enough to accept connections. Restart it from saved connections, then reconnect this lane.';
   static const String restoringConversationNoticeTitle =
       'Restoring conversation';
   static const String restoringConversationNoticeMessage =
@@ -195,6 +202,142 @@ abstract final class ConnectionWorkspaceCopy {
         ConnectionRemoteServerStatus.running => remoteServerRunningSummary,
         ConnectionRemoteServerStatus.unknown => null,
       },
+    };
+  }
+
+  static String remoteServerActionLabel(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) {
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start => startServerAction,
+      ConnectionSettingsRemoteServerActionId.stop => stopServerAction,
+      ConnectionSettingsRemoteServerActionId.restart => restartServerAction,
+    };
+  }
+
+  static String remoteServerActionProgressLabel(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) {
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start => startServerProgress,
+      ConnectionSettingsRemoteServerActionId.stop => stopServerProgress,
+      ConnectionSettingsRemoteServerActionId.restart => restartServerProgress,
+    };
+  }
+
+  static String openConnectionFailureMessage({
+    required ConnectionProfile profile,
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    final runtimeDetail = _remoteRuntimeFailureDetail(remoteRuntime);
+    if (runtimeDetail != null) {
+      return 'Could not open lane. $runtimeDetail';
+    }
+
+    final errorDetail = _normalizedErrorDetail(error);
+    if (errorDetail != null) {
+      return 'Could not open lane. $errorDetail';
+    }
+
+    return switch (profile.connectionMode) {
+      ConnectionMode.remote =>
+        'Could not open lane. Verify the saved connection and remote Pocket Relay server, then try again.',
+      ConnectionMode.local =>
+        'Could not open lane. Verify the saved connection, then try again.',
+    };
+  }
+
+  static String remoteServerActionFailureMessage(
+    ConnectionSettingsRemoteServerActionId actionId, {
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    final actionLabel = remoteServerActionLabel(actionId);
+    final runtimeDetail = _remoteRuntimeFailureDetail(remoteRuntime);
+    if (runtimeDetail != null) {
+      return 'Could not ${actionLabel.toLowerCase()}. $runtimeDetail';
+    }
+
+    final errorDetail = _normalizedErrorDetail(error);
+    if (errorDetail != null) {
+      return 'Could not ${actionLabel.toLowerCase()}. $errorDetail';
+    }
+
+    return 'Could not ${actionLabel.toLowerCase()}.';
+  }
+
+  static String? _remoteRuntimeFailureDetail(
+    ConnectionRemoteRuntimeState? remoteRuntime,
+  ) {
+    if (remoteRuntime == null) {
+      return null;
+    }
+
+    return switch (remoteRuntime.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.checking =>
+        'Pocket Relay is still checking the remote host.',
+      ConnectionRemoteHostCapabilityStatus.probeFailed =>
+        remoteRuntime.hostCapability.detail ??
+            'Pocket Relay could not verify the remote host.',
+      ConnectionRemoteHostCapabilityStatus.unsupported =>
+        remoteRuntime.hostCapability.detail ??
+            'This remote host does not satisfy Pocket Relay continuity requirements.',
+      ConnectionRemoteHostCapabilityStatus.unknown => switch (remoteRuntime
+          .server
+          .status) {
+        ConnectionRemoteServerStatus.checking =>
+          remoteRuntime.server.detail ??
+              'Pocket Relay is still checking the remote server.',
+        ConnectionRemoteServerStatus.notRunning =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still stopped.',
+        ConnectionRemoteServerStatus.unhealthy =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ConnectionRemoteServerStatus.running =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is running but the lane could not attach.',
+        ConnectionRemoteServerStatus.unknown => null,
+      },
+      ConnectionRemoteHostCapabilityStatus.supported => switch (remoteRuntime
+          .server
+          .status) {
+        ConnectionRemoteServerStatus.checking =>
+          remoteRuntime.server.detail ??
+              'Pocket Relay is still checking the remote server.',
+        ConnectionRemoteServerStatus.notRunning =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still stopped.',
+        ConnectionRemoteServerStatus.unhealthy =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ConnectionRemoteServerStatus.running =>
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is running but the lane could not attach.',
+        ConnectionRemoteServerStatus.unknown => null,
+      },
+    };
+  }
+
+  static String? _normalizedErrorDetail(Object? error) {
+    if (error == null) {
+      return null;
+    }
+
+    final detail = '$error'.trim();
+    if (detail.isEmpty) {
+      return null;
+    }
+
+    return switch (detail) {
+      final value when value.startsWith('Exception: ') => value.substring(
+        'Exception: '.length,
+      ),
+      final value when value.startsWith('Bad state: ') => value.substring(
+        'Bad state: '.length,
+      ),
+      _ => detail,
     };
   }
 }

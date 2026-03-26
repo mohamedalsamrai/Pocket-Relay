@@ -6,6 +6,7 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
@@ -407,6 +408,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('open_connection_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('open_connection_conn_secondary')),
     );
@@ -687,6 +692,10 @@ void main() {
         const Offset(-500, 0),
       );
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('open_connection_conn_secondary')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('open_connection_conn_secondary')),
       );
@@ -758,6 +767,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add_connection')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('saved_connection_conn_created')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('saved_connection_conn_created')),
       findsOneWidget,
@@ -803,6 +818,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('edit_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
     await tester.pumpAndSettle();
 
@@ -882,6 +901,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('delete_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('delete_conn_secondary')));
     await tester.pumpAndSettle();
 
@@ -937,6 +960,25 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
+    remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+      CodexRemoteAppServerHostCapabilities(),
+    ),
+    remoteAppServerOwnerInspector: const _StaticRemoteOwnerInspector(
+      CodexRemoteAppServerOwnerSnapshot(
+        ownerId: 'conn_primary',
+        workspaceDir: '/workspace',
+        status: CodexRemoteAppServerOwnerStatus.stopped,
+        sessionName: 'pocket-relay:conn_primary',
+      ),
+    ),
+    remoteAppServerOwnerControl: const _StaticRemoteOwnerControl(
+      CodexRemoteAppServerOwnerSnapshot(
+        ownerId: 'conn_primary',
+        workspaceDir: '/workspace',
+        status: CodexRemoteAppServerOwnerStatus.stopped,
+        sessionName: 'pocket-relay:conn_primary',
+      ),
+    ),
     laneBindingFactory: ({required connectionId, required connection}) {
       final appServerClient = clientsById[connectionId]!;
       return ConnectionLaneBinding(
@@ -954,6 +996,100 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _StaticRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _StaticRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _StaticRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _StaticRemoteOwnerControl(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
 }
 
 ConnectionProfile _profile(String label, String host) {

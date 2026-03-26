@@ -50,6 +50,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
             final reconnectRequirement = workspaceState.reconnectRequirementFor(
               connection.id,
             );
+            final remoteRuntime = workspaceState.remoteRuntimeFor(
+              connection.id,
+            );
             return Padding(
               padding: EdgeInsets.only(
                 bottom: index == savedConnections.length - 1 ? 0 : 12,
@@ -68,14 +71,23 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                 remoteStatusSummary:
                     ConnectionWorkspaceCopy.savedConnectionRemoteStatusSummary(
                       connection.profile,
-                      workspaceState.remoteRuntimeFor(connection.id),
+                      remoteRuntime,
                     ),
+                remoteServerActions: _visibleRemoteServerActionsFor(
+                  connection: connection,
+                  remoteRuntime: remoteRuntime,
+                ),
                 isLive: isLive,
                 isOpening: _instantiatingConnectionIds.contains(connection.id),
                 isEditing: _editingConnectionIds.contains(connection.id),
                 isDeleting: _deletingConnectionIds.contains(connection.id),
-                onOpen: () => _openConnection(connection.id),
+                activeRemoteServerAction:
+                    _activeRemoteServerActionByConnectionId[connection.id],
+                onOpen: () => _openConnection(connection),
                 onEdit: () => _editConnection(connection),
+                onRemoteServerAction: (actionId) {
+                  return _runRemoteServerAction(connection, actionId);
+                },
                 onDelete: isLive
                     ? null
                     : () => _deleteConnection(connection.id),
@@ -84,5 +96,33 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
           }),
       ],
     );
+  }
+
+  List<ConnectionSettingsRemoteServerActionId> _visibleRemoteServerActionsFor({
+    required SavedConnectionSummary connection,
+    required ConnectionRemoteRuntimeState? remoteRuntime,
+  }) {
+    if (connection.profile.isLocal || remoteRuntime == null) {
+      return const <ConnectionSettingsRemoteServerActionId>[];
+    }
+    if (!remoteRuntime.hostCapability.isSupported) {
+      return const <ConnectionSettingsRemoteServerActionId>[];
+    }
+
+    return switch (remoteRuntime.server.status) {
+      ConnectionRemoteServerStatus.notRunning =>
+        <ConnectionSettingsRemoteServerActionId>[
+          ConnectionSettingsRemoteServerActionId.start,
+        ],
+      ConnectionRemoteServerStatus.running ||
+      ConnectionRemoteServerStatus.unhealthy =>
+        <ConnectionSettingsRemoteServerActionId>[
+          ConnectionSettingsRemoteServerActionId.restart,
+          ConnectionSettingsRemoteServerActionId.stop,
+        ],
+      ConnectionRemoteServerStatus.checking ||
+      ConnectionRemoteServerStatus.unknown =>
+        const <ConnectionSettingsRemoteServerActionId>[],
+    };
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
@@ -54,6 +56,10 @@ class _ConnectionWorkspaceSavedConnectionsContentState
   final Set<String> _instantiatingConnectionIds = <String>{};
   final Set<String> _editingConnectionIds = <String>{};
   final Set<String> _deletingConnectionIds = <String>{};
+  final Set<String> _autoProbedRemoteRuntimeConnectionIds = <String>{};
+  final Map<String, ConnectionSettingsRemoteServerActionId>
+  _activeRemoteServerActionByConnectionId =
+      <String, ConnectionSettingsRemoteServerActionId>{};
   bool _isCreatingConnection = false;
 
   @override
@@ -66,6 +72,10 @@ class _ConnectionWorkspaceSavedConnectionsContentState
   Widget build(BuildContext context) {
     final workspaceState = widget.workspaceController.state;
     final savedConnections = workspaceState.catalog.orderedConnections;
+    _scheduleMissingRemoteRuntimeProbes(
+      workspaceState: workspaceState,
+      savedConnections: savedConnections,
+    );
 
     final content = _buildMaterialContent(
       context,
@@ -108,12 +118,43 @@ class _ConnectionWorkspaceSavedConnectionsContentState
     }
   }
 
-  Future<void> _openConnection(String connectionId) async {
-    if (widget.workspaceController.state.isConnectionLive(connectionId)) {
-      widget.workspaceController.selectConnection(connectionId);
+  Future<void> _openConnection(SavedConnectionSummary connection) async {
+    if (widget.workspaceController.state.isConnectionLive(connection.id)) {
+      widget.workspaceController.selectConnection(connection.id);
       return;
     }
-    await _instantiateConnection(connectionId);
+
+    try {
+      await _instantiateConnection(connection.id);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ConnectionRemoteRuntimeState? remoteRuntime;
+      if (connection.profile.isRemote) {
+        try {
+          remoteRuntime = await widget.workspaceController.refreshRemoteRuntime(
+            connectionId: connection.id,
+          );
+        } catch (_) {
+          remoteRuntime = widget.workspaceController.state.remoteRuntimeFor(
+            connection.id,
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      _showTransientMessage(
+        ConnectionWorkspaceCopy.openConnectionFailureMessage(
+          profile: connection.profile,
+          remoteRuntime: remoteRuntime,
+          error: error,
+        ),
+      );
+    }
   }
 
   Future<void> _createConnection() async {
@@ -200,6 +241,7 @@ class _ConnectionWorkspaceSavedConnectionsContentState
         profile: payload.profile,
         secrets: payload.secrets,
       );
+      _autoProbedRemoteRuntimeConnectionIds.remove(connectionId);
     } finally {
       if (mounted) {
         setState(() {
@@ -220,6 +262,8 @@ class _ConnectionWorkspaceSavedConnectionsContentState
 
     try {
       await widget.workspaceController.deleteSavedConnection(connectionId);
+      _autoProbedRemoteRuntimeConnectionIds.remove(connectionId);
+      _activeRemoteServerActionByConnectionId.remove(connectionId);
     } finally {
       if (mounted) {
         setState(() {
@@ -261,6 +305,117 @@ class _ConnectionWorkspaceSavedConnectionsContentState
     ];
   }
 
+  void _scheduleMissingRemoteRuntimeProbes({
+    required ConnectionWorkspaceState workspaceState,
+    required List<SavedConnectionSummary> savedConnections,
+  }) {
+    final connectionIdsToProbe = <String>[
+      for (final connection in savedConnections)
+        if (connection.profile.isRemote &&
+            workspaceState.remoteRuntimeFor(connection.id) == null &&
+            !_autoProbedRemoteRuntimeConnectionIds.contains(connection.id))
+          connection.id,
+    ];
+    if (connectionIdsToProbe.isEmpty) {
+      return;
+    }
+
+    _autoProbedRemoteRuntimeConnectionIds.addAll(connectionIdsToProbe);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final connectionId in connectionIdsToProbe) {
+        unawaited(
+          widget.workspaceController.refreshRemoteRuntime(
+            connectionId: connectionId,
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _runRemoteServerAction(
+    SavedConnectionSummary connection,
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) async {
+    if (_activeRemoteServerActionByConnectionId.containsKey(connection.id)) {
+      return;
+    }
+
+    setState(() {
+      _activeRemoteServerActionByConnectionId[connection.id] = actionId;
+    });
+
+    try {
+      final remoteRuntime = await switch (actionId) {
+        ConnectionSettingsRemoteServerActionId.start =>
+          widget.workspaceController.startRemoteServer(
+            connectionId: connection.id,
+          ),
+        ConnectionSettingsRemoteServerActionId.stop =>
+          widget.workspaceController.stopRemoteServer(
+            connectionId: connection.id,
+          ),
+        ConnectionSettingsRemoteServerActionId.restart =>
+          widget.workspaceController.restartRemoteServer(
+            connectionId: connection.id,
+          ),
+      };
+      if (!mounted) {
+        return;
+      }
+      if (!_didRemoteServerActionSucceed(actionId, remoteRuntime)) {
+        _showTransientMessage(
+          ConnectionWorkspaceCopy.remoteServerActionFailureMessage(
+            actionId,
+            remoteRuntime: remoteRuntime,
+          ),
+        );
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showTransientMessage(
+        ConnectionWorkspaceCopy.remoteServerActionFailureMessage(
+          actionId,
+          remoteRuntime: widget.workspaceController.state.remoteRuntimeFor(
+            connection.id,
+          ),
+          error: error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _activeRemoteServerActionByConnectionId.remove(connection.id);
+        });
+      }
+    }
+  }
+
+  bool _didRemoteServerActionSucceed(
+    ConnectionSettingsRemoteServerActionId actionId,
+    ConnectionRemoteRuntimeState remoteRuntime,
+  ) {
+    if (!remoteRuntime.hostCapability.isSupported) {
+      return false;
+    }
+
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start =>
+        remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
+      ConnectionSettingsRemoteServerActionId.stop =>
+        remoteRuntime.server.status == ConnectionRemoteServerStatus.notRunning,
+      ConnectionSettingsRemoteServerActionId.restart =>
+        remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
+    };
+  }
+
+  void _showTransientMessage(String message) {
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<ConnectionSettingsSubmitPayload?> _openConnectionSettings({
     String? connectionId,
     required ConnectionProfile profile,
@@ -288,27 +443,6 @@ class _ConnectionWorkspaceSavedConnectionsContentState
           secrets: payload.secrets,
         );
       },
-      onStartRemoteServer: connectionId == null
-          ? null
-          : () {
-              return widget.workspaceController.startRemoteServer(
-                connectionId: connectionId,
-              );
-            },
-      onStopRemoteServer: connectionId == null
-          ? null
-          : () {
-              return widget.workspaceController.stopRemoteServer(
-                connectionId: connectionId,
-              );
-            },
-      onRestartRemoteServer: connectionId == null
-          ? null
-          : () {
-              return widget.workspaceController.restartRemoteServer(
-                connectionId: connectionId,
-              );
-            },
     );
   }
 }

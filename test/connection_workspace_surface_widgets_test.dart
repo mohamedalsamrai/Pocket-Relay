@@ -81,7 +81,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane settings receive explicit remote server action callbacks for saved connections',
+    'live lane settings no longer expose remote server action callbacks',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
       final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -109,15 +109,15 @@ void main() {
 
       expect(
         settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
       expect(
         settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
       expect(
         settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
 
       settingsOverlayDelegate.complete(null);
@@ -159,7 +159,7 @@ void main() {
   );
 
   testWidgets(
-    'dormant roster edit action enters busy state before loading saved settings',
+    'saved connections edit action enters busy state before loading saved settings',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final repository = _DelayedMemoryCodexConnectionRepository(
@@ -195,13 +195,21 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final initialLoadCount =
+          repository.loadConnectionCallsById['conn_secondary'] ?? 0;
 
       await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
-      await tester.pump();
 
-      expect(repository.loadConnectionCallsById['conn_secondary'], 1);
+      final editButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('edit_conn_secondary')),
+      );
+      expect(editButton.onPressed, isNull);
+
+      expect(
+        repository.loadConnectionCallsById['conn_secondary'],
+        initialLoadCount + 1,
+      );
 
       repository.loadConnectionGates['conn_secondary']!.complete();
       await tester.pump();
@@ -262,6 +270,104 @@ void main() {
         originalBinding,
       );
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'saved connections rows own remote server controls instead of settings',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _RecordingRemoteOwnerControl();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
+            'conn_secondary': _notRunningOwnerSnapshot('conn_secondary'),
+          },
+        ),
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(
+        _buildDormantRosterApp(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(ownerControl.startCalls, hasLength(1));
+      expect(ownerControl.startCalls.single.ownerId, 'conn_secondary');
+      expect(settingsOverlayDelegate.launchCount, 0);
+    },
+  );
+
+  testWidgets(
+    'saved connections rows surface failed server actions with a snackbar',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _RecordingRemoteOwnerControl();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
+            'conn_secondary': _notRunningOwnerSnapshot('conn_secondary'),
+          },
+        ),
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Could not start server. The remote Pocket Relay server is still stopped.',
+        ),
+        findsOneWidget,
+      );
+      expect(ownerControl.startCalls, hasLength(1));
     },
   );
 
@@ -329,15 +435,15 @@ void main() {
       );
       expect(
         settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
       expect(
         settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
       expect(
         settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
-        isNotNull,
+        isNull,
       );
 
       settingsOverlayDelegate.complete(null);
@@ -1754,11 +1860,16 @@ Widget _buildDormantRosterApp(
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     home: Scaffold(
-      body: ConnectionWorkspaceSavedConnectionsContent(
-        workspaceController: controller,
-        description: 'Saved connections test surface.',
-        settingsOverlayDelegate: resolvedSettingsOverlayDelegate,
-        useSafeArea: false,
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          return ConnectionWorkspaceSavedConnectionsContent(
+            workspaceController: controller,
+            description: 'Saved connections test surface.',
+            settingsOverlayDelegate: resolvedSettingsOverlayDelegate,
+            useSafeArea: false,
+          );
+        },
       ),
     ),
   );
@@ -1821,6 +1932,8 @@ ConnectionWorkspaceController _buildWorkspaceController({
       const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
   CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
       const _ThrowingRemoteOwnerInspector(),
+  CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+      const _ThrowingRemoteOwnerControl(),
 }) {
   final resolvedRepository =
       repository ??
@@ -1843,6 +1956,7 @@ ConnectionWorkspaceController _buildWorkspaceController({
     modelCatalogStore: modelCatalogStore,
     remoteAppServerHostProbe: remoteAppServerHostProbe,
     remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
+    remoteAppServerOwnerControl: remoteAppServerOwnerControl,
     laneBindingFactory: ({required connectionId, required connection}) {
       return ConnectionLaneBinding(
         connectionId: connectionId,
@@ -1872,6 +1986,166 @@ final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
     required ConnectionSecrets secrets,
   }) async {
     return capabilities;
+  }
+}
+
+final class _MapRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _MapRemoteOwnerInspector(this.snapshotsByOwnerId);
+
+  final Map<String, CodexRemoteAppServerOwnerSnapshot> snapshotsByOwnerId;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshotsByOwnerId[ownerId] ??
+        _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _ThrowingRemoteOwnerControl();
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+}
+
+typedef _RemoteOwnerControlCall = ({
+  ConnectionProfile profile,
+  ConnectionSecrets secrets,
+  String ownerId,
+  String workspaceDir,
+});
+
+final class _RecordingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  final List<_RemoteOwnerControlCall> startCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> stopCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> restartCalls =
+      <_RemoteOwnerControlCall>[];
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    stopCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    restartCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
   }
 }
 
@@ -1943,6 +2217,18 @@ ConnectionProfile _profile(String label, String host) {
     host: host,
     username: 'vince',
     workspaceDir: '/workspace',
+  );
+}
+
+CodexRemoteAppServerOwnerSnapshot _notRunningOwnerSnapshot(
+  String ownerId, {
+  String workspaceDir = '/workspace',
+}) {
+  return CodexRemoteAppServerOwnerSnapshot(
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+    status: CodexRemoteAppServerOwnerStatus.stopped,
+    sessionName: 'pocket-relay:$ownerId',
   );
 }
 
