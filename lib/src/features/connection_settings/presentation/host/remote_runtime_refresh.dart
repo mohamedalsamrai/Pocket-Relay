@@ -1,5 +1,14 @@
 part of '../connection_settings_host.dart';
 
+const _pausedAuthenticationRuntime = ConnectionRemoteRuntimeState(
+  hostCapability: ConnectionRemoteHostCapabilityState(
+    status: ConnectionRemoteHostCapabilityStatus.unknown,
+    detail:
+        'Pocket Relay pauses remote checks while you edit authentication settings.',
+  ),
+  server: ConnectionRemoteServerState.unknown(),
+);
+
 void _scheduleConnectionSettingsRemoteRuntimeRefresh(
   _ConnectionSettingsHostState state, {
   bool immediate = false,
@@ -19,6 +28,15 @@ void _scheduleConnectionSettingsRemoteRuntimeRefresh(
     if (state._remoteRuntime != null) {
       state._setStateInternal(() {
         state._remoteRuntime = null;
+      });
+    }
+    return;
+  }
+
+  if (_hasUnsavedAuthenticationChanges(state)) {
+    if (state._remoteRuntime != _pausedAuthenticationRuntime) {
+      state._setStateInternal(() {
+        state._remoteRuntime = _pausedAuthenticationRuntime;
       });
     }
     return;
@@ -82,4 +100,14 @@ void _scheduleConnectionSettingsRemoteRuntimeRefresh(
       unawaited(runProbe());
     },
   );
+}
+
+bool _hasUnsavedAuthenticationChanges(_ConnectionSettingsHostState state) {
+  final draft = state._formState.draft;
+  final initialProfile = state.widget.initialProfile;
+  final initialSecrets = state.widget.initialSecrets;
+  return draft.authMode != initialProfile.authMode ||
+      draft.password != initialSecrets.password ||
+      draft.privateKeyPem != initialSecrets.privateKeyPem ||
+      draft.privateKeyPassphrase != initialSecrets.privateKeyPassphrase;
 }
