@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 
@@ -106,53 +106,17 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
               }
 
               if (snapshot.hasError) {
-                if (snapshot.error
-                    is CodexWorkspaceConversationHistoryUnpinnedHostKeyException) {
-                  final error =
-                      snapshot.error
-                          as CodexWorkspaceConversationHistoryUnpinnedHostKeyException;
-                  return _ConversationHistoryMessage(
-                    title: 'Host key not pinned',
-                    body:
-                        'Conversation history cannot connect until this host '
-                        'fingerprint is saved to the connection profile.\n'
-                        'Observed fingerprint: ${error.fingerprint}',
-                    actionLabel: onOpenConnectionSettings == null
-                        ? null
-                        : 'Open connection settings',
-                    onAction: onOpenConnectionSettings,
-                  );
-                }
-                if (snapshot.error is CodexRemoteAppServerAttachException) {
-                  final error =
-                      snapshot.error as CodexRemoteAppServerAttachException;
-                  final (title, body) = switch (error.snapshot.status) {
-                    CodexRemoteAppServerOwnerStatus.missing ||
-                    CodexRemoteAppServerOwnerStatus.stopped => (
-                      'Remote server stopped',
-                      error.message,
-                    ),
-                    CodexRemoteAppServerOwnerStatus.unhealthy => (
-                      'Remote server unhealthy',
-                      error.message,
-                    ),
-                    CodexRemoteAppServerOwnerStatus.running => (
-                      'Remote session unavailable',
-                      error.message,
-                    ),
-                  };
-                  return _ConversationHistoryMessage(
-                    title: title,
-                    body: body,
-                    actionLabel: onOpenConnectionSettings == null
-                        ? null
-                        : 'Open connection settings',
-                    onAction: onOpenConnectionSettings,
-                  );
-                }
+                final error =
+                    ConnectionLifecycleErrors.conversationHistoryFailure(
+                      snapshot.error!,
+                    );
                 return _ConversationHistoryMessage(
-                  title: 'Could not load conversations',
-                  body: '${snapshot.error}',
+                  title: error.title,
+                  body: error.bodyWithCode,
+                  actionLabel: onOpenConnectionSettings == null
+                      ? null
+                      : 'Open connection settings',
+                  onAction: onOpenConnectionSettings,
                 );
               }
 

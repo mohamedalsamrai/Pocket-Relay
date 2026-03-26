@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
@@ -325,6 +326,12 @@ void main() {
     await tester.tap(find.text('Conversation history'));
     await tester.pumpAndSettle();
     expect(find.text('Could not load conversations'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+      ),
+      findsOneWidget,
+    );
     expect(clientsById['conn_primary']?.disconnectCalls, 0);
   });
 
@@ -371,7 +378,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server unhealthy'), findsOneWidget);
-      expect(find.text('readyz failed'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionHistoryServerUnhealthy.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('readyz failed'), findsOneWidget);
 
       await tester.tap(
         find.byKey(
@@ -424,6 +437,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Host key not pinned'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionHistoryHostKeyUnpinned.code}]',
+        ),
+        findsOneWidget,
+      );
 
       await tester.tap(
         find.byKey(

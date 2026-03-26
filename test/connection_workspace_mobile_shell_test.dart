@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
@@ -258,6 +259,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Could not load conversations'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+        ),
+        findsOneWidget,
+      );
     },
   );
   testWidgets(

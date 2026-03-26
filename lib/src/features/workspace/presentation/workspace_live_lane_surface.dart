@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/connection_settings/presentation/conne
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
@@ -120,13 +121,11 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     return chatRoot;
   }
 
-  Widget? _transportRecoveryNoticeFor(
-    {
+  Widget? _transportRecoveryNoticeFor({
     required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
     required ConnectionWorkspaceTransportRecoveryPhase? phase,
     required ConnectionRemoteRuntimeState? remoteRuntime,
-  }
-  ) {
+  }) {
     final sessionController = widget.laneBinding.sessionController;
     if ((phase == null && liveReattachPhase == null) ||
         sessionController.historicalConversationRestoreState != null ||
@@ -134,11 +133,13 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       return null;
     }
 
-    if (liveReattachPhase == ConnectionWorkspaceLiveReattachPhase.liveReattached) {
+    if (liveReattachPhase ==
+        ConnectionWorkspaceLiveReattachPhase.liveReattached) {
       return null;
     }
 
-    if (liveReattachPhase == ConnectionWorkspaceLiveReattachPhase.fallbackRestore) {
+    if (liveReattachPhase ==
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore) {
       return const _WorkspaceLaneTransportNotice(
         title: ConnectionWorkspaceCopy.restoringConversationNoticeTitle,
         message: ConnectionWorkspaceCopy.restoringConversationNoticeMessage,
@@ -146,45 +147,18 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       );
     }
 
-    final unavailableNotice = switch (remoteRuntime?.server.status) {
-      _ when remoteRuntime?.hostCapability.status ==
-          ConnectionRemoteHostCapabilityStatus.unsupported => (
-        ConnectionWorkspaceCopy.remoteContinuityUnavailableNoticeTitle,
-        remoteRuntime?.hostCapability.detail ??
-            ConnectionWorkspaceCopy.remoteContinuityUnavailableNoticeMessage,
-        false,
-      ),
-      _ when remoteRuntime?.hostCapability.status ==
-          ConnectionRemoteHostCapabilityStatus.probeFailed => (
-        ConnectionWorkspaceCopy.remoteContinuityUnavailableNoticeTitle,
-        remoteRuntime?.hostCapability.detail ??
-            ConnectionWorkspaceCopy.remoteContinuityUnavailableNoticeMessage,
-        false,
-      ),
-      ConnectionRemoteServerStatus.notRunning => (
-        ConnectionWorkspaceCopy.remoteServerStoppedNoticeTitle,
-        remoteRuntime?.server.detail ??
-            ConnectionWorkspaceCopy.remoteServerStoppedNoticeMessage,
-        false,
-      ),
-      ConnectionRemoteServerStatus.unhealthy => (
-        ConnectionWorkspaceCopy.remoteServerUnhealthyNoticeTitle,
-        remoteRuntime?.server.detail ??
-            ConnectionWorkspaceCopy.remoteServerUnhealthyNoticeMessage,
-        false,
-      ),
-      _ => (
-        ConnectionWorkspaceCopy.transportUnavailableNoticeTitle,
-        ConnectionWorkspaceCopy.transportUnavailableNoticeMessage,
-        false,
-      ),
-    };
-    final (title, message, isLoading) = switch (
-      liveReattachPhase ?? phase
-    ) {
+    final transportLostError = ConnectionLifecycleErrors.transportLostNotice();
+    final unavailableError =
+        ConnectionLifecycleErrors.transportUnavailableNotice(remoteRuntime);
+    final unavailableNotice = (
+      unavailableError.title,
+      unavailableError.bodyWithCode,
+      false,
+    );
+    final (title, message, isLoading) = switch (liveReattachPhase ?? phase) {
       ConnectionWorkspaceLiveReattachPhase.transportLost => (
-        ConnectionWorkspaceCopy.transportLostNoticeTitle,
-        ConnectionWorkspaceCopy.transportLostNoticeMessage,
+        transportLostError.title,
+        transportLostError.bodyWithCode,
         false,
       ),
       ConnectionWorkspaceLiveReattachPhase.reconnecting => (
@@ -195,8 +169,8 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
       ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy => unavailableNotice,
       ConnectionWorkspaceTransportRecoveryPhase.lost => (
-        ConnectionWorkspaceCopy.transportLostNoticeTitle,
-        ConnectionWorkspaceCopy.transportLostNoticeMessage,
+        transportLostError.title,
+        transportLostError.bodyWithCode,
         false,
       ),
       ConnectionWorkspaceTransportRecoveryPhase.reconnecting => (
@@ -204,7 +178,8 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         ConnectionWorkspaceCopy.reconnectingNoticeMessage,
         true,
       ),
-      ConnectionWorkspaceTransportRecoveryPhase.unavailable => unavailableNotice,
+      ConnectionWorkspaceTransportRecoveryPhase.unavailable =>
+        unavailableNotice,
       _ => unavailableNotice,
     };
     return _WorkspaceLaneTransportNotice(

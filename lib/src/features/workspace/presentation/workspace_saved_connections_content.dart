@@ -11,6 +11,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/chat_sc
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_remote_runtime_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
@@ -148,11 +149,11 @@ class _ConnectionWorkspaceSavedConnectionsContentState
         return;
       }
       _showTransientMessage(
-        ConnectionWorkspaceCopy.openConnectionFailureMessage(
+        ConnectionLifecycleErrors.openConnectionFailure(
           profile: connection.profile,
           remoteRuntime: remoteRuntime,
           error: error,
-        ),
+        ).inlineMessage,
       );
     }
   }
@@ -364,10 +365,10 @@ class _ConnectionWorkspaceSavedConnectionsContentState
       }
       if (!_didRemoteServerActionSucceed(actionId, remoteRuntime)) {
         _showTransientMessage(
-          ConnectionWorkspaceCopy.remoteServerActionFailureMessage(
+          ConnectionLifecycleErrors.remoteServerActionFailure(
             actionId,
             remoteRuntime: remoteRuntime,
-          ),
+          ).inlineMessage,
         );
       }
     } catch (error) {
@@ -375,13 +376,13 @@ class _ConnectionWorkspaceSavedConnectionsContentState
         return;
       }
       _showTransientMessage(
-        ConnectionWorkspaceCopy.remoteServerActionFailureMessage(
+        ConnectionLifecycleErrors.remoteServerActionFailure(
           actionId,
           remoteRuntime: widget.workspaceController.state.remoteRuntimeFor(
             connection.id,
           ),
           error: error,
-        ),
+        ).inlineMessage,
       );
     } finally {
       if (mounted) {

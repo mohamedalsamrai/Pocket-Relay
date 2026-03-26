@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
@@ -362,12 +363,60 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'Could not start server. The remote Pocket Relay server is still stopped.',
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionStartServerStillStopped.code}]',
         ),
         findsOneWidget,
       );
+      expect(
+        find.textContaining('The remote Pocket Relay server is still stopped.'),
+        findsOneWidget,
+      );
       expect(ownerControl.startCalls, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'saved connections rows include the launch error when start server fails before the owner appears',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _ThrowingStartRemoteOwnerControl();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionStartServerStillStopped.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Underlying error:'), findsOneWidget);
+      expect(
+        find.textContaining('tmux is not available on the remote host.'),
+        findsOneWidget,
+      );
+      expect(ownerControl.startCalls, 1);
     },
   );
 
@@ -1612,7 +1661,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote continuity unavailable'), findsOneWidget);
-      expect(find.text('tmux is not installed on this host.'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionReconnectContinuityUnsupported.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('tmux is not installed on this host.'),
+        findsOneWidget,
+      );
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -1836,7 +1894,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server unhealthy'), findsOneWidget);
-      expect(find.text('readyz failed'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionReconnectServerUnhealthy.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('readyz failed'), findsOneWidget);
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -2034,7 +2098,13 @@ final class _ThrowingRemoteOwnerControl
     required String ownerId,
     required String workspaceDir,
   }) async {
-    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+    return CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.missing,
+      sessionName: 'pocket-relay:$ownerId',
+      detail: 'No Pocket Relay server is running for this connection.',
+    );
   }
 
   @override
@@ -2146,6 +2216,62 @@ final class _RecordingRemoteOwnerControl
       workspaceDir: workspaceDir,
     ));
     return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+}
+
+final class _ThrowingStartRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  int startCalls = 0;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls += 1;
+    throw StateError(
+      'Remote owner control command failed: exit 1 | tmux is not available on the remote host.',
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('stopOwner should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('restartOwner should not have been requested');
   }
 }
 

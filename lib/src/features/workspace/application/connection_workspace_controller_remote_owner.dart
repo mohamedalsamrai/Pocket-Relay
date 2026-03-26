@@ -6,6 +6,7 @@ Future<ConnectionRemoteRuntimeState> _startWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
+    actionId: ConnectionSettingsRemoteServerActionId.start,
     connectionId: connectionId,
     actionDetail: 'Starting remote Pocket Relay server…',
     runAction: ({required profile, required secrets, required ownerId}) =>
@@ -24,6 +25,7 @@ Future<ConnectionRemoteRuntimeState> _stopWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
+    actionId: ConnectionSettingsRemoteServerActionId.stop,
     connectionId: connectionId,
     actionDetail: 'Stopping remote Pocket Relay server…',
     runAction: ({required profile, required secrets, required ownerId}) =>
@@ -42,6 +44,7 @@ Future<ConnectionRemoteRuntimeState> _restartWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
+    actionId: ConnectionSettingsRemoteServerActionId.restart,
     connectionId: connectionId,
     actionDetail: 'Restarting remote Pocket Relay server…',
     runAction: ({required profile, required secrets, required ownerId}) =>
@@ -63,6 +66,7 @@ typedef _WorkspaceRemoteServerActionRunner =
 
 Future<ConnectionRemoteRuntimeState> _runWorkspaceRemoteServerAction(
   ConnectionWorkspaceController controller, {
+  required ConnectionSettingsRemoteServerActionId actionId,
   required String connectionId,
   required String actionDetail,
   required _WorkspaceRemoteServerActionRunner runAction,
@@ -120,21 +124,48 @@ Future<ConnectionRemoteRuntimeState> _runWorkspaceRemoteServerAction(
     );
   }
 
+  Object? actionError;
+  StackTrace? actionStackTrace;
   try {
     await runAction(
       profile: savedConnection.profile,
       secrets: savedConnection.secrets,
       ownerId: normalizedConnectionId,
     );
-  } catch (_) {
+  } catch (error, stackTrace) {
     // Always re-probe after an explicit lifecycle action so runtime truth comes
     // from the remote host, even when the action itself fails.
+    actionError = error;
+    actionStackTrace = stackTrace;
   }
 
-  return _refreshWorkspaceRemoteRuntime(
+  final nextRuntime = await _refreshWorkspaceRemoteRuntime(
     controller,
     normalizedConnectionId,
     profile: savedConnection.profile,
     secrets: savedConnection.secrets,
   );
+  if (actionError != null &&
+      !_didWorkspaceRemoteServerActionSucceed(actionId, nextRuntime)) {
+    Error.throwWithStackTrace(actionError, actionStackTrace!);
+  }
+  return nextRuntime;
+}
+
+bool _didWorkspaceRemoteServerActionSucceed(
+  ConnectionSettingsRemoteServerActionId actionId,
+  ConnectionRemoteRuntimeState remoteRuntime,
+) {
+  if (!remoteRuntime.hostCapability.isSupported) {
+    return false;
+  }
+
+  return switch (actionId) {
+    ConnectionSettingsRemoteServerActionId.start =>
+      remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
+    ConnectionSettingsRemoteServerActionId.stop =>
+      remoteRuntime.server.status == ConnectionRemoteServerStatus.notRunning,
+    ConnectionSettingsRemoteServerActionId.restart =>
+      remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
+  };
 }
