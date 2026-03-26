@@ -1,6 +1,5 @@
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
@@ -102,14 +101,14 @@ abstract final class ConnectionLifecycleErrors {
           title: 'Remote server stopped',
           message:
               remoteRuntime?.server.detail ??
-              'The Pocket Relay server for this connection is not running. Start it from saved connections, then reconnect this lane.',
+              'The Pocket Relay server for this connection is not running. Start it from this lane, then reconnect.',
         ),
         ConnectionRemoteServerStatus.unhealthy => PocketUserFacingError(
           definition: PocketErrorCatalog.connectionReconnectServerUnhealthy,
           title: 'Remote server unhealthy',
           message:
               remoteRuntime?.server.detail ??
-              'The Pocket Relay server exists but is not healthy enough to accept connections. Restart it from saved connections, then reconnect this lane.',
+              'The Pocket Relay server exists but is not healthy enough to accept connections. Restart it from this lane, then reconnect.',
         ),
         _ => PocketUserFacingError(
           definition: PocketErrorCatalog.connectionTransportUnavailable,
@@ -119,6 +118,22 @@ abstract final class ConnectionLifecycleErrors {
         ),
       },
     };
+  }
+
+  static PocketUserFacingError connectLaneFailure({
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    final unavailable = transportUnavailableNotice(remoteRuntime);
+    return PocketUserFacingError(
+      definition: unavailable.definition,
+      title: 'Could not connect lane',
+      message: _combinedFailureDetail(
+        runtimeDetail: unavailable.message,
+        errorDetail: _normalizedErrorDetail(error),
+        fallbackMessage: unavailable.message,
+      ),
+    );
   }
 
   static PocketUserFacingError conversationHistoryFailure(Object error) {

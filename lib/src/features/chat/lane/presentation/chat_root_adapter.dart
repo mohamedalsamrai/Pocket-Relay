@@ -26,6 +26,7 @@ class ChatRootAdapter extends StatefulWidget {
     this.screenPresenter = const ChatScreenPresenter(),
     this.overlayDelegate = const FlutterChatRootOverlayDelegate(),
     this.supplementalMenuActions = const <ChatChromeMenuAction>[],
+    this.supplementalStatusRegion,
     this.supplementalComposerNotice,
     this.laneRestartAction,
     this.onRestartLane,
@@ -38,6 +39,7 @@ class ChatRootAdapter extends StatefulWidget {
   final ChatScreenPresenter screenPresenter;
   final ChatRootOverlayDelegate overlayDelegate;
   final List<ChatChromeMenuAction> supplementalMenuActions;
+  final Widget? supplementalStatusRegion;
   final Widget? supplementalComposerNotice;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
@@ -109,6 +111,7 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
             onHistoricalConversationRestoreAction:
                 _handleHistoricalConversationRestoreAction,
           ),
+          supplementalStatusRegion: widget.supplementalStatusRegion,
           onStopActiveTurn: _stopActiveTurn,
           laneRestartAction: widget.laneRestartAction,
           onRestartLane: widget.onRestartLane,

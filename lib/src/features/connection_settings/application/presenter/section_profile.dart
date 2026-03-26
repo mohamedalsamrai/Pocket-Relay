@@ -75,9 +75,10 @@ ConnectionSettingsSectionContract? _buildRemoteConnectionSection(
       ),
       ConnectionSettingsTextFieldContract(
         id: ConnectionSettingsFieldId.hostFingerprint,
-        label: 'Host fingerprint (optional)',
+        label: 'Host fingerprint',
         value: draft.hostFingerprint,
         hintText: 'aa:bb:cc:dd:...',
+        errorText: state.hostFingerprintError,
       ),
     ],
   );

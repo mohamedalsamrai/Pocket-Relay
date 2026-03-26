@@ -15,6 +15,7 @@ class _ConnectionSettingsPresentationState {
     required this.hostError,
     required this.portError,
     required this.usernameError,
+    required this.hostFingerprintError,
     required this.workspaceDirError,
     required this.codexPathError,
     required this.passwordError,
@@ -44,6 +45,8 @@ class _ConnectionSettingsPresentationState {
     final hasHostError = isRemote && draft.host.trim().isEmpty;
     final hasPortError = isRemote && (port == null || port < 1 || port > 65535);
     final hasUsernameError = isRemote && draft.username.trim().isEmpty;
+    final hasHostFingerprintError =
+        isRemote && draft.hostFingerprint.trim().isEmpty;
     final hasWorkspaceDirError = draft.workspaceDir.trim().isEmpty;
     final hasCodexPathError = draft.codexPath.trim().isEmpty;
     final hasPasswordError =
@@ -67,6 +70,11 @@ class _ConnectionSettingsPresentationState {
     final usernameError = _requiredError(
       value: draft.username,
       message: 'Username is required',
+      show: shouldShowValidationErrors && isRemote,
+    );
+    final hostFingerprintError = _requiredError(
+      value: draft.hostFingerprint,
+      message: 'Host fingerprint is required',
       show: shouldShowValidationErrors && isRemote,
     );
     final workspaceDirError = _requiredError(
@@ -94,6 +102,7 @@ class _ConnectionSettingsPresentationState {
         hasHostError ||
         hasPortError ||
         hasUsernameError ||
+        hasHostFingerprintError ||
         hasWorkspaceDirError ||
         hasCodexPathError ||
         hasPasswordError ||
@@ -113,6 +122,7 @@ class _ConnectionSettingsPresentationState {
       hostError: hostError,
       portError: portError,
       usernameError: usernameError,
+      hostFingerprintError: hostFingerprintError,
       workspaceDirError: workspaceDirError,
       codexPathError: codexPathError,
       passwordError: passwordError,
@@ -133,6 +143,7 @@ class _ConnectionSettingsPresentationState {
   final String? hostError;
   final String? portError;
   final String? usernameError;
+  final String? hostFingerprintError;
   final String? workspaceDirError;
   final String? codexPathError;
   final String? passwordError;

@@ -127,6 +127,107 @@ void main() {
   );
 
   testWidgets(
+    'live lane shows a persistent connected status strip for healthy remote lanes',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        await controller.flushRecoveryPersistence();
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_strip')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_label')),
+        findsOneWidget,
+      );
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.text('primary.local · /workspace'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'live lane status strip starts the remote server for the selected lane',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final ownerControl = _RecordingRemoteOwnerControl();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
+          },
+        ),
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Server stopped'), findsOneWidget);
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('lane_connection_action_start_server'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(ownerControl.startCalls, hasLength(1));
+      expect(ownerControl.startCalls.single.ownerId, 'conn_primary');
+    },
+  );
+
+  testWidgets(
     'dormant roster add action launches settings only once while pending',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -275,10 +376,9 @@ void main() {
   );
 
   testWidgets(
-    'saved connections rows own remote server controls instead of settings',
+    'saved connections roster does not render remote server controls',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final ownerControl = _RecordingRemoteOwnerControl();
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
         remoteAppServerHostProbe: const _FakeRemoteHostProbe(
@@ -290,49 +390,74 @@ void main() {
             'conn_secondary': _notRunningOwnerSnapshot('conn_secondary'),
           },
         ),
-        remoteAppServerOwnerControl: ownerControl,
       );
-      final settingsOverlayDelegate =
-          _DeferredConnectionSettingsOverlayDelegate();
       addTearDown(() async {
         controller.dispose();
         await _closeClients(clientsById);
       });
 
       await controller.initialize();
+      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows a disconnected status and connect action when the remote server is running',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await clientsById['conn_primary']!.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
       await tester.pumpWidget(
-        _buildDormantRosterApp(
+        _buildLiveLaneApp(
           controller,
-          settingsOverlayDelegate: settingsOverlayDelegate,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
         ),
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Disconnected'), findsOneWidget);
+      expect(find.text('Connect'), findsOneWidget);
       expect(
         find.byKey(
-          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+          const ValueKey<String>('lane_connection_action_connect'),
         ),
         findsOneWidget,
       );
-
-      await tester.tap(
-        find.byKey(
-          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(ownerControl.startCalls, hasLength(1));
-      expect(ownerControl.startCalls.single.ownerId, 'conn_secondary');
-      expect(settingsOverlayDelegate.launchCount, 0);
     },
   );
 
   testWidgets(
-    'saved connections rows surface failed server actions with a snackbar',
+    'live lane connect action attaches the selected lane when the remote server is running',
     (tester) async {
-      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final ownerControl = _RecordingRemoteOwnerControl();
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
         remoteAppServerHostProbe: const _FakeRemoteHostProbe(
@@ -340,83 +465,95 @@ void main() {
         ),
         remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
           <String, CodexRemoteAppServerOwnerSnapshot>{
-            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
-            'conn_secondary': _notRunningOwnerSnapshot('conn_secondary'),
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
           },
         ),
-        remoteAppServerOwnerControl: ownerControl,
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClients(clientsById);
+        await client.dispose();
       });
 
       await controller.initialize();
-      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(
-        find.byKey(
-          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
-        ),
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining(
-          '[${PocketErrorCatalog.connectionStartServerStillStopped.code}]',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('The remote Pocket Relay server is still stopped.'),
-        findsOneWidget,
-      );
-      expect(ownerControl.startCalls, hasLength(1));
+      expect(client.connectCalls, 1);
+      expect(find.text('Connected'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'saved connections rows include the launch error when start server fails before the owner appears',
+    'live lane connect action surfaces a coded snackbar when transport attach fails',
     (tester) async {
-      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final ownerControl = _ThrowingStartRemoteOwnerControl();
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
       final controller = _buildWorkspaceController(
         clientsById: clientsById,
         remoteAppServerHostProbe: const _FakeRemoteHostProbe(
           CodexRemoteAppServerHostCapabilities(),
         ),
-        remoteAppServerOwnerInspector: ownerControl,
-        remoteAppServerOwnerControl: ownerControl,
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClients(clientsById);
+        await client.dispose();
       });
 
       await controller.initialize();
-      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      client.connectError = const CodexAppServerException('connect failed');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(
         find.byKey(
-          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+          const ValueKey<String>('lane_connection_action_connect'),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(
         find.textContaining(
-          '[${PocketErrorCatalog.connectionStartServerStillStopped.code}]',
+          '[${PocketErrorCatalog.connectionTransportUnavailable.code}]',
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('Underlying error:'), findsOneWidget);
       expect(
-        find.textContaining('tmux is not available on the remote host.'),
+        find.textContaining('Could not connect lane'),
         findsOneWidget,
       );
-      expect(ownerControl.startCalls, 1);
+      expect(
+        find.textContaining('Underlying error: connect failed'),
+        findsOneWidget,
+      );
+      expect(find.text('Disconnected'), findsOneWidget);
     },
   );
 
@@ -1900,7 +2037,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('readyz failed'), findsOneWidget);
+      expect(find.textContaining('readyz failed'), findsWidgets);
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -2219,62 +2356,6 @@ final class _RecordingRemoteOwnerControl
   }
 }
 
-final class _ThrowingStartRemoteOwnerControl
-    implements CodexRemoteAppServerOwnerControl {
-  int startCalls = 0;
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return const CodexRemoteAppServerHostCapabilities();
-  }
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
-  }
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    startCalls += 1;
-    throw StateError(
-      'Remote owner control command failed: exit 1 | tmux is not available on the remote host.',
-    );
-  }
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    throw StateError('stopOwner should not have been requested');
-  }
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    throw StateError('restartOwner should not have been requested');
-  }
-}
-
 final class _ThrowingRemoteHostProbe implements CodexRemoteAppServerHostProbe {
   const _ThrowingRemoteHostProbe(this.message);
 
@@ -2355,6 +2436,19 @@ CodexRemoteAppServerOwnerSnapshot _notRunningOwnerSnapshot(
     workspaceDir: workspaceDir,
     status: CodexRemoteAppServerOwnerStatus.stopped,
     sessionName: 'pocket-relay-$ownerId',
+  );
+}
+
+CodexRemoteAppServerOwnerSnapshot _runningOwnerSnapshot(
+  String ownerId, {
+  String workspaceDir = '/workspace',
+}) {
+  return CodexRemoteAppServerOwnerSnapshot(
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+    status: CodexRemoteAppServerOwnerStatus.running,
+    sessionName: 'pocket-relay-$ownerId',
+    endpoint: const CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
   );
 }
 

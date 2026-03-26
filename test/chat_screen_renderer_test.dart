@@ -33,6 +33,28 @@ void main() {
     expect(find.text('Composer region'), findsOneWidget);
   });
 
+  testWidgets(
+    'renders an injected supplemental status region above transcript',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildPocketTheme(Brightness.light),
+          home: FlutterChatScreenRenderer(
+            screen: _screenContract(),
+            appChrome: const _TestAppChrome(),
+            transcriptRegion: const Center(child: Text('Transcript region')),
+            composerRegion: const Text('Composer region'),
+            supplementalStatusRegion: const Text('Connection strip'),
+            onStopActiveTurn: () async {},
+          ),
+        ),
+      );
+
+      expect(find.text('Connection strip'), findsOneWidget);
+      expect(find.text('Transcript region'), findsOneWidget);
+    },
+  );
+
   testWidgets('forwards toolbar and menu actions through app chrome', (
     tester,
   ) async {

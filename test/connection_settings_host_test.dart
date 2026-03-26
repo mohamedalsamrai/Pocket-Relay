@@ -84,6 +84,21 @@ void main() {
   );
 
   testWidgets(
+    'material settings renderer requires a host fingerprint for remote connections',
+    (tester) async {
+      await tester.pumpWidget(_buildMaterialSettingsApp(onSubmit: (_) {}));
+
+      await tester.enterText(_materialTextField('Host fingerprint'), '');
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host fingerprint is required'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'desktop settings expose a local and remote route chooser and hide SSH fields for local mode',
     (tester) async {
       await tester.pumpWidget(
@@ -951,7 +966,7 @@ ConnectionSettingsFieldId _fieldIdForLabel(String label) {
     'Username' => ConnectionSettingsFieldId.username,
     'Workspace directory' => ConnectionSettingsFieldId.workspaceDir,
     'Codex launch command' => ConnectionSettingsFieldId.codexPath,
-    'Host fingerprint (optional)' => ConnectionSettingsFieldId.hostFingerprint,
+    'Host fingerprint' => ConnectionSettingsFieldId.hostFingerprint,
     'SSH password' => ConnectionSettingsFieldId.password,
     'Private key PEM' => ConnectionSettingsFieldId.privateKeyPem,
     'Key passphrase (optional)' =>
@@ -967,6 +982,7 @@ ConnectionProfile _configuredProfile() {
     username: 'vince',
     workspaceDir: '/workspace',
     codexPath: 'codex',
+    hostFingerprint: 'aa:bb:cc:dd',
   );
 }
 

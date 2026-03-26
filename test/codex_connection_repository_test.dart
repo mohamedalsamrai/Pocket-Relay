@@ -375,6 +375,72 @@ void main() {
   );
 
   test(
+    'loadCatalog fills an empty fingerprint from a sibling connection on the same remote host and port',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.connections.index',
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_a', 'conn_b'],
+        }),
+      );
+      await preferences.setString(
+        'pocket_relay.connection.conn_a.profile',
+        jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                host: '192.168.178.164',
+                username: 'vince',
+                workspaceDir: '/workspace/a',
+                hostFingerprint: 'SHA256:shared',
+              )
+              .toJson(),
+        ),
+      );
+      await preferences.setString(
+        'pocket_relay.connection.conn_b.profile',
+        jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                host: '192.168.178.164',
+                username: 'vince',
+                workspaceDir: '/workspace/b',
+              )
+              .toJson(),
+        ),
+      );
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: _FakeFlutterSecureStorage(<String, String>{}),
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_b');
+
+      expect(
+        catalog.connectionForId('conn_b')?.profile.hostFingerprint,
+        'SHA256:shared',
+      );
+      expect(connection.profile.hostFingerprint, 'SHA256:shared');
+      expect(
+        await preferences.getString('pocket_relay.connection.conn_b.profile'),
+        jsonEncode(
+          ConnectionProfile.defaults()
+              .copyWith(
+                host: '192.168.178.164',
+                username: 'vince',
+                workspaceDir: '/workspace/b',
+                hostFingerprint: 'SHA256:shared',
+              )
+              .toJson(),
+        ),
+      );
+    },
+  );
+
+  test(
     'saveConnection appends a new saved connection to the catalog',
     () async {
       final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
@@ -412,6 +478,52 @@ void main() {
       expect(connection.profile.host, 'second.example.com');
       expect(connection.secrets.password, 'second-secret');
       expect(connection.secrets.privateKeyPem, 'pem');
+    },
+  );
+
+  test(
+    'saveConnection propagates an updated fingerprint to sibling connections on the same remote host and port',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      final repository = SecureCodexConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      await repository.loadCatalog();
+      await repository.saveConnection(
+        SavedConnection(
+          id: 'conn_second',
+          profile: ConnectionProfile.defaults().copyWith(
+            label: 'Second Box',
+            host: '192.168.178.164',
+            username: 'vince',
+            workspaceDir: '/workspace/b',
+          ),
+          secrets: const ConnectionSecrets(password: 'second-secret'),
+        ),
+      );
+
+      await repository.saveConnection(
+        SavedConnection(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults().copyWith(
+            host: '192.168.178.164',
+            username: 'vince',
+            workspaceDir: '/workspace/a',
+            hostFingerprint: 'SHA256:updated',
+          ),
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+
+      final primaryConnection = await repository.loadConnection('conn_seed');
+      final siblingConnection = await repository.loadConnection('conn_second');
+
+      expect(primaryConnection.profile.hostFingerprint, 'SHA256:updated');
+      expect(siblingConnection.profile.hostFingerprint, 'SHA256:updated');
     },
   );
 

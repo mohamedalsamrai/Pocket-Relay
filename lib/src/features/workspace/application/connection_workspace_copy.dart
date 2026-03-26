@@ -10,11 +10,11 @@ abstract final class ConnectionWorkspaceCopy {
   static const String savedConnectionsMenuLabel = savedConnectionsTitle;
   static const String conversationHistoryMenuLabel = 'Conversation history';
   static const String mobileSavedConnectionsDescription =
-      'Jump back to an open lane or open another saved connection.';
+      'Jump back to an open lane or open another saved connection. Connection and server controls stay inside each lane.';
   static const String desktopSidebarDescription =
       'Keep multiple lanes open while every saved connection stays visible in one inventory.';
   static const String desktopSavedConnectionsDescription =
-      'Open another saved connection or jump back to a lane that is already open.';
+      'Open another saved connection or jump back to a lane that is already open. Connection and server controls stay inside each lane.';
   static const String addConnectionAction = 'Add connection';
   static const String addConnectionProgress = 'Adding…';
   static const String openLaneAction = 'Open lane';
@@ -59,6 +59,28 @@ abstract final class ConnectionWorkspaceCopy {
   static const String remoteHostProbeFailedSummary = 'Host check failed';
   static const String remoteHostCheckingSummary = 'Checking host';
   static const String remoteServerCheckingSummary = 'Checking server';
+  static const String laneConnectedStatus = 'Connected';
+  static const String laneDisconnectedStatus = 'Disconnected';
+  static const String laneConnectingStatus = 'Connecting';
+  static const String laneConfigurationIncompleteStatus =
+      'Connection not configured';
+  static const String laneLocalReadyStatus = 'Local workspace ready';
+  static const String laneServerRunningStatus = 'Server running';
+  static const String laneServerStoppedStatus = 'Server stopped';
+  static const String laneServerUnhealthyStatus = 'Server unhealthy';
+  static const String laneHostUnknownStatus = 'Host status unknown';
+  static const String laneHostCheckingStatus = 'Checking host';
+  static const String laneServerCheckingStatus = 'Checking server';
+  static const String laneHostCheckFailedStatus = 'Host check failed';
+  static const String laneContinuityUnavailableStatus =
+      'Remote continuity unavailable';
+  static const String laneReconnectNeededStatus = 'Reconnect needed';
+  static const String laneChangesPendingStatus = 'Changes pending';
+  static const String laneReconnectingStatus = 'Reconnecting';
+  static const String connectAction = 'Connect';
+  static const String connectProgress = 'Connecting…';
+  static const String checkHostAction = 'Check host';
+  static const String checkHostProgress = 'Checking…';
   static const String collapseSidebarAction = 'Collapse sidebar';
   static const String expandSidebarAction = 'Expand sidebar';
   static const String workspaceNotSet = 'Workspace not set';

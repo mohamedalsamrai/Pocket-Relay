@@ -58,9 +58,6 @@ class _ConnectionWorkspaceSavedConnectionsContentState
   final Set<String> _editingConnectionIds = <String>{};
   final Set<String> _deletingConnectionIds = <String>{};
   final Set<String> _autoProbedRemoteRuntimeConnectionIds = <String>{};
-  final Map<String, ConnectionSettingsRemoteServerActionId>
-  _activeRemoteServerActionByConnectionId =
-      <String, ConnectionSettingsRemoteServerActionId>{};
   bool _isCreatingConnection = false;
 
   @override
@@ -264,7 +261,6 @@ class _ConnectionWorkspaceSavedConnectionsContentState
     try {
       await widget.workspaceController.deleteSavedConnection(connectionId);
       _autoProbedRemoteRuntimeConnectionIds.remove(connectionId);
-      _activeRemoteServerActionByConnectionId.remove(connectionId);
     } finally {
       if (mounted) {
         setState(() {
@@ -331,84 +327,6 @@ class _ConnectionWorkspaceSavedConnectionsContentState
         );
       }
     });
-  }
-
-  Future<void> _runRemoteServerAction(
-    SavedConnectionSummary connection,
-    ConnectionSettingsRemoteServerActionId actionId,
-  ) async {
-    if (_activeRemoteServerActionByConnectionId.containsKey(connection.id)) {
-      return;
-    }
-
-    setState(() {
-      _activeRemoteServerActionByConnectionId[connection.id] = actionId;
-    });
-
-    try {
-      final remoteRuntime = await switch (actionId) {
-        ConnectionSettingsRemoteServerActionId.start =>
-          widget.workspaceController.startRemoteServer(
-            connectionId: connection.id,
-          ),
-        ConnectionSettingsRemoteServerActionId.stop =>
-          widget.workspaceController.stopRemoteServer(
-            connectionId: connection.id,
-          ),
-        ConnectionSettingsRemoteServerActionId.restart =>
-          widget.workspaceController.restartRemoteServer(
-            connectionId: connection.id,
-          ),
-      };
-      if (!mounted) {
-        return;
-      }
-      if (!_didRemoteServerActionSucceed(actionId, remoteRuntime)) {
-        _showTransientMessage(
-          ConnectionLifecycleErrors.remoteServerActionFailure(
-            actionId,
-            remoteRuntime: remoteRuntime,
-          ).inlineMessage,
-        );
-      }
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      _showTransientMessage(
-        ConnectionLifecycleErrors.remoteServerActionFailure(
-          actionId,
-          remoteRuntime: widget.workspaceController.state.remoteRuntimeFor(
-            connection.id,
-          ),
-          error: error,
-        ).inlineMessage,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _activeRemoteServerActionByConnectionId.remove(connection.id);
-        });
-      }
-    }
-  }
-
-  bool _didRemoteServerActionSucceed(
-    ConnectionSettingsRemoteServerActionId actionId,
-    ConnectionRemoteRuntimeState remoteRuntime,
-  ) {
-    if (!remoteRuntime.hostCapability.isSupported) {
-      return false;
-    }
-
-    return switch (actionId) {
-      ConnectionSettingsRemoteServerActionId.start =>
-        remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
-      ConnectionSettingsRemoteServerActionId.stop =>
-        remoteRuntime.server.status == ConnectionRemoteServerStatus.notRunning,
-      ConnectionSettingsRemoteServerActionId.restart =>
-        remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
-    };
   }
 
   void _showTransientMessage(String message) {

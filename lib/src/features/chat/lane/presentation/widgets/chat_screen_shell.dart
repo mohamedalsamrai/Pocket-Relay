@@ -33,6 +33,7 @@ class ChatScreenBody extends StatelessWidget {
     required this.composerRegion,
     required this.loadingIndicator,
     required this.onStopActiveTurn,
+    this.supplementalStatusRegion,
     this.laneRestartAction,
     this.onRestartLane,
   });
@@ -42,6 +43,7 @@ class ChatScreenBody extends StatelessWidget {
   final Widget composerRegion;
   final Widget loadingIndicator;
   final Future<void> Function() onStopActiveTurn;
+  final Widget? supplementalStatusRegion;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
 
@@ -53,6 +55,7 @@ class ChatScreenBody extends StatelessWidget {
 
     return Column(
       children: [
+        if (supplementalStatusRegion != null) supplementalStatusRegion!,
         Expanded(child: transcriptRegion),
         if (screen.turnIndicator != null || laneRestartAction != null)
           Padding(
