@@ -136,6 +136,16 @@ class CodexRuntimePayloadSupport {
     };
   }
 
+  CodexRuntimeTurnState? historicalTurnCompletionState(String? rawStatus) {
+    return switch (rawStatus) {
+      'running' || 'active' || 'inProgress' || 'in_progress' => null,
+      'failed' => CodexRuntimeTurnState.failed,
+      'interrupted' => CodexRuntimeTurnState.interrupted,
+      'cancelled' => CodexRuntimeTurnState.cancelled,
+      _ => CodexRuntimeTurnState.completed,
+    };
+  }
+
   CodexRuntimeItemStatus itemStatus(
     Object? rawStatus,
     CodexRuntimeItemStatus fallback,

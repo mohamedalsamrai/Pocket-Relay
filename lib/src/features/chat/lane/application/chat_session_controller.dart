@@ -84,9 +84,11 @@ class ChatSessionController extends ChangeNotifier {
   bool _sawTrackedSshBootstrapFailure = false;
   bool _sawTrackedUnpinnedHostKeyFailure = false;
   bool _suppressTrackedThreadReuse = false;
+  bool _isBufferingRuntimeEvents = false;
   bool _didAttemptModelCatalogHydration = false;
   int _historicalConversationRestoreGeneration = 0;
   final Set<String> _threadMetadataHydrationAttempts = <String>{};
+  final List<CodexRuntimeEvent> _bufferedRuntimeEvents = <CodexRuntimeEvent>[];
   StreamSubscription<CodexAppServerEvent>? _appServerEventSubscription;
   Future<void>? _initializationFuture;
   Future<void>? _modelCatalogHydrationFuture;

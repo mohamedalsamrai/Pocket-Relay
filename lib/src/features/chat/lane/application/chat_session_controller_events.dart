@@ -102,6 +102,10 @@ void _applyChatSessionRuntimeEvent(
   ChatSessionController controller,
   CodexRuntimeEvent event,
 ) {
+  if (controller._isBufferingRuntimeEvents) {
+    controller._bufferedRuntimeEvents.add(event);
+    return;
+  }
   controller._applySessionState(
     controller._sessionReducer.reduceRuntimeEvent(
       controller._sessionState,

@@ -27,8 +27,8 @@ class CodexHistoricalTurn {
     required this.id,
     required this.threadId,
     required this.createdAt,
-    required this.completedAt,
-    required this.state,
+    this.completedAt,
+    this.state,
     this.model,
     this.effort,
     this.stopReason,
@@ -43,8 +43,8 @@ class CodexHistoricalTurn {
   final String id;
   final String threadId;
   final DateTime createdAt;
-  final DateTime completedAt;
-  final CodexRuntimeTurnState state;
+  final DateTime? completedAt;
+  final CodexRuntimeTurnState? state;
   final String? model;
   final String? effort;
   final String? stopReason;
@@ -54,6 +54,8 @@ class CodexHistoricalTurn {
   final String? errorMessage;
   final Map<String, dynamic>? snapshot;
   final List<CodexHistoricalEntry> entries;
+
+  bool get isCompleted => completedAt != null && state != null;
 }
 
 class CodexHistoricalEntry {

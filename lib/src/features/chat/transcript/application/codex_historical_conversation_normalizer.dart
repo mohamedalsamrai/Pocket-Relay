@@ -41,13 +41,18 @@ class CodexHistoricalConversationNormalizer {
   }) {
     final effectiveThreadId = turn.threadId ?? threadId;
     final createdAt = _eventTimestamp(turn.raw, fallback: fallbackCreatedAt);
-    final completedAt = _eventTimestamp(turn.raw, fallback: createdAt);
+    final completionState = _payloadSupport.historicalTurnCompletionState(
+      turn.status,
+    );
+    final completedAt = completionState == null
+        ? null
+        : _eventTimestamp(turn.raw, fallback: createdAt);
     return CodexHistoricalTurn(
       id: turn.id,
       threadId: effectiveThreadId,
       createdAt: createdAt,
       completedAt: completedAt,
-      state: _payloadSupport.turnState(turn.status),
+      state: completionState,
       model: turn.model,
       effort: turn.effort,
       stopReason: turn.stopReason,

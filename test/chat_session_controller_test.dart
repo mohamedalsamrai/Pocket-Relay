@@ -1153,9 +1153,12 @@ void main() {
   );
 
   test(
-    'reattachConversation seeds live thread identity without hydrating transcript history when the lane is empty',
+    'reattachConversation restores the selected transcript when the lane is empty',
     () async {
-      final appServerClient = FakeCodexAppServerClient();
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_live'] = _savedConversationThread(
+          threadId: 'thread_live',
+        );
       addTearDown(appServerClient.close);
 
       final controller = ChatSessionController(
@@ -1185,8 +1188,89 @@ void main() {
       );
       expect(controller.sessionState.rootThreadId, 'thread_live');
       expect(controller.sessionState.currentThreadId, 'thread_live');
-      expect(controller.transcriptBlocks, isEmpty);
+      expect(
+        controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+          (block) => block.text,
+        ),
+        contains('Restore this'),
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexTextBlock>().map(
+          (block) => block.body,
+        ),
+        contains('Restored answer'),
+      );
       expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'reattachConversation restores history and keeps the latest running turn active on an empty lane',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'input_running',
+        method: 'item/tool/requestUserInput',
+        params: <String, Object?>{
+          'threadId': 'thread_live',
+          'turnId': 'turn_running',
+          'itemId': 'item_assistant_running',
+          'questions': <Object?>[
+            <String, Object?>{
+              'id': 'q1',
+              'header': 'Approval',
+              'question': 'Continue?',
+            },
+          ],
+        },
+      );
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_live'] = _runningConversationThread(
+          threadId: 'thread_live',
+        )
+        ..resumeThreadReplayEventsByThreadId['thread_live'] =
+            <CodexAppServerEvent>[replayedRequest];
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.initialize();
+      await controller.reattachConversation('thread_live');
+
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.readThreadCalls, <String>['thread_live']);
+      expect(controller.sessionState.currentThreadId, 'thread_live');
+      expect(controller.sessionState.activeTurn?.turnId, 'turn_running');
+      expect(
+        controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+          (block) => block.text,
+        ),
+        containsAll(<String>['Restore this', 'Keep going']),
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexTextBlock>().map(
+          (block) => block.body,
+        ),
+        containsAll(<String>['Restored answer', 'Still running']),
+      );
+      expect(
+        controller.sessionState.pendingUserInputRequests.containsKey(
+          'input_running',
+        ),
+        isTrue,
+      );
     },
   );
 
@@ -2986,6 +3070,126 @@ CodexAppServerThreadHistory _savedConversationThread({
               'status': 'completed',
               'content': <Object>[
                 <String, Object?>{'text': 'Second answer'},
+              ],
+            },
+          ],
+        },
+      ),
+    ],
+  );
+}
+
+CodexAppServerThreadHistory _runningConversationThread({
+  required String threadId,
+}) {
+  return CodexAppServerThreadHistory(
+    id: threadId,
+    name: 'Live conversation',
+    sourceKind: 'app-server',
+    turns: const <CodexAppServerHistoryTurn>[
+      CodexAppServerHistoryTurn(
+        id: 'turn_saved',
+        status: 'completed',
+        items: <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant',
+            type: 'agent_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ),
+        ],
+        raw: <String, dynamic>{
+          'id': 'turn_saved',
+          'status': 'completed',
+          'items': <Object>[
+            <String, Object?>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+            <String, Object?>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ],
+        },
+      ),
+      CodexAppServerHistoryTurn(
+        id: 'turn_running',
+        status: 'running',
+        items: <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user_running',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user_running',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Keep going'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant_running',
+            type: 'agent_message',
+            status: 'in_progress',
+            raw: <String, dynamic>{
+              'id': 'item_assistant_running',
+              'type': 'agent_message',
+              'status': 'in_progress',
+              'content': <Object>[
+                <String, Object?>{'text': 'Still running'},
+              ],
+            },
+          ),
+        ],
+        raw: <String, dynamic>{
+          'id': 'turn_running',
+          'status': 'running',
+          'items': <Object>[
+            <String, Object?>{
+              'id': 'item_user_running',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Keep going'},
+              ],
+            },
+            <String, Object?>{
+              'id': 'item_assistant_running',
+              'type': 'agent_message',
+              'status': 'in_progress',
+              'content': <Object>[
+                <String, Object?>{'text': 'Still running'},
               ],
             },
           ],
