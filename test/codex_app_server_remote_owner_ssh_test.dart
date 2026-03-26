@@ -258,9 +258,9 @@ exit 1
     expect(command, contains('tmux new-session'));
     expect(command, contains('ws://127.0.0.1:45123'));
     expect(command, contains('/tmp/pocket-relay-remote-1.log'));
-    expect(command, contains('launch_command='));
-    expect(command, contains('codex app-server --listen ws://127.0.0.1:45123'));
-    expect(command, contains(r'eval "$launch_command"'));
+    expect(command, contains('requested_codex='));
+    expect(command, contains('resolve_requested_codex()'));
+    expect(command, contains('run_requested_codex app-server --listen'));
     expect(command, contains('codex app-server exited with status'));
     expect(command, contains('pocket-relay-remote-1'));
     expect(command, contains('tmux respawn-pane'));
@@ -279,12 +279,8 @@ exit 1
         port: 45123,
       );
 
-      expect(
-        command,
-        contains(
-          'source /etc/profile && codex app-server --listen ws://127.0.0.1:45123',
-        ),
-      );
+      expect(command, contains('source /etc/profile && codex'));
+      expect(command, contains('run_requested_codex app-server --listen'));
     },
   );
 

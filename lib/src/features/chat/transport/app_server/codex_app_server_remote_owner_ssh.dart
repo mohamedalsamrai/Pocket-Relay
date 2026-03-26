@@ -550,14 +550,12 @@ String buildSshRemoteOwnerStartCommand({
   final logFile = buildPocketRelayRemoteOwnerLogFilePath(
     sessionName: sessionName,
   );
-  final launchCommand =
-      '${codexPath.trim()} app-server --listen ws://127.0.0.1:$port';
   final tmuxCommand =
       '''
-launch_command=${shellEscape(launchCommand)}
+${_buildRequestedCodexShellFunctions(requestedCodex: codexPath)}
 log_file=${shellEscape(logFile)}
 rm -f "\$log_file"
-eval "\$launch_command" >>"\$log_file" 2>&1
+run_requested_codex app-server --listen ws://127.0.0.1:$port >>"\$log_file" 2>&1
 status=\$?
 echo "pocket-relay: codex app-server exited with status \$status" >>"\$log_file"
 exit "\$status"

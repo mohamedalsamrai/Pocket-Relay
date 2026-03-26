@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_inventory.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
@@ -115,12 +117,47 @@ class _ConnectionWorkspaceDesktopShellState
       return;
     }
 
+    final connection = widget.workspaceController.state.catalog.connectionForId(
+      connectionId,
+    );
+    if (connection == null) {
+      return;
+    }
+
     setState(() {
       _openingInventoryConnectionIds.add(connectionId);
     });
 
     try {
       await widget.workspaceController.instantiateConnection(connectionId);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ConnectionRemoteRuntimeState? remoteRuntime;
+      if (connection.profile.isRemote) {
+        try {
+          remoteRuntime = await widget.workspaceController.refreshRemoteRuntime(
+            connectionId: connectionId,
+          );
+        } catch (_) {
+          remoteRuntime = widget.workspaceController.state.remoteRuntimeFor(
+            connectionId,
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      _showTransientMessage(
+        ConnectionLifecycleErrors.openConnectionFailure(
+          profile: connection.profile,
+          remoteRuntime: remoteRuntime,
+          error: error,
+        ).inlineMessage,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -128,5 +165,11 @@ class _ConnectionWorkspaceDesktopShellState
         });
       }
     }
+  }
+
+  void _showTransientMessage(String message) {
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(message)));
   }
 }

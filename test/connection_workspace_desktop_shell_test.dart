@@ -217,6 +217,56 @@ void main() {
   );
 
   testWidgets(
+    'desktop sidebar surfaces lane open failures instead of leaking async errors',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final repository = _FailingLoadConnectionRepository(
+        delegate: MemoryCodexConnectionRepository(
+          initialConnections: <SavedConnection>[
+            SavedConnection(
+              id: 'conn_primary',
+              profile: _profile('Primary Box', 'primary.local'),
+              secrets: const ConnectionSecrets(password: 'secret-1'),
+            ),
+            SavedConnection(
+              id: 'conn_secondary',
+              profile: _profile('Secondary Box', 'secondary.local'),
+              secrets: const ConnectionSecrets(password: 'secret-2'),
+            ),
+          ],
+        ),
+        failingConnectionId: 'conn_secondary',
+        error: StateError('saved definition unavailable'),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        repository: repository,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildShell(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Could not open lane'), findsOneWidget);
+      expect(
+        find.textContaining('saved definition unavailable'),
+        findsOneWidget,
+      );
+      expect(controller.state.selectedConnectionId, 'conn_primary');
+      expect(controller.state.liveConnectionIds, <String>['conn_primary']);
+    },
+  );
+
+  testWidgets(
     'desktop lane strip opens the workspace conversation history sheet',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -293,9 +343,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(repository.loadCalls, hasLength(1));
@@ -1135,7 +1185,7 @@ Widget _buildShell(
 
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
-  MemoryCodexConnectionRepository? repository,
+  CodexConnectionRepository? repository,
 }) {
   final resolvedRepository =
       repository ??
@@ -1191,6 +1241,44 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FailingLoadConnectionRepository
+    implements CodexConnectionRepository {
+  _FailingLoadConnectionRepository({
+    required this.delegate,
+    required this.failingConnectionId,
+    required this.error,
+  });
+
+  final CodexConnectionRepository delegate;
+  final String failingConnectionId;
+  final Object error;
+
+  @override
+  Future<ConnectionCatalogState> loadCatalog() => delegate.loadCatalog();
+
+  @override
+  Future<SavedConnection> loadConnection(String connectionId) {
+    if (connectionId == failingConnectionId) {
+      throw error;
+    }
+    return delegate.loadConnection(connectionId);
+  }
+
+  @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) => delegate.createConnection(profile: profile, secrets: secrets);
+
+  @override
+  Future<void> saveConnection(SavedConnection connection) =>
+      delegate.saveConnection(connection);
+
+  @override
+  Future<void> deleteConnection(String connectionId) =>
+      delegate.deleteConnection(connectionId);
 }
 
 final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
