@@ -97,7 +97,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
 
   void _detachLaneBindingListeners(ConnectionLaneBinding laneBinding) {
     laneBinding.sessionController.removeListener(_handleLaneBindingChange);
-    unawaited(_laneAppServerEventSubscription?.cancel() ?? Future<void>.value());
+    unawaited(
+      _laneAppServerEventSubscription?.cancel() ?? Future<void>.value(),
+    );
     _laneAppServerEventSubscription = null;
   }
 
@@ -162,14 +164,17 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         ConnectionWorkspaceTransportRecoveryPhase.reconnecting;
     final isRestartInProgress =
         _isRestartingLane || isTransportReconnectInProgress;
+    final recoveryNotice = _transportRecoveryNoticeFor(
+      liveReattachPhase: liveReattachPhase,
+      phase: transportRecoveryPhase,
+      remoteRuntime: remoteRuntime,
+    );
     final chatRoot = ChatRootAdapter(
       laneBinding: widget.laneBinding,
       platformPolicy: widget.platformPolicy,
       onConnectionSettingsRequested: _handleConnectionSettingsRequested,
       supplementalMenuActions: _supplementalMenuActionsFor(
-        reconnectRequirement: reconnectRequirement,
         isLaneBusy: isLaneBusy,
-        isRestartInProgress: isRestartInProgress,
       ),
       supplementalStatusRegion: _buildLaneConnectionStrip(
         context,
@@ -179,31 +184,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         liveReattachPhase: liveReattachPhase,
         remoteRuntime: remoteRuntime,
         isLaneBusy: isLaneBusy,
+        isRestartInProgress: isRestartInProgress,
+        recoveryNotice: recoveryNotice,
       ),
-      supplementalComposerNotice: _transportRecoveryNoticeFor(
-        liveReattachPhase: liveReattachPhase,
-        phase: transportRecoveryPhase,
-        remoteRuntime: remoteRuntime,
-      ),
-      laneRestartAction: reconnectRequirement != null
-          ? ChatLaneRestartActionContract(
-              badgeLabel: ConnectionWorkspaceCopy.reconnectBadgeFor(
-                reconnectRequirement,
-              ),
-              label: isRestartInProgress
-                  ? ConnectionWorkspaceCopy.reconnectProgressFor(
-                      reconnectRequirement,
-                    )
-                  : ConnectionWorkspaceCopy.reconnectActionFor(
-                      reconnectRequirement,
-                    ),
-              isInProgress: isRestartInProgress,
-            )
-          : null,
-      onRestartLane:
-          reconnectRequirement != null && !isLaneBusy && !isRestartInProgress
-          ? _restartLane
-          : null,
     );
     return chatRoot;
   }
@@ -284,7 +267,8 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
   }
 
   Future<void> _connectLaneTransport() async {
-    if (_isConnectingLaneTransport || widget.laneBinding.appServerClient.isConnected) {
+    if (_isConnectingLaneTransport ||
+        widget.laneBinding.appServerClient.isConnected) {
       return;
     }
 
@@ -304,7 +288,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
           connectionId: connectionId,
         );
       } catch (_) {
-        remoteRuntime = workspaceController.state.remoteRuntimeFor(connectionId);
+        remoteRuntime = workspaceController.state.remoteRuntimeFor(
+          connectionId,
+        );
       }
       if (!mounted) {
         return;
@@ -425,6 +411,8 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
     required ConnectionRemoteRuntimeState? remoteRuntime,
     required bool isLaneBusy,
+    required bool isRestartInProgress,
+    required Widget? recoveryNotice,
   }) {
     final status = _laneStatusContractFor(
       profile: profile,
@@ -438,10 +426,17 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       reconnectRequirement: reconnectRequirement,
       remoteRuntime: remoteRuntime,
       isLaneBusy: isLaneBusy,
+      isRestartInProgress: isRestartInProgress,
+    );
+    final secondaryAction = _laneConversationHistoryActionFor(
+      profile: profile,
+      isLaneBusy: isLaneBusy,
     );
     return _WorkspaceLaneConnectionStrip(
       status: status,
       primaryAction: primaryAction,
+      secondaryAction: secondaryAction,
+      notice: recoveryNotice,
     );
   }
 
@@ -458,7 +453,10 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     if (!profile.isReady) {
       return _WorkspaceLaneStatusContract(
         label: ConnectionWorkspaceCopy.laneConfigurationIncompleteStatus,
-        detail: baseDetail,
+        detail: _laneStatusDetail(
+          baseDetail,
+          ConnectionWorkspaceCopy.laneConfigurationIncompleteDetail,
+        ),
         icon: Icons.settings_outlined,
         tone: _WorkspaceLaneStatusTone.warning,
       );
@@ -566,14 +564,20 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       ConnectionRemoteHostCapabilityStatus.unknown =>
         _WorkspaceLaneStatusContract(
           label: ConnectionWorkspaceCopy.laneHostUnknownStatus,
-          detail: baseDetail,
+          detail: _laneStatusDetail(
+            baseDetail,
+            ConnectionWorkspaceCopy.laneBootstrapDetail,
+          ),
           icon: Icons.help_outline_rounded,
           tone: _WorkspaceLaneStatusTone.neutral,
         ),
       ConnectionRemoteHostCapabilityStatus.checking =>
         _WorkspaceLaneStatusContract(
           label: ConnectionWorkspaceCopy.laneHostCheckingStatus,
-          detail: baseDetail,
+          detail: _laneStatusDetail(
+            baseDetail,
+            ConnectionWorkspaceCopy.laneHostCheckingDetail,
+          ),
           icon: Icons.sync_rounded,
           tone: _WorkspaceLaneStatusTone.loading,
         ),
@@ -604,7 +608,10 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         ConnectionRemoteServerStatus.unknown ||
         ConnectionRemoteServerStatus.checking => _WorkspaceLaneStatusContract(
           label: ConnectionWorkspaceCopy.laneServerCheckingStatus,
-          detail: baseDetail,
+          detail: _laneStatusDetail(
+            baseDetail,
+            ConnectionWorkspaceCopy.laneServerCheckingDetail,
+          ),
           icon: Icons.sync_rounded,
           tone: _WorkspaceLaneStatusTone.loading,
         ),
@@ -643,8 +650,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     required ConnectionWorkspaceReconnectRequirement? reconnectRequirement,
     required ConnectionRemoteRuntimeState? remoteRuntime,
     required bool isLaneBusy,
+    required bool isRestartInProgress,
   }) {
-    if (!profile.isRemote || !profile.isReady || reconnectRequirement != null) {
+    if (!profile.isRemote || !profile.isReady) {
       return null;
     }
 
@@ -652,7 +660,18 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         isLaneBusy ||
         _isRefreshingLaneRemoteRuntime ||
         _isConnectingLaneTransport ||
-        _activeLaneRemoteServerAction != null;
+        _activeLaneRemoteServerAction != null ||
+        isRestartInProgress;
+    if (reconnectRequirement case final requirement?) {
+      return _WorkspaceLaneStatusActionContract(
+        key: const ValueKey<String>('lane_connection_action_reconnect'),
+        label: isRestartInProgress
+            ? ConnectionWorkspaceCopy.reconnectProgressFor(requirement)
+            : ConnectionWorkspaceCopy.reconnectActionFor(requirement),
+        onPressed: isBusy ? null : _restartLane,
+      );
+    }
+
     switch (remoteRuntime?.hostCapability.status ??
         ConnectionRemoteHostCapabilityStatus.unknown) {
       case ConnectionRemoteHostCapabilityStatus.unknown:
@@ -716,6 +735,20 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         }
     }
   }
+
+  _WorkspaceLaneStatusActionContract _laneConversationHistoryActionFor({
+    required ConnectionProfile profile,
+    required bool isLaneBusy,
+  }) {
+    final hasWorkspaceHistoryScope = profile.workspaceDir.trim().isNotEmpty;
+    return _WorkspaceLaneStatusActionContract(
+      key: const ValueKey<String>('lane_connection_action_history'),
+      label: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
+      onPressed: hasWorkspaceHistoryScope && !isLaneBusy
+          ? _showConversationHistory
+          : null,
+    );
+  }
 }
 
 enum _WorkspaceLaneStatusTone { neutral, good, warning, danger, loading }
@@ -750,19 +783,24 @@ class _WorkspaceLaneConnectionStrip extends StatelessWidget {
   const _WorkspaceLaneConnectionStrip({
     required this.status,
     this.primaryAction,
+    this.secondaryAction,
+    this.notice,
   });
 
   final _WorkspaceLaneStatusContract status;
   final _WorkspaceLaneStatusActionContract? primaryAction;
+  final _WorkspaceLaneStatusActionContract? secondaryAction;
+  final Widget? notice;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = _colorsFor(theme, status.tone);
     final primaryAction = this.primaryAction;
+    final secondaryAction = this.secondaryAction;
     final detail = switch (status.label) {
       ConnectionWorkspaceCopy.laneDisconnectedStatus =>
-        '${status.detail.isEmpty ? '' : '${status.detail} · '}Connect this lane to Codex to continue.',
+        '${status.detail.isEmpty ? '' : '${status.detail} · '}${ConnectionWorkspaceCopy.laneDisconnectedDetail}',
       _ => status.detail,
     };
 
@@ -832,6 +870,16 @@ class _WorkspaceLaneConnectionStrip extends StatelessWidget {
                           },
                     child: Text(primaryAction.label),
                   ),
+                if (secondaryAction != null)
+                  OutlinedButton(
+                    key: secondaryAction.key,
+                    onPressed: secondaryAction.onPressed == null
+                        ? null
+                        : () {
+                            unawaited(secondaryAction.onPressed!());
+                          },
+                    child: Text(secondaryAction.label),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -842,6 +890,7 @@ class _WorkspaceLaneConnectionStrip extends StatelessWidget {
                 height: 1.35,
               ),
             ),
+            if (notice != null) ...[const SizedBox(height: 12), notice!],
           ],
         ),
       ),

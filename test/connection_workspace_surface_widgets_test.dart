@@ -82,51 +82,6 @@ void main() {
   );
 
   testWidgets(
-    'live lane settings no longer expose remote server action callbacks',
-    (tester) async {
-      final clientsById = _buildClientsById('conn_primary');
-      final controller = _buildWorkspaceController(clientsById: clientsById);
-      final settingsOverlayDelegate =
-          _DeferredConnectionSettingsOverlayDelegate();
-      addTearDown(() async {
-        controller.dispose();
-        await _closeClients(clientsById);
-      });
-
-      await controller.initialize();
-      final laneBinding = controller.selectedLaneBinding!;
-
-      await tester.pumpWidget(
-        _buildLiveLaneApp(
-          controller,
-          laneBinding,
-          settingsOverlayDelegate: settingsOverlayDelegate,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Connection settings'));
-      await tester.pump();
-
-      expect(
-        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
-        isNull,
-      );
-
-      settingsOverlayDelegate.complete(null);
-      await tester.pumpAndSettle();
-    },
-  );
-
-  testWidgets(
     'live lane shows a persistent connected status strip for healthy remote lanes',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary');
@@ -175,6 +130,7 @@ void main() {
       );
       expect(find.text('Connected'), findsOneWidget);
       expect(find.text('primary.local · /workspace'), findsOneWidget);
+      await controller.flushRecoveryPersistence();
     },
   );
 
@@ -224,6 +180,41 @@ void main() {
 
       expect(ownerControl.startCalls, hasLength(1));
       expect(ownerControl.startCalls.single.ownerId, 'conn_primary');
+    },
+  );
+
+  testWidgets(
+    'live lane explains that opening a remote lane does not connect automatically',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host status unknown'), findsOneWidget);
+      expect(
+        find.textContaining('Open lane does not connect automatically.'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_history')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -445,9 +436,7 @@ void main() {
       expect(find.text('Disconnected'), findsOneWidget);
       expect(find.text('Connect'), findsOneWidget);
       expect(
-        find.byKey(
-          const ValueKey<String>('lane_connection_action_connect'),
-        ),
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
         findsOneWidget,
       );
     },
@@ -533,9 +522,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(
-        find.byKey(
-          const ValueKey<String>('lane_connection_action_connect'),
-        ),
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
       );
       await tester.pumpAndSettle();
 
@@ -545,10 +532,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(
-        find.textContaining('Could not connect lane'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Could not connect lane'), findsOneWidget);
       expect(
         find.textContaining('Underlying error: connect failed'),
         findsOneWidget,
@@ -619,19 +603,6 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogSources.single,
         ConnectionSettingsModelCatalogSource.connectionCache,
       );
-      expect(
-        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
-        isNull,
-      );
-
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
     },
@@ -701,19 +672,6 @@ void main() {
         ConnectionSettingsModelCatalogSource.lastKnownCache,
       );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
-      expect(
-        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
-        isNull,
-      );
-      expect(
-        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
-        isNull,
-      );
-
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
     },
@@ -1944,9 +1902,9 @@ void main() {
           workspaceDir: '/workspace',
           status: CodexRemoteAppServerOwnerStatus.stopped,
           sessionName: 'pocket-relay-conn_primary',
-          detail: 'Remote Pocket Relay server is not running.',
+          detail: 'Managed remote app-server is not running.',
         ),
-        message: 'Remote Pocket Relay server is not running.',
+        message: 'Managed remote app-server is not running.',
       );
       await controller.reconnectConnection('conn_primary');
       await tester.pumpAndSettle();
@@ -2240,7 +2198,7 @@ final class _ThrowingRemoteOwnerControl
       workspaceDir: workspaceDir,
       status: CodexRemoteAppServerOwnerStatus.missing,
       sessionName: 'pocket-relay-$ownerId',
-      detail: 'No Pocket Relay server is running for this connection.',
+      detail: 'No managed remote app-server is running for this connection.',
     );
   }
 
@@ -2550,15 +2508,6 @@ class _DeferredConnectionSettingsOverlayDelegate
   final List<ConnectionSettingsRemoteRuntimeRefresher?>
   launchedRemoteRuntimeCallbacks =
       <ConnectionSettingsRemoteRuntimeRefresher?>[];
-  final List<ConnectionSettingsRemoteServerActionRunner?>
-  launchedStartRemoteServerCallbacks =
-      <ConnectionSettingsRemoteServerActionRunner?>[];
-  final List<ConnectionSettingsRemoteServerActionRunner?>
-  launchedStopRemoteServerCallbacks =
-      <ConnectionSettingsRemoteServerActionRunner?>[];
-  final List<ConnectionSettingsRemoteServerActionRunner?>
-  launchedRestartRemoteServerCallbacks =
-      <ConnectionSettingsRemoteServerActionRunner?>[];
   Completer<ConnectionSettingsSubmitPayload?> _completer =
       Completer<ConnectionSettingsSubmitPayload?>();
 
@@ -2574,9 +2523,6 @@ class _DeferredConnectionSettingsOverlayDelegate
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
     ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
-    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
-    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
-    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
@@ -2585,9 +2531,6 @@ class _DeferredConnectionSettingsOverlayDelegate
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
     launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
-    launchedStartRemoteServerCallbacks.add(onStartRemoteServer);
-    launchedStopRemoteServerCallbacks.add(onStopRemoteServer);
-    launchedRestartRemoteServerCallbacks.add(onRestartRemoteServer);
     return _completer.future;
   }
 

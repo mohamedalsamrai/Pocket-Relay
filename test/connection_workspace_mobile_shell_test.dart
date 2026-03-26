@@ -73,7 +73,7 @@ void main() {
     );
   });
 
-  testWidgets('overflow menu opens the workspace conversation history sheet', (
+  testWidgets('lane strip opens the workspace conversation history sheet', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -101,9 +101,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('More actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Conversation history'));
+    await tester.tap(
+      find.byKey(const ValueKey('lane_connection_action_history')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(BottomSheet), findsOneWidget);
@@ -166,9 +166,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_saved')),
@@ -218,9 +218,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_empty')),
@@ -232,44 +232,43 @@ void main() {
     },
   );
 
+  testWidgets('lane strip shows a generic conversation history backend error', (
+    tester,
+  ) async {
+    final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+    final controller = _buildWorkspaceController(clientsById: clientsById);
+    addTearDown(() async {
+      controller.dispose();
+      await _closeClients(clientsById);
+    });
+
+    await controller.initialize();
+    await tester.pumpWidget(
+      _buildShell(
+        controller,
+        conversationHistoryRepository:
+            FakeCodexWorkspaceConversationHistoryRepository(
+              error: StateError('history backend unavailable'),
+            ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('lane_connection_action_history')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load conversations'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+      ),
+      findsOneWidget,
+    );
+  });
   testWidgets(
-    'overflow menu shows a generic conversation history backend error',
-    (tester) async {
-      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
-      final controller = _buildWorkspaceController(clientsById: clientsById);
-      addTearDown(() async {
-        controller.dispose();
-        await _closeClients(clientsById);
-      });
-
-      await controller.initialize();
-      await tester.pumpWidget(
-        _buildShell(
-          controller,
-          conversationHistoryRepository:
-              FakeCodexWorkspaceConversationHistoryRepository(
-                error: StateError('history backend unavailable'),
-              ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Could not load conversations'), findsOneWidget);
-      expect(
-        find.textContaining(
-          '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
-        ),
-        findsOneWidget,
-      );
-    },
-  );
-  testWidgets(
-    'overflow menu disables non-roster actions when the active lane has no workspace',
+    'when the active lane has no workspace, the lane strip disables history and the overflow keeps only roster actions',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final repository = MemoryCodexConnectionRepository(
@@ -302,6 +301,10 @@ void main() {
       await tester.pumpWidget(_buildShell(controller));
       await tester.pumpAndSettle();
 
+      final historyButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
+
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
@@ -314,12 +317,6 @@ void main() {
       final clearTranscriptItem = tester.widget<PopupMenuItem<int>>(
         find.ancestor(
           of: find.text('Clear transcript'),
-          matching: find.byType(PopupMenuItem<int>),
-        ),
-      );
-      final historyItem = tester.widget<PopupMenuItem<int>>(
-        find.ancestor(
-          of: find.text('Conversation history'),
           matching: find.byType(PopupMenuItem<int>),
         ),
       );
@@ -338,9 +335,16 @@ void main() {
 
       expect(newThreadItem.enabled, isFalse);
       expect(clearTranscriptItem.enabled, isFalse);
-      expect(historyItem.enabled, isFalse);
-      expect(closeLaneItem.enabled, isFalse);
+      expect(historyButton.onPressed, isNull);
+      expect(closeLaneItem.enabled, isTrue);
       expect(savedConnectionsItem.enabled, isTrue);
+      expect(
+        find.ancestor(
+          of: find.text('Conversation history'),
+          matching: find.byType(PopupMenuItem<int>),
+        ),
+        findsNothing,
+      );
     },
   );
 
@@ -556,9 +560,12 @@ void main() {
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
-      expect(find.text('Changes pending'), findsOneWidget);
+      expect(find.text('Changes pending'), findsWidgets);
       expect(find.text('Apply changes'), findsOneWidget);
-      expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('lane_connection_action_reconnect')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -592,7 +599,10 @@ void main() {
       expect(find.text('Reconnect'), findsOneWidget);
       expect(find.text('Changes pending'), findsNothing);
       expect(find.text('Apply changes'), findsNothing);
-      expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('lane_connection_action_reconnect')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -670,7 +680,9 @@ void main() {
 
       await tester.tap(find.byTooltip('Connection settings'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('restart_lane')));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_reconnect')),
+      );
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);

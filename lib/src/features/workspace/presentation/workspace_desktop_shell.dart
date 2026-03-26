@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
@@ -6,6 +8,8 @@ import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_workspace_inventory.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
@@ -41,6 +45,7 @@ class ConnectionWorkspaceDesktopShell extends StatefulWidget {
 class _ConnectionWorkspaceDesktopShellState
     extends State<ConnectionWorkspaceDesktopShell> {
   bool _isSidebarCollapsed = false;
+  final Set<String> _openingInventoryConnectionIds = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +71,8 @@ class _ConnectionWorkspaceDesktopShellState
                 onToggleCollapsed: supportsCollapsedSidebar
                     ? _toggleSidebarCollapsed
                     : null,
-                connectionSubtitleBuilder: _connectionSubtitle,
+                openingConnectionIds: _openingInventoryConnectionIds,
+                onOpenConnection: _openConnectionFromInventory,
               ),
               Expanded(
                 child: switch ((
@@ -106,7 +112,64 @@ class _ConnectionWorkspaceDesktopShellState
     });
   }
 
-  String _connectionSubtitle(ConnectionProfile profile) {
-    return ConnectionWorkspaceCopy.connectionSubtitle(profile);
+  Future<void> _openConnectionFromInventory(String connectionId) async {
+    if (_openingInventoryConnectionIds.contains(connectionId)) {
+      return;
+    }
+
+    final connection = widget.workspaceController.state.catalog.connectionForId(
+      connectionId,
+    );
+    if (connection == null) {
+      return;
+    }
+
+    setState(() {
+      _openingInventoryConnectionIds.add(connectionId);
+    });
+
+    try {
+      await widget.workspaceController.instantiateConnection(connectionId);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ConnectionRemoteRuntimeState? remoteRuntime;
+      if (connection.profile.isRemote) {
+        try {
+          remoteRuntime = await widget.workspaceController.refreshRemoteRuntime(
+            connectionId: connectionId,
+          );
+        } catch (_) {
+          remoteRuntime = widget.workspaceController.state.remoteRuntimeFor(
+            connectionId,
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      _showTransientMessage(
+        ConnectionLifecycleErrors.openConnectionFailure(
+          profile: connection.profile,
+          remoteRuntime: remoteRuntime,
+          error: error,
+        ).inlineMessage,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _openingInventoryConnectionIds.remove(connectionId);
+        });
+      }
+    }
+  }
+
+  void _showTransientMessage(String message) {
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(message)));
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,55 @@ void main() {
     expect(command, contains(r'$HOME/.local/bin/$requested_codex'));
     expect(command, contains('/workspace'));
   });
+
+  test(
+    'capability probe command executes successfully for a plain codex binary',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'pocket_relay_capability_probe_',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final workspaceDir = Directory('${tempDir.path}/workspace')..createSync();
+      final localBinDir = Directory('${tempDir.path}/.local/bin')
+        ..createSync(recursive: true);
+      final codexFile = File('${localBinDir.path}/codex');
+      codexFile.writeAsStringSync('''
+#!/bin/bash
+if [ "\$1" = "app-server" ] && [ "\$2" = "--help" ]; then
+  exit 0
+fi
+exit 1
+''');
+      await Process.run('/bin/chmod', <String>['+x', codexFile.path]);
+
+      final command = buildSshRemoteHostCapabilityProbeCommand(
+        profile: _profile().copyWith(
+          codexPath: 'codex',
+          workspaceDir: workspaceDir.path,
+        ),
+      );
+
+      final result = await Process.run(
+        '/bin/bash',
+        <String>['-c', command],
+        environment: <String, String>{
+          'HOME': tempDir.path,
+          'PATH': Platform.environment['PATH'] ?? '',
+        },
+      );
+
+      expect(result.exitCode, 0, reason: result.stderr.toString());
+      expect(
+        result.stdout.toString(),
+        contains('__pocket_relay_capabilities__ tmux='),
+      );
+    },
+  );
 
   test(
     'builds a capability probe command for a launch command with spaces',
@@ -208,9 +258,31 @@ void main() {
     expect(command, contains('tmux new-session'));
     expect(command, contains('ws://127.0.0.1:45123'));
     expect(command, contains('/tmp/pocket-relay-remote-1.log'));
-    expect(command, contains('exec_requested_codex app-server --listen'));
+    expect(command, contains('requested_codex='));
+    expect(command, contains('resolve_requested_codex()'));
+    expect(command, contains('run_requested_codex app-server --listen'));
+    expect(command, contains('codex app-server exited with status'));
     expect(command, contains('pocket-relay-remote-1'));
+    expect(command, contains('tmux respawn-pane'));
+    expect(command, contains('exec bash -lc'));
+    expect(command, contains('tmux new-session -d -P -F'));
+    expect(command, contains('#{pane_id}'));
   });
+
+  test(
+    'buildSshRemoteOwnerStartCommand preserves shell-wrapped launch commands',
+    () {
+      final command = buildSshRemoteOwnerStartCommand(
+        sessionName: 'pocket-relay-remote-1',
+        workspaceDir: '/workspace',
+        codexPath: 'source /etc/profile && codex',
+        port: 45123,
+      );
+
+      expect(command, contains('source /etc/profile && codex'));
+      expect(command, contains('run_requested_codex app-server --listen'));
+    },
+  );
 
   test('buildSshRemoteOwnerStopCommand kills the expected tmux session', () {
     final command = buildSshRemoteOwnerStopCommand(
@@ -272,7 +344,10 @@ void main() {
 
     expect(snapshot.status, CodexRemoteAppServerOwnerStatus.missing);
     expect(snapshot.sessionName, 'pocket-relay-remote-1');
-    expect(snapshot.detail, contains('No Pocket Relay server is running'));
+    expect(
+      snapshot.detail,
+      contains('No managed remote app-server is running'),
+    );
     expect(snapshot.isConnectable, isFalse);
   });
 
@@ -305,6 +380,44 @@ void main() {
       expect(snapshot.status, CodexRemoteAppServerOwnerStatus.stopped);
       expect(snapshot.pid, 2041);
       expect(snapshot.detail, contains('not running a websocket app-server'));
+    },
+  );
+
+  test(
+    'inspectOwner appends explicit app-server exit status from the launch log',
+    () async {
+      final encodedLog = base64.encode(
+        utf8.encode('pocket-relay: codex app-server exited with status 23\n'),
+      );
+      final process = _FakeCodexAppServerProcess(
+        stdoutLines: <String>[
+          '__pocket_relay_owner__ status=stopped pid=2041 host= port= detail=process_missing log_b64=$encodedLog',
+        ],
+      );
+      final inspector = CodexSshRemoteAppServerOwnerInspector(
+        sshBootstrap:
+            ({
+              required profile,
+              required secrets,
+              required verifyHostKey,
+            }) async {
+              return _FakeSshBootstrapClient(process: process);
+            },
+      );
+
+      final snapshot = await inspector.inspectOwner(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        ownerId: 'remote-1',
+        workspaceDir: '/workspace',
+      );
+
+      expect(snapshot.status, CodexRemoteAppServerOwnerStatus.stopped);
+      expect(snapshot.detail, contains('Underlying error:'));
+      expect(
+        snapshot.detail,
+        contains('codex app-server exited with status 23'),
+      );
     },
   );
 

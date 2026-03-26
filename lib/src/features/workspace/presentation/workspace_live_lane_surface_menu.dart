@@ -2,46 +2,20 @@ part of 'workspace_live_lane_surface.dart';
 
 extension on _ConnectionWorkspaceLiveLaneSurfaceState {
   List<ChatChromeMenuAction> _supplementalMenuActionsFor({
-    required ConnectionWorkspaceReconnectRequirement? reconnectRequirement,
     required bool isLaneBusy,
-    required bool isRestartInProgress,
   }) {
-    final hasWorkspaceHistoryScope = widget
-        .laneBinding
-        .sessionController
-        .profile
-        .workspaceDir
-        .trim()
-        .isNotEmpty;
     return <ChatChromeMenuAction>[
-      ChatChromeMenuAction(
-        label: ConnectionWorkspaceCopy.conversationHistoryMenuLabel,
-        onSelected: () {
-          unawaited(_showConversationHistory());
-        },
-        isEnabled: hasWorkspaceHistoryScope && !isLaneBusy,
-      ),
       ChatChromeMenuAction(
         label: ConnectionWorkspaceCopy.savedConnectionsMenuLabel,
         onSelected: widget.workspaceController.showSavedConnections,
       ),
-      if (reconnectRequirement case final requirement?)
-        ChatChromeMenuAction(
-          label: isRestartInProgress
-              ? ConnectionWorkspaceCopy.reconnectMenuProgressFor(requirement)
-              : ConnectionWorkspaceCopy.reconnectMenuActionFor(requirement),
-          onSelected: () {
-            unawaited(_restartLane());
-          },
-          isEnabled: !isRestartInProgress && !isLaneBusy,
-        ),
       ChatChromeMenuAction(
         label: ConnectionWorkspaceCopy.closeLaneAction,
         onSelected: () => widget.workspaceController.terminateConnection(
           widget.laneBinding.connectionId,
         ),
         isDestructive: true,
-        isEnabled: hasWorkspaceHistoryScope && !isLaneBusy,
+        isEnabled: !isLaneBusy,
       ),
     ];
   }

@@ -22,7 +22,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake
 import 'support/fake_connection_settings_overlay_delegate.dart';
 
 void main() {
-  testWidgets('renders live and dormant sections in the desktop sidebar', (
+  testWidgets('renders a unified connection inventory in the desktop sidebar', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -37,17 +37,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Connections'), findsOneWidget);
-    expect(find.text('Open lanes'), findsOneWidget);
-    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Inventory'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('desktop_live_conn_primary')),
+      find.byKey(const ValueKey('desktop_connection_conn_primary')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('desktop_connection_conn_secondary')),
       findsOneWidget,
     );
     expect(
       find.byKey(const ValueKey('desktop_saved_connections')),
       findsOneWidget,
     );
-    expect(find.textContaining('Secondary Box'), findsOneWidget);
+    expect(find.text('Manage connections'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('desktop_sidebar_toggle')),
       findsOneWidget,
@@ -160,7 +163,7 @@ void main() {
     },
   );
 
-  testWidgets('dormant sidebar action shows the roster in the main pane', (
+  testWidgets('manage connections action shows the roster in the main pane', (
     tester,
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
@@ -186,7 +189,85 @@ void main() {
   });
 
   testWidgets(
-    'desktop overflow menu opens the workspace conversation history sheet',
+    'dormant inventory rows open a lane directly from the desktop sidebar',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildShell(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.state.isShowingLiveLane, isTrue);
+      expect(controller.state.selectedConnectionId, 'conn_secondary');
+      expect(controller.state.liveConnectionIds, <String>[
+        'conn_primary',
+        'conn_secondary',
+      ]);
+    },
+  );
+
+  testWidgets(
+    'desktop sidebar surfaces lane open failures instead of leaking async errors',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final repository = _FailingLoadConnectionRepository(
+        delegate: MemoryCodexConnectionRepository(
+          initialConnections: <SavedConnection>[
+            SavedConnection(
+              id: 'conn_primary',
+              profile: _profile('Primary Box', 'primary.local'),
+              secrets: const ConnectionSecrets(password: 'secret-1'),
+            ),
+            SavedConnection(
+              id: 'conn_secondary',
+              profile: _profile('Secondary Box', 'secondary.local'),
+              secrets: const ConnectionSecrets(password: 'secret-2'),
+            ),
+          ],
+        ),
+        failingConnectionId: 'conn_secondary',
+        error: StateError('saved definition unavailable'),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        repository: repository,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildShell(controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Could not open lane'), findsOneWidget);
+      expect(
+        find.textContaining('saved definition unavailable'),
+        findsOneWidget,
+      );
+      expect(controller.state.selectedConnectionId, 'conn_primary');
+      expect(controller.state.liveConnectionIds, <String>['conn_primary']);
+    },
+  );
+
+  testWidgets(
+    'desktop lane strip opens the workspace conversation history sheet',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -213,9 +294,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsNothing);
@@ -262,9 +343,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(repository.loadCalls, hasLength(1));
@@ -316,6 +397,10 @@ void main() {
       await tester.pumpWidget(_buildShell(controller));
       await tester.pumpAndSettle();
 
+      final historyButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
+
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
@@ -328,12 +413,6 @@ void main() {
       final clearTranscriptItem = tester.widget<PopupMenuItem<int>>(
         find.ancestor(
           of: find.text('Clear transcript'),
-          matching: find.byType(PopupMenuItem<int>),
-        ),
-      );
-      final historyItem = tester.widget<PopupMenuItem<int>>(
-        find.ancestor(
-          of: find.text('Conversation history'),
           matching: find.byType(PopupMenuItem<int>),
         ),
       );
@@ -352,9 +431,16 @@ void main() {
 
       expect(newThreadItem.enabled, isFalse);
       expect(clearTranscriptItem.enabled, isFalse);
-      expect(historyItem.enabled, isFalse);
-      expect(closeLaneItem.enabled, isFalse);
+      expect(historyButton.onPressed, isNull);
+      expect(closeLaneItem.enabled, isTrue);
       expect(savedConnectionsItem.enabled, isTrue);
+      expect(
+        find.ancestor(
+          of: find.text('Conversation history'),
+          matching: find.byType(PopupMenuItem<int>),
+        ),
+        findsNothing,
+      );
     },
   );
 
@@ -380,9 +466,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('More actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Conversation history'));
+    await tester.tap(
+      find.byKey(const ValueKey('lane_connection_action_history')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Could not load conversations'), findsOneWidget);
     expect(
@@ -431,9 +517,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server unhealthy'), findsOneWidget);
@@ -490,9 +576,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Host key not pinned'), findsOneWidget);
@@ -550,9 +636,9 @@ void main() {
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
 
       expect(repository.loadCalls, hasLength(1));
@@ -595,9 +681,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_saved')),
@@ -656,9 +742,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_empty')),
@@ -703,9 +789,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conversation history'));
+      await tester.tap(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_saved')),
@@ -766,21 +852,23 @@ void main() {
     controller.showSavedConnections();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('desktop_live_conn_secondary')));
+    await tester.tap(
+      find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.state.isShowingLiveLane, isTrue);
     expect(controller.state.selectedConnectionId, 'conn_secondary');
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
         matching: find.text('Secondary Box'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
         matching: find.text('secondary.local · /workspace'),
       ),
       findsOneWidget,
@@ -815,19 +903,23 @@ void main() {
       'conn_primary',
     ]);
     expect(
-      find.byKey(const ValueKey('desktop_live_conn_primary')),
+      find.byKey(const ValueKey('desktop_connection_conn_primary')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('desktop_close_lane_conn_primary')),
       findsNothing,
     );
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
         matching: find.text('Secondary Box'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('desktop_live_conn_secondary')),
+        of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
         matching: find.text('secondary.local · /workspace'),
       ),
       findsOneWidget,
@@ -917,9 +1009,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.state.requiresReconnect('conn_primary'), isTrue);
-      expect(find.text('Changes pending'), findsNWidgets(2));
+      expect(find.text('Changes pending'), findsWidgets);
       expect(find.text('Apply changes'), findsOneWidget);
-      expect(find.byKey(const ValueKey('restart_lane')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('lane_connection_action_reconnect')),
+        findsOneWidget,
+      );
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },
   );
@@ -1052,7 +1147,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Secondary Box · Remote connection not configured'),
+        find.descendant(
+          of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+          matching: find.text('Secondary Box'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('desktop_connection_conn_secondary')),
+          matching: find.text('Remote connection not configured'),
+        ),
         findsOneWidget,
       );
     },
@@ -1080,7 +1185,7 @@ Widget _buildShell(
 
 ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
-  MemoryCodexConnectionRepository? repository,
+  CodexConnectionRepository? repository,
 }) {
   final resolvedRepository =
       repository ??
@@ -1136,6 +1241,44 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FailingLoadConnectionRepository
+    implements CodexConnectionRepository {
+  _FailingLoadConnectionRepository({
+    required this.delegate,
+    required this.failingConnectionId,
+    required this.error,
+  });
+
+  final CodexConnectionRepository delegate;
+  final String failingConnectionId;
+  final Object error;
+
+  @override
+  Future<ConnectionCatalogState> loadCatalog() => delegate.loadCatalog();
+
+  @override
+  Future<SavedConnection> loadConnection(String connectionId) {
+    if (connectionId == failingConnectionId) {
+      throw error;
+    }
+    return delegate.loadConnection(connectionId);
+  }
+
+  @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) => delegate.createConnection(profile: profile, secrets: secrets);
+
+  @override
+  Future<void> saveConnection(SavedConnection connection) =>
+      delegate.saveConnection(connection);
+
+  @override
+  Future<void> deleteConnection(String connectionId) =>
+      delegate.deleteConnection(connectionId);
 }
 
 final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {

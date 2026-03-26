@@ -4,10 +4,10 @@ import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_
 
 abstract final class ConnectionWorkspaceCopy {
   static const String workspaceTitle = 'Connections';
-  static const String openLanesSectionTitle = 'Open lanes';
-  static const String savedSectionTitle = 'Saved';
+  static const String connectionInventorySectionTitle = 'Inventory';
   static const String savedConnectionsTitle = 'Saved connections';
   static const String savedConnectionsMenuLabel = savedConnectionsTitle;
+  static const String manageConnectionsAction = 'Manage connections';
   static const String conversationHistoryMenuLabel = 'Conversation history';
   static const String mobileSavedConnectionsDescription =
       'Jump back to an open lane or open another saved connection. Connection and server controls stay inside each lane.';
@@ -77,6 +77,16 @@ abstract final class ConnectionWorkspaceCopy {
   static const String laneReconnectNeededStatus = 'Reconnect needed';
   static const String laneChangesPendingStatus = 'Changes pending';
   static const String laneReconnectingStatus = 'Reconnecting';
+  static const String laneBootstrapDetail =
+      'Open lane does not connect automatically. Check this host to continue from here.';
+  static const String laneConfigurationIncompleteDetail =
+      'Finish the connection definition before this lane can continue.';
+  static const String laneHostCheckingDetail =
+      'Pocket Relay is checking whether this host can support continuity for this lane.';
+  static const String laneServerCheckingDetail =
+      'Pocket Relay is checking the managed remote session for this lane.';
+  static const String laneDisconnectedDetail =
+      'Connect this lane to Codex to continue.';
   static const String connectAction = 'Connect';
   static const String connectProgress = 'Connecting…';
   static const String checkHostAction = 'Check host';
@@ -104,19 +114,6 @@ abstract final class ConnectionWorkspaceCopy {
       ConnectionMode.local when workspaceDir.isNotEmpty =>
         'Local Codex · $workspaceDir',
       ConnectionMode.local => 'Local Codex · $workspaceNotSet',
-    };
-  }
-
-  static String compactSavedConnectionLabel(ConnectionProfile profile) {
-    final host = profile.host.trim();
-    final workspaceDir = profile.workspaceDir.trim();
-
-    return switch (profile.connectionMode) {
-      ConnectionMode.remote when host.isNotEmpty => host,
-      ConnectionMode.remote when workspaceDir.isNotEmpty => hostNotSet,
-      ConnectionMode.remote => remoteConnectionNotConfigured,
-      ConnectionMode.local when workspaceDir.isNotEmpty => 'Local Codex',
-      ConnectionMode.local => workspaceNotSet,
     };
   }
 
