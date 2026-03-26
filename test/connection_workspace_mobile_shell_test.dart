@@ -101,10 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey('lane_connection_action_history')),
-    );
-    await tester.pumpAndSettle();
+    await _openLaneConversationHistory(tester);
 
     expect(find.byType(BottomSheet), findsOneWidget);
     expect(find.text('Saved backend thread'), findsOneWidget);
@@ -166,10 +163,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('lane_connection_action_history')),
-      );
-      await tester.pumpAndSettle();
+      await _openLaneConversationHistory(tester);
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_saved')),
       );
@@ -218,10 +212,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const ValueKey('lane_connection_action_history')),
-      );
-      await tester.pumpAndSettle();
+      await _openLaneConversationHistory(tester);
       await tester.tap(
         find.byKey(const ValueKey('workspace_conversation_thread_empty')),
       );
@@ -254,10 +245,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey('lane_connection_action_history')),
-    );
-    await tester.pumpAndSettle();
+    await _openLaneConversationHistory(tester);
 
     expect(find.text('Could not load conversations'), findsOneWidget);
     expect(
@@ -301,10 +289,6 @@ void main() {
       await tester.pumpWidget(_buildShell(controller));
       await tester.pumpAndSettle();
 
-      final historyButton = tester.widget<OutlinedButton>(
-        find.byKey(const ValueKey('lane_connection_action_history')),
-      );
-
       await tester.tap(find.byTooltip('More actions'));
       await tester.pumpAndSettle();
 
@@ -335,7 +319,10 @@ void main() {
 
       expect(newThreadItem.enabled, isFalse);
       expect(clearTranscriptItem.enabled, isFalse);
-      expect(historyButton.onPressed, isNull);
+      expect(
+        find.byKey(const ValueKey('lane_connection_action_history')),
+        findsNothing,
+      );
       expect(closeLaneItem.enabled, isTrue);
       expect(savedConnectionsItem.enabled, isTrue);
       expect(
@@ -956,6 +943,15 @@ Widget _buildShell(
           settingsOverlayDelegate ?? FakeConnectionSettingsOverlayDelegate(),
     ),
   );
+}
+
+Future<void> _openLaneConversationHistory(WidgetTester tester) async {
+  final historyButton = find.byKey(
+    const ValueKey('lane_connection_action_history'),
+  );
+  await tester.ensureVisible(historyButton);
+  await tester.tap(historyButton);
+  await tester.pumpAndSettle();
 }
 
 ConnectionWorkspaceController _buildWorkspaceController({

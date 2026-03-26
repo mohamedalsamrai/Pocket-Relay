@@ -662,9 +662,16 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       isLaneBusy: isLaneBusy,
       isRestartInProgress: isRestartInProgress,
     );
+    final secondaryAction = showConnectionControls
+        ? _laneConversationHistoryActionFor(
+            profile: profile,
+            isLaneBusy: isLaneBusy,
+          )
+        : null;
     if (workspacePath.isEmpty &&
         status == null &&
         primaryAction == null &&
+        secondaryAction == null &&
         recoveryNotice == null) {
       return null;
     }
@@ -681,6 +688,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
               remoteRuntime: remoteRuntime,
             ),
       primaryAction: primaryAction,
+      secondaryAction: secondaryAction,
       notice: recoveryNotice,
     );
   }
@@ -1055,6 +1063,7 @@ class _WorkspaceLaneEmptyStateContent extends StatelessWidget {
     this.status,
     this.statusMessage,
     this.primaryAction,
+    this.secondaryAction,
     this.notice,
   });
 
@@ -1062,6 +1071,7 @@ class _WorkspaceLaneEmptyStateContent extends StatelessWidget {
   final _WorkspaceLaneStatusContract? status;
   final String? statusMessage;
   final _WorkspaceLaneStatusActionContract? primaryAction;
+  final _WorkspaceLaneStatusActionContract? secondaryAction;
   final Widget? notice;
 
   @override
@@ -1069,6 +1079,7 @@ class _WorkspaceLaneEmptyStateContent extends StatelessWidget {
     final theme = Theme.of(context);
     final status = this.status;
     final primaryAction = this.primaryAction;
+    final secondaryAction = this.secondaryAction;
     final workspacePath = this.workspacePath?.trim();
     final hasWorkspacePath = workspacePath != null && workspacePath.isNotEmpty;
     final colors = status == null ? null : _colorsFor(theme, status.tone);
@@ -1151,6 +1162,18 @@ class _WorkspaceLaneEmptyStateContent extends StatelessWidget {
                       unawaited(primaryAction.onPressed!());
                     },
               child: Text(primaryAction.label),
+            ),
+          ],
+          if (secondaryAction != null) ...[
+            const SizedBox(height: 10),
+            OutlinedButton(
+              key: secondaryAction.key,
+              onPressed: secondaryAction.onPressed == null
+                  ? null
+                  : () {
+                      unawaited(secondaryAction.onPressed!());
+                    },
+              child: Text(secondaryAction.label),
             ),
           ],
           if (notice != null) ...[const SizedBox(height: 14), notice!],
