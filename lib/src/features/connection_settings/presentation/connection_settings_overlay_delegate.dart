@@ -39,6 +39,33 @@ class ModalConnectionSettingsOverlayDelegate
     onRefreshModelCatalog,
     ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
   }) {
+    if (platformBehavior.isDesktopExperience) {
+      return showDialog<ConnectionSettingsSubmitPayload>(
+        context: context,
+        builder: (dialogContext) {
+          return ConnectionSettingsHost(
+            initialProfile: initialProfile,
+            initialSecrets: initialSecrets,
+            availableModelCatalog: availableModelCatalog,
+            availableModelCatalogSource: availableModelCatalogSource,
+            onRefreshModelCatalog: onRefreshModelCatalog,
+            platformBehavior: platformBehavior,
+            onCancel: () => Navigator.of(dialogContext).pop(),
+            onSubmit: (payload) {
+              Navigator.of(dialogContext).pop(payload);
+            },
+            builder: (context, viewModel, actions) {
+              return ConnectionSheet(
+                platformBehavior: platformBehavior,
+                viewModel: viewModel,
+                actions: actions,
+              );
+            },
+          );
+        },
+      );
+    }
+
     return showModalBottomSheet<ConnectionSettingsSubmitPayload>(
       context: context,
       isScrollControlled: true,
@@ -59,7 +86,11 @@ class ModalConnectionSettingsOverlayDelegate
             Navigator.of(sheetContext).pop(payload);
           },
           builder: (context, viewModel, actions) {
-            return ConnectionSheet(viewModel: viewModel, actions: actions);
+            return ConnectionSheet(
+              platformBehavior: platformBehavior,
+              viewModel: viewModel,
+              actions: actions,
+            );
           },
         );
       },
