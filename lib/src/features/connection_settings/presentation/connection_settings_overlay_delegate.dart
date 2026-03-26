@@ -13,10 +13,15 @@ abstract interface class ConnectionSettingsOverlayDelegate {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
+    ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   });
 }
 
@@ -30,10 +35,15 @@ class ModalConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
+    ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   }) {
     if (platformBehavior.isDesktopExperience) {
       return showDialog<ConnectionSettingsSubmitPayload>(
@@ -71,9 +81,14 @@ class ModalConnectionSettingsOverlayDelegate
         return ConnectionSettingsHost(
           initialProfile: initialProfile,
           initialSecrets: initialSecrets,
+          initialRemoteRuntime: initialRemoteRuntime,
           availableModelCatalog: availableModelCatalog,
           availableModelCatalogSource: availableModelCatalogSource,
           onRefreshModelCatalog: onRefreshModelCatalog,
+          onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+          onStartRemoteServer: onStartRemoteServer,
+          onStopRemoteServer: onStopRemoteServer,
+          onRestartRemoteServer: onRestartRemoteServer,
           platformBehavior: platformBehavior,
           onCancel: () => Navigator.of(sheetContext).pop(),
           onSubmit: (payload) {

@@ -51,6 +51,18 @@ class ConnectionProfile {
 
   bool get isRemote => connectionMode == ConnectionMode.remote;
   bool get isLocal => connectionMode == ConnectionMode.local;
+  String? get remoteHostIdentityKey {
+    if (!isRemote) {
+      return null;
+    }
+
+    final normalizedHost = host.trim().toLowerCase();
+    if (normalizedHost.isEmpty) {
+      return null;
+    }
+
+    return '$normalizedHost:$port';
+  }
 
   bool get isReady => switch (connectionMode) {
     ConnectionMode.remote =>

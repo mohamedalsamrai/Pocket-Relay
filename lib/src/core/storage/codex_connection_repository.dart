@@ -149,6 +149,89 @@ String generateConnectionId() {
   return buffer.toString();
 }
 
+Map<String, ConnectionProfile> _normalizeProfilesWithSharedHostFingerprints({
+  required Iterable<String> orderedConnectionIds,
+  required Map<String, ConnectionProfile> profilesByConnectionId,
+  String? preferredConnectionId,
+  required bool overwriteExistingFingerprints,
+}) {
+  final sharedFingerprintsByHostIdentity =
+      _sharedHostFingerprintsByHostIdentity(
+        orderedConnectionIds: orderedConnectionIds,
+        profilesByConnectionId: profilesByConnectionId,
+      );
+
+  final preferredProfile = preferredConnectionId == null
+      ? null
+      : profilesByConnectionId[preferredConnectionId];
+  final preferredHostIdentityKey = preferredProfile?.remoteHostIdentityKey;
+  final preferredFingerprint = preferredProfile?.hostFingerprint.trim() ?? '';
+  if (preferredHostIdentityKey != null && preferredFingerprint.isNotEmpty) {
+    sharedFingerprintsByHostIdentity[preferredHostIdentityKey] =
+        preferredFingerprint;
+  }
+
+  return <String, ConnectionProfile>{
+    for (final entry in profilesByConnectionId.entries)
+      entry.key: _normalizeProfileWithSharedHostFingerprint(
+        entry.value,
+        sharedFingerprintsByHostIdentity: sharedFingerprintsByHostIdentity,
+        overwriteExistingFingerprint: overwriteExistingFingerprints,
+      ),
+  };
+}
+
+Map<String, String> _sharedHostFingerprintsByHostIdentity({
+  required Iterable<String> orderedConnectionIds,
+  required Map<String, ConnectionProfile> profilesByConnectionId,
+}) {
+  final sharedFingerprintsByHostIdentity = <String, String>{};
+  for (final connectionId in orderedConnectionIds) {
+    final profile = profilesByConnectionId[connectionId];
+    if (profile == null) {
+      continue;
+    }
+
+    final hostIdentityKey = profile.remoteHostIdentityKey;
+    final hostFingerprint = profile.hostFingerprint.trim();
+    if (hostIdentityKey == null || hostFingerprint.isEmpty) {
+      continue;
+    }
+
+    sharedFingerprintsByHostIdentity.putIfAbsent(
+      hostIdentityKey,
+      () => hostFingerprint,
+    );
+  }
+  return sharedFingerprintsByHostIdentity;
+}
+
+ConnectionProfile _normalizeProfileWithSharedHostFingerprint(
+  ConnectionProfile profile, {
+  required Map<String, String> sharedFingerprintsByHostIdentity,
+  required bool overwriteExistingFingerprint,
+}) {
+  final hostIdentityKey = profile.remoteHostIdentityKey;
+  if (hostIdentityKey == null) {
+    return profile;
+  }
+
+  final sharedFingerprint = sharedFingerprintsByHostIdentity[hostIdentityKey];
+  if (sharedFingerprint == null || sharedFingerprint.isEmpty) {
+    return profile;
+  }
+
+  final currentFingerprint = profile.hostFingerprint.trim();
+  if (currentFingerprint == sharedFingerprint) {
+    return profile;
+  }
+  if (currentFingerprint.isNotEmpty && !overwriteExistingFingerprint) {
+    return profile;
+  }
+
+  return profile.copyWith(hostFingerprint: sharedFingerprint);
+}
+
 ConnectionIdGenerator _defaultMemoryConnectionIdGenerator() {
   var nextId = 1;
   return () => 'conn_memory_${nextId++}';

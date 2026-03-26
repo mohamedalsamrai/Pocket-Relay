@@ -39,10 +39,13 @@ extension _ChatSessionControllerModelCapabilities on ChatSessionController {
     try {
       await _ensureChatSessionAppServerConnected(this);
     } catch (error) {
+      final userFacingError = ChatSessionErrors.imageSupportCheckFailed();
       _reportAppServerFailure(
-        title: 'Send failed',
-        message: 'Could not connect to Codex to validate image support.',
-        error: error,
+        userFacingError: userFacingError,
+        runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+          userFacingError,
+          error: error,
+        ),
       );
       return false;
     }

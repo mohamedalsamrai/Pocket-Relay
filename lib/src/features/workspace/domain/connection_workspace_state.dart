@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 
-enum ConnectionWorkspaceViewport { liveLane, dormantRoster }
+enum ConnectionWorkspaceViewport { liveLane, savedConnections }
 
 enum ConnectionWorkspaceBackgroundLifecycleState { inactive, hidden, paused }
 
@@ -21,12 +21,12 @@ enum ConnectionWorkspaceTransportLossReason {
   sshConnectFailed,
   sshHostKeyMismatch,
   sshAuthenticationFailed,
-  sshRemoteLaunchFailed,
 }
 
 enum ConnectionWorkspaceRecoveryOutcome {
   transportRestored,
   transportUnavailable,
+  liveReattached,
   conversationRestored,
   conversationUnavailable,
   conversationRestoreFailed,
@@ -36,6 +36,15 @@ enum ConnectionWorkspaceTransportRecoveryPhase {
   lost,
   reconnecting,
   unavailable,
+}
+
+enum ConnectionWorkspaceLiveReattachPhase {
+  transportLost,
+  reconnecting,
+  ownerMissing,
+  ownerUnhealthy,
+  liveReattached,
+  fallbackRestore,
 }
 
 @immutable
@@ -143,6 +152,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     lastRecoveryOutcome,
   );
 }
+
 class ConnectionWorkspaceState {
   const ConnectionWorkspaceState({
     required this.isLoading,
@@ -153,7 +163,9 @@ class ConnectionWorkspaceState {
     required this.savedSettingsReconnectRequiredConnectionIds,
     required this.transportReconnectRequiredConnectionIds,
     required this.transportRecoveryPhasesByConnectionId,
+    required this.liveReattachPhasesByConnectionId,
     required this.recoveryDiagnosticsByConnectionId,
+    required this.remoteRuntimeByConnectionId,
   });
 
   const ConnectionWorkspaceState.initial()
@@ -166,8 +178,12 @@ class ConnectionWorkspaceState {
       transportReconnectRequiredConnectionIds = const <String>{},
       transportRecoveryPhasesByConnectionId =
           const <String, ConnectionWorkspaceTransportRecoveryPhase>{},
+      liveReattachPhasesByConnectionId =
+          const <String, ConnectionWorkspaceLiveReattachPhase>{},
       recoveryDiagnosticsByConnectionId =
-          const <String, ConnectionWorkspaceRecoveryDiagnostics>{};
+          const <String, ConnectionWorkspaceRecoveryDiagnostics>{},
+      remoteRuntimeByConnectionId =
+          const <String, ConnectionRemoteRuntimeState>{};
 
   final bool isLoading;
   final ConnectionCatalogState catalog;
@@ -178,15 +194,20 @@ class ConnectionWorkspaceState {
   final Set<String> transportReconnectRequiredConnectionIds;
   final Map<String, ConnectionWorkspaceTransportRecoveryPhase>
   transportRecoveryPhasesByConnectionId;
+  final Map<String, ConnectionWorkspaceLiveReattachPhase>
+  liveReattachPhasesByConnectionId;
   final Map<String, ConnectionWorkspaceRecoveryDiagnostics>
   recoveryDiagnosticsByConnectionId;
+  final Map<String, ConnectionRemoteRuntimeState> remoteRuntimeByConnectionId;
 
   Set<String> get reconnectRequiredConnectionIds => <String>{
     ...savedSettingsReconnectRequiredConnectionIds,
     ...transportReconnectRequiredConnectionIds,
   };
 
-  List<String> get dormantConnectionIds {
+  List<String> get savedConnectionIds => catalog.orderedConnectionIds;
+
+  List<String> get nonLiveSavedConnectionIds {
     return <String>[
       for (final connectionId in catalog.orderedConnectionIds)
         if (!liveConnectionIds.contains(connectionId)) connectionId,
@@ -216,10 +237,20 @@ class ConnectionWorkspaceState {
     return transportRecoveryPhasesByConnectionId[connectionId];
   }
 
+  ConnectionWorkspaceLiveReattachPhase? liveReattachPhaseFor(
+    String connectionId,
+  ) {
+    return liveReattachPhasesByConnectionId[connectionId];
+  }
+
   ConnectionWorkspaceRecoveryDiagnostics? recoveryDiagnosticsFor(
     String connectionId,
   ) {
     return recoveryDiagnosticsByConnectionId[connectionId];
+  }
+
+  ConnectionRemoteRuntimeState? remoteRuntimeFor(String connectionId) {
+    return remoteRuntimeByConnectionId[connectionId];
   }
 
   ConnectionWorkspaceReconnectRequirement? reconnectRequirementFor(
@@ -243,8 +274,8 @@ class ConnectionWorkspaceState {
   bool get isShowingLiveLane =>
       viewport == ConnectionWorkspaceViewport.liveLane;
 
-  bool get isShowingDormantRoster =>
-      viewport == ConnectionWorkspaceViewport.dormantRoster;
+  bool get isShowingSavedConnections =>
+      viewport == ConnectionWorkspaceViewport.savedConnections;
 
   ConnectionWorkspaceState copyWith({
     bool? isLoading,
@@ -256,8 +287,11 @@ class ConnectionWorkspaceState {
     Set<String>? transportReconnectRequiredConnectionIds,
     Map<String, ConnectionWorkspaceTransportRecoveryPhase>?
     transportRecoveryPhasesByConnectionId,
+    Map<String, ConnectionWorkspaceLiveReattachPhase>?
+    liveReattachPhasesByConnectionId,
     Map<String, ConnectionWorkspaceRecoveryDiagnostics>?
     recoveryDiagnosticsByConnectionId,
+    Map<String, ConnectionRemoteRuntimeState>? remoteRuntimeByConnectionId,
     bool clearSelectedConnectionId = false,
   }) {
     return ConnectionWorkspaceState(
@@ -277,9 +311,14 @@ class ConnectionWorkspaceState {
       transportRecoveryPhasesByConnectionId:
           transportRecoveryPhasesByConnectionId ??
           this.transportRecoveryPhasesByConnectionId,
+      liveReattachPhasesByConnectionId:
+          liveReattachPhasesByConnectionId ??
+          this.liveReattachPhasesByConnectionId,
       recoveryDiagnosticsByConnectionId:
           recoveryDiagnosticsByConnectionId ??
           this.recoveryDiagnosticsByConnectionId,
+      remoteRuntimeByConnectionId:
+          remoteRuntimeByConnectionId ?? this.remoteRuntimeByConnectionId,
     );
   }
 
@@ -304,8 +343,16 @@ class ConnectionWorkspaceState {
           transportRecoveryPhasesByConnectionId,
         ) &&
         mapEquals(
+          other.liveReattachPhasesByConnectionId,
+          liveReattachPhasesByConnectionId,
+        ) &&
+        mapEquals(
           other.recoveryDiagnosticsByConnectionId,
           recoveryDiagnosticsByConnectionId,
+        ) &&
+        mapEquals(
+          other.remoteRuntimeByConnectionId,
+          remoteRuntimeByConnectionId,
         );
   }
 
@@ -324,7 +371,17 @@ class ConnectionWorkspaceState {
       ),
     ),
     Object.hashAllUnordered(
+      liveReattachPhasesByConnectionId.entries.map(
+        (entry) => Object.hash(entry.key, entry.value),
+      ),
+    ),
+    Object.hashAllUnordered(
       recoveryDiagnosticsByConnectionId.entries.map(
+        (entry) => Object.hash(entry.key, entry.value),
+      ),
+    ),
+    Object.hashAllUnordered(
+      remoteRuntimeByConnectionId.entries.map(
         (entry) => Object.hash(entry.key, entry.value),
       ),
     ),

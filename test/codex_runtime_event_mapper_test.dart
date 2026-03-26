@@ -467,6 +467,44 @@ void main() {
     expect(specific.message, 'Connection refused');
   });
 
+  test('maps SSH port-forward events into runtime diagnostics', () {
+    final mapper = CodexRuntimeEventMapper();
+
+    final started = mapper.mapEvent(
+      const CodexAppServerSshPortForwardStartedEvent(
+        host: '192.168.1.10',
+        port: 22,
+        username: 'vince',
+        remoteHost: '127.0.0.1',
+        remotePort: 4100,
+        localPort: 54123,
+      ),
+    );
+    final failed = mapper.mapEvent(
+      const CodexAppServerSshPortForwardFailedEvent(
+        host: '192.168.1.10',
+        port: 22,
+        username: 'vince',
+        remoteHost: '127.0.0.1',
+        remotePort: 4100,
+        message: 'open failed',
+        detail: 'administratively prohibited',
+      ),
+    );
+
+    expect(started.single, isA<CodexRuntimeWarningEvent>());
+    expect(
+      (started.single as CodexRuntimeWarningEvent).summary,
+      contains('localhost:54123'),
+    );
+
+    expect(failed.single, isA<CodexRuntimeErrorEvent>());
+    final failedEvent = failed.single as CodexRuntimeErrorEvent;
+    expect(failedEvent.message, contains('open failed'));
+    expect(failedEvent.detail, 'administratively prohibited');
+    expect(failedEvent.errorClass, CodexRuntimeErrorClass.transportError);
+  });
+
   test(
     'maps SSH host-key mismatches and auth failures into typed runtime events only',
     () {
@@ -508,48 +546,20 @@ void main() {
     },
   );
 
-  test(
-    'maps SSH authenticated, remote launch failed, and remote process started events',
-    () {
-      final mapper = CodexRuntimeEventMapper();
+  test('maps SSH authenticated events into typed runtime events only', () {
+    final mapper = CodexRuntimeEventMapper();
 
-      final authenticated = mapper.mapEvent(
-        const CodexAppServerSshAuthenticatedEvent(
-          host: '192.168.1.10',
-          port: 22,
-          username: 'vince',
-          authMode: AuthMode.password,
-        ),
-      );
-      final launchFailed = mapper.mapEvent(
-        const CodexAppServerSshRemoteLaunchFailedEvent(
-          host: '192.168.1.10',
-          port: 22,
-          username: 'vince',
-          command: 'bash -lc codex app-server --listen stdio://',
-          message: 'exec request denied',
-        ),
-      );
-      final processStarted = mapper.mapEvent(
-        const CodexAppServerSshRemoteProcessStartedEvent(
-          host: '192.168.1.10',
-          port: 22,
-          username: 'vince',
-          command: 'bash -lc codex app-server --listen stdio://',
-        ),
-      );
+    final authenticated = mapper.mapEvent(
+      const CodexAppServerSshAuthenticatedEvent(
+        host: '192.168.1.10',
+        port: 22,
+        username: 'vince',
+        authMode: AuthMode.password,
+      ),
+    );
 
-      expect(authenticated.single, isA<CodexRuntimeSshAuthenticatedEvent>());
-      expect(
-        launchFailed.single,
-        isA<CodexRuntimeSshRemoteLaunchFailedEvent>(),
-      );
-      expect(
-        processStarted.single,
-        isA<CodexRuntimeSshRemoteProcessStartedEvent>(),
-      );
-    },
-  );
+    expect(authenticated.single, isA<CodexRuntimeSshAuthenticatedEvent>());
+  });
 
   test('maps turn plan notifications into runtime events', () {
     final mapper = CodexRuntimeEventMapper();

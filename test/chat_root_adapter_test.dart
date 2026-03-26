@@ -575,7 +575,7 @@ void main() {
       expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
       expect(
         overlayDelegate.transientFeedbackMessages.single,
-        'Could not rewind this conversation to the selected prompt.',
+        '[PR-CHAT-1202] Continue from prompt failed. Could not rewind this conversation to the selected prompt.',
       );
     },
   );

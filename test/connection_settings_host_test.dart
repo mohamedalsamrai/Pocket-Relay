@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
@@ -79,6 +81,21 @@ void main() {
       expect(find.text('SSH password'), findsNothing);
       expect(find.text('Private key PEM'), findsOneWidget);
       expect(find.text('Key passphrase (optional)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'material settings renderer requires a host fingerprint for remote connections',
+    (tester) async {
+      await tester.pumpWidget(_buildMaterialSettingsApp(onSubmit: (_) {}));
+
+      await tester.enterText(_materialTextField('Host fingerprint'), '');
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_save_top')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Host fingerprint is required'), findsOneWidget);
     },
   );
 
@@ -518,17 +535,385 @@ void main() {
       expect(find.text('GPT Live Default').last, findsOneWidget);
     },
   );
+
+  testWidgets(
+    'shared host probes remote runtime on open and exposes the result through the contract',
+    (tester) async {
+      final probePayloads = <ConnectionSettingsSubmitPayload>[];
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          onRefreshRemoteRuntime: (payload) async {
+            probePayloads.add(payload);
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.unknown(),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(probePayloads, hasLength(1));
+      expect(probePayloads.single.profile.host, 'devbox.local');
+      expect(probePayloads.single.profile.workspaceDir, '/workspace');
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.supported,
+      );
+    },
+  );
+
+  testWidgets(
+    'shared host records probe failures separately from unsupported capability results',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          onRefreshRemoteRuntime: (payload) async {
+            throw StateError('ssh failed');
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.probeFailed,
+      );
+      expect(
+        remoteRuntimeStates.last!.hostCapability.detail,
+        contains('ssh failed'),
+      );
+    },
+  );
+
+  testWidgets(
+    'shared host exposes an initial remote runtime when no refresh callback is provided',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.running(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay-conn_primary',
+              port: 4100,
+            ),
+          ),
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return const SizedBox();
+          },
+        ),
+      );
+      await tester.pump();
+
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+      expect(remoteRuntimeStates.last!.server.port, 4100);
+    },
+  );
+
+  testWidgets(
+    'shared host runs explicit remote server actions and updates the contract runtime',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+      var startCalls = 0;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.notRunning(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay-conn_primary',
+            ),
+          ),
+          onStartRemoteServer: () async {
+            startCalls += 1;
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.running(
+                ownerId: 'conn_primary',
+                sessionName: 'pocket-relay-conn_primary',
+                port: 4100,
+              ),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.start,
+                );
+              },
+              child: const Text('start'),
+            );
+          },
+        ),
+      );
+
+      await tester.tap(find.text('start'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(startCalls, 1);
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+      expect(remoteRuntimeStates.last!.server.port, 4100);
+    },
+  );
+
+  testWidgets(
+    'shared host ignores stale remote probes after an explicit server action',
+    (tester) async {
+      final staleProbeCompleter = Completer<ConnectionRemoteRuntimeState>();
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+      var stopCalls = 0;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.running(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay-conn_primary',
+              port: 4100,
+            ),
+          ),
+          onRefreshRemoteRuntime: (payload) {
+            return staleProbeCompleter.future;
+          },
+          onStopRemoteServer: () async {
+            stopCalls += 1;
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.supported(
+                detail: 'ready',
+              ),
+              server: ConnectionRemoteServerState.notRunning(
+                ownerId: 'conn_primary',
+                sessionName: 'pocket-relay-conn_primary',
+                detail:
+                    'No Pocket Relay server is running for this connection.',
+              ),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.stop,
+                );
+              },
+              child: const Text('stop'),
+            );
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('stop'));
+      await tester.pump();
+
+      staleProbeCompleter.complete(
+        const ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(
+            detail: 'ready',
+          ),
+          server: ConnectionRemoteServerState.running(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay-conn_primary',
+            port: 4100,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(stopCalls, 1);
+      expect(remoteRuntimeStates.last, isNotNull);
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+    },
+  );
+
+  testWidgets(
+    'shared host re-probes runtime truth after a remote server action fails',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+      var refreshCalls = 0;
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.notRunning(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay-conn_primary',
+            ),
+          ),
+          onStartRemoteServer: () async {
+            throw StateError('ssh control failed');
+          },
+          onRefreshRemoteRuntime: (payload) async {
+            refreshCalls += 1;
+            return const ConnectionRemoteRuntimeState(
+              hostCapability: ConnectionRemoteHostCapabilityState.probeFailed(
+                detail: 'ssh control failed',
+              ),
+              server: ConnectionRemoteServerState.notRunning(
+                ownerId: 'conn_primary',
+                sessionName: 'pocket-relay-conn_primary',
+                detail:
+                    'No Pocket Relay server is running for this connection.',
+              ),
+            );
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.start,
+                );
+              },
+              child: const Text('start'),
+            );
+          },
+        ),
+      );
+
+      await tester.tap(find.text('start'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(refreshCalls, greaterThan(1));
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.probeFailed,
+      );
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+    },
+  );
+
+  testWidgets(
+    'shared host marks host check failed when a remote server action fails without a refresh callback',
+    (tester) async {
+      final remoteRuntimeStates = <ConnectionRemoteRuntimeState?>[];
+
+      await tester.pumpWidget(
+        _buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialRemoteRuntime: const ConnectionRemoteRuntimeState(
+            hostCapability: ConnectionRemoteHostCapabilityState.supported(
+              detail: 'ready',
+            ),
+            server: ConnectionRemoteServerState.running(
+              ownerId: 'conn_primary',
+              sessionName: 'pocket-relay-conn_primary',
+              port: 4100,
+            ),
+          ),
+          onRestartRemoteServer: () async {
+            throw StateError('ssh control failed');
+          },
+          builder: (context, viewModel, actions) {
+            remoteRuntimeStates.add(viewModel.contract.remoteRuntime);
+            return TextButton(
+              onPressed: () {
+                actions.onRemoteServerAction(
+                  ConnectionSettingsRemoteServerActionId.restart,
+                );
+              },
+              child: const Text('restart'),
+            );
+          },
+        ),
+      );
+
+      await tester.tap(find.text('restart'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        remoteRuntimeStates.last!.hostCapability.status,
+        ConnectionRemoteHostCapabilityStatus.probeFailed,
+      );
+      expect(
+        remoteRuntimeStates.last!.hostCapability.detail,
+        contains('ssh control failed'),
+      );
+      expect(
+        remoteRuntimeStates.last!.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+    },
+  );
 }
 
 Widget _buildMaterialSettingsApp({
   Brightness brightness = Brightness.light,
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionRemoteRuntimeState? initialRemoteRuntime,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
+  ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+  ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
+  ConnectionSettingsHostBuilder? builder,
 }) {
   return MaterialApp(
     theme: buildPocketTheme(brightness),
@@ -538,17 +923,24 @@ Widget _buildMaterialSettingsApp({
       body: _buildHost(
         onSubmit: onSubmit,
         platformBehavior: platformBehavior,
+        initialRemoteRuntime: initialRemoteRuntime,
         availableModelCatalog: availableModelCatalog,
         availableModelCatalogSource: availableModelCatalogSource,
         initialProfile: initialProfile,
         onRefreshModelCatalog: onRefreshModelCatalog,
-        builder: (context, viewModel, actions) {
-          return ConnectionSheet(
-            platformBehavior: platformBehavior,
-            viewModel: viewModel,
-            actions: actions,
-          );
-        },
+        onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+        onStartRemoteServer: onStartRemoteServer,
+        onStopRemoteServer: onStopRemoteServer,
+        onRestartRemoteServer: onRestartRemoteServer,
+        builder:
+            builder ??
+            (context, viewModel, actions) {
+              return ConnectionSheet(
+                platformBehavior: platformBehavior,
+                viewModel: viewModel,
+                actions: actions,
+              );
+            },
       ),
     ),
   );
@@ -558,18 +950,28 @@ Widget _buildHost({
   required ValueChanged<ConnectionSettingsSubmitPayload> onSubmit,
   required ConnectionSettingsHostBuilder builder,
   PocketPlatformBehavior platformBehavior = _mobileBehavior,
+  ConnectionRemoteRuntimeState? initialRemoteRuntime,
   ConnectionModelCatalog? availableModelCatalog,
   ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
   ConnectionProfile? initialProfile,
   Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog,
+  ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+  ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+  ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
 }) {
   return ConnectionSettingsHost(
     initialProfile: initialProfile ?? _configuredProfile(),
     initialSecrets: const ConnectionSecrets(password: 'secret'),
+    initialRemoteRuntime: initialRemoteRuntime,
     availableModelCatalog: availableModelCatalog,
     availableModelCatalogSource: availableModelCatalogSource,
     onRefreshModelCatalog: onRefreshModelCatalog,
+    onRefreshRemoteRuntime: onRefreshRemoteRuntime,
+    onStartRemoteServer: onStartRemoteServer,
+    onStopRemoteServer: onStopRemoteServer,
+    onRestartRemoteServer: onRestartRemoteServer,
     platformBehavior: platformBehavior,
     onCancel: () {},
     onSubmit: onSubmit,
@@ -593,7 +995,7 @@ ConnectionSettingsFieldId _fieldIdForLabel(String label) {
     'Username' => ConnectionSettingsFieldId.username,
     'Workspace directory' => ConnectionSettingsFieldId.workspaceDir,
     'Codex launch command' => ConnectionSettingsFieldId.codexPath,
-    'Host fingerprint (optional)' => ConnectionSettingsFieldId.hostFingerprint,
+    'Host fingerprint' => ConnectionSettingsFieldId.hostFingerprint,
     'SSH password' => ConnectionSettingsFieldId.password,
     'Private key PEM' => ConnectionSettingsFieldId.privateKeyPem,
     'Key passphrase (optional)' =>
@@ -609,6 +1011,7 @@ ConnectionProfile _configuredProfile() {
     username: 'vince',
     workspaceDir: '/workspace',
     codexPath: 'codex',
+    hostFingerprint: 'aa:bb:cc:dd',
   );
 }
 

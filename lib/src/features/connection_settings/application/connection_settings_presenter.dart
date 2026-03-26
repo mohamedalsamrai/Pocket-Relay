@@ -2,8 +2,14 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 
-part 'connection_settings_presenter_sections.dart';
 part 'connection_settings_presenter_state.dart';
+part 'presenter/helper_text.dart';
+part 'presenter/section_authentication.dart';
+part 'presenter/section_codex.dart';
+part 'presenter/section_model.dart';
+part 'presenter/section_profile.dart';
+part 'presenter/section_remote_server.dart';
+part 'presenter/submit_payload.dart';
 
 class ConnectionSettingsPresenter {
   const ConnectionSettingsPresenter();
@@ -12,6 +18,11 @@ class ConnectionSettingsPresenter {
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required ConnectionSettingsFormState formState,
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    bool supportsRemoteServerStart = false,
+    bool supportsRemoteServerStop = false,
+    bool supportsRemoteServerRestart = false,
+    ConnectionSettingsRemoteServerActionId? activeRemoteServerAction,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     bool didModelCatalogRefreshFail = false,
@@ -42,6 +53,14 @@ class ConnectionSettingsPresenter {
         supportsLocalConnectionMode: supportsLocalConnectionMode,
       ),
       remoteConnectionSection: _buildRemoteConnectionSection(presentationState),
+      remoteServerSection: _buildRemoteServerSection(
+        presentationState,
+        remoteRuntime: remoteRuntime,
+        supportsRemoteServerStart: supportsRemoteServerStart,
+        supportsRemoteServerStop: supportsRemoteServerStop,
+        supportsRemoteServerRestart: supportsRemoteServerRestart,
+        activeRemoteServerAction: activeRemoteServerAction,
+      ),
       authenticationSection: _buildAuthenticationSection(presentationState),
       codexSection: _buildCodexSection(presentationState),
       modelSection: _buildModelSection(presentationState),
@@ -76,6 +95,7 @@ class ConnectionSettingsPresenter {
                 state: presentationState,
               ),
       ),
+      remoteRuntime: presentationState.isRemote ? remoteRuntime : null,
     );
   }
 

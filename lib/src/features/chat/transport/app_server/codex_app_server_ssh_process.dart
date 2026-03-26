@@ -7,16 +7,14 @@ import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 
 import 'codex_app_server_models.dart';
 
-Future<CodexAppServerProcess> openSshCodexAppServerProcess({
+Future<CodexSshBootstrapClient> connectAuthenticatedSshBootstrapClient({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
   required void Function(CodexAppServerEvent event) emitEvent,
-  @visibleForTesting
-  CodexSshProcessBootstrap sshBootstrap = _connectSshBootstrap,
+  CodexSshProcessBootstrap sshBootstrap = connectSshBootstrapClient,
 }) async {
   final host = profile.host.trim();
   final username = profile.username.trim();
-  final command = buildSshCodexAppServerCommand(profile: profile);
   var emittedHostKeyMismatch = false;
   var emittedUnpinnedHostKey = false;
 
@@ -122,32 +120,7 @@ Future<CodexAppServerProcess> openSshCodexAppServerProcess({
       authMode: profile.authMode,
     ),
   );
-
-  try {
-    final process = await client.launchProcess(command);
-    emitEvent(
-      CodexAppServerSshRemoteProcessStartedEvent(
-        host: host,
-        port: profile.port,
-        username: username,
-        command: command,
-      ),
-    );
-    return process;
-  } catch (error) {
-    client.close();
-    emitEvent(
-      CodexAppServerSshRemoteLaunchFailedEvent(
-        host: host,
-        port: profile.port,
-        username: username,
-        command: command,
-        message: _sshErrorMessage(error),
-        detail: error,
-      ),
-    );
-    rethrow;
-  }
+  return client;
 }
 
 bool _shouldSuppressHostKeyFailure(
@@ -189,16 +162,7 @@ List<SSHKeyPair>? _buildIdentities(
   return SSHKeyPair.fromPem(privateKey, passphrase.isEmpty ? null : passphrase);
 }
 
-@visibleForTesting
-String buildSshCodexAppServerCommand({required ConnectionProfile profile}) {
-  final launcher = profile.codexPath.trim();
-  final command =
-      'cd ${shellEscape(profile.workspaceDir.trim())} && '
-      '$launcher app-server --listen stdio://';
-  return 'bash -lc ${shellEscape(command)}';
-}
-
-Future<CodexSshBootstrapClient> _connectSshBootstrap({
+Future<CodexSshBootstrapClient> connectSshBootstrapClient({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
   required bool Function(String keyType, String actualFingerprint)
@@ -238,8 +202,47 @@ final class _DartSshBootstrapClient implements CodexSshBootstrapClient {
   }
 
   @override
+  Future<CodexSshForwardChannel> forwardLocal(
+    String remoteHost,
+    int remotePort, {
+    String localHost = 'localhost',
+    int localPort = 0,
+  }) async {
+    final channel = await _client.forwardLocal(
+      remoteHost,
+      remotePort,
+      localHost: localHost,
+      localPort: localPort,
+    );
+    return _DartSshForwardChannel(channel);
+  }
+
+  @override
   void close() {
     _client.close();
+  }
+}
+
+final class _DartSshForwardChannel implements CodexSshForwardChannel {
+  _DartSshForwardChannel(this._channel);
+
+  final SSHForwardChannel _channel;
+
+  @override
+  Stream<Uint8List> get stream => _channel.stream;
+
+  @override
+  StreamSink<List<int>> get sink => _channel.sink;
+
+  @override
+  Future<void> get done => _channel.done;
+
+  @override
+  Future<void> close() => _channel.close();
+
+  @override
+  void destroy() {
+    _channel.destroy();
   }
 }
 

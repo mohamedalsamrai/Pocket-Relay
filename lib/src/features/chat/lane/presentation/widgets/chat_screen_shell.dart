@@ -35,6 +35,7 @@ class ChatScreenBody extends StatelessWidget {
     required this.composerRegion,
     required this.loadingIndicator,
     required this.onStopActiveTurn,
+    this.supplementalStatusRegion,
     this.laneRestartAction,
     this.onRestartLane,
   });
@@ -47,6 +48,7 @@ class ChatScreenBody extends StatelessWidget {
   final Widget composerRegion;
   final Widget loadingIndicator;
   final Future<void> Function() onStopActiveTurn;
+  final Widget? supplementalStatusRegion;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
 
@@ -58,6 +60,11 @@ class ChatScreenBody extends StatelessWidget {
 
     return Column(
       children: [
+        if (supplementalStatusRegion != null)
+          _wrapDesktopLaneSection(
+            supplementalStatusRegion!,
+            key: const ValueKey<String>('desktop_chat_status_region'),
+          ),
         Expanded(
           child: _wrapDesktopLaneSection(
             transcriptRegion,

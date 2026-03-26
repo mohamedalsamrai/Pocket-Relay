@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_connection_scoped_transport.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
 
 abstract interface class CodexWorkspaceConversationHistoryRepository {
@@ -13,6 +14,7 @@ abstract interface class CodexWorkspaceConversationHistoryRepository {
   Future<List<CodexWorkspaceConversationSummary>> loadWorkspaceConversations({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
+    String? ownerId,
   });
 }
 
@@ -52,6 +54,7 @@ class CodexAppServerConversationHistoryRepository
   Future<List<CodexWorkspaceConversationSummary>> loadWorkspaceConversations({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
+    String? ownerId,
   }) async {
     // Conversation discovery comes from Codex itself. The app only displays the
     // upstream truth; it does not maintain its own historical catalog.
@@ -60,7 +63,24 @@ class CodexAppServerConversationHistoryRepository
       return const <CodexWorkspaceConversationSummary>[];
     }
 
-    final client = clientFactory?.call() ?? CodexAppServerClient();
+    final client =
+        clientFactory?.call() ??
+        switch (profile.connectionMode) {
+          ConnectionMode.local => CodexAppServerClient(),
+          ConnectionMode.remote => () {
+            final normalizedOwnerId = ownerId?.trim();
+            if (normalizedOwnerId == null || normalizedOwnerId.isEmpty) {
+              throw const CodexAppServerException(
+                'Remote conversation history requires a managed owner id.',
+              );
+            }
+            return CodexAppServerClient(
+              transportOpener: buildConnectionScopedCodexAppServerTransportOpener(
+                ownerId: normalizedOwnerId,
+              ),
+            );
+          }(),
+        };
     StreamSubscription<CodexAppServerEvent>? eventsSubscription;
     CodexAppServerUnpinnedHostKeyEvent? unpinnedHostKeyEvent;
     try {

@@ -131,40 +131,39 @@ List<CodexRuntimeEvent>? _mapTransportRuntimeEvent(
           rawMethod: 'transport/ssh/authenticated',
         ),
       ];
-    case CodexAppServerSshRemoteLaunchFailedEvent(
+    case CodexAppServerSshPortForwardStartedEvent(
       :final host,
       :final port,
       :final username,
-      :final command,
+      :final remoteHost,
+      :final remotePort,
+      :final localPort,
+    ):
+      return <CodexRuntimeEvent>[
+        CodexRuntimeWarningEvent(
+          createdAt: now,
+          summary:
+              'SSH forwarding ready for $username@$host:$port to $remoteHost:$remotePort on localhost:$localPort.',
+          rawMethod: 'transport/ssh/portForwardStarted',
+        ),
+      ];
+    case CodexAppServerSshPortForwardFailedEvent(
+      :final host,
+      :final port,
+      :final username,
+      :final remoteHost,
+      :final remotePort,
       :final message,
       :final detail,
     ):
       return <CodexRuntimeEvent>[
-        CodexRuntimeSshRemoteLaunchFailedEvent(
+        CodexRuntimeErrorEvent(
           createdAt: now,
-          host: host,
-          port: port,
-          username: username,
-          command: command,
-          message: message,
+          message:
+              'SSH forwarding failed for $username@$host:$port to $remoteHost:$remotePort: $message',
           detail: detail,
-          rawMethod: 'transport/ssh/remoteLaunchFailed',
-        ),
-      ];
-    case CodexAppServerSshRemoteProcessStartedEvent(
-      :final host,
-      :final port,
-      :final username,
-      :final command,
-    ):
-      return <CodexRuntimeEvent>[
-        CodexRuntimeSshRemoteProcessStartedEvent(
-          createdAt: now,
-          host: host,
-          port: port,
-          username: username,
-          command: command,
-          rawMethod: 'transport/ssh/remoteProcessStarted',
+          errorClass: CodexRuntimeErrorClass.transportError,
+          rawMethod: 'transport/ssh/portForwardFailed',
         ),
       ];
     case CodexAppServerRequestEvent() || CodexAppServerNotificationEvent():

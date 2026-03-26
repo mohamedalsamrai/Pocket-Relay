@@ -1,12 +1,13 @@
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_session_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_errors.dart';
 
 typedef ChatConversationFailurePresentation = ({
-  String title,
-  String message,
-  String? runtimeErrorMessage,
+  PocketUserFacingError userFacingError,
+  String runtimeErrorMessage,
 });
 
 class ChatConversationSendFailureAssessment {
@@ -58,10 +59,10 @@ class ChatConversationRecoveryPolicy {
       expectedThreadId: final expectedThreadId,
       actualThreadId: final actualThreadId,
     )) {
-      final message =
-          'Pocket Relay expected remote conversation "$expectedThreadId", '
-          'but the remote session returned "$actualThreadId". Sending is '
-          'blocked to avoid attaching your draft to a different conversation.';
+      final userFacingError = ChatSessionErrors.sendConversationChanged(
+        expectedThreadId: expectedThreadId,
+        actualThreadId: actualThreadId,
+      );
       return ChatConversationSendFailureAssessment(
         recoveryState: ChatConversationRecoveryState(
           reason: ChatConversationRecoveryReason.unexpectedRemoteConversation,
@@ -74,18 +75,14 @@ class ChatConversationRecoveryPolicy {
         ),
         suppressSnackBar: true,
         presentation: (
-          title: 'Conversation changed',
-          message: message,
-          runtimeErrorMessage: message,
+          userFacingError: userFacingError,
+          runtimeErrorMessage: userFacingError.inlineMessage,
         ),
       );
     }
 
     if (_isMissingConversationThreadError(error)) {
-      const message =
-          'Could not continue this conversation because the remote '
-          'conversation was not found. Start a fresh conversation to '
-          'continue.';
+      final userFacingError = ChatSessionErrors.sendConversationUnavailable();
       return ChatConversationSendFailureAssessment(
         recoveryState: ChatConversationRecoveryState(
           reason: ChatConversationRecoveryReason.missingRemoteConversation,
@@ -96,18 +93,22 @@ class ChatConversationRecoveryPolicy {
         ),
         suppressSnackBar: true,
         presentation: (
-          title: 'Conversation unavailable',
-          message: message,
-          runtimeErrorMessage: message,
+          userFacingError: userFacingError,
+          runtimeErrorMessage: userFacingError.inlineMessage,
         ),
       );
     }
 
+    final userFacingError = ChatSessionErrors.sendFailed(
+      sessionLabel: sessionLabel,
+    );
     return ChatConversationSendFailureAssessment(
       presentation: (
-        title: 'Send failed',
-        message: 'Could not send the prompt to the $sessionLabel session.',
-        runtimeErrorMessage: null,
+        userFacingError: userFacingError,
+        runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+          userFacingError,
+          error: error,
+        ),
       ),
     );
   }

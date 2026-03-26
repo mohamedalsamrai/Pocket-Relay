@@ -13,32 +13,32 @@ Future<void> _connectImpl(
   connection._disconnecting = false;
 
   try {
-    final process = await connection._processLauncher(
+    final transport = await connection._transportOpener(
       profile: profile,
       secrets: secrets,
       emitEvent: connection._emitEvent,
     );
 
-    connection._process = process;
+    connection._transport = transport;
     connection._profile = profile;
-    connection._stdoutClosedCompleter = Completer<void>();
-    connection._stderrClosedCompleter = Completer<void>();
-    connection._stdoutSubscription = connection._decodeLines(process.stdout).listen(
-      connection._handleStdoutLine,
+    connection._protocolMessagesClosedCompleter = Completer<void>();
+    connection._diagnosticsClosedCompleter = Completer<void>();
+    connection._protocolMessageSubscription = transport.protocolMessages.listen(
+      connection._handleProtocolMessage,
       onError: (Object error, StackTrace stackTrace) {
         connection._emitEvent(
           CodexAppServerDiagnosticEvent(
-            message: 'Failed to decode app-server stdout: $error',
+            message: 'Failed to read app-server protocol messages: $error',
             isError: true,
           ),
         );
       },
       onDone: () {
-        connection._stdoutClosedCompleter?.complete();
+        connection._protocolMessagesClosedCompleter?.complete();
         connection._handleProcessClosed();
       },
     );
-    connection._stderrSubscription = connection._decodeLines(process.stderr).listen(
+    connection._diagnosticSubscription = transport.diagnostics.listen(
       (line) {
         final trimmed = line.trim();
         if (trimmed.isEmpty) {
@@ -50,31 +50,30 @@ Future<void> _connectImpl(
         );
       },
       onDone: () {
-        connection._stderrClosedCompleter?.complete();
+        connection._diagnosticsClosedCompleter?.complete();
       },
     );
 
-    process.done.then((_) {
+    transport.done.then((_) {
       if (!connection._disconnecting) {
         connection._handleProcessClosed();
       }
     });
 
     final initializeResponse = await connection
-        .sendRequest(
-          'initialize',
-          <String, Object?>{
-            'clientInfo': <String, String>{
-              'name': connection.clientName,
-              'title': 'Pocket Relay',
-              'version': connection.clientVersion,
-            },
-            'capabilities': const <String, bool>{'experimentalApi': true},
+        .sendRequest('initialize', <String, Object?>{
+          'clientInfo': <String, String>{
+            'name': connection.clientName,
+            'title': 'Pocket Relay',
+            'version': connection.clientVersion,
           },
-        )
+          'capabilities': const <String, bool>{'experimentalApi': true},
+        })
         .timeout(const Duration(seconds: 10));
 
-    connection.writeMessage(const CodexJsonRpcNotification(method: 'initialized'));
+    connection.writeMessage(
+      const CodexJsonRpcNotification(method: 'initialized'),
+    );
     final payload = CodexAppServerConnection._asObject(initializeResponse);
     connection._emitEvent(
       CodexAppServerConnectedEvent(
@@ -93,38 +92,40 @@ Future<void> _disconnectImpl(
 }) async {
   connection._disconnecting = true;
 
-  final process = connection._process;
-  connection._process = null;
+  final transport = connection._transport;
+  connection._transport = null;
   connection._profile = null;
   connection._threadId = null;
   connection._activeTurnId = null;
 
-  if (process != null) {
-    final exitCode = process.exitCode;
-    await process.close();
+  if (transport != null) {
+    final exitCode = transport.termination?.exitCode;
+    await transport.close();
     await connection._drainOutputStreams();
-    await connection._stdoutSubscription?.cancel();
-    await connection._stderrSubscription?.cancel();
-    connection._stdoutSubscription = null;
-    connection._stderrSubscription = null;
-    connection._stdoutClosedCompleter = null;
-    connection._stderrClosedCompleter = null;
+    await connection._protocolMessageSubscription?.cancel();
+    await connection._diagnosticSubscription?.cancel();
+    connection._protocolMessageSubscription = null;
+    connection._diagnosticSubscription = null;
+    connection._protocolMessagesClosedCompleter = null;
+    connection._diagnosticsClosedCompleter = null;
     connection._requestTracker.failPending(
       const CodexAppServerException('App-server session disconnected.'),
     );
     connection._inboundRequestStore.clear();
     if (emitDisconnectedEvent) {
-      connection._emitEvent(CodexAppServerDisconnectedEvent(exitCode: exitCode));
+      connection._emitEvent(
+        CodexAppServerDisconnectedEvent(exitCode: exitCode),
+      );
     }
     return;
   }
 
-  await connection._stdoutSubscription?.cancel();
-  await connection._stderrSubscription?.cancel();
-  connection._stdoutSubscription = null;
-  connection._stderrSubscription = null;
-  connection._stdoutClosedCompleter = null;
-  connection._stderrClosedCompleter = null;
+  await connection._protocolMessageSubscription?.cancel();
+  await connection._diagnosticSubscription?.cancel();
+  connection._protocolMessageSubscription = null;
+  connection._diagnosticSubscription = null;
+  connection._protocolMessagesClosedCompleter = null;
+  connection._diagnosticsClosedCompleter = null;
   connection._requestTracker.failPending(
     const CodexAppServerException('App-server session disconnected.'),
   );
@@ -132,7 +133,7 @@ Future<void> _disconnectImpl(
 }
 
 void _handleProcessClosedImpl(CodexAppServerConnection connection) {
-  if (connection._process == null) {
+  if (connection._transport == null) {
     return;
   }
   unawaited(connection._disconnect(emitDisconnectedEvent: true));

@@ -7,43 +7,39 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_process_launcher.dart';
 
 void main() {
-  test('delegates remote mode to the remote launcher', () async {
-    var remoteCalls = 0;
+  test('rejects remote mode for the generic process launcher path', () async {
     var localCalls = 0;
 
-    await openCodexAppServerProcess(
-      profile: _profile(ConnectionMode.remote),
-      secrets: const ConnectionSecrets(password: 'secret'),
-      emitEvent: (_) {},
-      remoteLauncher:
-          ({required profile, required secrets, required emitEvent}) async {
-            remoteCalls += 1;
-            return _FakeProcess();
-          },
-      localLauncher:
-          ({required profile, required secrets, required emitEvent}) {
-            localCalls += 1;
-            throw StateError('should not use local launcher');
-          },
+    await expectLater(
+      () => openCodexAppServerProcess(
+        profile: _profile(ConnectionMode.remote),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        emitEvent: (_) {},
+        localLauncher:
+            ({required profile, required secrets, required emitEvent}) {
+              localCalls += 1;
+              throw StateError('should not use local launcher');
+            },
+      ),
+      throwsA(
+        isA<CodexAppServerException>().having(
+          (error) => error.message,
+          'message',
+          contains('managed-owner websocket transport path'),
+        ),
+      ),
     );
 
-    expect(remoteCalls, 1);
     expect(localCalls, 0);
   });
 
   test('delegates local mode to the local launcher', () async {
-    var remoteCalls = 0;
     var localCalls = 0;
 
     await openCodexAppServerProcess(
       profile: _profile(ConnectionMode.local),
       secrets: const ConnectionSecrets(),
       emitEvent: (_) {},
-      remoteLauncher:
-          ({required profile, required secrets, required emitEvent}) {
-            remoteCalls += 1;
-            throw StateError('should not use remote launcher');
-          },
       localLauncher:
           ({required profile, required secrets, required emitEvent}) async {
             localCalls += 1;
@@ -51,9 +47,59 @@ void main() {
           },
     );
 
-    expect(remoteCalls, 0);
     expect(localCalls, 1);
   });
+
+  test(
+    'rejects remote mode for the generic transport opener path',
+    () async {
+      var localCalls = 0;
+
+      await expectLater(
+        () => openCodexAppServerTransport(
+          profile: _profile(ConnectionMode.remote),
+          secrets: const ConnectionSecrets(password: 'secret'),
+          emitEvent: (_) {},
+          localLauncher:
+              ({required profile, required secrets, required emitEvent}) {
+                localCalls += 1;
+                throw StateError('should not use local launcher');
+              },
+        ),
+        throwsA(
+          isA<CodexAppServerException>().having(
+            (error) => error.message,
+            'message',
+            contains('managed-owner websocket transport path'),
+          ),
+        ),
+      );
+
+      expect(localCalls, 0);
+    },
+  );
+
+  test(
+    'opens a transport that delegates local mode to the local launcher',
+    () async {
+      var localCalls = 0;
+
+      final transport = await openCodexAppServerTransport(
+        profile: _profile(ConnectionMode.local),
+        secrets: const ConnectionSecrets(),
+        emitEvent: (_) {},
+        localLauncher:
+            ({required profile, required secrets, required emitEvent}) async {
+              localCalls += 1;
+              return _FakeProcess();
+            },
+      );
+
+      expect(transport, isA<CodexAppServerTransport>());
+      expect(localCalls, 1);
+      await transport.close();
+    },
+  );
 }
 
 ConnectionProfile _profile(ConnectionMode mode) {
@@ -88,7 +134,7 @@ final class _FakeProcess implements CodexAppServerProcess {
 
   @override
   Future<void> close() async {
-    await _stdinController.close();
+    unawaited(_stdinController.close());
     await _stdoutController.close();
     await _stderrController.close();
   }

@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 
@@ -12,18 +10,18 @@ part 'codex_app_server_connection_messages.dart';
 
 class CodexAppServerConnection {
   CodexAppServerConnection({
-    required CodexAppServerProcessLauncher processLauncher,
+    required CodexAppServerTransportOpener transportOpener,
     required CodexJsonRpcCodec jsonRpcCodec,
     required CodexJsonRpcRequestTracker requestTracker,
     required CodexJsonRpcInboundRequestStore inboundRequestStore,
     required this.clientName,
     required this.clientVersion,
-  }) : _processLauncher = processLauncher,
+  }) : _transportOpener = transportOpener,
        _jsonRpcCodec = jsonRpcCodec,
        _requestTracker = requestTracker,
        _inboundRequestStore = inboundRequestStore;
 
-  final CodexAppServerProcessLauncher _processLauncher;
+  final CodexAppServerTransportOpener _transportOpener;
   final CodexJsonRpcCodec _jsonRpcCodec;
   final CodexJsonRpcRequestTracker _requestTracker;
   final CodexJsonRpcInboundRequestStore _inboundRequestStore;
@@ -32,11 +30,11 @@ class CodexAppServerConnection {
 
   final _eventsController = StreamController<CodexAppServerEvent>.broadcast();
 
-  StreamSubscription<String>? _stdoutSubscription;
-  StreamSubscription<String>? _stderrSubscription;
-  Completer<void>? _stdoutClosedCompleter;
-  Completer<void>? _stderrClosedCompleter;
-  CodexAppServerProcess? _process;
+  StreamSubscription<String>? _protocolMessageSubscription;
+  StreamSubscription<String>? _diagnosticSubscription;
+  Completer<void>? _protocolMessagesClosedCompleter;
+  Completer<void>? _diagnosticsClosedCompleter;
+  CodexAppServerTransport? _transport;
   ConnectionProfile? _profile;
   bool _disconnecting = false;
   bool _isDisposed = false;
@@ -44,7 +42,7 @@ class CodexAppServerConnection {
   String? _activeTurnId;
 
   Stream<CodexAppServerEvent> get events => _eventsController.stream;
-  bool get isConnected => _process != null;
+  bool get isConnected => _transport != null;
   String? get threadId => _threadId;
   String? get activeTurnId => _activeTurnId;
 
@@ -145,7 +143,7 @@ class CodexAppServerConnection {
 
   void requireConnected() {
     _ensureNotDisposed();
-    if (_process == null) {
+    if (_transport == null) {
       throw const CodexAppServerException('App-server is not connected.');
     }
   }
@@ -177,8 +175,8 @@ class CodexAppServerConnection {
     return _disconnectImpl(this, emitDisconnectedEvent: emitDisconnectedEvent);
   }
 
-  void _handleStdoutLine(String line) {
-    _handleStdoutLineImpl(this, line);
+  void _handleProtocolMessage(String line) {
+    _handleProtocolMessageImpl(this, line);
   }
 
   void _updateRuntimePointers(String method, Object? params) {
@@ -190,13 +188,13 @@ class CodexAppServerConnection {
   }
 
   void writeMessage(CodexJsonRpcMessage message) {
-    final process = _process;
-    if (process == null) {
+    final transport = _transport;
+    if (transport == null) {
       throw const CodexAppServerException('App-server is not connected.');
     }
 
     final line = _jsonRpcCodec.encodeLine(message);
-    process.stdin.add(Uint8List.fromList(utf8.encode(line)));
+    transport.sendLine(line);
   }
 
   void _emitEvent(CodexAppServerEvent event) {
@@ -207,13 +205,15 @@ class CodexAppServerConnection {
 
   Future<void> _drainOutputStreams() async {
     final futures = <Future<void>>[];
-    final stdoutClosedCompleter = _stdoutClosedCompleter;
-    final stderrClosedCompleter = _stderrClosedCompleter;
-    if (stdoutClosedCompleter != null && !stdoutClosedCompleter.isCompleted) {
-      futures.add(stdoutClosedCompleter.future);
+    final protocolMessagesClosedCompleter = _protocolMessagesClosedCompleter;
+    final diagnosticsClosedCompleter = _diagnosticsClosedCompleter;
+    if (protocolMessagesClosedCompleter != null &&
+        !protocolMessagesClosedCompleter.isCompleted) {
+      futures.add(protocolMessagesClosedCompleter.future);
     }
-    if (stderrClosedCompleter != null && !stderrClosedCompleter.isCompleted) {
-      futures.add(stderrClosedCompleter.future);
+    if (diagnosticsClosedCompleter != null &&
+        !diagnosticsClosedCompleter.isCompleted) {
+      futures.add(diagnosticsClosedCompleter.future);
     }
     if (futures.isEmpty) {
       return;
@@ -224,13 +224,6 @@ class CodexAppServerConnection {
     } on TimeoutException {
       // Don't block teardown indefinitely if a transport stream never closes.
     }
-  }
-
-  Stream<String> _decodeLines(Stream<Uint8List> stream) {
-    return stream
-        .cast<List<int>>()
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
   }
 
   void _ensureNotDisposed() {

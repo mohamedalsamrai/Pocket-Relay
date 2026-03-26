@@ -86,11 +86,14 @@ Future<void> _handleUnsupportedChatSessionHostRequest(
       message: message,
     );
   } catch (error) {
+    final userFacingError = ChatSessionErrors.rejectUnsupportedRequestFailed();
     _reportChatSessionAppServerFailure(
       controller,
-      title: 'Request handling failed',
-      message: 'Could not reject an unsupported app-server request.',
-      error: error,
+      userFacingError: userFacingError,
+      runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+        userFacingError,
+        error: error,
+      ),
     );
   }
 }

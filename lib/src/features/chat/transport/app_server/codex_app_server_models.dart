@@ -127,12 +127,31 @@ class CodexAppServerSshAuthenticatedEvent extends CodexAppServerEvent {
   final AuthMode authMode;
 }
 
-class CodexAppServerSshRemoteLaunchFailedEvent extends CodexAppServerEvent {
-  const CodexAppServerSshRemoteLaunchFailedEvent({
+class CodexAppServerSshPortForwardStartedEvent extends CodexAppServerEvent {
+  const CodexAppServerSshPortForwardStartedEvent({
     required this.host,
     required this.port,
     required this.username,
-    required this.command,
+    required this.remoteHost,
+    required this.remotePort,
+    required this.localPort,
+  });
+
+  final String host;
+  final int port;
+  final String username;
+  final String remoteHost;
+  final int remotePort;
+  final int localPort;
+}
+
+class CodexAppServerSshPortForwardFailedEvent extends CodexAppServerEvent {
+  const CodexAppServerSshPortForwardFailedEvent({
+    required this.host,
+    required this.port,
+    required this.username,
+    required this.remoteHost,
+    required this.remotePort,
     required this.message,
     this.detail,
   });
@@ -140,23 +159,10 @@ class CodexAppServerSshRemoteLaunchFailedEvent extends CodexAppServerEvent {
   final String host;
   final int port;
   final String username;
-  final String command;
+  final String remoteHost;
+  final int remotePort;
   final String message;
   final Object? detail;
-}
-
-class CodexAppServerSshRemoteProcessStartedEvent extends CodexAppServerEvent {
-  const CodexAppServerSshRemoteProcessStartedEvent({
-    required this.host,
-    required this.port,
-    required this.username,
-    required this.command,
-  });
-
-  final String host;
-  final int port;
-  final String username;
-  final String command;
 }
 
 class CodexAppServerThreadSummary {
@@ -532,6 +538,29 @@ class CodexAppServerException implements Exception {
   }
 }
 
+class CodexAppServerTransportTermination {
+  const CodexAppServerTransportTermination({this.exitCode, this.reason});
+
+  final int? exitCode;
+  final String? reason;
+}
+
+abstract interface class CodexAppServerTransport {
+  Stream<String> get protocolMessages;
+  Stream<String> get diagnostics;
+  void sendLine(String line);
+  Future<void> get done;
+  CodexAppServerTransportTermination? get termination;
+  Future<void> close();
+}
+
+typedef CodexAppServerTransportOpener =
+    Future<CodexAppServerTransport> Function({
+      required ConnectionProfile profile,
+      required ConnectionSecrets secrets,
+      required void Function(CodexAppServerEvent event) emitEvent,
+    });
+
 abstract interface class CodexAppServerProcess {
   Stream<Uint8List> get stdout;
   Stream<Uint8List> get stderr;
@@ -551,7 +580,21 @@ typedef CodexAppServerProcessLauncher =
 abstract interface class CodexSshBootstrapClient {
   Future<void> authenticate();
   Future<CodexAppServerProcess> launchProcess(String command);
+  Future<CodexSshForwardChannel> forwardLocal(
+    String remoteHost,
+    int remotePort, {
+    String localHost = 'localhost',
+    int localPort = 0,
+  });
   void close();
+}
+
+abstract interface class CodexSshForwardChannel {
+  Stream<Uint8List> get stream;
+  StreamSink<List<int>> get sink;
+  Future<void> get done;
+  Future<void> close();
+  void destroy();
 }
 
 typedef CodexSshProcessBootstrap =

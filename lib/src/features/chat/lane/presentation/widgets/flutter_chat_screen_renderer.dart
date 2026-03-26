@@ -24,6 +24,7 @@ class FlutterChatScreenRenderer extends StatelessWidget {
     required this.transcriptRegion,
     required this.composerRegion,
     required this.onStopActiveTurn,
+    this.supplementalStatusRegion,
     this.laneRestartAction,
     this.onRestartLane,
   });
@@ -34,6 +35,7 @@ class FlutterChatScreenRenderer extends StatelessWidget {
   final Widget transcriptRegion;
   final Widget composerRegion;
   final Future<void> Function() onStopActiveTurn;
+  final Widget? supplementalStatusRegion;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
 
@@ -49,6 +51,7 @@ class FlutterChatScreenRenderer extends StatelessWidget {
           composerRegion: composerRegion,
           loadingIndicator: const CircularProgressIndicator(),
           onStopActiveTurn: onStopActiveTurn,
+          supplementalStatusRegion: supplementalStatusRegion,
           laneRestartAction: laneRestartAction,
           onRestartLane: onRestartLane,
         ),

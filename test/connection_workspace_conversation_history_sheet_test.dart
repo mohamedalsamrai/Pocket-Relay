@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
 import 'package:pocket_relay/src/features/workspace/domain/codex_workspace_conversation_summary.dart';
@@ -102,6 +103,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load conversations'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('history backend unavailable'), findsOneWidget);
   });
 
@@ -130,6 +137,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Host key not pinned'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionHistoryHostKeyUnpinned.code}]',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('7a:9f:d7:dc:2e:f2'), findsOneWidget);
 
       await tester.tap(

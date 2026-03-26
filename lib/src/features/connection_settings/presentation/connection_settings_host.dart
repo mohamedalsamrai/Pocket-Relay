@@ -7,6 +7,12 @@ import 'package:pocket_relay/src/features/connection_settings/domain/connection_
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_presenter.dart';
 
+part 'host/host_models.dart';
+part 'host/model_catalog_refresh.dart';
+part 'host/remote_runtime_refresh.dart';
+part 'host/remote_server_actions.dart';
+part 'host/state_updates.dart';
+
 typedef ConnectionSettingsHostBuilder =
     Widget Function(
       BuildContext context,
@@ -14,14 +20,27 @@ typedef ConnectionSettingsHostBuilder =
       ConnectionSettingsHostActions actions,
     );
 
+typedef ConnectionSettingsRemoteRuntimeRefresher =
+    Future<ConnectionRemoteRuntimeState> Function(
+      ConnectionSettingsSubmitPayload payload,
+    );
+
+typedef ConnectionSettingsRemoteServerActionRunner =
+    Future<ConnectionRemoteRuntimeState> Function();
+
 class ConnectionSettingsHost extends StatefulWidget {
   const ConnectionSettingsHost({
     super.key,
     required this.initialProfile,
     required this.initialSecrets,
+    this.initialRemoteRuntime,
     this.availableModelCatalog,
     this.availableModelCatalogSource,
     this.onRefreshModelCatalog,
+    this.onRefreshRemoteRuntime,
+    this.onStartRemoteServer,
+    this.onStopRemoteServer,
+    this.onRestartRemoteServer,
     required this.onCancel,
     required this.onSubmit,
     required this.builder,
@@ -30,10 +49,15 @@ class ConnectionSettingsHost extends StatefulWidget {
 
   final ConnectionProfile initialProfile;
   final ConnectionSecrets initialSecrets;
+  final ConnectionRemoteRuntimeState? initialRemoteRuntime;
   final ConnectionModelCatalog? availableModelCatalog;
   final ConnectionSettingsModelCatalogSource? availableModelCatalogSource;
   final Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
   onRefreshModelCatalog;
+  final ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime;
+  final ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer;
+  final ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer;
+  final ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer;
   final VoidCallback onCancel;
   final ValueChanged<ConnectionSettingsSubmitPayload> onSubmit;
   final ConnectionSettingsHostBuilder builder;
@@ -51,6 +75,10 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   ConnectionSettingsModelCatalogSource? _availableModelCatalogSource;
   bool _didModelCatalogRefreshFail = false;
   bool _isRefreshingModelCatalog = false;
+  ConnectionRemoteRuntimeState? _remoteRuntime;
+  ConnectionSettingsRemoteServerActionId? _activeRemoteServerAction;
+  Timer? _remoteRuntimeRefreshDebounce;
+  int _remoteRuntimeRefreshToken = 0;
 
   @override
   void initState() {
@@ -59,6 +87,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       profile: widget.initialProfile,
       secrets: widget.initialSecrets,
     );
+    _remoteRuntime = widget.initialRemoteRuntime;
     _availableModelCatalog = widget.availableModelCatalog;
     _availableModelCatalogSource = widget.availableModelCatalogSource;
     final draft = _formState.draft;
@@ -66,10 +95,12 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
       for (final fieldId in ConnectionSettingsFieldId.values)
         fieldId: TextEditingController(text: draft.valueForField(fieldId)),
     };
+    _scheduleRemoteRuntimeRefresh(immediate: true);
   }
 
   @override
   void dispose() {
+    _remoteRuntimeRefreshDebounce?.cancel();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -92,6 +123,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
         onAuthModeChanged: _updateAuthMode,
         onReasoningEffortChanged: _updateReasoningEffort,
         onRefreshModelCatalog: _refreshModelCatalog,
+        onRemoteServerAction: _runRemoteServerAction,
         onToggleChanged: _updateToggle,
         onCancel: widget.onCancel,
         onSave: _save,
@@ -101,193 +133,54 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
 
   ConnectionSettingsContract _buildContract([
     ConnectionSettingsFormState? formState,
-  ]) {
-    return _presenter.present(
-      initialProfile: widget.initialProfile,
-      initialSecrets: widget.initialSecrets,
-      formState: formState ?? _formState,
-      availableModelCatalog: _availableModelCatalog,
-      availableModelCatalogSource: _availableModelCatalogSource,
-      didModelCatalogRefreshFail: _didModelCatalogRefreshFail,
-      supportsModelCatalogRefresh: widget.onRefreshModelCatalog != null,
-      isRefreshingModelCatalog: _isRefreshingModelCatalog,
-      supportsLocalConnectionMode:
-          widget.platformBehavior.supportsLocalConnectionMode,
-    );
-  }
+  ]) => _buildConnectionSettingsHostContract(this, formState: formState);
 
-  void _updateField(ConnectionSettingsFieldId fieldId, String value) {
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWithField(fieldId, value),
+  void _updateField(ConnectionSettingsFieldId fieldId, String value) =>
+      _updateConnectionSettingsField(this, fieldId, value);
+
+  void _updateConnectionMode(ConnectionMode connectionMode) =>
+      _updateConnectionSettingsConnectionMode(this, connectionMode);
+
+  void _updateAuthMode(AuthMode authMode) =>
+      _updateConnectionSettingsAuthMode(this, authMode);
+
+  void _updateToggle(ConnectionSettingsToggleId toggleId, bool value) =>
+      _updateConnectionSettingsToggle(this, toggleId, value);
+
+  void _updateReasoningEffort(CodexReasoningEffort? reasoningEffort) =>
+      _updateConnectionSettingsReasoningEffort(this, reasoningEffort);
+
+  void _updateModel(String? modelId) =>
+      _updateConnectionSettingsModel(this, modelId);
+
+  bool _shouldRefreshRemoteRuntimeForField(ConnectionSettingsFieldId fieldId) =>
+      _shouldRefreshConnectionSettingsRemoteRuntimeForField(fieldId);
+
+  void _scheduleRemoteRuntimeRefresh({bool immediate = false}) =>
+      _scheduleConnectionSettingsRemoteRuntimeRefresh(
+        this,
+        immediate: immediate,
       );
-    });
+
+  Future<void> _refreshModelCatalog() =>
+      _refreshConnectionSettingsModelCatalog(this);
+
+  Future<void> _runRemoteServerAction(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) => _runConnectionSettingsRemoteServerAction(this, actionId);
+
+  Future<ConnectionRemoteRuntimeState> _remoteRuntimeAfterServerActionFailure({
+    required Object error,
+    required ConnectionRemoteRuntimeState fallbackRuntime,
+  }) => _connectionSettingsRemoteRuntimeAfterServerActionFailure(
+    this,
+    error: error,
+    fallbackRuntime: fallbackRuntime,
+  );
+
+  void _setStateInternal(VoidCallback fn) {
+    setState(fn);
   }
 
-  void _updateConnectionMode(ConnectionMode connectionMode) {
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWithConnectionMode(connectionMode),
-      );
-    });
-  }
-
-  void _updateAuthMode(AuthMode authMode) {
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWith(authMode: authMode),
-      );
-    });
-  }
-
-  void _updateToggle(ConnectionSettingsToggleId toggleId, bool value) {
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWithToggle(toggleId, value),
-      );
-    });
-  }
-
-  void _updateReasoningEffort(CodexReasoningEffort? reasoningEffort) {
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWith(reasoningEffort: reasoningEffort),
-      );
-    });
-  }
-
-  void _updateModel(String? modelId) {
-    final normalizedModel = modelId?.trim() ?? '';
-    final nextEffort = codexNormalizedReasoningEffortForModel(
-      normalizedModel.isEmpty ? null : normalizedModel,
-      _formState.draft.reasoningEffort,
-      availableModelCatalog: _availableModelCatalog,
-    );
-    setState(() {
-      _formState = _formState.copyWith(
-        draft: _formState.draft.copyWith(
-          model: normalizedModel,
-          reasoningEffort: nextEffort,
-        ),
-      );
-    });
-  }
-
-  Future<void> _refreshModelCatalog() async {
-    final onRefreshModelCatalog = widget.onRefreshModelCatalog;
-    if (onRefreshModelCatalog == null || _isRefreshingModelCatalog) {
-      return;
-    }
-
-    setState(() {
-      _isRefreshingModelCatalog = true;
-      _didModelCatalogRefreshFail = false;
-    });
-
-    try {
-      final refreshedCatalog = await onRefreshModelCatalog(_formState.draft);
-      if (!mounted) {
-        return;
-      }
-      if (refreshedCatalog == null) {
-        setState(() {
-          _didModelCatalogRefreshFail = true;
-        });
-        return;
-      }
-
-      final selectedModelId = _formState.draft.model.trim().isEmpty
-          ? null
-          : _formState.draft.model.trim();
-      final nextEffort = codexNormalizedReasoningEffortForModel(
-        selectedModelId,
-        _formState.draft.reasoningEffort,
-        availableModelCatalog: refreshedCatalog,
-      );
-      setState(() {
-        _availableModelCatalog = refreshedCatalog;
-        _availableModelCatalogSource =
-            ConnectionSettingsModelCatalogSource.connectionCache;
-        _didModelCatalogRefreshFail = false;
-        _formState = _formState.copyWith(
-          draft: _formState.draft.copyWith(reasoningEffort: nextEffort),
-        );
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _didModelCatalogRefreshFail = true;
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingModelCatalog = false;
-        });
-      }
-    }
-  }
-
-  void _save() {
-    final nextState = _formState.revealValidationErrors();
-    final contract = _buildContract(nextState);
-    setState(() {
-      _formState = nextState;
-    });
-
-    final payload = contract.saveAction.submitPayload;
-    if (!contract.saveAction.canSubmit || payload == null) {
-      return;
-    }
-
-    widget.onSubmit(payload);
-  }
-}
-
-class ConnectionSettingsHostViewModel {
-  const ConnectionSettingsHostViewModel({
-    required this.contract,
-    required this.fieldControllers,
-  });
-
-  final ConnectionSettingsContract contract;
-  final Map<ConnectionSettingsFieldId, TextEditingController> fieldControllers;
-
-  TextEditingController controllerForField(ConnectionSettingsFieldId fieldId) {
-    return fieldControllers[fieldId]!;
-  }
-
-  Map<ConnectionSettingsFieldId, ConnectionSettingsTextFieldContract> fieldMap(
-    Iterable<ConnectionSettingsTextFieldContract> fields,
-  ) {
-    return <ConnectionSettingsFieldId, ConnectionSettingsTextFieldContract>{
-      for (final field in fields) field.id: field,
-    };
-  }
-}
-
-class ConnectionSettingsHostActions {
-  const ConnectionSettingsHostActions({
-    required this.onFieldChanged,
-    required this.onModelChanged,
-    required this.onConnectionModeChanged,
-    required this.onAuthModeChanged,
-    required this.onReasoningEffortChanged,
-    required this.onRefreshModelCatalog,
-    required this.onToggleChanged,
-    required this.onCancel,
-    required this.onSave,
-  });
-
-  final void Function(ConnectionSettingsFieldId fieldId, String value)
-  onFieldChanged;
-  final ValueChanged<String?> onModelChanged;
-  final ValueChanged<ConnectionMode> onConnectionModeChanged;
-  final ValueChanged<AuthMode> onAuthModeChanged;
-  final ValueChanged<CodexReasoningEffort?> onReasoningEffortChanged;
-  final Future<void> Function() onRefreshModelCatalog;
-  final void Function(ConnectionSettingsToggleId toggleId, bool value)
-  onToggleChanged;
-  final VoidCallback onCancel;
-  final VoidCallback onSave;
+  void _save() => _saveConnectionSettingsHost(this);
 }

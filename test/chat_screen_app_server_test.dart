@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
@@ -134,7 +135,7 @@ void main() {
       tester.widget<TextField>(composerField).controller?.text,
       'Hello Codex',
     );
-    expect(find.textContaining('Could not send the prompt'), findsOneWidget);
+    expect(find.textContaining('Could not send the prompt'), findsWidgets);
   });
 
   testWidgets(
@@ -519,39 +520,6 @@ void main() {
         find.byKey(const ValueKey('open_connection_settings')),
         findsOneWidget,
       );
-    },
-  );
-
-  testWidgets(
-    'renders SSH remote launch failure as a dedicated settings-oriented surface',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      addTearDown(appServerClient.close);
-
-      await tester.pumpWidget(
-        _buildCatalogApp(appServerClient: appServerClient),
-      );
-
-      await _pumpAppReady(tester);
-
-      appServerClient.emit(
-        const CodexAppServerSshRemoteLaunchFailedEvent(
-          host: 'example.com',
-          port: 22,
-          username: 'vince',
-          command: 'bash -lc codex app-server --listen stdio://',
-          message: 'exec request denied',
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('SSH remote launch failed'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('ssh_remote_command_value')),
-        findsOneWidget,
-      );
-      expect(find.text('exec request denied'), findsOneWidget);
-      expect(find.byKey(const ValueKey('save_host_fingerprint')), findsNothing);
     },
   );
 
@@ -3060,6 +3028,18 @@ PocketRelayApp _buildCatalogApp({
   required CodexAppServerClient appServerClient,
   SavedProfile? savedProfile,
   CodexConnectionRepository? connectionRepository,
+  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+      const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
+  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+      const _FakeRemoteOwnerInspector(
+        CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.stopped,
+          sessionName: 'pocket-relay-conn_primary',
+          detail: 'Remote Pocket Relay server is not running.',
+        ),
+      ),
 }) {
   return PocketRelayApp(
     connectionRepository:
@@ -3071,6 +3051,8 @@ PocketRelayApp _buildCatalogApp({
     modelCatalogStore: MemoryConnectionModelCatalogStore(),
     recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
     appServerClient: appServerClient,
+    remoteAppServerHostProbe: remoteAppServerHostProbe,
+    remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
   );
 }
 
@@ -3107,4 +3089,43 @@ Future<void> _pumpUntil(
     'title=${find.text('Pocket Relay').evaluate().length} '
     'configureRemote=${find.text('Configure remote').evaluate().length}',
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _FakeRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _FakeRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
 }

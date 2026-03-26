@@ -228,6 +228,208 @@ void main() {
       },
     );
 
+    test('preserves remote runtime state for remote settings contracts', () {
+      final initialProfile = _configuredProfile();
+      const initialSecrets = ConnectionSecrets(password: 'secret');
+      final formState = ConnectionSettingsFormState.initial(
+        profile: initialProfile,
+        secrets: initialSecrets,
+      );
+      const remoteRuntime = ConnectionRemoteRuntimeState(
+        hostCapability: ConnectionRemoteHostCapabilityState.unsupported(
+          issues: <ConnectionRemoteHostCapabilityIssue>{
+            ConnectionRemoteHostCapabilityIssue.tmuxMissing,
+          },
+        ),
+        server: ConnectionRemoteServerState.notRunning(
+          detail: 'No Pocket Relay server is running.',
+        ),
+      );
+
+      final contract = presenter.present(
+        initialProfile: initialProfile,
+        initialSecrets: initialSecrets,
+        formState: formState,
+        remoteRuntime: remoteRuntime,
+      );
+
+      expect(contract.remoteRuntime, remoteRuntime);
+      expect(
+        contract.remoteRuntime!.hostCapability.issues,
+        <ConnectionRemoteHostCapabilityIssue>{
+          ConnectionRemoteHostCapabilityIssue.tmuxMissing,
+        },
+      );
+      expect(
+        contract.remoteRuntime!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+      expect(contract.remoteServerSection, isNotNull);
+      expect(contract.remoteServerSection!.statusLabel, 'Host unsupported');
+    });
+
+    test('drops remote runtime state for local settings contracts', () {
+      final initialProfile = _configuredProfile();
+      const initialSecrets = ConnectionSecrets(password: 'secret');
+      final formState =
+          ConnectionSettingsFormState.initial(
+            profile: initialProfile,
+            secrets: initialSecrets,
+          ).copyWith(
+            draft: ConnectionSettingsDraft.fromConnection(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(connectionMode: ConnectionMode.local),
+          );
+      const remoteRuntime = ConnectionRemoteRuntimeState(
+        hostCapability: ConnectionRemoteHostCapabilityState.supported(),
+        server: ConnectionRemoteServerState.running(port: 4100),
+      );
+
+      final contract = presenter.present(
+        initialProfile: initialProfile,
+        initialSecrets: initialSecrets,
+        formState: formState,
+        remoteRuntime: remoteRuntime,
+        supportsLocalConnectionMode: true,
+      );
+
+      expect(contract.remoteRuntime, isNull);
+      expect(contract.remoteServerSection, isNull);
+    });
+
+    test(
+      'surfaces workspace availability failures as host unsupported in the remote server section',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState = ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        );
+        const remoteRuntime = ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.unsupported(
+            issues: <ConnectionRemoteHostCapabilityIssue>{
+              ConnectionRemoteHostCapabilityIssue.workspaceUnavailable,
+            },
+            detail:
+                'The configured workspace directory is not accessible on the remote host.',
+          ),
+          server: ConnectionRemoteServerState.unknown(),
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          remoteRuntime: remoteRuntime,
+          supportsRemoteServerStart: true,
+          supportsRemoteServerStop: true,
+          supportsRemoteServerRestart: true,
+        );
+
+        expect(contract.remoteServerSection, isNotNull);
+        expect(contract.remoteServerSection!.statusLabel, 'Host unsupported');
+        expect(
+          contract.remoteServerSection!.detail,
+          'The configured workspace directory is not accessible on the remote host.',
+        );
+        expect(
+          contract.remoteServerSection!.actions.every(
+            (action) => action.isEnabled == false,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'enables explicit remote server controls only for saved, unchanged remote connections',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState = ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        );
+        const remoteRuntime = ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(),
+          server: ConnectionRemoteServerState.notRunning(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay-conn_primary',
+          ),
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          remoteRuntime: remoteRuntime,
+          supportsRemoteServerStart: true,
+          supportsRemoteServerStop: true,
+          supportsRemoteServerRestart: true,
+        );
+
+        expect(contract.remoteServerSection, isNotNull);
+        final startAction = contract.remoteServerSection!.actions.firstWhere(
+          (action) => action.id == ConnectionSettingsRemoteServerActionId.start,
+        );
+        final stopAction = contract.remoteServerSection!.actions.firstWhere(
+          (action) => action.id == ConnectionSettingsRemoteServerActionId.stop,
+        );
+        expect(startAction.isEnabled, isTrue);
+        expect(stopAction.isEnabled, isFalse);
+      },
+    );
+
+    test(
+      'disables remote server controls while the sheet has unsaved changes',
+      () {
+        final initialProfile = _configuredProfile();
+        const initialSecrets = ConnectionSecrets(password: 'secret');
+        final formState =
+            ConnectionSettingsFormState.initial(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(
+              draft: ConnectionSettingsDraft.fromConnection(
+                profile: initialProfile,
+                secrets: initialSecrets,
+              ).copyWithField(ConnectionSettingsFieldId.host, 'new-host.local'),
+            );
+        const remoteRuntime = ConnectionRemoteRuntimeState(
+          hostCapability: ConnectionRemoteHostCapabilityState.supported(),
+          server: ConnectionRemoteServerState.running(
+            ownerId: 'conn_primary',
+            sessionName: 'pocket-relay-conn_primary',
+            port: 4100,
+          ),
+        );
+
+        final contract = presenter.present(
+          initialProfile: initialProfile,
+          initialSecrets: initialSecrets,
+          formState: formState,
+          remoteRuntime: remoteRuntime,
+          supportsRemoteServerStart: true,
+          supportsRemoteServerStop: true,
+          supportsRemoteServerRestart: true,
+        );
+
+        expect(contract.remoteServerSection, isNotNull);
+        expect(
+          contract.remoteServerSection!.detail,
+          contains('Save or discard staged connection edits'),
+        );
+        expect(
+          contract.remoteServerSection!.actions.every(
+            (action) => !action.isEnabled,
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test(
       'filters reasoning effort options to the selected reference model',
       () {
@@ -404,36 +606,33 @@ void main() {
       },
     );
 
-    test(
-      'calls out refresh failure while preserving cached catalog context',
-      () {
-        final initialProfile = _configuredProfile();
-        const initialSecrets = ConnectionSecrets(password: 'secret');
-        final formState = ConnectionSettingsFormState.initial(
-          profile: initialProfile,
-          secrets: initialSecrets,
-        );
+    test('calls out refresh failure while preserving cached catalog context', () {
+      final initialProfile = _configuredProfile();
+      const initialSecrets = ConnectionSecrets(password: 'secret');
+      final formState = ConnectionSettingsFormState.initial(
+        profile: initialProfile,
+        secrets: initialSecrets,
+      );
 
-        final contract = presenter.present(
-          initialProfile: initialProfile,
-          initialSecrets: initialSecrets,
-          formState: formState,
-          availableModelCatalog: codexReferenceModelCatalog(
-            connectionId: 'presenter-cache-failure-test',
-            fetchedAt: DateTime.utc(2026, 3, 22, 15, 45),
-          ),
-          availableModelCatalogSource:
-              ConnectionSettingsModelCatalogSource.lastKnownCache,
-          didModelCatalogRefreshFail: true,
-          supportsModelCatalogRefresh: true,
-        );
+      final contract = presenter.present(
+        initialProfile: initialProfile,
+        initialSecrets: initialSecrets,
+        formState: formState,
+        availableModelCatalog: codexReferenceModelCatalog(
+          connectionId: 'presenter-cache-failure-test',
+          fetchedAt: DateTime.utc(2026, 3, 22, 15, 45),
+        ),
+        availableModelCatalogSource:
+            ConnectionSettingsModelCatalogSource.lastKnownCache,
+        didModelCatalogRefreshFail: true,
+        supportsModelCatalogRefresh: true,
+      );
 
-        expect(
-          contract.modelSection.refreshActionHelperText,
-          'Refresh failed. Showing the previous model list. Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 15:45 UTC. Use Refresh models to try again.',
-        );
-      },
-    );
+      expect(
+        contract.modelSection.refreshActionHelperText,
+        'Refresh failed. Showing the previous model list. Showing last-known models from a previous backend refresh. They may not match this connection until it refreshes. Last refreshed 2026-03-22 15:45 UTC. Use Refresh models to try again.',
+      );
+    });
 
     test('disables refresh when the workspace directory is empty', () {
       final initialProfile = _configuredProfile().copyWith(workspaceDir: '');

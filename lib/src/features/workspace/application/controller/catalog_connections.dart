@@ -1,4 +1,4 @@
-part of 'connection_workspace_controller.dart';
+part of '../connection_workspace_controller.dart';
 
 Future<SavedConnection> _loadWorkspaceSavedConnection(
   ConnectionWorkspaceController controller,
@@ -52,18 +52,55 @@ Future<String> _createWorkspaceConnection(
             transportRecoveryPhasesByConnectionId:
                 controller._state.transportRecoveryPhasesByConnectionId,
           ),
+      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
+        catalog: nextCatalog,
+        liveConnectionIds: controller._state.liveConnectionIds,
+        liveReattachPhasesByConnectionId:
+            controller._state.liveReattachPhasesByConnectionId,
+      ),
       recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
         catalog: nextCatalog,
         liveConnectionIds: controller._state.liveConnectionIds,
         recoveryDiagnosticsByConnectionId:
             controller._state.recoveryDiagnosticsByConnectionId,
       ),
+      remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
+        catalog: nextCatalog,
+        remoteRuntimeByConnectionId:
+            controller._state.remoteRuntimeByConnectionId,
+      ),
     ),
   );
   return connection.id;
 }
 
-Future<void> _saveWorkspaceDormantConnection(
+Future<void> _saveWorkspaceSavedConnection(
+  ConnectionWorkspaceController controller, {
+  required String connectionId,
+  required ConnectionProfile profile,
+  required ConnectionSecrets secrets,
+}) async {
+  final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
+  await controller.initialize();
+  _requireKnownWorkspaceConnectionId(controller, normalizedConnectionId);
+  if (controller._state.isConnectionLive(normalizedConnectionId)) {
+    return _saveWorkspaceLiveConnectionEdits(
+      controller,
+      connectionId: normalizedConnectionId,
+      profile: profile,
+      secrets: secrets,
+    );
+  }
+
+  return _saveWorkspaceInactiveSavedConnection(
+    controller,
+    connectionId: normalizedConnectionId,
+    profile: profile,
+    secrets: secrets,
+  );
+}
+
+Future<void> _saveWorkspaceInactiveSavedConnection(
   ConnectionWorkspaceController controller, {
   required String connectionId,
   required ConnectionProfile profile,
@@ -74,7 +111,7 @@ Future<void> _saveWorkspaceDormantConnection(
   _requireKnownWorkspaceConnectionId(controller, normalizedConnectionId);
   if (controller._state.isConnectionLive(normalizedConnectionId)) {
     throw StateError(
-      'Cannot save dormant connection settings for a live lane: '
+      'Cannot apply inactive saved-connection settings to a live lane: '
       '$normalizedConnectionId',
     );
   }
@@ -88,6 +125,16 @@ Future<void> _saveWorkspaceDormantConnection(
   );
 
   final nextCatalog = await controller._connectionRepository.loadCatalog();
+  final nextRemoteRuntimeByConnectionId =
+      Map<String, ConnectionRemoteRuntimeState>.from(
+        controller._state.remoteRuntimeByConnectionId,
+      );
+  if (profile.isLocal) {
+    nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
+    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+      normalizedConnectionId,
+    );
+  }
   if (controller._isDisposed) {
     return;
   }
@@ -117,13 +164,34 @@ Future<void> _saveWorkspaceDormantConnection(
             transportRecoveryPhasesByConnectionId:
                 controller._state.transportRecoveryPhasesByConnectionId,
           ),
+      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
+        catalog: nextCatalog,
+        liveConnectionIds: controller._state.liveConnectionIds,
+        liveReattachPhasesByConnectionId:
+            controller._state.liveReattachPhasesByConnectionId,
+      ),
       recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
         catalog: nextCatalog,
         liveConnectionIds: controller._state.liveConnectionIds,
         recoveryDiagnosticsByConnectionId:
             controller._state.recoveryDiagnosticsByConnectionId,
       ),
+      remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
+        catalog: nextCatalog,
+        remoteRuntimeByConnectionId: nextRemoteRuntimeByConnectionId,
+      ),
     ),
+  );
+
+  if (!profile.isRemote || controller._isDisposed) {
+    return;
+  }
+
+  await _refreshWorkspaceRemoteRuntime(
+    controller,
+    normalizedConnectionId,
+    profile: profile,
+    secrets: secrets,
   );
 }
 
@@ -138,7 +206,7 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
   _requireKnownWorkspaceConnectionId(controller, normalizedConnectionId);
   if (!controller._state.isConnectionLive(normalizedConnectionId)) {
     throw StateError(
-      'Cannot stage live connection edits for a dormant connection: '
+      'Cannot stage live connection edits for a non-live saved connection: '
       '$normalizedConnectionId',
     );
   }
@@ -164,6 +232,16 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
       if (connectionId != normalizedConnectionId) connectionId,
     if (shouldRequireReconnect) normalizedConnectionId,
   };
+  final nextRemoteRuntimeByConnectionId =
+      Map<String, ConnectionRemoteRuntimeState>.from(
+        controller._state.remoteRuntimeByConnectionId,
+      );
+  if (profile.isLocal) {
+    nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
+    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+      normalizedConnectionId,
+    );
+  }
   if (controller._isDisposed) {
     return;
   }
@@ -192,69 +270,38 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
             transportRecoveryPhasesByConnectionId:
                 controller._state.transportRecoveryPhasesByConnectionId,
           ),
+      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
+        catalog: nextCatalog,
+        liveConnectionIds: controller._state.liveConnectionIds,
+        liveReattachPhasesByConnectionId:
+            controller._state.liveReattachPhasesByConnectionId,
+      ),
       recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
         catalog: nextCatalog,
         liveConnectionIds: controller._state.liveConnectionIds,
         recoveryDiagnosticsByConnectionId:
             controller._state.recoveryDiagnosticsByConnectionId,
       ),
+      remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
+        catalog: nextCatalog,
+        remoteRuntimeByConnectionId: nextRemoteRuntimeByConnectionId,
+      ),
     ),
   );
-}
 
-Future<ConnectionModelCatalog?> _loadWorkspaceConnectionModelCatalog(
-  ConnectionWorkspaceController controller,
-  String connectionId,
-) async {
-  final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
-  await controller.initialize();
-  _requireKnownWorkspaceConnectionId(controller, normalizedConnectionId);
-  return controller._modelCatalogStore.load(normalizedConnectionId);
-}
+  if (!profile.isRemote || controller._isDisposed) {
+    return;
+  }
 
-Future<void> _saveWorkspaceConnectionModelCatalog(
-  ConnectionWorkspaceController controller,
-  ConnectionModelCatalog catalog,
-) async {
-  final normalizedConnectionId = _normalizeWorkspaceConnectionId(
-    catalog.connectionId,
-  );
-  await controller.initialize();
-  _requireKnownWorkspaceConnectionId(controller, normalizedConnectionId);
-  await controller._modelCatalogStore.save(
-    ConnectionModelCatalog(
-      connectionId: normalizedConnectionId,
-      fetchedAt: catalog.fetchedAt,
-      models: catalog.models,
-    ),
+  await _refreshWorkspaceRemoteRuntime(
+    controller,
+    normalizedConnectionId,
+    profile: profile,
+    secrets: secrets,
   );
 }
 
-Future<ConnectionModelCatalog?> _loadWorkspaceLastKnownConnectionModelCatalog(
-  ConnectionWorkspaceController controller,
-) async {
-  await controller.initialize();
-  return controller._modelCatalogStore.loadLastKnown();
-}
-
-Future<void> _saveWorkspaceLastKnownConnectionModelCatalog(
-  ConnectionWorkspaceController controller,
-  ConnectionModelCatalog catalog,
-) async {
-  final normalizedConnectionId = _normalizeWorkspaceConnectionId(
-    catalog.connectionId,
-  );
-  await controller.initialize();
-  await controller._modelCatalogStore.saveLastKnown(
-    ConnectionModelCatalog(
-      connectionId: normalizedConnectionId,
-      fetchedAt: catalog.fetchedAt,
-      models: catalog.models,
-    ),
-  );
-}
-
-Future<void> _deleteWorkspaceDormantConnection(
+Future<void> _deleteWorkspaceSavedConnection(
   ConnectionWorkspaceController controller,
   String connectionId,
 ) async {
@@ -268,7 +315,7 @@ Future<void> _deleteWorkspaceDormantConnection(
     );
   }
 
-  await _deleteDormantWorkspaceConnection(controller, normalizedConnectionId);
+  await _deleteWorkspaceSavedConnectionImpl(controller, normalizedConnectionId);
 }
 
 String _normalizeWorkspaceConnectionId(String connectionId) {
@@ -290,50 +337,4 @@ void _requireKnownWorkspaceConnectionId(
   if (controller._state.catalog.connectionForId(connectionId) == null) {
     throw StateError('Unknown saved connection: $connectionId');
   }
-}
-
-Set<String> _sanitizeWorkspaceReconnectRequiredIds({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
-  required Set<String> reconnectRequiredConnectionIds,
-}) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
-  return <String>{
-    for (final connectionId in reconnectRequiredConnectionIds)
-      if (catalog.connectionForId(connectionId) != null &&
-          liveConnectionIdSet.contains(connectionId))
-        connectionId,
-  };
-}
-
-Map<String, ConnectionWorkspaceTransportRecoveryPhase>
-_sanitizeWorkspaceTransportRecoveryPhases({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
-  required Map<String, ConnectionWorkspaceTransportRecoveryPhase>
-  transportRecoveryPhasesByConnectionId,
-}) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
-  return <String, ConnectionWorkspaceTransportRecoveryPhase>{
-    for (final entry in transportRecoveryPhasesByConnectionId.entries)
-      if (catalog.connectionForId(entry.key) != null &&
-          liveConnectionIdSet.contains(entry.key))
-        entry.key: entry.value,
-  };
-}
-
-Map<String, ConnectionWorkspaceRecoveryDiagnostics>
-_sanitizeWorkspaceRecoveryDiagnostics({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
-  required Map<String, ConnectionWorkspaceRecoveryDiagnostics>
-  recoveryDiagnosticsByConnectionId,
-}) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
-  return <String, ConnectionWorkspaceRecoveryDiagnostics>{
-    for (final entry in recoveryDiagnosticsByConnectionId.entries)
-      if (catalog.connectionForId(entry.key) != null &&
-          liveConnectionIdSet.contains(entry.key))
-        entry.key: entry.value,
-  };
 }

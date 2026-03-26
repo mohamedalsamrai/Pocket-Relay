@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
@@ -37,13 +38,197 @@ void main() {
       expect(controller.state.isLoading, isFalse);
       expect(controller.state.catalog, const ConnectionCatalogState.empty());
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, isNull);
       expect(
         controller.state.viewport,
-        ConnectionWorkspaceViewport.dormantRoster,
+        ConnectionWorkspaceViewport.savedConnections,
       );
       expect(controller.selectedLaneBinding, isNull);
+    },
+  );
+
+  test(
+    'refreshRemoteRuntime stores inspected remote server state on the workspace controller',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_primary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay-conn_primary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4100,
+            ),
+            detail: 'Remote Pocket Relay server is ready.',
+          ),
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.refreshRemoteRuntime(
+        connectionId: 'conn_primary',
+      );
+
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'saveSavedConnection clears cached remote runtime when the connection becomes local',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_secondary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay-conn_secondary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4101,
+            ),
+          ),
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.refreshRemoteRuntime(connectionId: 'conn_secondary');
+      expect(controller.state.remoteRuntimeFor('conn_secondary'), isNotNull);
+
+      await controller.saveSavedConnection(
+        connectionId: 'conn_secondary',
+        profile: _profile(
+          'Secondary Box',
+          'secondary.local',
+        ).copyWith(connectionMode: ConnectionMode.local),
+        secrets: const ConnectionSecrets(password: 'secret-2'),
+      );
+
+      expect(controller.state.remoteRuntimeFor('conn_secondary'), isNull);
+    },
+  );
+
+  test(
+    'startRemoteServer refreshes controller runtime after an explicit start action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.missing,
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.startRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.startCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'stopRemoteServer refreshes controller runtime after an explicit stop action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.running,
+          sessionName: 'pocket-relay-conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.stopRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.stopCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.notRunning);
+      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+    },
+  );
+
+  test(
+    'restartRemoteServer refreshes controller runtime after an explicit restart action',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _MutableRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.running,
+          sessionName: 'pocket-relay-conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      final runtime = await controller.restartRemoteServer(
+        connectionId: 'conn_primary',
+      );
+
+      expect(ownerControl.restartCalls, 1);
+      expect(ownerControl.stopCalls, 1);
+      expect(ownerControl.startCalls, 1);
+      expect(runtime.server.status, ConnectionRemoteServerStatus.running);
+      expect(runtime.server.port, 4100);
     },
   );
 
@@ -59,7 +244,9 @@ void main() {
 
     expect(controller.state.isLoading, isFalse);
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>['conn_secondary']);
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
+      'conn_secondary',
+    ]);
     expect(controller.state.selectedConnectionId, 'conn_primary');
     expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
     expect(controller.selectedLaneBinding?.connectionId, 'conn_primary');
@@ -227,7 +414,15 @@ void main() {
             .body,
         'Restored answer',
       );
+      expect(
+        clientsById['conn_secondary']!
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_saved',
+      );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
+        'thread_saved',
         'thread_saved',
       ]);
       expect(clientsById['conn_secondary']!.connectCalls, 1);
@@ -238,6 +433,10 @@ void main() {
       expect(
         controller.state.transportRecoveryPhaseFor('conn_secondary'),
         isNull,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_secondary'),
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
       );
       final diagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
@@ -255,6 +454,86 @@ void main() {
       expect(
         diagnostics.lastRecoveryOutcome,
         ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+      );
+    },
+  );
+
+  test(
+    'initialization keeps live reattach as the default when cold-start resume replays pending requests',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'input_restore_1',
+        method: 'item/tool/requestUserInput',
+        params: <String, Object?>{
+          'threadId': 'thread_saved',
+          'turnId': 'turn_restore_1',
+          'itemId': 'item_restore_1',
+          'questions': <Object?>[
+            <String, Object?>{
+              'id': 'q1',
+              'header': 'Name',
+              'question': 'What is your name?',
+            },
+          ],
+        },
+      );
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_secondary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      clientsById['conn_secondary']!
+              .resumeThreadReplayEventsByThreadId['thread_saved'] =
+          <CodexAppServerEvent>[replayedRequest];
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_secondary',
+          selectedThreadId: 'thread_saved',
+          draftText: 'Restore my draft',
+          backgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      final binding = controller.selectedLaneBinding;
+      expect(controller.state.selectedConnectionId, 'conn_secondary');
+      expect(binding, isNotNull);
+      expect(binding!.composerDraftHost.draft.text, 'Restore my draft');
+      expect(
+        clientsById['conn_secondary']!
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_saved',
+      );
+      expect(
+        binding.sessionController.sessionState.pendingUserInputRequests
+            .containsKey('input_restore_1'),
+        isTrue,
+      );
+      expect(
+        binding.sessionController.transcriptBlocks
+            .whereType<CodexTextBlock>()
+            .map((block) => block.body),
+        isNot(contains('Restored answer')),
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_secondary'),
+        ConnectionWorkspaceLiveReattachPhase.liveReattached,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_secondary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
     },
   );
@@ -383,6 +662,7 @@ void main() {
         controller.state.transportRecoveryPhaseFor('conn_secondary'),
         ConnectionWorkspaceTransportRecoveryPhase.unavailable,
       );
+      expect(controller.state.liveReattachPhaseFor('conn_secondary'), isNull);
       final unavailableDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
       );
@@ -408,6 +688,62 @@ void main() {
         isNull,
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, isEmpty);
+    },
+  );
+
+  test(
+    'initialization stores remote stopped runtime when cold-start transport bootstrap cannot attach to the managed owner',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_secondary']!.connectError =
+          const CodexRemoteAppServerAttachException(
+            snapshot: CodexRemoteAppServerOwnerSnapshot(
+              ownerId: 'conn_secondary',
+              workspaceDir: '/workspace',
+              status: CodexRemoteAppServerOwnerStatus.stopped,
+              sessionName: 'pocket-relay-conn_secondary',
+              detail: 'Remote Pocket Relay server is not running.',
+            ),
+            message: 'Remote Pocket Relay server is not running.',
+          );
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_secondary',
+          selectedThreadId: 'thread_saved',
+          draftText: 'Restore my draft',
+          backgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+        ),
+      );
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      final remoteRuntime = controller.state.remoteRuntimeFor('conn_secondary');
+      expect(remoteRuntime, isNotNull);
+      expect(
+        remoteRuntime!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+      expect(
+        remoteRuntime.server.detail,
+        'Remote Pocket Relay server is not running.',
+      );
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_secondary'),
+        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_secondary'),
+        ConnectionWorkspaceLiveReattachPhase.ownerMissing,
+      );
     },
   );
 
@@ -465,7 +801,15 @@ void main() {
             .body,
         'Restored answer',
       );
+      expect(
+        clientsById['conn_secondary']!
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_saved',
+      );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
+        'thread_saved',
         'thread_saved',
       ]);
       expect(
@@ -501,7 +845,7 @@ void main() {
         'conn_primary',
         'conn_secondary',
       ]);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, 'conn_secondary');
       expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
       expect(
@@ -539,7 +883,9 @@ void main() {
     controller.terminateConnection('conn_secondary');
 
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>['conn_secondary']);
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
+      'conn_secondary',
+    ]);
     expect(controller.state.selectedConnectionId, 'conn_primary');
     expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
     expect(controller.bindingForConnectionId('conn_secondary'), isNull);
@@ -562,14 +908,14 @@ void main() {
       controller.terminateConnection('conn_primary');
 
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, <String>[
+      expect(controller.state.nonLiveSavedConnectionIds, <String>[
         'conn_primary',
         'conn_secondary',
       ]);
       expect(controller.state.selectedConnectionId, isNull);
       expect(
         controller.state.viewport,
-        ConnectionWorkspaceViewport.dormantRoster,
+        ConnectionWorkspaceViewport.savedConnections,
       );
       expect(controller.selectedLaneBinding, isNull);
       expect(clientsById['conn_primary']?.disconnectCalls, 1);
@@ -577,7 +923,7 @@ void main() {
     },
   );
 
-  test('showDormantRoster preserves the selected live lane', () async {
+  test('showSavedConnections preserves the selected live lane', () async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
     final controller = _buildWorkspaceController(clientsById: clientsById);
     addTearDown(() async {
@@ -587,11 +933,11 @@ void main() {
 
     await controller.initialize();
 
-    controller.showDormantRoster();
+    controller.showSavedConnections();
 
     expect(
       controller.state.viewport,
-      ConnectionWorkspaceViewport.dormantRoster,
+      ConnectionWorkspaceViewport.savedConnections,
     );
     expect(controller.state.selectedConnectionId, 'conn_primary');
     expect(controller.selectedLaneBinding?.connectionId, 'conn_primary');
@@ -608,7 +954,7 @@ void main() {
       });
 
       await controller.initialize();
-      controller.showDormantRoster();
+      controller.showSavedConnections();
 
       await controller.instantiateConnection('conn_secondary');
 
@@ -628,7 +974,7 @@ void main() {
       });
 
       await controller.initialize();
-      controller.showDormantRoster();
+      controller.showSavedConnections();
 
       controller.selectConnection('conn_primary');
 
@@ -677,7 +1023,7 @@ void main() {
       'conn_created',
     ]);
     expect(controller.state.liveConnectionIds, <String>['conn_primary']);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_secondary',
       'conn_created',
     ]);
@@ -685,7 +1031,7 @@ void main() {
   });
 
   test(
-    'saveDormantConnection updates the saved definition immediately',
+    'saveSavedConnection updates a non-live saved definition immediately',
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -696,7 +1042,7 @@ void main() {
 
       await controller.initialize();
 
-      await controller.saveDormantConnection(
+      await controller.saveSavedConnection(
         connectionId: 'conn_secondary',
         profile: _profile('Secondary Renamed', 'secondary.changed'),
         secrets: const ConnectionSecrets(password: 'new-secret'),
@@ -710,6 +1056,39 @@ void main() {
       expect(controller.bindingForConnectionId('conn_secondary'), isNull);
       expect(clientsById['conn_primary']?.disconnectCalls, 0);
       expect(clientsById['conn_secondary']?.disconnectCalls, 0);
+    },
+  );
+
+  test(
+    'saveSavedConnection routes live rows through staged reconnect edits',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary');
+
+      await controller.saveSavedConnection(
+        connectionId: 'conn_primary',
+        profile: _profile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+
+      expect(controller.state.requiresReconnect('conn_primary'), isTrue);
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(controller.bindingForConnectionId('conn_primary'), firstBinding);
+      expect(
+        controller.state.catalog.connectionForId('conn_primary')?.profile.host,
+        'primary.changed',
+      );
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
     },
   );
 
@@ -826,6 +1205,10 @@ void main() {
       expect(
         controller.state.transportRecoveryPhaseFor('conn_primary'),
         ConnectionWorkspaceTransportRecoveryPhase.lost,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.transportLost,
       );
       final diagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_primary',
@@ -985,7 +1368,7 @@ void main() {
   );
 
   test(
-    'reconnectConnection on a transport-loss lane reconnects the recreated empty lane before clearing transport recovery state',
+    'reconnectConnection on a transport-loss lane reconnects through the existing binding before clearing transport recovery state',
     () async {
       final repository = MemoryCodexConnectionRepository(
         initialConnections: <SavedConnection>[
@@ -1049,9 +1432,9 @@ void main() {
 
       final nextBinding = controller.bindingForConnectionId('conn_primary');
       expect(nextBinding, isNotNull);
-      expect(nextBinding, isNot(same(firstBinding)));
-      expect(clientsByConnectionId['conn_primary'], hasLength(2));
-      expect(clientsByConnectionId['conn_primary']!.last.connectCalls, 1);
+      expect(nextBinding, same(firstBinding));
+      expect(clientsByConnectionId['conn_primary'], hasLength(1));
+      expect(clientsByConnectionId['conn_primary']!.first.connectCalls, 2);
       expect(
         controller.state.requiresTransportReconnect('conn_primary'),
         isFalse,
@@ -1060,6 +1443,105 @@ void main() {
         controller.state.transportRecoveryPhaseFor('conn_primary'),
         isNull,
       );
+    },
+  );
+
+  test(
+    'reconnectConnection live-reattaches the selected thread on the existing binding before using history fallback',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.readThreadCalls.clear();
+      clientsById['conn_primary']!.startSessionCalls = 0;
+      clientsById['conn_primary']!.startSessionRequests.clear();
+
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(clientsById['conn_primary']!.startSessionCalls, 1);
+      expect(
+        clientsById['conn_primary']!.startSessionRequests.single.resumeThreadId,
+        'thread_saved',
+      );
+      expect(clientsById['conn_primary']!.readThreadCalls, isEmpty);
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.liveReattached,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+    },
+  );
+
+  test(
+    'reconnectConnection falls back to history restore only after live reattach fails on the existing binding',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _savedConversationThread(threadId: 'thread_saved');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.readThreadCalls.clear();
+      clientsById['conn_primary']!.startSessionCalls = 0;
+      clientsById['conn_primary']!.startSessionRequests.clear();
+      clientsById['conn_primary']!.startSessionError =
+          const CodexAppServerException('resume failed');
+
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(clientsById['conn_primary']!.startSessionCalls, 0);
+      expect(clientsById['conn_primary']!.readThreadCalls, <String>[
+        'thread_saved',
+      ]);
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
     },
   );
 
@@ -1387,11 +1869,15 @@ void main() {
 
       final nextBinding = controller.bindingForConnectionId('conn_primary');
       expect(nextBinding, isNotNull);
-      expect(nextBinding, isNot(same(firstBinding)));
+      expect(nextBinding, same(firstBinding));
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
       expect(
         controller.state.transportRecoveryPhaseFor('conn_primary'),
         isNull,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.liveReattached,
       );
       final resumedDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_primary',
@@ -1403,18 +1889,244 @@ void main() {
       );
       expect(
         resumedDiagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
-      expect(clientsByConnectionId['conn_primary'], hasLength(2));
-      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
+      expect(clientsByConnectionId['conn_primary'], hasLength(1));
+      expect(clientsByConnectionId['conn_primary']!.first.connectCalls, 1);
+      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 0);
+      expect(clientsByConnectionId['conn_primary']!.first.startSessionCalls, 1);
       expect(
-        clientsByConnectionId['conn_primary']!.last.readThreadCalls,
+        clientsByConnectionId['conn_primary']!
+            .first
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_123',
+      );
+      expect(
+        clientsByConnectionId['conn_primary']!.first.readThreadCalls,
         <String>['thread_123'],
       );
       expect(nextBinding!.composerDraftHost.draft.text, 'Recover me');
       expect(
         nextBinding.sessionController.sessionState.rootThreadId,
         'thread_123',
+      );
+    },
+  );
+
+  test(
+    'resumed auto-reconnect replays pending user input so the lane can still submit it through the workspace path',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'input_replay_1',
+        method: 'item/tool/requestUserInput',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_running',
+          'itemId': 'item_input_1',
+          'questions': <Object?>[
+            <String, Object?>{
+              'id': 'q1',
+              'header': 'Name',
+              'question': 'What is your name?',
+            },
+          ],
+        },
+      );
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..threadHistoriesById['thread_123'] = _savedConversationThread(
+              threadId: 'thread_123',
+            );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await _startBusyTurn(
+        binding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+      clientsByConnectionId['conn_primary']!.first.emit(replayedRequest);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        binding.sessionController.sessionState.pendingUserInputRequests
+            .containsKey('input_replay_1'),
+        isTrue,
+      );
+
+      clientsByConnectionId['conn_primary']!
+              .first
+              .resumeThreadReplayEventsByThreadId['thread_123'] =
+          <CodexAppServerEvent>[replayedRequest];
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await clientsByConnectionId['conn_primary']!.first.disconnect();
+      await Future<void>.delayed(Duration.zero);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final reboundBinding = controller.bindingForConnectionId('conn_primary')!;
+      expect(reboundBinding, same(binding));
+      expect(
+        reboundBinding.sessionController.sessionState.pendingUserInputRequests
+            .containsKey('input_replay_1'),
+        isTrue,
+      );
+
+      await reboundBinding.sessionController.submitUserInput(
+        'input_replay_1',
+        const <String, List<String>>{
+          'q1': <String>['Vince'],
+        },
+      );
+
+      expect(
+        clientsByConnectionId['conn_primary']!.first.userInputResponses,
+        <({String requestId, Map<String, List<String>> answers})>[
+          (
+            requestId: 'input_replay_1',
+            answers: const <String, List<String>>{
+              'q1': <String>['Vince'],
+            },
+          ),
+        ],
+      );
+    },
+  );
+
+  test(
+    'resumed auto-reconnect replays pending approvals so the lane can still approve through the workspace path',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'approval_replay_1',
+        method: 'item/permissions/requestApproval',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_running',
+          'itemId': 'item_approval_1',
+          'message': 'Need permission to continue.',
+        },
+      );
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..threadHistoriesById['thread_123'] = _savedConversationThread(
+              threadId: 'thread_123',
+            );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await _startBusyTurn(
+        binding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+      clientsByConnectionId['conn_primary']!.first.emit(replayedRequest);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        binding.sessionController.sessionState.pendingApprovalRequests
+            .containsKey('approval_replay_1'),
+        isTrue,
+      );
+
+      clientsByConnectionId['conn_primary']!
+              .first
+              .resumeThreadReplayEventsByThreadId['thread_123'] =
+          <CodexAppServerEvent>[replayedRequest];
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await clientsByConnectionId['conn_primary']!.first.disconnect();
+      await Future<void>.delayed(Duration.zero);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final reboundBinding = controller.bindingForConnectionId('conn_primary')!;
+      expect(reboundBinding, same(binding));
+      expect(
+        reboundBinding.sessionController.sessionState.pendingApprovalRequests
+            .containsKey('approval_replay_1'),
+        isTrue,
+      );
+
+      await reboundBinding.sessionController.approveRequest(
+        'approval_replay_1',
+      );
+
+      expect(
+        clientsByConnectionId['conn_primary']!.first.approvalDecisions,
+        <({String requestId, bool approved})>[
+          (requestId: 'approval_replay_1', approved: true),
+        ],
       );
     },
   );
@@ -1477,6 +2189,8 @@ void main() {
         firstBinding,
         clientsByConnectionId['conn_primary']!.first,
       );
+      clientsByConnectionId['conn_primary']!.first.connectError =
+          const CodexAppServerException('connect failed');
 
       await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       clientsByConnectionId['conn_primary']!.first.emit(
@@ -1490,7 +2204,7 @@ void main() {
 
       final nextBinding = controller.bindingForConnectionId('conn_primary');
       expect(nextBinding, isNotNull);
-      expect(nextBinding, isNot(same(firstBinding)));
+      expect(nextBinding, same(firstBinding));
       expect(
         controller.state.requiresTransportReconnect('conn_primary'),
         isTrue,
@@ -1516,11 +2230,254 @@ void main() {
         ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
       );
       expect(nextBinding!.composerDraftHost.draft.text, 'Recover me');
-      expect(clientsByConnectionId['conn_primary'], hasLength(2));
-      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 1);
+      expect(clientsByConnectionId['conn_primary'], hasLength(1));
+      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 0);
       expect(
-        clientsByConnectionId['conn_primary']!.last.readThreadCalls,
-        isEmpty,
+        clientsByConnectionId['conn_primary']!.first.readThreadCalls,
+        <String>['thread_123'],
+      );
+    },
+  );
+
+  test(
+    'resumed auto-reconnect stores remote stopped runtime when attach to the managed owner fails',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+        'conn_secondary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..connectError =
+                clientsByConnectionId[connectionId]!.isEmpty &&
+                    connectionId == 'conn_primary'
+                ? null
+                : const CodexRemoteAppServerAttachException(
+                    snapshot: CodexRemoteAppServerOwnerSnapshot(
+                      ownerId: 'conn_primary',
+                      workspaceDir: '/workspace',
+                      status: CodexRemoteAppServerOwnerStatus.stopped,
+                      sessionName: 'pocket-relay-conn_primary',
+                      detail: 'Remote Pocket Relay server is not running.',
+                    ),
+                    message: 'Remote Pocket Relay server is not running.',
+                  );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+      firstBinding.restoreComposerDraft('Recover me');
+      await _startBusyTurn(
+        firstBinding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+      clientsByConnectionId['conn_primary']!.first.connectError =
+          const CodexRemoteAppServerAttachException(
+            snapshot: CodexRemoteAppServerOwnerSnapshot(
+              ownerId: 'conn_primary',
+              workspaceDir: '/workspace',
+              status: CodexRemoteAppServerOwnerStatus.stopped,
+              sessionName: 'pocket-relay-conn_primary',
+              detail: 'Remote Pocket Relay server is not running.',
+            ),
+            message: 'Remote Pocket Relay server is not running.',
+          );
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clientsByConnectionId['conn_primary']!.first.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final remoteRuntime = controller.state.remoteRuntimeFor('conn_primary');
+      expect(remoteRuntime, isNotNull);
+      expect(
+        remoteRuntime!.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+      expect(
+        remoteRuntime.server.detail,
+        'Remote Pocket Relay server is not running.',
+      );
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.ownerMissing,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
+      );
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(firstBinding),
+      );
+    },
+  );
+
+  test(
+    'resumed auto-reconnect stores remote unhealthy runtime when attach to the managed owner fails',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+          SavedConnection(
+            id: 'conn_secondary',
+            profile: _profile('Secondary Box', 'secondary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-2'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+        'conn_secondary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..connectError =
+                clientsByConnectionId[connectionId]!.isEmpty &&
+                    connectionId == 'conn_primary'
+                ? null
+                : const CodexRemoteAppServerAttachException(
+                    snapshot: CodexRemoteAppServerOwnerSnapshot(
+                      ownerId: 'conn_primary',
+                      workspaceDir: '/workspace',
+                      status: CodexRemoteAppServerOwnerStatus.unhealthy,
+                      sessionName: 'pocket-relay-conn_primary',
+                      endpoint: CodexRemoteAppServerEndpoint(
+                        host: '127.0.0.1',
+                        port: 4100,
+                      ),
+                      detail: 'readyz failed',
+                    ),
+                    message: 'readyz failed',
+                  );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+      firstBinding.restoreComposerDraft('Recover me');
+      await _startBusyTurn(
+        firstBinding,
+        clientsByConnectionId['conn_primary']!.first,
+      );
+      clientsByConnectionId['conn_primary']!
+          .first
+          .connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+          sessionName: 'pocket-relay-conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+          detail: 'readyz failed',
+        ),
+        message: 'readyz failed',
+      );
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      clientsByConnectionId['conn_primary']!.first.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      final remoteRuntime = controller.state.remoteRuntimeFor('conn_primary');
+      expect(remoteRuntime, isNotNull);
+      expect(
+        remoteRuntime!.server.status,
+        ConnectionRemoteServerStatus.unhealthy,
+      );
+      expect(remoteRuntime.server.detail, 'readyz failed');
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
+      );
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(firstBinding),
       );
     },
   );
@@ -1971,7 +2928,7 @@ void main() {
     expect(controller.state.requiresReconnect('conn_primary'), isTrue);
   });
 
-  test('deleteDormantConnection removes the saved definition', () async {
+  test('deleteSavedConnection removes the saved definition', () async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
     final modelCatalogStore = MemoryConnectionModelCatalogStore(
       initialCatalogs: <ConnectionModelCatalog>[
@@ -2011,12 +2968,12 @@ void main() {
     });
 
     await controller.initialize();
-    await controller.deleteDormantConnection('conn_secondary');
+    await controller.deleteSavedConnection('conn_secondary');
 
     expect(controller.state.catalog.orderedConnectionIds, <String>[
       'conn_primary',
     ]);
-    expect(controller.state.dormantConnectionIds, isEmpty);
+    expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
     expect(await modelCatalogStore.load('conn_secondary'), isNull);
   });
 
@@ -2095,6 +3052,7 @@ void main() {
       );
       expect(controller.state.selectedConnectionId, 'conn_primary');
       expect(controller.state.viewport, ConnectionWorkspaceViewport.liveLane);
+      expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
     },
   );
 
@@ -2364,15 +3322,15 @@ void main() {
       await controller.initialize();
 
       controller.terminateConnection('conn_primary');
-      await controller.deleteDormantConnection('conn_primary');
+      await controller.deleteSavedConnection('conn_primary');
 
       expect(controller.state.catalog, const ConnectionCatalogState.empty());
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.dormantConnectionIds, isEmpty);
+      expect(controller.state.nonLiveSavedConnectionIds, isEmpty);
       expect(controller.state.selectedConnectionId, isNull);
       expect(
         controller.state.viewport,
-        ConnectionWorkspaceViewport.dormantRoster,
+        ConnectionWorkspaceViewport.savedConnections,
       );
       expect(controller.selectedLaneBinding, isNull);
       expect(clientsById['conn_primary']?.disconnectCalls, 1);
@@ -2385,6 +3343,12 @@ ConnectionWorkspaceController _buildWorkspaceController({
   MemoryCodexConnectionRepository? repository,
   ConnectionModelCatalogStore? modelCatalogStore,
   ConnectionWorkspaceRecoveryStore? recoveryStore,
+  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+      const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
+  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+      const _ThrowingRemoteOwnerInspector(),
+  CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+      const _ThrowingRemoteOwnerControl(),
   Duration? recoveryPersistenceDebounceDuration,
   WorkspaceNow? now,
 }) {
@@ -2408,6 +3372,9 @@ ConnectionWorkspaceController _buildWorkspaceController({
     connectionRepository: resolvedRepository,
     modelCatalogStore: modelCatalogStore,
     recoveryStore: recoveryStore,
+    remoteAppServerHostProbe: remoteAppServerHostProbe,
+    remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
+    remoteAppServerOwnerControl: remoteAppServerOwnerControl,
     recoveryPersistenceDebounceDuration:
         recoveryPersistenceDebounceDuration ??
         const Duration(milliseconds: 250),
@@ -2429,6 +3396,213 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _FakeRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _FakeRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _ThrowingRemoteOwnerInspector();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('owner inspection should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _ThrowingRemoteOwnerControl();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+}
+
+final class _MutableRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  _MutableRemoteOwnerControl({
+    required CodexRemoteAppServerOwnerSnapshot snapshot,
+  }) : _snapshot = snapshot;
+
+  CodexRemoteAppServerOwnerSnapshot _snapshot;
+  int startCalls = 0;
+  int stopCalls = 0;
+  int restartCalls = 0;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    restartCalls += 1;
+    await stopOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+    return startOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls += 1;
+    _snapshot = CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.running,
+      sessionName: 'pocket-relay-$ownerId',
+      endpoint: const CodexRemoteAppServerEndpoint(
+        host: '127.0.0.1',
+        port: 4100,
+      ),
+      detail: 'Remote Pocket Relay server is ready.',
+    );
+    return _snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    stopCalls += 1;
+    _snapshot = CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.missing,
+      sessionName: 'pocket-relay-$ownerId',
+      detail: 'No Pocket Relay server is running for this connection.',
+    );
+    return _snapshot;
+  }
 }
 
 class _RecordingConnectionWorkspaceRecoveryStore

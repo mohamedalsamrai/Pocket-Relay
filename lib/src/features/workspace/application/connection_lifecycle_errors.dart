@@ -1,0 +1,418 @@
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
+import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
+import 'package:pocket_relay/src/features/workspace/infrastructure/codex_workspace_conversation_history_repository.dart';
+
+abstract final class ConnectionLifecycleErrors {
+  static PocketUserFacingError openConnectionFailure({
+    required ConnectionProfile profile,
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    if (profile.connectionMode == ConnectionMode.local) {
+      final message =
+          _normalizedErrorDetail(error) ??
+          'Verify the saved connection, then try again.';
+      return PocketUserFacingError(
+        definition: PocketErrorCatalog.connectionOpenLocalUnexpectedFailure,
+        title: 'Could not open lane',
+        message: message,
+      );
+    }
+
+    final runtimeResolution = _openRemoteResolution(remoteRuntime);
+    if (runtimeResolution != null) {
+      return PocketUserFacingError(
+        definition: runtimeResolution.$1,
+        title: 'Could not open lane',
+        message: runtimeResolution.$2,
+      );
+    }
+
+    final errorDetail = _normalizedErrorDetail(error);
+    if (errorDetail != null) {
+      return PocketUserFacingError(
+        definition: PocketErrorCatalog.connectionOpenRemoteUnexpectedFailure,
+        title: 'Could not open lane',
+        message: errorDetail,
+      );
+    }
+
+    return PocketUserFacingError(
+      definition: PocketErrorCatalog.connectionOpenRemoteUnexpectedFailure,
+      title: 'Could not open lane',
+      message:
+          'Verify the saved connection and remote Pocket Relay server, then try again.',
+    );
+  }
+
+  static PocketUserFacingError remoteServerActionFailure(
+    ConnectionSettingsRemoteServerActionId actionId, {
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    final resolution = _remoteServerActionResolution(actionId, remoteRuntime);
+    final runtimeDetail = resolution?.$2;
+    final errorDetail = _normalizedErrorDetail(error);
+    final message = _combinedFailureDetail(
+      runtimeDetail: runtimeDetail,
+      errorDetail: errorDetail,
+      fallbackMessage: _genericRemoteServerActionFailureMessage(actionId),
+    );
+    return PocketUserFacingError(
+      definition:
+          resolution?.$1 ?? _unexpectedRemoteServerActionDefinition(actionId),
+      title: 'Could not ${_remoteServerActionVerb(actionId)}',
+      message: message,
+    );
+  }
+
+  static PocketUserFacingError transportLostNotice() {
+    return PocketUserFacingError(
+      definition: PocketErrorCatalog.connectionTransportLost,
+      title: 'Live transport lost',
+      message:
+          'Pocket Relay lost the live connection to Codex. Your draft is preserved below until the lane reconnects.',
+    );
+  }
+
+  static PocketUserFacingError transportUnavailableNotice(
+    ConnectionRemoteRuntimeState? remoteRuntime,
+  ) {
+    return switch (remoteRuntime?.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.unsupported => PocketUserFacingError(
+        definition: PocketErrorCatalog.connectionReconnectContinuityUnsupported,
+        title: 'Remote continuity unavailable',
+        message:
+            remoteRuntime?.hostCapability.detail ??
+            'This host does not currently satisfy Pocket Relay continuity requirements. Verify SSH access, tmux, and codex, then reconnect this lane.',
+      ),
+      ConnectionRemoteHostCapabilityStatus.probeFailed => PocketUserFacingError(
+        definition: PocketErrorCatalog.connectionReconnectHostProbeFailed,
+        title: 'Remote continuity unavailable',
+        message:
+            remoteRuntime?.hostCapability.detail ??
+            'This host does not currently satisfy Pocket Relay continuity requirements. Verify SSH access, tmux, and codex, then reconnect this lane.',
+      ),
+      _ => switch (remoteRuntime?.server.status) {
+        ConnectionRemoteServerStatus.notRunning => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionReconnectServerStopped,
+          title: 'Remote server stopped',
+          message:
+              remoteRuntime?.server.detail ??
+              'The Pocket Relay server for this connection is not running. Start it from this lane, then reconnect.',
+        ),
+        ConnectionRemoteServerStatus.unhealthy => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionReconnectServerUnhealthy,
+          title: 'Remote server unhealthy',
+          message:
+              remoteRuntime?.server.detail ??
+              'The Pocket Relay server exists but is not healthy enough to accept connections. Restart it from this lane, then reconnect.',
+        ),
+        _ => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionTransportUnavailable,
+          title: 'Remote session unavailable',
+          message:
+              'Pocket Relay could not reconnect this lane to Codex. Your draft is preserved below. Try reconnecting again.',
+        ),
+      },
+    };
+  }
+
+  static PocketUserFacingError connectLaneFailure({
+    ConnectionRemoteRuntimeState? remoteRuntime,
+    Object? error,
+  }) {
+    final unavailable = transportUnavailableNotice(remoteRuntime);
+    return PocketUserFacingError(
+      definition: unavailable.definition,
+      title: 'Could not connect lane',
+      message: _combinedFailureDetail(
+        runtimeDetail: unavailable.message,
+        errorDetail: _normalizedErrorDetail(error),
+        fallbackMessage: unavailable.message,
+      ),
+    );
+  }
+
+  static PocketUserFacingError conversationHistoryFailure(Object error) {
+    if (error is CodexWorkspaceConversationHistoryUnpinnedHostKeyException) {
+      return PocketUserFacingError(
+        definition: PocketErrorCatalog.connectionHistoryHostKeyUnpinned,
+        title: 'Host key not pinned',
+        message:
+            'Conversation history cannot connect until this host fingerprint is saved to the connection profile.\nObserved fingerprint: ${error.fingerprint}',
+      );
+    }
+
+    if (error is CodexRemoteAppServerAttachException) {
+      return switch (error.snapshot.status) {
+        CodexRemoteAppServerOwnerStatus.missing ||
+        CodexRemoteAppServerOwnerStatus.stopped => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionHistoryServerStopped,
+          title: 'Remote server stopped',
+          message: error.message.trim().isEmpty
+              ? 'Remote Pocket Relay server is not running for this connection.'
+              : error.message,
+        ),
+        CodexRemoteAppServerOwnerStatus.unhealthy => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionHistoryServerUnhealthy,
+          title: 'Remote server unhealthy',
+          message: error.message.trim().isEmpty
+              ? 'Remote Pocket Relay server is unhealthy and cannot load conversation history.'
+              : error.message,
+        ),
+        CodexRemoteAppServerOwnerStatus.running => PocketUserFacingError(
+          definition: PocketErrorCatalog.connectionHistorySessionUnavailable,
+          title: 'Remote session unavailable',
+          message: error.message.trim().isEmpty
+              ? 'Pocket Relay could not attach to the managed remote session to load conversation history.'
+              : error.message,
+        ),
+      };
+    }
+
+    return PocketUserFacingError(
+      definition: PocketErrorCatalog.connectionHistoryLoadFailed,
+      title: 'Could not load conversations',
+      message:
+          _normalizedErrorDetail(error) ??
+          'Pocket Relay could not load conversations from Codex.',
+    );
+  }
+
+  static (PocketErrorDefinition, String)? _openRemoteResolution(
+    ConnectionRemoteRuntimeState? remoteRuntime,
+  ) {
+    if (remoteRuntime == null) {
+      return null;
+    }
+
+    return switch (remoteRuntime.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.probeFailed => (
+        PocketErrorCatalog.connectionOpenRemoteHostProbeFailed,
+        remoteRuntime.hostCapability.detail ??
+            'Pocket Relay could not verify the remote host.',
+      ),
+      ConnectionRemoteHostCapabilityStatus.unsupported => (
+        PocketErrorCatalog.connectionOpenRemoteContinuityUnsupported,
+        remoteRuntime.hostCapability.detail ??
+            'This remote host does not satisfy Pocket Relay continuity requirements.',
+      ),
+      _ => switch (remoteRuntime.server.status) {
+        ConnectionRemoteServerStatus.notRunning => (
+          PocketErrorCatalog.connectionOpenRemoteServerStopped,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still stopped.',
+        ),
+        ConnectionRemoteServerStatus.unhealthy => (
+          PocketErrorCatalog.connectionOpenRemoteServerUnhealthy,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ),
+        ConnectionRemoteServerStatus.running => (
+          PocketErrorCatalog.connectionOpenRemoteAttachUnavailable,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is running but the lane could not attach.',
+        ),
+        _ => null,
+      },
+    };
+  }
+
+  static (PocketErrorDefinition, String?)? _remoteServerActionResolution(
+    ConnectionSettingsRemoteServerActionId actionId,
+    ConnectionRemoteRuntimeState? remoteRuntime,
+  ) {
+    if (remoteRuntime == null) {
+      return null;
+    }
+
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start => _startServerResolution(
+        remoteRuntime,
+      ),
+      ConnectionSettingsRemoteServerActionId.stop => _stopServerResolution(
+        remoteRuntime,
+      ),
+      ConnectionSettingsRemoteServerActionId.restart =>
+        _restartServerResolution(remoteRuntime),
+    };
+  }
+
+  static (PocketErrorDefinition, String?)? _startServerResolution(
+    ConnectionRemoteRuntimeState remoteRuntime,
+  ) {
+    return switch (remoteRuntime.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.probeFailed => (
+        PocketErrorCatalog.connectionStartServerHostProbeFailed,
+        remoteRuntime.hostCapability.detail ??
+            'Pocket Relay could not verify the remote host.',
+      ),
+      ConnectionRemoteHostCapabilityStatus.unsupported => (
+        PocketErrorCatalog.connectionStartServerContinuityUnsupported,
+        remoteRuntime.hostCapability.detail ??
+            'This remote host does not satisfy Pocket Relay continuity requirements.',
+      ),
+      _ => switch (remoteRuntime.server.status) {
+        ConnectionRemoteServerStatus.notRunning => (
+          PocketErrorCatalog.connectionStartServerStillStopped,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still stopped.',
+        ),
+        ConnectionRemoteServerStatus.unhealthy => (
+          PocketErrorCatalog.connectionStartServerUnhealthy,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ),
+        _ => null,
+      },
+    };
+  }
+
+  static (PocketErrorDefinition, String?)? _stopServerResolution(
+    ConnectionRemoteRuntimeState remoteRuntime,
+  ) {
+    return switch (remoteRuntime.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.probeFailed => (
+        PocketErrorCatalog.connectionStopServerHostProbeFailed,
+        remoteRuntime.hostCapability.detail ??
+            'Pocket Relay could not verify the remote host.',
+      ),
+      ConnectionRemoteHostCapabilityStatus.unsupported => (
+        PocketErrorCatalog.connectionStopServerContinuityUnsupported,
+        remoteRuntime.hostCapability.detail ??
+            'This remote host does not satisfy Pocket Relay continuity requirements.',
+      ),
+      _ => switch (remoteRuntime.server.status) {
+        ConnectionRemoteServerStatus.running => (
+          PocketErrorCatalog.connectionStopServerStillRunning,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still running.',
+        ),
+        ConnectionRemoteServerStatus.unhealthy => (
+          PocketErrorCatalog.connectionStopServerStillUnhealthy,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ),
+        _ => null,
+      },
+    };
+  }
+
+  static (PocketErrorDefinition, String?)? _restartServerResolution(
+    ConnectionRemoteRuntimeState remoteRuntime,
+  ) {
+    return switch (remoteRuntime.hostCapability.status) {
+      ConnectionRemoteHostCapabilityStatus.probeFailed => (
+        PocketErrorCatalog.connectionRestartServerHostProbeFailed,
+        remoteRuntime.hostCapability.detail ??
+            'Pocket Relay could not verify the remote host.',
+      ),
+      ConnectionRemoteHostCapabilityStatus.unsupported => (
+        PocketErrorCatalog.connectionRestartServerContinuityUnsupported,
+        remoteRuntime.hostCapability.detail ??
+            'This remote host does not satisfy Pocket Relay continuity requirements.',
+      ),
+      _ => switch (remoteRuntime.server.status) {
+        ConnectionRemoteServerStatus.notRunning => (
+          PocketErrorCatalog.connectionRestartServerStopped,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still stopped.',
+        ),
+        ConnectionRemoteServerStatus.unhealthy => (
+          PocketErrorCatalog.connectionRestartServerUnhealthy,
+          remoteRuntime.server.detail ??
+              'The remote Pocket Relay server is still unhealthy.',
+        ),
+        _ => null,
+      },
+    };
+  }
+
+  static PocketErrorDefinition _unexpectedRemoteServerActionDefinition(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) {
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start =>
+        PocketErrorCatalog.connectionStartServerUnexpectedFailure,
+      ConnectionSettingsRemoteServerActionId.stop =>
+        PocketErrorCatalog.connectionStopServerUnexpectedFailure,
+      ConnectionSettingsRemoteServerActionId.restart =>
+        PocketErrorCatalog.connectionRestartServerUnexpectedFailure,
+    };
+  }
+
+  static String _combinedFailureDetail({
+    required String? runtimeDetail,
+    required String? errorDetail,
+    required String fallbackMessage,
+  }) {
+    if (runtimeDetail != null &&
+        errorDetail != null &&
+        errorDetail != runtimeDetail) {
+      return '$runtimeDetail Underlying error: $errorDetail';
+    }
+    if (runtimeDetail != null) {
+      return runtimeDetail;
+    }
+    if (errorDetail != null) {
+      return errorDetail;
+    }
+    return fallbackMessage;
+  }
+
+  static String _genericRemoteServerActionFailureMessage(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) {
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start =>
+        'Pocket Relay could not verify that the remote server started.',
+      ConnectionSettingsRemoteServerActionId.stop =>
+        'Pocket Relay could not verify that the remote server stopped.',
+      ConnectionSettingsRemoteServerActionId.restart =>
+        'Pocket Relay could not verify that the remote server restarted.',
+    };
+  }
+
+  static String _remoteServerActionVerb(
+    ConnectionSettingsRemoteServerActionId actionId,
+  ) {
+    return switch (actionId) {
+      ConnectionSettingsRemoteServerActionId.start => 'start server',
+      ConnectionSettingsRemoteServerActionId.stop => 'stop server',
+      ConnectionSettingsRemoteServerActionId.restart => 'restart server',
+    };
+  }
+
+  static String? _normalizedErrorDetail(Object? error) {
+    if (error == null) {
+      return null;
+    }
+
+    final detail = '$error'.trim();
+    if (detail.isEmpty) {
+      return null;
+    }
+
+    return switch (detail) {
+      final value when value.startsWith('Exception: ') => value.substring(
+        'Exception: '.length,
+      ),
+      final value when value.startsWith('Bad state: ') => value.substring(
+        'Bad state: '.length,
+      ),
+      final value when value.startsWith('CodexAppServerException: ') =>
+        value.substring('CodexAppServerException: '.length),
+      final value
+          when value.startsWith('CodexAppServerException(') &&
+              value.contains('): ') =>
+        value.substring(value.indexOf('): ') + 3),
+      final value
+          when value.startsWith('Remote owner control command failed: ') =>
+        value.substring('Remote owner control command failed: '.length),
+      _ => detail,
+    };
+  }
+}

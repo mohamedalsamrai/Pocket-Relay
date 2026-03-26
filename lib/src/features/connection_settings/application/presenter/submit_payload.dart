@@ -1,0 +1,36 @@
+part of '../connection_settings_presenter.dart';
+
+ConnectionSettingsSubmitPayload _buildSubmitPayload({
+  required ConnectionProfile initialProfile,
+  required ConnectionSecrets initialSecrets,
+  required _ConnectionSettingsPresentationState state,
+}) {
+  final draft = state.draft;
+  final presenter = const ConnectionSettingsPresenter();
+  return ConnectionSettingsSubmitPayload(
+    profile: initialProfile.copyWith(
+      label: presenter._normalizedLabel(draft.label),
+      connectionMode: draft.connectionMode,
+      host: draft.host.trim(),
+      port: state.port ?? initialProfile.port,
+      username: draft.username.trim(),
+      workspaceDir: draft.workspaceDir.trim(),
+      codexPath: draft.codexPath.trim(),
+      model: _selectedModelIdForDraft(draft) ?? '',
+      reasoningEffort: codexNormalizedReasoningEffortForModel(
+        _selectedModelIdForDraft(draft),
+        draft.reasoningEffort,
+        availableModelCatalog: state.availableModelCatalog,
+      ),
+      authMode: draft.authMode,
+      hostFingerprint: draft.hostFingerprint.trim(),
+      dangerouslyBypassSandbox: draft.dangerouslyBypassSandbox,
+      ephemeralSession: draft.ephemeralSession,
+    ),
+    secrets: initialSecrets.copyWith(
+      password: draft.password,
+      privateKeyPem: draft.privateKeyPem,
+      privateKeyPassphrase: draft.privateKeyPassphrase,
+    ),
+  );
+}

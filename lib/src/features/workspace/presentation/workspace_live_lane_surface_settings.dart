@@ -61,9 +61,19 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         initialProfile: initialSettings.$1,
         initialSecrets: initialSettings.$2,
         platformBehavior: platformPolicy.behavior,
+        initialRemoteRuntime: workspaceController.state.remoteRuntimeFor(
+          connectionId,
+        ),
         availableModelCatalog: availableModelCatalog.$1,
         availableModelCatalogSource: availableModelCatalog.$2,
         onRefreshModelCatalog: onRefreshModelCatalog,
+        onRefreshRemoteRuntime: (payload) {
+          return workspaceController.refreshRemoteRuntime(
+            connectionId: connectionId,
+            profile: payload.profile,
+            secrets: payload.secrets,
+          );
+        },
       );
       if (!_matchesLiveRequestContext(
             workspaceController: workspaceController,

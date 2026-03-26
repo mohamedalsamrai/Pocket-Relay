@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
@@ -766,7 +767,7 @@ void main() {
       );
       expect(
         await snackBarMessage,
-        'Could not rewind this conversation to the selected prompt.',
+        '[${PocketErrorCatalog.chatSessionContinueFromPromptFailed.code}] Continue from prompt failed. Could not rewind this conversation to the selected prompt.',
       );
     },
   );
@@ -988,7 +989,7 @@ void main() {
       );
       expect(
         await snackBarMessage,
-        'Could not branch this conversation from Codex.',
+        '[${PocketErrorCatalog.chatSessionBranchConversationFailed.code}] Branch conversation failed. Could not branch this conversation from Codex.',
       );
     },
   );
@@ -1085,6 +1086,232 @@ void main() {
         contains('Restored answer'),
       );
       expect(controller.sessionState.rootThreadId, 'thread_saved');
+    },
+  );
+
+  test(
+    'reattachConversation resumes the same thread without rereading transcript history',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_saved'] = _savedConversationThread(
+          threadId: 'thread_saved',
+        );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.selectConversationForResume('thread_saved');
+      final restoredUserTexts = controller.transcriptBlocks
+          .whereType<CodexUserMessageBlock>()
+          .map((block) => block.text)
+          .toList(growable: false);
+      final restoredAssistantTexts = controller.transcriptBlocks
+          .whereType<CodexTextBlock>()
+          .map((block) => block.body)
+          .toList(growable: false);
+
+      appServerClient.readThreadCalls.clear();
+      appServerClient.startSessionCalls = 0;
+      appServerClient.startSessionRequests.clear();
+
+      await controller.reattachConversation('thread_saved');
+
+      expect(appServerClient.readThreadCalls, isEmpty);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(
+        appServerClient.startSessionRequests.single.resumeThreadId,
+        'thread_saved',
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexUserMessageBlock>().map(
+          (block) => block.text,
+        ),
+        restoredUserTexts,
+      );
+      expect(
+        controller.transcriptBlocks.whereType<CodexTextBlock>().map(
+          (block) => block.body,
+        ),
+        restoredAssistantTexts,
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_saved');
+      expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'reattachConversation seeds live thread identity without hydrating transcript history when the lane is empty',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.initialize();
+      await controller.reattachConversation('thread_live');
+
+      expect(appServerClient.connectCalls, 1);
+      expect(appServerClient.readThreadCalls, <String>['thread_live']);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(
+        appServerClient.startSessionRequests.single.resumeThreadId,
+        'thread_live',
+      );
+      expect(controller.sessionState.rootThreadId, 'thread_live');
+      expect(controller.sessionState.currentThreadId, 'thread_live');
+      expect(controller.transcriptBlocks, isEmpty);
+      expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'reattachConversation replays pending user input requests so they remain actionable after reconnect',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'input_1',
+        method: 'item/tool/requestUserInput',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'itemId': 'item_1',
+          'questions': <Object?>[
+            <String, Object?>{
+              'id': 'q1',
+              'header': 'Name',
+              'question': 'What is your name?',
+            },
+          ],
+        },
+      );
+      final appServerClient = FakeCodexAppServerClient()
+        ..resumeThreadReplayEventsByThreadId['thread_123'] =
+            <CodexAppServerEvent>[replayedRequest];
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(replayedRequest);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.sessionState.pendingUserInputRequests.containsKey('input_1'),
+        isTrue,
+      );
+
+      await appServerClient.disconnect();
+      await controller.reattachConversation('thread_123');
+      await controller.submitUserInput('input_1', const <String, List<String>>{
+        'q1': <String>['Vince'],
+      });
+
+      expect(
+        appServerClient.userInputResponses,
+        <({String requestId, Map<String, List<String>> answers})>[
+          (
+            requestId: 'input_1',
+            answers: const <String, List<String>>{
+              'q1': <String>['Vince'],
+            },
+          ),
+        ],
+      );
+    },
+  );
+
+  test(
+    'reattachConversation replays pending approval requests so they remain actionable after reconnect',
+    () async {
+      const replayedRequest = CodexAppServerRequestEvent(
+        requestId: 'approval_1',
+        method: 'item/permissions/requestApproval',
+        params: <String, Object?>{
+          'threadId': 'thread_123',
+          'turnId': 'turn_1',
+          'itemId': 'item_approval_1',
+          'message': 'Need permission to continue.',
+        },
+      );
+      final appServerClient = FakeCodexAppServerClient()
+        ..resumeThreadReplayEventsByThreadId['thread_123'] =
+            <CodexAppServerEvent>[replayedRequest];
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(replayedRequest);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.sessionState.pendingApprovalRequests.containsKey(
+          'approval_1',
+        ),
+        isTrue,
+      );
+
+      await appServerClient.disconnect();
+      await controller.reattachConversation('thread_123');
+      await controller.approveRequest('approval_1');
+
+      expect(
+        appServerClient.approvalDecisions,
+        <({String requestId, bool approved})>[
+          (requestId: 'approval_1', approved: true),
+        ],
+      );
     },
   );
 
@@ -1252,6 +1479,59 @@ void main() {
 
       expect(controller.sessionState.rootThreadId, 'thread_new');
       expect(controller.historicalConversationRestoreState, isNull);
+    },
+  );
+
+  test(
+    'selectConversationForResume surfaces a coded runtime error when transcript loading fails',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..readThreadWithTurnsError = StateError('history backend unavailable');
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+
+      await controller.selectConversationForResume('thread_saved');
+
+      expect(
+        controller.historicalConversationRestoreState?.phase,
+        ChatHistoricalConversationRestorePhase.failed,
+      );
+      final runtimeErrors = controller.transcriptBlocks
+          .whereType<CodexErrorBlock>()
+          .toList(growable: false);
+      expect(runtimeErrors, hasLength(1));
+      expect(
+        runtimeErrors.single.body,
+        contains(
+          '[${PocketErrorCatalog.chatSessionConversationLoadFailed.code}]',
+        ),
+      );
+      expect(
+        runtimeErrors.single.body,
+        contains('history backend unavailable'),
+      );
+      expect(
+        await snackBarMessage,
+        '[${PocketErrorCatalog.chatSessionConversationLoadFailed.code}] Conversation load failed. Could not load the saved conversation transcript.',
+      );
     },
   );
 
@@ -1640,9 +1920,17 @@ void main() {
       expect(controller.transcriptBlocks.first, isA<CodexUserMessageBlock>());
       expect(controller.sessionState.pendingLocalUserMessageBlockIds, isEmpty);
       expect(controller.sessionState.localUserMessageProviderBindings, isEmpty);
+      final runtimeErrors = controller.transcriptBlocks
+          .whereType<CodexErrorBlock>()
+          .toList(growable: false);
+      expect(runtimeErrors, hasLength(1));
+      expect(
+        runtimeErrors.single.body,
+        contains('[${PocketErrorCatalog.chatSessionSendFailed.code}]'),
+      );
       expect(
         await snackBarMessage,
-        'Could not send the prompt to the remote Codex session.',
+        '[${PocketErrorCatalog.chatSessionSendFailed.code}] Send failed. Could not send the prompt to the remote Codex session.',
       );
     },
   );
@@ -1843,7 +2131,7 @@ void main() {
       );
       expect(
         controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
-        'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+        '[${PocketErrorCatalog.chatSessionSendConversationUnavailable.code}] Conversation unavailable. Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
       );
     },
   );
@@ -1893,7 +2181,7 @@ void main() {
       );
       expect(
         controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
-        'Pocket Relay expected remote conversation "thread_old", but the remote session returned "thread_new". Sending is blocked to avoid attaching your draft to a different conversation.',
+        '[${PocketErrorCatalog.chatSessionSendConversationChanged.code}] Conversation changed. Pocket Relay expected remote conversation "thread_old", but the remote session returned "thread_new". Sending is blocked to avoid attaching your draft to a different conversation.',
       );
     },
   );
@@ -2411,10 +2699,7 @@ void main() {
         hasLength(1),
       );
       expect(controller.transcriptBlocks.whereType<CodexErrorBlock>(), isEmpty);
-      await expectLater(
-        snackBarMessage,
-        throwsA(isA<TimeoutException>()),
-      );
+      await expectLater(snackBarMessage, throwsA(isA<TimeoutException>()));
     },
   );
 
@@ -2461,7 +2746,7 @@ void main() {
       expect(errors.single.message, contains('Connection refused'));
       expect(
         await snackBarMessage,
-        'Could not send the prompt to the remote Codex session.',
+        '[${PocketErrorCatalog.chatSessionSendFailed.code}] Send failed. Could not send the prompt to the remote Codex session.',
       );
     },
   );

@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/codex_ui_block.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
@@ -171,6 +172,88 @@ void main() {
   );
 
   testWidgets(
+    'workspace app lifecycle host preserves completed transcript details across a brief pause and resume',
+    (tester) async {
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient();
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      final firstBinding = controller.bindingForConnectionId('conn_primary')!;
+      _emitCompletedAssistantTurn(clientsByConnectionId['conn_primary']!.first);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WorkspaceAppLifecycleHost(
+            workspaceController: controller,
+            child: const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final beforeTranscript = firstBinding.sessionController.transcriptBlocks;
+      final beforeMessage = beforeTranscript.whereType<CodexTextBlock>().single;
+      final beforeReadThreadCalls = List<String>.from(
+        clientsByConnectionId['conn_primary']!.first.readThreadCalls,
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      final nextBinding = controller.bindingForConnectionId('conn_primary');
+      expect(nextBinding, same(firstBinding));
+      final afterTranscript = nextBinding!.sessionController.transcriptBlocks;
+      final afterMessage = afterTranscript.whereType<CodexTextBlock>().single;
+
+      expect(afterTranscript, hasLength(beforeTranscript.length));
+      expect(afterMessage.body, beforeMessage.body);
+      expect(nextBinding.sessionController.sessionState.isBusy, isFalse);
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(
+        clientsByConnectionId['conn_primary']!.first.readThreadCalls,
+        beforeReadThreadCalls,
+      );
+      expect(clientsByConnectionId['conn_primary']!.first.disconnectCalls, 0);
+    },
+  );
+
+  testWidgets(
     'PocketRelayApp keeps the foreground-service, background-grace, lifecycle, and wake-lock hosts in place',
     (tester) async {
       final appServerClient = FakeCodexAppServerClient();
@@ -270,6 +353,83 @@ Future<void> _closeClientLists(
       await client.close();
     }
   }
+}
+
+void _emitCompletedAssistantTurn(FakeCodexAppServerClient appServerClient) {
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'thread/started',
+      params: <String, Object?>{
+        'thread': <String, Object?>{'id': 'thread_123'},
+      },
+    ),
+  );
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'turn/started',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turn': <String, Object?>{
+          'id': 'turn_1',
+          'status': 'running',
+          'model': 'gpt-5.4',
+          'effort': 'high',
+        },
+      },
+    ),
+  );
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'item/started',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turnId': 'turn_1',
+        'item': <String, Object?>{
+          'id': 'item_1',
+          'type': 'agentMessage',
+          'status': 'inProgress',
+        },
+      },
+    ),
+  );
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'item/agentMessage/delta',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turnId': 'turn_1',
+        'itemId': 'item_1',
+        'delta': 'Finished answer',
+      },
+    ),
+  );
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'item/completed',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turnId': 'turn_1',
+        'item': <String, Object?>{
+          'id': 'item_1',
+          'type': 'agentMessage',
+          'status': 'completed',
+          'text': 'Finished answer',
+        },
+      },
+    ),
+  );
+  appServerClient.emit(
+    const CodexAppServerNotificationEvent(
+      method: 'turn/completed',
+      params: <String, Object?>{
+        'threadId': 'thread_123',
+        'turn': <String, Object?>{
+          'id': 'turn_1',
+          'status': 'completed',
+        },
+      },
+    ),
+  );
 }
 
 CodexAppServerThreadHistory _savedConversationThread({

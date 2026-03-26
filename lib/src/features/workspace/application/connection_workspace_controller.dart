@@ -4,16 +4,31 @@ import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_remote_runtime_probe.dart';
+import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
 
-part 'connection_workspace_controller_catalog.dart';
 part 'connection_workspace_controller_lane.dart';
-part 'connection_workspace_controller_lifecycle.dart';
+part 'connection_workspace_controller_remote_owner.dart';
+part 'controller/app_lifecycle.dart';
+part 'controller/binding_runtime.dart';
+part 'controller/bootstrap.dart';
+part 'controller/catalog_connections.dart';
+part 'controller/conversation_selection.dart';
+part 'controller/delete_connection.dart';
+part 'controller/model_catalogs.dart';
+part 'controller/recovery_diagnostics.dart';
+part 'controller/recovery_persistence.dart';
+part 'controller/reconnect.dart';
+part 'controller/remote_runtime.dart';
+part 'controller/state_sanitizers.dart';
 
 typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
@@ -28,6 +43,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     required ConnectionLaneBindingFactory laneBindingFactory,
     ConnectionModelCatalogStore? modelCatalogStore,
     ConnectionWorkspaceRecoveryStore? recoveryStore,
+    CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+        const CodexSshRemoteAppServerHostProbe(),
+    CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+        const CodexSshRemoteAppServerOwnerInspector(),
+    CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+        const CodexSshRemoteAppServerOwnerControl(),
     Duration recoveryPersistenceDebounceDuration = const Duration(
       milliseconds: 250,
     ),
@@ -38,6 +59,9 @@ class ConnectionWorkspaceController extends ChangeNotifier {
            modelCatalogStore ?? const NoopConnectionModelCatalogStore(),
        _recoveryStore =
            recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
+       _remoteAppServerHostProbe = remoteAppServerHostProbe,
+       _remoteAppServerOwnerInspector = remoteAppServerOwnerInspector,
+       _remoteAppServerOwnerControl = remoteAppServerOwnerControl,
        _recoveryPersistenceDebounceDuration =
            recoveryPersistenceDebounceDuration,
        _now = now ?? DateTime.now;
@@ -46,6 +70,9 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionModelCatalogStore _modelCatalogStore;
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
+  final CodexRemoteAppServerHostProbe _remoteAppServerHostProbe;
+  final CodexRemoteAppServerOwnerInspector _remoteAppServerOwnerInspector;
+  final CodexRemoteAppServerOwnerControl _remoteAppServerOwnerControl;
   final Duration _recoveryPersistenceDebounceDuration;
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
@@ -67,6 +94,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
           StreamSubscription<CodexAppServerEvent> appServerEventSubscription,
         })
       >{};
+  final Map<String, int> _remoteRuntimeRefreshGenerationByConnectionId =
+      <String, int>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
@@ -106,12 +135,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     return _createWorkspaceConnection(this, profile: profile, secrets: secrets);
   }
 
-  Future<void> saveDormantConnection({
+  Future<void> saveSavedConnection({
     required String connectionId,
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   }) {
-    return _saveWorkspaceDormantConnection(
+    return _saveWorkspaceSavedConnection(
       this,
       connectionId: connectionId,
       profile: profile,
@@ -156,6 +185,37 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     return _reconnectWorkspaceLane(this, connectionId);
   }
 
+  Future<ConnectionRemoteRuntimeState> refreshRemoteRuntime({
+    required String connectionId,
+    ConnectionProfile? profile,
+    ConnectionSecrets? secrets,
+  }) {
+    return _refreshWorkspaceRemoteRuntime(
+      this,
+      connectionId,
+      profile: profile,
+      secrets: secrets,
+    );
+  }
+
+  Future<ConnectionRemoteRuntimeState> startRemoteServer({
+    required String connectionId,
+  }) {
+    return _startWorkspaceRemoteServer(this, connectionId: connectionId);
+  }
+
+  Future<ConnectionRemoteRuntimeState> stopRemoteServer({
+    required String connectionId,
+  }) {
+    return _stopWorkspaceRemoteServer(this, connectionId: connectionId);
+  }
+
+  Future<ConnectionRemoteRuntimeState> restartRemoteServer({
+    required String connectionId,
+  }) {
+    return _restartWorkspaceRemoteServer(this, connectionId: connectionId);
+  }
+
   Future<void> handleAppLifecycleStateChanged(AppLifecycleState state) {
     return _handleWorkspaceAppLifecycleState(this, state);
   }
@@ -171,8 +231,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     );
   }
 
-  Future<void> deleteDormantConnection(String connectionId) {
-    return _deleteWorkspaceDormantConnection(this, connectionId);
+  Future<void> deleteSavedConnection(String connectionId) {
+    return _deleteWorkspaceSavedConnection(this, connectionId);
   }
 
   Future<void> instantiateConnection(String connectionId) {
@@ -183,8 +243,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _selectWorkspaceConnection(this, connectionId);
   }
 
-  void showDormantRoster() {
-    _showWorkspaceDormantRoster(this);
+  void showSavedConnections() {
+    _showWorkspaceSavedConnections(this);
   }
 
   void terminateConnection(String connectionId) {
@@ -225,460 +285,149 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     return true;
   }
 
-  void _notifyBindingChange() {
-    if (_isDisposed) {
-      return;
-    }
-
+  void _notifyListenersInternal() {
     notifyListeners();
-    unawaited(_enqueueRecoveryPersistence());
   }
+
+  void _notifyBindingChange() => _notifyWorkspaceBindingChange(this);
 
   void _registerLiveBinding(
     String connectionId,
     ConnectionLaneBinding binding,
-  ) {
-    _unregisterLiveBinding(connectionId);
-    void listener() {
-      if (_state.selectedConnectionId != connectionId) {
-        return;
-      }
-      final snapshot = _selectedRecoveryStateSnapshot();
-      if (_hasImmediateRecoveryIdentityChange(snapshot)) {
-        unawaited(_queueRecoveryPersistenceSnapshot(snapshot: snapshot));
-        return;
-      }
-      _scheduleRecoveryPersistence();
-    }
+  ) => _registerWorkspaceLiveBinding(this, connectionId, binding);
 
-    _bindingRecoveryRegistrationsByConnectionId[connectionId] = (
-      binding: binding,
-      listener: listener,
-      appServerEventSubscription: binding.appServerClient.events.listen((
-        event,
-      ) {
-        switch (event) {
-          case CodexAppServerDisconnectedEvent(:final exitCode):
-            _recordTransportLoss(
-              connectionId,
-              occurredAt: _now(),
-              reason: switch (exitCode) {
-                null => ConnectionWorkspaceTransportLossReason.disconnected,
-                0 =>
-                  ConnectionWorkspaceTransportLossReason.appServerExitGraceful,
-                _ => ConnectionWorkspaceTransportLossReason.appServerExitError,
-              },
-            );
-            _markTransportReconnectRequired(connectionId);
-            break;
-          case CodexAppServerConnectedEvent():
-            final wasRecovering = _state.requiresTransportReconnect(
-              connectionId,
-            );
-            _clearTransportReconnectRequired(connectionId);
-            if (wasRecovering) {
-              _completeRecoveryAttempt(
-                connectionId,
-                completedAt: _now(),
-                outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
-              );
-            }
-            break;
-          case CodexAppServerSshConnectFailedEvent():
-            _recordTransportLoss(
-              connectionId,
-              occurredAt: _now(),
-              reason: ConnectionWorkspaceTransportLossReason.sshConnectFailed,
-            );
-            break;
-          case CodexAppServerSshHostKeyMismatchEvent():
-            _recordTransportLoss(
-              connectionId,
-              occurredAt: _now(),
-              reason: ConnectionWorkspaceTransportLossReason.sshHostKeyMismatch,
-            );
-            break;
-          case CodexAppServerSshAuthenticationFailedEvent():
-            _recordTransportLoss(
-              connectionId,
-              occurredAt: _now(),
-              reason: ConnectionWorkspaceTransportLossReason
-                  .sshAuthenticationFailed,
-            );
-            break;
-          case CodexAppServerSshRemoteLaunchFailedEvent():
-            _recordTransportLoss(
-              connectionId,
-              occurredAt: _now(),
-              reason:
-                  ConnectionWorkspaceTransportLossReason.sshRemoteLaunchFailed,
-            );
-            break;
-          default:
-            break;
-        }
-      }),
-    );
-    binding.sessionController.addListener(listener);
-    binding.composerDraftHost.addListener(listener);
-  }
+  void _unregisterLiveBinding(String connectionId) =>
+      _unregisterWorkspaceLiveBinding(this, connectionId);
 
-  void _unregisterLiveBinding(String connectionId) {
-    final registration = _bindingRecoveryRegistrationsByConnectionId.remove(
-      connectionId,
-    );
-    if (registration == null) {
-      return;
-    }
-
-    registration.binding.sessionController.removeListener(
-      registration.listener,
-    );
-    registration.binding.composerDraftHost.removeListener(
-      registration.listener,
-    );
-    unawaited(registration.appServerEventSubscription.cancel());
-  }
-
-  void _scheduleRecoveryPersistence() {
-    if (_isDisposed) {
-      return;
-    }
-    _recoveryPersistenceDebounceTimer?.cancel();
-    _recoveryPersistenceDebounceTimer = Timer(
-      _recoveryPersistenceDebounceDuration,
-      () {
-        _recoveryPersistenceDebounceTimer = null;
-        unawaited(
-          _queueRecoveryPersistenceSnapshot(
-            snapshot: _selectedRecoveryStateSnapshot(),
-          ),
-        );
-      },
-    );
-  }
+  void _scheduleRecoveryPersistence() =>
+      _scheduleWorkspaceRecoveryPersistence(this);
 
   Future<void> _enqueueRecoveryPersistence({
     DateTime? backgroundedAt,
     ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState,
-  }) {
-    _recoveryPersistenceDebounceTimer?.cancel();
-    _recoveryPersistenceDebounceTimer = null;
-    return _queueRecoveryPersistenceSnapshot(
-      snapshot: _selectedRecoveryStateSnapshot(
-        backgroundedAt: backgroundedAt,
-        backgroundedLifecycleState: backgroundedLifecycleState,
-      ),
-    );
-  }
+  }) => _enqueueWorkspaceRecoveryPersistence(
+    this,
+    backgroundedAt: backgroundedAt,
+    backgroundedLifecycleState: backgroundedLifecycleState,
+  );
+
+  void _clearLiveReattachPhase(String connectionId) =>
+      _clearWorkspaceLiveReattachPhase(this, connectionId);
+
+  void _setLiveReattachPhase(
+    String connectionId,
+    ConnectionWorkspaceLiveReattachPhase phase,
+  ) => _setWorkspaceLiveReattachPhase(this, connectionId, phase);
 
   Future<void> _queueRecoveryPersistenceSnapshot({
     ConnectionWorkspaceRecoveryState? snapshot,
-  }) {
-    if (_isDisposed) {
-      return _recoveryPersistence;
-    }
-
-    if (snapshot == _lastPersistedRecoveryState ||
-        snapshot == _pendingRecoveryPersistenceState) {
-      return _recoveryPersistence;
-    }
-
-    _pendingRecoveryPersistenceState = snapshot;
-    if (_isPersistingRecoveryState) {
-      return _recoveryPersistence;
-    }
-
-    _isPersistingRecoveryState = true;
-    _recoveryPersistence = _drainRecoveryPersistenceQueue();
-    return _recoveryPersistence;
-  }
-
-  Future<void> _drainRecoveryPersistenceQueue() async {
-    try {
-      while (true) {
-        final snapshot = _pendingRecoveryPersistenceState;
-        _pendingRecoveryPersistenceState = null;
-        if (snapshot == null) {
-          break;
-        }
-        if (snapshot == _lastPersistedRecoveryState) {
-          if (_pendingRecoveryPersistenceState == null) {
-            break;
-          }
-          continue;
-        }
-        try {
-          await _recoveryStore.save(snapshot);
-          _lastPersistedRecoveryState = snapshot;
-        } catch (error, stackTrace) {
-          assert(() {
-            debugPrint('Failed to save workspace recovery state: $error');
-            debugPrintStack(stackTrace: stackTrace);
-            return true;
-          }());
-        }
-        if (_pendingRecoveryPersistenceState == null) {
-          break;
-        }
-      }
-    } finally {
-      _isPersistingRecoveryState = false;
-      if (_pendingRecoveryPersistenceState != null && !_isDisposed) {
-        _isPersistingRecoveryState = true;
-        _recoveryPersistence = _drainRecoveryPersistenceQueue();
-      }
-    }
-  }
+  }) => _queueWorkspaceRecoveryPersistenceSnapshot(this, snapshot: snapshot);
 
   bool _hasImmediateRecoveryIdentityChange(
     ConnectionWorkspaceRecoveryState? snapshot,
-  ) {
-    final referenceSnapshot =
-        _pendingRecoveryPersistenceState ?? _lastPersistedRecoveryState;
-    return referenceSnapshot?.connectionId != snapshot?.connectionId ||
-        referenceSnapshot?.selectedThreadId != snapshot?.selectedThreadId;
-  }
+  ) => _hasWorkspaceImmediateRecoveryIdentityChange(this, snapshot);
 
   ConnectionWorkspaceRecoveryState? _selectedRecoveryStateSnapshot({
     DateTime? backgroundedAt,
     ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState,
-  }) {
-    final selectedConnectionId = _state.selectedConnectionId;
-    if (selectedConnectionId == null ||
-        !_state.isConnectionLive(selectedConnectionId)) {
-      return null;
-    }
+  }) => _selectedWorkspaceRecoveryStateSnapshot(
+    this,
+    backgroundedAt: backgroundedAt,
+    backgroundedLifecycleState: backgroundedLifecycleState,
+  );
 
-    final binding = _liveBindingsByConnectionId[selectedConnectionId];
-    if (binding == null) {
-      return null;
-    }
+  void _markTransportReconnectRequired(String connectionId) =>
+      _markWorkspaceTransportReconnectRequired(this, connectionId);
 
-    final selectedThreadId = _normalizedWorkspaceThreadId(
-      binding.sessionController.sessionState.currentThreadId ??
-          binding.sessionController.sessionState.rootThreadId ??
-          binding
-              .sessionController
-              .historicalConversationRestoreState
-              ?.threadId,
-    );
-    final diagnostics = _state.recoveryDiagnosticsFor(selectedConnectionId);
-
-    return ConnectionWorkspaceRecoveryState(
-      connectionId: selectedConnectionId,
-      selectedThreadId: selectedThreadId,
-      draftText: binding.composerDraftHost.draft.text,
-      backgroundedAt: backgroundedAt ?? diagnostics?.lastBackgroundedAt,
-      backgroundedLifecycleState:
-          backgroundedLifecycleState ??
-          diagnostics?.lastBackgroundedLifecycleState,
-    );
-  }
-
-  void _markTransportReconnectRequired(String connectionId) {
-    if (_isDisposed ||
-        !_state.isConnectionLive(connectionId) ||
-        _state.requiresTransportReconnect(connectionId)) {
-      return;
-    }
-
-    _applyState(
-      _state.copyWith(
-        transportReconnectRequiredConnectionIds:
-            _sanitizeWorkspaceReconnectRequiredIds(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              reconnectRequiredConnectionIds: <String>{
-                ..._state.transportReconnectRequiredConnectionIds,
-                connectionId,
-              },
-            ),
-        transportRecoveryPhasesByConnectionId:
-            _sanitizeWorkspaceTransportRecoveryPhases(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              transportRecoveryPhasesByConnectionId:
-                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                    ..._state.transportRecoveryPhasesByConnectionId,
-                    connectionId:
-                        ConnectionWorkspaceTransportRecoveryPhase.lost,
-                  },
-            ),
-      ),
-    );
-  }
-
-  void _clearTransportReconnectRequired(String connectionId) {
-    if (_isDisposed || !_state.requiresTransportReconnect(connectionId)) {
-      return;
-    }
-
-    _applyState(
-      _state.copyWith(
-        transportReconnectRequiredConnectionIds:
-            _sanitizeWorkspaceReconnectRequiredIds(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              reconnectRequiredConnectionIds: <String>{
-                ..._state.transportReconnectRequiredConnectionIds,
-              }..remove(connectionId),
-            ),
-        transportRecoveryPhasesByConnectionId:
-            _sanitizeWorkspaceTransportRecoveryPhases(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              transportRecoveryPhasesByConnectionId:
-                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                    for (final entry
-                        in _state.transportRecoveryPhasesByConnectionId.entries)
-                      if (entry.key != connectionId) entry.key: entry.value,
-                  },
-            ),
-      ),
-    );
-  }
+  void _clearTransportReconnectRequired(String connectionId) =>
+      _clearWorkspaceTransportReconnectRequired(this, connectionId);
 
   void _setTransportRecoveryPhase(
     String connectionId,
     ConnectionWorkspaceTransportRecoveryPhase phase,
-  ) {
-    if (_isDisposed || !_state.isConnectionLive(connectionId)) {
-      return;
-    }
-
-    if (_state.transportRecoveryPhaseFor(connectionId) == phase) {
-      return;
-    }
-
-    _applyState(
-      _state.copyWith(
-        transportRecoveryPhasesByConnectionId:
-            _sanitizeWorkspaceTransportRecoveryPhases(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              transportRecoveryPhasesByConnectionId:
-                  <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                    ..._state.transportRecoveryPhasesByConnectionId,
-                    connectionId: phase,
-                  },
-            ),
-      ),
-    );
-  }
+  ) => _setWorkspaceTransportRecoveryPhase(this, connectionId, phase);
 
   void _recordLifecycleBackgroundSnapshot(
     String connectionId, {
     required DateTime occurredAt,
     required ConnectionWorkspaceBackgroundLifecycleState lifecycleState,
-  }) {
-    _updateRecoveryDiagnostics(
-      connectionId,
-      (current) => current.copyWith(
-        lastBackgroundedAt: occurredAt,
-        lastBackgroundedLifecycleState: lifecycleState,
-      ),
-    );
-  }
+  }) => _recordWorkspaceLifecycleBackgroundSnapshot(
+    this,
+    connectionId,
+    occurredAt: occurredAt,
+    lifecycleState: lifecycleState,
+  );
 
   void _recordLifecycleResume(
     String connectionId, {
     required DateTime occurredAt,
-  }) {
-    _updateRecoveryDiagnostics(
-      connectionId,
-      (current) => current.copyWith(
-        lastResumedAt: occurredAt,
-        clearLastBackgroundedAt: true,
-        clearLastBackgroundedLifecycleState: true,
-      ),
-    );
-  }
+  }) => _recordWorkspaceLifecycleResume(
+    this,
+    connectionId,
+    occurredAt: occurredAt,
+  );
 
   void _recordTransportLoss(
     String connectionId, {
     required DateTime occurredAt,
     required ConnectionWorkspaceTransportLossReason reason,
-  }) {
-    _updateRecoveryDiagnostics(
-      connectionId,
-      (current) => current.copyWith(
-        lastTransportLossAt: occurredAt,
-        lastTransportLossReason: reason,
-      ),
-    );
-  }
+  }) => _recordWorkspaceTransportLoss(
+    this,
+    connectionId,
+    occurredAt: occurredAt,
+    reason: reason,
+  );
 
   void _recordFallbackTransportConnectFailure(
     String connectionId, {
     required DateTime occurredAt,
-  }) {
-    final diagnostics = _state.recoveryDiagnosticsFor(connectionId);
-    final lastRecoveryStartedAt = diagnostics?.lastRecoveryStartedAt;
-    final lastTransportLossAt = diagnostics?.lastTransportLossAt;
-    if (lastRecoveryStartedAt != null &&
-        lastTransportLossAt != null &&
-        !lastTransportLossAt.isBefore(lastRecoveryStartedAt)) {
-      return;
-    }
-
-    _recordTransportLoss(
-      connectionId,
-      occurredAt: occurredAt,
-      reason: ConnectionWorkspaceTransportLossReason.connectFailed,
-    );
-  }
+  }) => _recordWorkspaceFallbackTransportConnectFailure(
+    this,
+    connectionId,
+    occurredAt: occurredAt,
+  );
 
   void _beginRecoveryAttempt(
     String connectionId, {
     required DateTime startedAt,
     required ConnectionWorkspaceRecoveryOrigin origin,
-  }) {
-    _updateRecoveryDiagnostics(
-      connectionId,
-      (current) => current.copyWith(
-        lastRecoveryOrigin: origin,
-        lastRecoveryStartedAt: startedAt,
-        clearLastRecoveryCompletedAt: true,
-        clearLastRecoveryOutcome: true,
-      ),
-    );
-  }
+  }) => _beginWorkspaceRecoveryAttempt(
+    this,
+    connectionId,
+    startedAt: startedAt,
+    origin: origin,
+  );
 
   void _completeRecoveryAttempt(
     String connectionId, {
     required DateTime completedAt,
     required ConnectionWorkspaceRecoveryOutcome outcome,
-  }) {
-    _updateRecoveryDiagnostics(
-      connectionId,
-      (current) => current.copyWith(
-        lastRecoveryCompletedAt: completedAt,
-        lastRecoveryOutcome: outcome,
-      ),
-    );
-  }
+  }) => _completeWorkspaceRecoveryAttempt(
+    this,
+    connectionId,
+    completedAt: completedAt,
+    outcome: outcome,
+  );
 
   void _completeConversationRecoveryAttempt(
     String connectionId,
     ConnectionLaneBinding binding, {
     required DateTime completedAt,
-  }) {
-    final restorePhase =
-        binding.sessionController.historicalConversationRestoreState?.phase;
-    final outcome = switch (restorePhase) {
-      ChatHistoricalConversationRestorePhase.unavailable =>
-        ConnectionWorkspaceRecoveryOutcome.conversationUnavailable,
-      ChatHistoricalConversationRestorePhase.failed =>
-        ConnectionWorkspaceRecoveryOutcome.conversationRestoreFailed,
-      _ => ConnectionWorkspaceRecoveryOutcome.conversationRestored,
-    };
-    _completeRecoveryAttempt(
-      connectionId,
-      completedAt: completedAt,
-      outcome: outcome,
-    );
-  }
+  }) => _completeWorkspaceConversationRecoveryAttempt(
+    this,
+    connectionId,
+    binding,
+    completedAt: completedAt,
+  );
+
+  void _completeLiveReattachRecoveryAttempt(
+    String connectionId, {
+    required DateTime completedAt,
+  }) => _completeWorkspaceLiveReattachRecoveryAttempt(
+    this,
+    connectionId,
+    completedAt: completedAt,
+  );
 
   void _updateRecoveryDiagnostics(
     String connectionId,
@@ -686,32 +435,5 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       ConnectionWorkspaceRecoveryDiagnostics current,
     )
     update,
-  ) {
-    if (_isDisposed || !_state.isConnectionLive(connectionId)) {
-      return;
-    }
-
-    final currentDiagnostics =
-        _state.recoveryDiagnosticsFor(connectionId) ??
-        const ConnectionWorkspaceRecoveryDiagnostics();
-    final nextDiagnostics = update(currentDiagnostics);
-    if (nextDiagnostics == currentDiagnostics) {
-      return;
-    }
-
-    _applyState(
-      _state.copyWith(
-        recoveryDiagnosticsByConnectionId:
-            _sanitizeWorkspaceRecoveryDiagnostics(
-              catalog: _state.catalog,
-              liveConnectionIds: _state.liveConnectionIds,
-              recoveryDiagnosticsByConnectionId:
-                  <String, ConnectionWorkspaceRecoveryDiagnostics>{
-                    ..._state.recoveryDiagnosticsByConnectionId,
-                    connectionId: nextDiagnostics,
-                  },
-            ),
-      ),
-    );
-  }
+  ) => _updateWorkspaceRecoveryDiagnostics(this, connectionId, update);
 }

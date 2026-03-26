@@ -1,6 +1,9 @@
 part of 'codex_app_server_connection.dart';
 
-void _handleStdoutLineImpl(CodexAppServerConnection connection, String line) {
+void _handleProtocolMessageImpl(
+  CodexAppServerConnection connection,
+  String line,
+) {
   final trimmed = line.trim();
   if (trimmed.isEmpty) {
     return;

@@ -7,6 +7,47 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('connect supports a transport opener without process streams', () async {
+    late _FakeCodexAppServerTransport transport;
+    transport = _FakeCodexAppServerTransport(
+      onClientLine: (line) {
+        final message = jsonDecode(line) as Map<String, dynamic>;
+        if (message['method'] == 'initialize') {
+          transport.sendProtocolMessage(<String, Object?>{
+            'id': message['id'],
+            'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+          });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      transportOpener:
+          ({required profile, required secrets, required emitEvent}) async =>
+              transport,
+    );
+    final events = <CodexAppServerEvent>[];
+    final subscription = client.events.listen(events.add);
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transport.writtenLines, hasLength(2));
+    expect(
+      jsonDecode(transport.writtenLines[1]) as Map<String, dynamic>,
+      <String, Object?>{'method': 'initialized'},
+    );
+
+    final connected = events.whereType<CodexAppServerConnectedEvent>().single;
+    expect(connected.userAgent, 'codex-app-server-test');
+
+    await subscription.cancel();
+    await client.disconnect();
+  });
+
   test(
     'connect performs initialize handshake and emits connected event',
     () async {
@@ -957,6 +998,64 @@ void main() {
     },
   );
 
+  test('resumeThread exposes thread/resume as a first-class client request', () async {
+    late _FakeCodexAppServerProcess process;
+    process = _FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        switch (message['method']) {
+          case 'initialize':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'userAgent': 'codex-app-server-test',
+              },
+            });
+          case 'thread/resume':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'thread': <String, Object?>{'id': 'thread_old'},
+                'cwd': '/workspace/subdir',
+                'model': 'gpt-5.3-codex',
+                'modelProvider': 'openai',
+                'approvalPolicy': 'on-request',
+                'sandbox': <String, Object?>{'type': 'workspace-write'},
+              },
+            });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: _profile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    final session = await client.resumeThread(
+      threadId: 'thread_old',
+      cwd: '/workspace/subdir',
+    );
+
+    expect(session.threadId, 'thread_old');
+    final resumeRequest = process.writtenMessages.firstWhere(
+      (message) => message['method'] == 'thread/resume',
+    );
+    expect(resumeRequest['params'], <String, Object?>{
+      'cwd': '/workspace/subdir',
+      'approvalPolicy': 'on-request',
+      'sandbox': 'workspace-write',
+      'threadId': 'thread_old',
+    });
+
+    await client.disconnect();
+  });
+
   test(
     'startSession surfaces thread/resume mismatches instead of accepting a different thread id',
     () async {
@@ -1763,5 +1862,56 @@ class _FakeCodexAppServerProcess implements CodexAppServerProcess {
     await _stdinController.close();
     await _stdoutController.close();
     await _stderrController.close();
+  }
+}
+
+class _FakeCodexAppServerTransport implements CodexAppServerTransport {
+  _FakeCodexAppServerTransport({this.onClientLine});
+
+  final void Function(String line)? onClientLine;
+  @override
+  final CodexAppServerTransportTermination? termination =
+      const CodexAppServerTransportTermination(exitCode: 0);
+  final List<String> writtenLines = <String>[];
+
+  final _protocolMessagesController = StreamController<String>.broadcast();
+  final _diagnosticsController = StreamController<String>.broadcast();
+  final _doneCompleter = Completer<void>();
+  bool _isClosed = false;
+
+  @override
+  Stream<String> get protocolMessages => _protocolMessagesController.stream;
+
+  @override
+  Stream<String> get diagnostics => _diagnosticsController.stream;
+
+  @override
+  Future<void> get done => _doneCompleter.future;
+
+  void sendProtocolMessage(Map<String, Object?> payload) {
+    _protocolMessagesController.add(jsonEncode(payload));
+  }
+
+  void sendDiagnostic(String message) {
+    _diagnosticsController.add(message);
+  }
+
+  @override
+  void sendLine(String line) {
+    writtenLines.add(line);
+    onClientLine?.call(line);
+  }
+
+  @override
+  Future<void> close() async {
+    if (_isClosed) {
+      return;
+    }
+    _isClosed = true;
+    if (!_doneCompleter.isCompleted) {
+      _doneCompleter.complete();
+    }
+    await _protocolMessagesController.close();
+    await _diagnosticsController.close();
   }
 }

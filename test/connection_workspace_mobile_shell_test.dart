@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
@@ -40,10 +42,10 @@ void main() {
 
     expect(find.text('Saved connections'), findsWidgets);
     expect(
-      find.byKey(const ValueKey('dormant_connection_conn_secondary')),
+      find.byKey(const ValueKey('saved_connection_conn_secondary')),
       findsOneWidget,
     );
-    expect(controller.state.isShowingDormantRoster, isTrue);
+    expect(controller.state.isShowingSavedConnections, isTrue);
     expect(controller.state.selectedConnectionId, 'conn_primary');
   });
 
@@ -64,8 +66,11 @@ void main() {
     await tester.tap(find.text('Saved connections'));
     await tester.pumpAndSettle();
 
-    expect(controller.state.isShowingDormantRoster, isTrue);
-    expect(find.byKey(const ValueKey('dormant_roster_page')), findsOneWidget);
+    expect(controller.state.isShowingSavedConnections, isTrue);
+    expect(
+      find.byKey(const ValueKey('saved_connections_page')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('overflow menu opens the workspace conversation history sheet', (
@@ -73,6 +78,18 @@ void main() {
   ) async {
     final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
     final controller = _buildWorkspaceController(clientsById: clientsById);
+    final repository = FakeCodexWorkspaceConversationHistoryRepository(
+      conversations: <CodexWorkspaceConversationSummary>[
+        CodexWorkspaceConversationSummary(
+          threadId: 'thread_saved',
+          preview: 'Saved backend thread',
+          cwd: '/workspace',
+          promptCount: 2,
+          firstPromptAt: DateTime(2026, 3, 20, 9),
+          lastActivityAt: DateTime(2026, 3, 20, 10),
+        ),
+      ],
+    );
     addTearDown(() async {
       controller.dispose();
       await _closeClients(clientsById);
@@ -80,22 +97,7 @@ void main() {
 
     await controller.initialize();
     await tester.pumpWidget(
-      _buildShell(
-        controller,
-        conversationHistoryRepository:
-            FakeCodexWorkspaceConversationHistoryRepository(
-              conversations: <CodexWorkspaceConversationSummary>[
-                CodexWorkspaceConversationSummary(
-                  threadId: 'thread_saved',
-                  preview: 'Saved backend thread',
-                  cwd: '/workspace',
-                  promptCount: 2,
-                  firstPromptAt: DateTime(2026, 3, 20, 9),
-                  lastActivityAt: DateTime(2026, 3, 20, 10),
-                ),
-              ],
-            ),
-      ),
+      _buildShell(controller, conversationHistoryRepository: repository),
     );
     await tester.pumpAndSettle();
 
@@ -107,6 +109,7 @@ void main() {
     expect(find.byType(BottomSheet), findsOneWidget);
     expect(find.text('Saved backend thread'), findsOneWidget);
     expect(find.textContaining('2 prompts'), findsOneWidget);
+    expect(repository.loadOwnerIds, <String?>['conn_primary']);
   });
 
   testWidgets(
@@ -230,7 +233,7 @@ void main() {
   );
 
   testWidgets(
-    'overflow menu shows an honest error until Codex-backed history loading exists',
+    'overflow menu shows a generic conversation history backend error',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final controller = _buildWorkspaceController(clientsById: clientsById);
@@ -257,6 +260,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Could not load conversations'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionHistoryLoadFailed.code}]',
+        ),
+        findsOneWidget,
+      );
     },
   );
   testWidgets(
@@ -407,7 +416,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('instantiate_conn_secondary')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('open_connection_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('open_connection_conn_secondary')),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.state.liveConnectionIds, <String>[
@@ -444,18 +459,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.liveConnectionIds, isEmpty);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_primary',
       'conn_secondary',
     ]);
     expect(controller.state.selectedConnectionId, isNull);
-    expect(controller.state.isShowingDormantRoster, isTrue);
+    expect(controller.state.isShowingSavedConnections, isTrue);
     expect(
-      find.byKey(const ValueKey('dormant_connection_conn_primary')),
+      find.byKey(const ValueKey('saved_connection_conn_primary')),
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('dormant_connection_conn_secondary')),
+      find.byKey(const ValueKey('saved_connection_conn_secondary')),
       findsOneWidget,
     );
     expect(clientsById['conn_primary']?.disconnectCalls, 1);
@@ -498,14 +513,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('dormant_connection_conn_created')),
+        find.byKey(const ValueKey('saved_connection_conn_created')),
         findsOneWidget,
       );
       expect(controller.state.catalog.orderedConnectionIds, <String>[
         'conn_created',
       ]);
       expect(controller.state.liveConnectionIds, isEmpty);
-      expect(controller.state.isShowingDormantRoster, isTrue);
+      expect(controller.state.isShowingSavedConnections, isTrue);
     },
   );
 
@@ -685,8 +700,12 @@ void main() {
         const Offset(-500, 0),
       );
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('open_connection_conn_secondary')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('instantiate_conn_secondary')),
+        find.byKey(const ValueKey('open_connection_conn_secondary')),
       );
       await tester.pumpAndSettle();
 
@@ -756,8 +775,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add_connection')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('saved_connection_conn_created')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('dormant_connection_conn_created')),
+      find.byKey(const ValueKey('saved_connection_conn_created')),
       findsOneWidget,
     );
     expect(controller.state.catalog.orderedConnectionIds, <String>[
@@ -765,7 +790,7 @@ void main() {
       'conn_secondary',
       'conn_created',
     ]);
-    expect(controller.state.dormantConnectionIds, <String>[
+    expect(controller.state.nonLiveSavedConnectionIds, <String>[
       'conn_secondary',
       'conn_created',
     ]);
@@ -801,6 +826,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('edit_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
     await tester.pumpAndSettle();
 
@@ -880,11 +909,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('delete_conn_secondary')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('delete_conn_secondary')));
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('dormant_connection_conn_secondary')),
+      find.byKey(const ValueKey('saved_connection_conn_secondary')),
       findsNothing,
     );
     expect(controller.state.catalog.orderedConnectionIds, <String>[
@@ -935,6 +968,25 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
+    remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+      CodexRemoteAppServerHostCapabilities(),
+    ),
+    remoteAppServerOwnerInspector: const _StaticRemoteOwnerInspector(
+      CodexRemoteAppServerOwnerSnapshot(
+        ownerId: 'conn_primary',
+        workspaceDir: '/workspace',
+        status: CodexRemoteAppServerOwnerStatus.stopped,
+        sessionName: 'pocket-relay-conn_primary',
+      ),
+    ),
+    remoteAppServerOwnerControl: const _StaticRemoteOwnerControl(
+      CodexRemoteAppServerOwnerSnapshot(
+        ownerId: 'conn_primary',
+        workspaceDir: '/workspace',
+        status: CodexRemoteAppServerOwnerStatus.stopped,
+        sessionName: 'pocket-relay-conn_primary',
+      ),
+    ),
     laneBindingFactory: ({required connectionId, required connection}) {
       final appServerClient = clientsById[connectionId]!;
       return ConnectionLaneBinding(
@@ -952,6 +1004,100 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
     },
   );
+}
+
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _StaticRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _StaticRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _StaticRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _StaticRemoteOwnerControl(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
 }
 
 ConnectionProfile _profile(String label, String host) {
@@ -1056,12 +1202,15 @@ class FakeCodexWorkspaceConversationHistoryRepository
 
   final List<CodexWorkspaceConversationSummary> conversations;
   final Object? error;
+  final List<String?> loadOwnerIds = <String?>[];
 
   @override
   Future<List<CodexWorkspaceConversationSummary>> loadWorkspaceConversations({
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
+    String? ownerId,
   }) async {
+    loadOwnerIds.add(ownerId);
     if (error != null) {
       throw error!;
     }

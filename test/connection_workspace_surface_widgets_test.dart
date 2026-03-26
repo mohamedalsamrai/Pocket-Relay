@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
@@ -12,17 +13,220 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
+import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_host.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/workspace_dormant_roster_content.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/workspace_saved_connections_content.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 
 void main() {
+  testWidgets(
+    'live lane settings receive the controller-owned initial remote runtime for the selected connection',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: const _FakeRemoteOwnerInspector(
+          CodexRemoteAppServerOwnerSnapshot(
+            ownerId: 'conn_primary',
+            workspaceDir: '/workspace',
+            status: CodexRemoteAppServerOwnerStatus.running,
+            sessionName: 'pocket-relay-conn_primary',
+            endpoint: CodexRemoteAppServerEndpoint(
+              host: '127.0.0.1',
+              port: 4100,
+            ),
+          ),
+        ),
+      );
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(
+        settingsOverlayDelegate.launchedInitialRemoteRuntimes.single,
+        controller.state.remoteRuntimeFor('conn_primary'),
+      );
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'live lane settings no longer expose remote server action callbacks',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Connection settings'));
+      await tester.pump();
+
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNull,
+      );
+
+      settingsOverlayDelegate.complete(null);
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'live lane shows a persistent connected status strip for healthy remote lanes',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        await controller.flushRecoveryPersistence();
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_strip')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_status_label')),
+        findsOneWidget,
+      );
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.text('primary.local · /workspace'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'live lane status strip starts the remote server for the selected lane',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final ownerControl = _RecordingRemoteOwnerControl();
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
+          },
+        ),
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Server stopped'), findsOneWidget);
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('lane_connection_action_start_server'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(ownerControl.startCalls, hasLength(1));
+      expect(ownerControl.startCalls.single.ownerId, 'conn_primary');
+    },
+  );
+
   testWidgets(
     'dormant roster add action launches settings only once while pending',
     (tester) async {
@@ -57,7 +261,7 @@ void main() {
   );
 
   testWidgets(
-    'dormant roster edit action enters busy state before loading saved settings',
+    'saved connections edit action enters busy state before loading saved settings',
     (tester) async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
       final repository = _DelayedMemoryCodexConnectionRepository(
@@ -93,13 +297,21 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final initialLoadCount =
+          repository.loadConnectionCallsById['conn_secondary'] ?? 0;
 
       await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
-      await tester.pump();
 
-      expect(repository.loadConnectionCallsById['conn_secondary'], 1);
+      final editButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('edit_conn_secondary')),
+      );
+      expect(editButton.onPressed, isNull);
+
+      expect(
+        repository.loadConnectionCallsById['conn_secondary'],
+        initialLoadCount + 1,
+      );
 
       repository.loadConnectionGates['conn_secondary']!.complete();
       await tester.pump();
@@ -108,6 +320,240 @@ void main() {
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'saved connections edit action stages reconnect changes for an open row',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      final settingsOverlayDelegate =
+          _DeferredConnectionSettingsOverlayDelegate();
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final originalBinding = controller.bindingForConnectionId('conn_primary');
+
+      await tester.pumpWidget(
+        _buildDormantRosterApp(
+          controller,
+          settingsOverlayDelegate: settingsOverlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('edit_conn_primary')));
+      await tester.pump();
+
+      expect(settingsOverlayDelegate.launchCount, 1);
+
+      settingsOverlayDelegate.complete(
+        ConnectionSettingsSubmitPayload(
+          profile: _profile('Primary Renamed', 'primary.changed'),
+          secrets: const ConnectionSecrets(password: 'updated-secret'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.catalog.connectionForId('conn_primary')?.profile.host,
+        'primary.changed',
+      );
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        originalBinding,
+      );
+      expect(clientsById['conn_primary']?.disconnectCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'saved connections roster does not render remote server controls',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _notRunningOwnerSnapshot('conn_primary'),
+            'conn_secondary': _notRunningOwnerSnapshot('conn_secondary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(_buildDormantRosterApp(controller));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey('saved_connection_remote_server_start_conn_secondary'),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows a disconnected status and connect action when the remote server is running',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await clientsById['conn_primary']!.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Disconnected'), findsOneWidget);
+      expect(find.text('Connect'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey<String>('lane_connection_action_connect'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane connect action attaches the selected lane when the remote server is running',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('lane_connection_action_connect')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.connectCalls, 1);
+      expect(find.text('Connected'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'live lane connect action surfaces a coded snackbar when transport attach fails',
+    (tester) async {
+      final clientsById = _buildClientsById('conn_primary');
+      final client = clientsById['conn_primary']!;
+      final controller = _buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(),
+        ),
+        remoteAppServerOwnerInspector: _MapRemoteOwnerInspector(
+          <String, CodexRemoteAppServerOwnerSnapshot>{
+            'conn_primary': _runningOwnerSnapshot('conn_primary'),
+          },
+        ),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      client.connectError = const CodexAppServerException('connect failed');
+      final laneBinding = controller.selectedLaneBinding!;
+      await tester.pumpWidget(
+        _buildLiveLaneApp(
+          controller,
+          laneBinding,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate()
+            ..complete(null),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('lane_connection_action_connect'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionTransportUnavailable.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Could not connect lane'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Underlying error: connect failed'),
+        findsOneWidget,
+      );
+      expect(find.text('Disconnected'), findsOneWidget);
     },
   );
 
@@ -134,7 +580,7 @@ void main() {
                   ),
                 ],
             defaultReasoningEffort: CodexReasoningEffort.medium,
-            inputModalities: const <String>['text'],
+            inputModalities: <String>['text'],
             supportsPersonality: false,
             isDefault: true,
           ),
@@ -173,6 +619,18 @@ void main() {
         settingsOverlayDelegate.launchedModelCatalogSources.single,
         ConnectionSettingsModelCatalogSource.connectionCache,
       );
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -201,7 +659,7 @@ void main() {
                   ),
                 ],
             defaultReasoningEffort: CodexReasoningEffort.medium,
-            inputModalities: const <String>['text'],
+            inputModalities: <String>['text'],
             supportsPersonality: false,
             isDefault: true,
           ),
@@ -243,6 +701,18 @@ void main() {
         ConnectionSettingsModelCatalogSource.lastKnownCache,
       );
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
+      expect(
+        settingsOverlayDelegate.launchedStartRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedStopRemoteServerCallbacks.single,
+        isNull,
+      );
+      expect(
+        settingsOverlayDelegate.launchedRestartRemoteServerCallbacks.single,
+        isNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -271,7 +741,7 @@ void main() {
                   ),
                 ],
             defaultReasoningEffort: CodexReasoningEffort.medium,
-            inputModalities: const <String>['text'],
+            inputModalities: <String>['text'],
             supportsPersonality: false,
             isDefault: true,
           ),
@@ -372,18 +842,19 @@ void main() {
 
       await controller.initialize();
       await controller.instantiateConnection('conn_secondary');
-      controller.showDormantRoster();
+      controller.showSavedConnections();
 
       await tester.pumpWidget(_buildDormantRosterApp(controller));
       await tester.pumpAndSettle();
 
-      expect(find.text('Return to open lane'), findsOneWidget);
-
-      await tester.tap(find.text('Return to open lane'));
-      await tester.pumpAndSettle();
-
-      expect(controller.state.isShowingLiveLane, isTrue);
-      expect(controller.state.selectedConnectionId, 'conn_secondary');
+      expect(
+        find.byKey(const ValueKey('saved_connection_conn_primary')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('saved_connection_conn_secondary')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -435,7 +906,7 @@ void main() {
                   ),
                 ],
             defaultReasoningEffort: CodexReasoningEffort.medium,
-            inputModalities: const <String>['text'],
+            inputModalities: <String>['text'],
             supportsPersonality: false,
             isDefault: true,
           ),
@@ -483,6 +954,10 @@ void main() {
         settingsOverlayDelegate.launchedRefreshCallbacks.single,
         isNotNull,
       );
+      expect(
+        settingsOverlayDelegate.launchedRemoteRuntimeCallbacks.single,
+        isNotNull,
+      );
       expect(client.listModelCalls, isEmpty);
 
       settingsOverlayDelegate.complete(null);
@@ -513,7 +988,7 @@ void main() {
             ),
           ],
           defaultReasoningEffort: CodexReasoningEffort.xhigh,
-          inputModalities: const <String>['text'],
+          inputModalities: <String>['text'],
           supportsPersonality: false,
           isDefault: true,
         ),
@@ -588,7 +1063,7 @@ void main() {
       final client = clientsById['conn_primary']!;
       client.listedModelPages.addAll(<CodexAppServerModelListPage>[
         const CodexAppServerModelListPage(
-          models: const <CodexAppServerModel>[
+          models: <CodexAppServerModel>[
             CodexAppServerModel(
               id: 'preset_page_1',
               model: 'gpt-page-1',
@@ -596,9 +1071,9 @@ void main() {
               description: 'First paginated model.',
               hidden: false,
               supportedReasoningEfforts:
-                  const <CodexAppServerReasoningEffortOption>[],
+                  <CodexAppServerReasoningEffortOption>[],
               defaultReasoningEffort: CodexReasoningEffort.medium,
-              inputModalities: const <String>['text'],
+              inputModalities: <String>['text'],
               supportsPersonality: false,
               isDefault: true,
             ),
@@ -606,7 +1081,7 @@ void main() {
           nextCursor: 'repeat-cursor',
         ),
         const CodexAppServerModelListPage(
-          models: const <CodexAppServerModel>[
+          models: <CodexAppServerModel>[
             CodexAppServerModel(
               id: 'preset_page_2',
               model: 'gpt-page-2',
@@ -614,9 +1089,9 @@ void main() {
               description: 'Second paginated model.',
               hidden: false,
               supportedReasoningEfforts:
-                  const <CodexAppServerReasoningEffortOption>[],
+                  <CodexAppServerReasoningEffortOption>[],
               defaultReasoningEffort: CodexReasoningEffort.medium,
-              inputModalities: const <String>['text'],
+              inputModalities: <String>['text'],
               supportsPersonality: false,
               isDefault: false,
             ),
@@ -975,7 +1450,7 @@ void main() {
                   ),
                 ],
             defaultReasoningEffort: CodexReasoningEffort.high,
-            inputModalities: const <String>['text'],
+            inputModalities: <String>['text'],
             supportsPersonality: false,
             isDefault: true,
           ),
@@ -1022,6 +1497,10 @@ void main() {
       );
       expect(client.listModelCalls, isEmpty);
       expect(settingsOverlayDelegate.launchedRefreshCallbacks.single, isNull);
+      expect(
+        settingsOverlayDelegate.launchedRemoteRuntimeCallbacks.single,
+        isNotNull,
+      );
 
       settingsOverlayDelegate.complete(null);
       await tester.pumpAndSettle();
@@ -1117,31 +1596,17 @@ void main() {
           ),
         ],
       );
-      final reconnectGate = Completer<void>();
-      final queuedClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[
-              FakeCodexAppServerClient(),
-              FakeCodexAppServerClient()..connectGate = reconnectGate,
-            ],
-          };
-      final createdClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[],
-          };
+      final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
         laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = queuedClientsByConnectionId[connectionId]!
-              .removeAt(0);
-          createdClientsByConnectionId[connectionId]!.add(appServerClient);
           return ConnectionLaneBinding(
             connectionId: connectionId,
             profileStore: ConnectionScopedProfileStore(
               connectionId: connectionId,
               connectionRepository: repository,
             ),
-            appServerClient: appServerClient,
+            appServerClient: client,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,
               secrets: connection.secrets,
@@ -1152,15 +1617,15 @@ void main() {
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClientLists(createdClientsByConnectionId);
+        await client.dispose();
       });
 
       await controller.initialize();
-      await createdClientsByConnectionId['conn_primary']!.first.connect(
+      await client.connect(
         profile: ConnectionProfile.defaults(),
         secrets: const ConnectionSecrets(),
       );
-      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+      await client.disconnect();
 
       await tester.pumpWidget(
         _buildWorkspaceDrivenLiveLaneApp(
@@ -1173,6 +1638,8 @@ void main() {
       expect(find.text('Live transport lost'), findsOneWidget);
       expect(find.text('Reconnect'), findsOneWidget);
 
+      final reconnectGate = Completer<void>();
+      client.connectGate = reconnectGate;
       unawaited(controller.reconnectConnection('conn_primary'));
       await tester.pump();
       await tester.pump();
@@ -1208,33 +1675,17 @@ void main() {
           ),
         ],
       );
-      final queuedClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[
-              FakeCodexAppServerClient(),
-              FakeCodexAppServerClient()
-                ..connectError = const CodexAppServerException(
-                  'connect failed',
-                ),
-            ],
-          };
-      final createdClientsByConnectionId =
-          <String, List<FakeCodexAppServerClient>>{
-            'conn_primary': <FakeCodexAppServerClient>[],
-          };
+      final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
         laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = queuedClientsByConnectionId[connectionId]!
-              .removeAt(0);
-          createdClientsByConnectionId[connectionId]!.add(appServerClient);
           return ConnectionLaneBinding(
             connectionId: connectionId,
             profileStore: ConnectionScopedProfileStore(
               connectionId: connectionId,
               connectionRepository: repository,
             ),
-            appServerClient: appServerClient,
+            appServerClient: client,
             initialSavedProfile: SavedProfile(
               profile: connection.profile,
               secrets: connection.secrets,
@@ -1245,16 +1696,16 @@ void main() {
       );
       addTearDown(() async {
         controller.dispose();
-        await _closeClientLists(createdClientsByConnectionId);
+        await client.dispose();
       });
 
       await controller.initialize();
       controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
-      await createdClientsByConnectionId['conn_primary']!.first.connect(
+      await client.connect(
         profile: ConnectionProfile.defaults(),
         secrets: const ConnectionSecrets(),
       );
-      await createdClientsByConnectionId['conn_primary']!.first.disconnect();
+      await client.disconnect();
 
       await tester.pumpWidget(
         _buildWorkspaceDrivenLiveLaneApp(
@@ -1264,10 +1715,329 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      client.connectError = const CodexAppServerException('connect failed');
       await controller.reconnectConnection('conn_primary');
       await tester.pumpAndSettle();
 
       expect(find.text('Remote session unavailable'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows remote-continuity-unavailable notice when the host lacks required continuity support',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        remoteAppServerHostProbe: const _FakeRemoteHostProbe(
+          CodexRemoteAppServerHostCapabilities(
+            issues: <ConnectionRemoteHostCapabilityIssue>{
+              ConnectionRemoteHostCapabilityIssue.tmuxMissing,
+            },
+            detail: 'tmux is not installed on this host.',
+          ),
+        ),
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.connectError = const CodexAppServerException('connect failed');
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote continuity unavailable'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionReconnectContinuityUnsupported.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('tmux is not installed on this host.'),
+        findsOneWidget,
+      );
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows remote-continuity-unavailable notice when host capability probing fails',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        remoteAppServerHostProbe: const _ThrowingRemoteHostProbe(
+          'ssh probe failed',
+        ),
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.refreshRemoteRuntime(connectionId: 'conn_primary');
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.connectError = const CodexAppServerException('connect failed');
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote continuity unavailable'), findsOneWidget);
+      expect(find.textContaining('ssh probe failed'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows remote-server-stopped notice when transport reconnect cannot attach to the managed owner',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.stopped,
+          sessionName: 'pocket-relay-conn_primary',
+          detail: 'Remote Pocket Relay server is not running.',
+        ),
+        message: 'Remote Pocket Relay server is not running.',
+      );
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote server stopped'), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(
+        controller.selectedLaneBinding!.composerDraftHost.draft.text,
+        'Keep me',
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane shows remote-server-unhealthy notice when transport reconnect cannot attach to an unhealthy managed owner',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      controller.selectedLaneBinding!.restoreComposerDraft('Keep me');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        _buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: _DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.connectError = const CodexRemoteAppServerAttachException(
+        snapshot: CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+          sessionName: 'pocket-relay-conn_primary',
+          endpoint: CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
+          detail: 'readyz failed',
+        ),
+        message: 'readyz failed',
+      );
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remote server unhealthy'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.connectionReconnectServerUnhealthy.code}]',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('readyz failed'), findsWidgets);
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -1291,11 +2061,16 @@ Widget _buildDormantRosterApp(
   return MaterialApp(
     theme: buildPocketTheme(Brightness.light),
     home: Scaffold(
-      body: ConnectionWorkspaceDormantRosterContent(
-        workspaceController: controller,
-        description: 'Saved connections test surface.',
-        settingsOverlayDelegate: resolvedSettingsOverlayDelegate,
-        useSafeArea: false,
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          return ConnectionWorkspaceSavedConnectionsContent(
+            workspaceController: controller,
+            description: 'Saved connections test surface.',
+            settingsOverlayDelegate: resolvedSettingsOverlayDelegate,
+            useSafeArea: false,
+          );
+        },
       ),
     ),
   );
@@ -1354,6 +2129,12 @@ ConnectionWorkspaceController _buildWorkspaceController({
   required Map<String, FakeCodexAppServerClient> clientsById,
   CodexConnectionRepository? repository,
   ConnectionModelCatalogStore? modelCatalogStore,
+  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
+      const _FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
+  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
+      const _ThrowingRemoteOwnerInspector(),
+  CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl =
+      const _ThrowingRemoteOwnerControl(),
 }) {
   final resolvedRepository =
       repository ??
@@ -1374,6 +2155,9 @@ ConnectionWorkspaceController _buildWorkspaceController({
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
     modelCatalogStore: modelCatalogStore,
+    remoteAppServerHostProbe: remoteAppServerHostProbe,
+    remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
+    remoteAppServerOwnerControl: remoteAppServerOwnerControl,
     laneBindingFactory: ({required connectionId, required connection}) {
       return ConnectionLaneBinding(
         connectionId: connectionId,
@@ -1392,12 +2176,279 @@ ConnectionWorkspaceController _buildWorkspaceController({
   );
 }
 
+final class _FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _FakeRemoteHostProbe(this.capabilities);
+
+  final CodexRemoteAppServerHostCapabilities capabilities;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return capabilities;
+  }
+}
+
+final class _MapRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _MapRemoteOwnerInspector(this.snapshotsByOwnerId);
+
+  final Map<String, CodexRemoteAppServerOwnerSnapshot> snapshotsByOwnerId;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshotsByOwnerId[ownerId] ??
+        _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  const _ThrowingRemoteOwnerControl();
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return CodexRemoteAppServerOwnerSnapshot(
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+      status: CodexRemoteAppServerOwnerStatus.missing,
+      sessionName: 'pocket-relay-$ownerId',
+      detail: 'No Pocket Relay server is running for this connection.',
+    );
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('remote owner control should not have been requested');
+  }
+}
+
+typedef _RemoteOwnerControlCall = ({
+  ConnectionProfile profile,
+  ConnectionSecrets secrets,
+  String ownerId,
+  String workspaceDir,
+});
+
+final class _RecordingRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  final List<_RemoteOwnerControlCall> startCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> stopCalls = <_RemoteOwnerControlCall>[];
+  final List<_RemoteOwnerControlCall> restartCalls =
+      <_RemoteOwnerControlCall>[];
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    stopCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    restartCalls.add((
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: workspaceDir,
+    ));
+    return _notRunningOwnerSnapshot(ownerId, workspaceDir: workspaceDir);
+  }
+}
+
+final class _ThrowingRemoteHostProbe implements CodexRemoteAppServerHostProbe {
+  const _ThrowingRemoteHostProbe(this.message);
+
+  final String message;
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    throw Exception(message);
+  }
+}
+
+final class _FakeRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _FakeRemoteOwnerInspector(this.snapshot);
+
+  final CodexRemoteAppServerOwnerSnapshot snapshot;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
+final class _ThrowingRemoteOwnerInspector
+    implements CodexRemoteAppServerOwnerInspector {
+  const _ThrowingRemoteOwnerInspector();
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('owner inspection should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+}
+
 ConnectionProfile _profile(String label, String host) {
   return ConnectionProfile.defaults().copyWith(
     label: label,
     host: host,
     username: 'vince',
     workspaceDir: '/workspace',
+  );
+}
+
+CodexRemoteAppServerOwnerSnapshot _notRunningOwnerSnapshot(
+  String ownerId, {
+  String workspaceDir = '/workspace',
+}) {
+  return CodexRemoteAppServerOwnerSnapshot(
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+    status: CodexRemoteAppServerOwnerStatus.stopped,
+    sessionName: 'pocket-relay-$ownerId',
+  );
+}
+
+CodexRemoteAppServerOwnerSnapshot _runningOwnerSnapshot(
+  String ownerId, {
+  String workspaceDir = '/workspace',
+}) {
+  return CodexRemoteAppServerOwnerSnapshot(
+    ownerId: ownerId,
+    workspaceDir: workspaceDir,
+    status: CodexRemoteAppServerOwnerStatus.running,
+    sessionName: 'pocket-relay-$ownerId',
+    endpoint: const CodexRemoteAppServerEndpoint(host: '127.0.0.1', port: 4100),
   );
 }
 
@@ -1478,16 +2529,6 @@ Future<void> _closeClients(
   }
 }
 
-Future<void> _closeClientLists(
-  Map<String, List<FakeCodexAppServerClient>> clientsByConnectionId,
-) async {
-  for (final clients in clientsByConnectionId.values) {
-    for (final client in clients) {
-      await client.close();
-    }
-  }
-}
-
 class _DeferredConnectionSettingsOverlayDelegate
     implements ConnectionSettingsOverlayDelegate {
   int launchCount = 0;
@@ -1495,6 +2536,8 @@ class _DeferredConnectionSettingsOverlayDelegate
       <(ConnectionProfile, ConnectionSecrets)>[];
   final List<ConnectionModelCatalog?> launchedModelCatalogs =
       <ConnectionModelCatalog?>[];
+  final List<ConnectionRemoteRuntimeState?> launchedInitialRemoteRuntimes =
+      <ConnectionRemoteRuntimeState?>[];
   final List<ConnectionSettingsModelCatalogSource?>
   launchedModelCatalogSources = <ConnectionSettingsModelCatalogSource?>[];
   final List<
@@ -1504,6 +2547,18 @@ class _DeferredConnectionSettingsOverlayDelegate
       <
         Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
       >[];
+  final List<ConnectionSettingsRemoteRuntimeRefresher?>
+  launchedRemoteRuntimeCallbacks =
+      <ConnectionSettingsRemoteRuntimeRefresher?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedStopRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
+  final List<ConnectionSettingsRemoteServerActionRunner?>
+  launchedRestartRemoteServerCallbacks =
+      <ConnectionSettingsRemoteServerActionRunner?>[];
   Completer<ConnectionSettingsSubmitPayload?> _completer =
       Completer<ConnectionSettingsSubmitPayload?>();
 
@@ -1513,16 +2568,26 @@ class _DeferredConnectionSettingsOverlayDelegate
     required ConnectionProfile initialProfile,
     required ConnectionSecrets initialSecrets,
     required PocketPlatformBehavior platformBehavior,
+    ConnectionRemoteRuntimeState? initialRemoteRuntime,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
     Future<ConnectionModelCatalog?> Function(ConnectionSettingsDraft draft)?
     onRefreshModelCatalog,
+    ConnectionSettingsRemoteRuntimeRefresher? onRefreshRemoteRuntime,
+    ConnectionSettingsRemoteServerActionRunner? onStartRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onStopRemoteServer,
+    ConnectionSettingsRemoteServerActionRunner? onRestartRemoteServer,
   }) {
     launchCount += 1;
     launchedSettings.add((initialProfile, initialSecrets));
     launchedModelCatalogs.add(availableModelCatalog);
+    launchedInitialRemoteRuntimes.add(initialRemoteRuntime);
     launchedModelCatalogSources.add(availableModelCatalogSource);
     launchedRefreshCallbacks.add(onRefreshModelCatalog);
+    launchedRemoteRuntimeCallbacks.add(onRefreshRemoteRuntime);
+    launchedStartRemoteServerCallbacks.add(onStartRemoteServer);
+    launchedStopRemoteServerCallbacks.add(onStopRemoteServer);
+    launchedRestartRemoteServerCallbacks.add(onRestartRemoteServer);
     return _completer.future;
   }
 

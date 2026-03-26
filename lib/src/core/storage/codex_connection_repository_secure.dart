@@ -7,7 +7,9 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
 
   final seededCatalog = await repository._catalogRecovery.loadCatalog();
   final legacyConnection = await _loadLegacySingletonConnection(repository);
-  if (seededCatalog case final existingCatalog? when existingCatalog.isNotEmpty) {
+  late final ConnectionCatalogState catalog;
+  if (seededCatalog case final existingCatalog?
+      when existingCatalog.isNotEmpty) {
     final migratedCatalog =
         await _migrateLegacySingletonIntoSeededCatalogIfNeeded(
           repository,
@@ -16,33 +18,33 @@ Future<ConnectionCatalogState> _secureLoadCatalog(
         );
     if (migratedCatalog != null) {
       await _deleteLegacySingletonStorage(repository);
-      return migratedCatalog;
+      catalog = migratedCatalog;
+    } else {
+      catalog = existingCatalog;
     }
-    return existingCatalog;
-  }
-
-  if (seededCatalog case final existingCatalog?) {
+  } else if (seededCatalog case final existingCatalog?) {
     if (legacyConnection != null) {
-      final catalog = await _seedCatalogWithConnection(repository, legacyConnection);
+      catalog = await _seedCatalogWithConnection(repository, legacyConnection);
       await _deleteLegacySingletonStorage(repository);
-      return catalog;
+    } else {
+      catalog = existingCatalog;
     }
-    return existingCatalog;
+  } else {
+    catalog = await _seedCatalogWithConnection(
+      repository,
+      legacyConnection ??
+          SavedConnection(
+            id: repository._connectionIdGenerator(),
+            profile: ConnectionProfile.defaults(),
+            secrets: const ConnectionSecrets(),
+          ),
+    );
+    if (legacyConnection != null) {
+      await _deleteLegacySingletonStorage(repository);
+    }
   }
 
-  final catalog = await _seedCatalogWithConnection(
-    repository,
-    legacyConnection ??
-        SavedConnection(
-          id: repository._connectionIdGenerator(),
-          profile: ConnectionProfile.defaults(),
-          secrets: const ConnectionSecrets(),
-        ),
-  );
-  if (legacyConnection != null) {
-    await _deleteLegacySingletonStorage(repository);
-  }
-  return catalog;
+  return _normalizeSecureCatalogFingerprints(repository, catalog);
 }
 
 Future<SavedConnection> _secureLoadConnection(
@@ -93,16 +95,46 @@ Future<void> _secureSaveConnection(
   final orderedConnectionIds = exists
       ? catalog.orderedConnectionIds
       : <String>[...catalog.orderedConnectionIds, normalizedConnection.id];
+  final normalizedProfilesByConnectionId =
+      _normalizeProfilesWithSharedHostFingerprints(
+        orderedConnectionIds: orderedConnectionIds,
+        profilesByConnectionId: <String, ConnectionProfile>{
+          for (final entry in catalog.connectionsById.entries)
+            entry.key: entry.value.profile,
+          normalizedConnection.id: normalizedConnection.profile,
+        },
+        preferredConnectionId: normalizedConnection.id,
+        overwriteExistingFingerprints: true,
+      );
+  final synchronizedConnection = normalizedConnection.copyWith(
+    profile: normalizedProfilesByConnectionId[normalizedConnection.id]!,
+  );
   final nextCatalog = ConnectionCatalogState(
     orderedConnectionIds: orderedConnectionIds,
     connectionsById: <String, SavedConnectionSummary>{
-      ...catalog.connectionsById,
-      normalizedConnection.id: normalizedConnection.toSummary(),
+      for (final entry in catalog.connectionsById.entries)
+        entry.key: entry.value.copyWith(
+          profile:
+              normalizedProfilesByConnectionId[entry.key] ??
+              entry.value.profile,
+        ),
+      synchronizedConnection.id: synchronizedConnection.toSummary(),
     },
   );
 
-  await _persistConnectionProfile(repository, normalizedConnection);
-  await _persistConnectionSecrets(repository, normalizedConnection);
+  for (final entry in nextCatalog.connectionsById.entries) {
+    final existingProfile = catalog.connectionForId(entry.key)?.profile;
+    if (existingProfile == entry.value.profile) {
+      continue;
+    }
+
+    await _persistConnectionProfileSummary(
+      repository,
+      connectionId: entry.key,
+      profile: entry.value.profile,
+    );
+  }
+  await _persistConnectionSecrets(repository, synchronizedConnection);
   await repository._catalogRecovery.persistCatalogIndex(
     nextCatalog.orderedConnectionIds,
   );
@@ -139,9 +171,21 @@ Future<void> _persistConnectionProfile(
   SecureCodexConnectionRepository repository,
   SavedConnection connection,
 ) async {
+  await _persistConnectionProfileSummary(
+    repository,
+    connectionId: connection.id,
+    profile: connection.profile,
+  );
+}
+
+Future<void> _persistConnectionProfileSummary(
+  SecureCodexConnectionRepository repository, {
+  required String connectionId,
+  required ConnectionProfile profile,
+}) async {
   await repository._preferences.setString(
-    _profileKeyForConnection(connection.id),
-    jsonEncode(connection.profile.toJson()),
+    _profileKeyForConnection(connectionId),
+    jsonEncode(profile.toJson()),
   );
 }
 
@@ -264,7 +308,8 @@ Future<ConnectionCatalogState> _seedCatalogWithConnection(
   return nextCatalog;
 }
 
-Future<ConnectionCatalogState?> _migrateLegacySingletonIntoSeededCatalogIfNeeded(
+Future<ConnectionCatalogState?>
+_migrateLegacySingletonIntoSeededCatalogIfNeeded(
   SecureCodexConnectionRepository repository, {
   required ConnectionCatalogState catalog,
   required SavedConnection? legacyConnection,
@@ -295,6 +340,45 @@ Future<ConnectionCatalogState?> _migrateLegacySingletonIntoSeededCatalogIfNeeded
       seededConnectionId: migratedConnection.toSummary(),
     },
   );
+}
+
+Future<ConnectionCatalogState> _normalizeSecureCatalogFingerprints(
+  SecureCodexConnectionRepository repository,
+  ConnectionCatalogState catalog,
+) async {
+  final normalizedProfilesByConnectionId =
+      _normalizeProfilesWithSharedHostFingerprints(
+        orderedConnectionIds: catalog.orderedConnectionIds,
+        profilesByConnectionId: <String, ConnectionProfile>{
+          for (final entry in catalog.connectionsById.entries)
+            entry.key: entry.value.profile,
+        },
+        overwriteExistingFingerprints: false,
+      );
+
+  var didChange = false;
+  final normalizedConnectionsById = <String, SavedConnectionSummary>{};
+  for (final entry in catalog.connectionsById.entries) {
+    final normalizedProfile =
+        normalizedProfilesByConnectionId[entry.key] ?? entry.value.profile;
+    if (normalizedProfile != entry.value.profile) {
+      didChange = true;
+      await _persistConnectionProfileSummary(
+        repository,
+        connectionId: entry.key,
+        profile: normalizedProfile,
+      );
+    }
+    normalizedConnectionsById[entry.key] = entry.value.copyWith(
+      profile: normalizedProfile,
+    );
+  }
+
+  if (!didChange) {
+    return catalog;
+  }
+
+  return catalog.copyWith(connectionsById: normalizedConnectionsById);
 }
 
 bool _looksLikeSeededDefaultCatalog(ConnectionCatalogState catalog) {
@@ -330,7 +414,8 @@ Future<void> _deleteLegacySingletonStorage(
     key: SecureCodexConnectionRepository._legacySingletonPrivateKeyKey,
   );
   await repository._secureStorage.delete(
-    key: SecureCodexConnectionRepository._legacySingletonPrivateKeyPassphraseKey,
+    key:
+        SecureCodexConnectionRepository._legacySingletonPrivateKeyPassphraseKey,
   );
 }
 
