@@ -1227,6 +1227,46 @@ void main() {
   );
 
   test(
+    'intentional transport disconnect keeps the live lane but does not stage reconnect recovery',
+    () async {
+      final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
+      final controller = _buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await _closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await clientsById['conn_primary']!.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.disconnectConnection('conn_primary');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(clientsById['conn_primary']?.disconnectCalls, 1);
+      expect(clientsById['conn_primary']?.isConnected, isFalse);
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        isNull,
+      );
+      expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
+      expect(controller.state.reconnectRequiredConnectionIds, isEmpty);
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')
+            ?.lastTransportLossReason,
+        isNull,
+      );
+    },
+  );
+
+  test(
     'unexpected graceful app-server exit records a distinct transport loss reason',
     () async {
       final clientsById = _buildClientsById('conn_primary', 'conn_secondary');
