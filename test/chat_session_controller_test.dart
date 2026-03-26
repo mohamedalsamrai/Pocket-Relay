@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
@@ -766,7 +767,7 @@ void main() {
       );
       expect(
         await snackBarMessage,
-        'Could not rewind this conversation to the selected prompt.',
+        '[${PocketErrorCatalog.chatSessionContinueFromPromptFailed.code}] Continue from prompt failed. Could not rewind this conversation to the selected prompt.',
       );
     },
   );
@@ -988,7 +989,7 @@ void main() {
       );
       expect(
         await snackBarMessage,
-        'Could not branch this conversation from Codex.',
+        '[${PocketErrorCatalog.chatSessionBranchConversationFailed.code}] Branch conversation failed. Could not branch this conversation from Codex.',
       );
     },
   );
@@ -1482,6 +1483,59 @@ void main() {
   );
 
   test(
+    'selectConversationForResume surfaces a coded runtime error when transcript loading fails',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..readThreadWithTurnsError = StateError('history backend unavailable');
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: _configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: _configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+
+      await controller.selectConversationForResume('thread_saved');
+
+      expect(
+        controller.historicalConversationRestoreState?.phase,
+        ChatHistoricalConversationRestorePhase.failed,
+      );
+      final runtimeErrors = controller.transcriptBlocks
+          .whereType<CodexErrorBlock>()
+          .toList(growable: false);
+      expect(runtimeErrors, hasLength(1));
+      expect(
+        runtimeErrors.single.body,
+        contains(
+          '[${PocketErrorCatalog.chatSessionConversationLoadFailed.code}]',
+        ),
+      );
+      expect(
+        runtimeErrors.single.body,
+        contains('history backend unavailable'),
+      );
+      expect(
+        await snackBarMessage,
+        '[${PocketErrorCatalog.chatSessionConversationLoadFailed.code}] Conversation load failed. Could not load the saved conversation transcript.',
+      );
+    },
+  );
+
+  test(
     'startFreshConversation invalidates an in-flight history restore',
     () async {
       final appServerClient = FakeCodexAppServerClient()
@@ -1866,9 +1920,17 @@ void main() {
       expect(controller.transcriptBlocks.first, isA<CodexUserMessageBlock>());
       expect(controller.sessionState.pendingLocalUserMessageBlockIds, isEmpty);
       expect(controller.sessionState.localUserMessageProviderBindings, isEmpty);
+      final runtimeErrors = controller.transcriptBlocks
+          .whereType<CodexErrorBlock>()
+          .toList(growable: false);
+      expect(runtimeErrors, hasLength(1));
+      expect(
+        runtimeErrors.single.body,
+        contains('[${PocketErrorCatalog.chatSessionSendFailed.code}]'),
+      );
       expect(
         await snackBarMessage,
-        'Could not send the prompt to the remote Codex session.',
+        '[${PocketErrorCatalog.chatSessionSendFailed.code}] Send failed. Could not send the prompt to the remote Codex session.',
       );
     },
   );
@@ -2069,7 +2131,7 @@ void main() {
       );
       expect(
         controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
-        'Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
+        '[${PocketErrorCatalog.chatSessionSendConversationUnavailable.code}] Conversation unavailable. Could not continue this conversation because the remote conversation was not found. Start a fresh conversation to continue.',
       );
     },
   );
@@ -2119,7 +2181,7 @@ void main() {
       );
       expect(
         controller.transcriptBlocks.whereType<CodexErrorBlock>().last.body,
-        'Pocket Relay expected remote conversation "thread_old", but the remote session returned "thread_new". Sending is blocked to avoid attaching your draft to a different conversation.',
+        '[${PocketErrorCatalog.chatSessionSendConversationChanged.code}] Conversation changed. Pocket Relay expected remote conversation "thread_old", but the remote session returned "thread_new". Sending is blocked to avoid attaching your draft to a different conversation.',
       );
     },
   );
@@ -2684,7 +2746,7 @@ void main() {
       expect(errors.single.message, contains('Connection refused'));
       expect(
         await snackBarMessage,
-        'Could not send the prompt to the remote Codex session.',
+        '[${PocketErrorCatalog.chatSessionSendFailed.code}] Send failed. Could not send the prompt to the remote Codex session.',
       );
     },
   );

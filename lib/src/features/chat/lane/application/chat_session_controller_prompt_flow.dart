@@ -154,10 +154,13 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
         );
       }
     } catch (error) {
+      final userFacingError = ChatSessionErrors.submitUserInputFailed();
       _reportAppServerFailure(
-        title: 'Input failed',
-        message: 'Could not submit the requested user input.',
-        error: error,
+        userFacingError: userFacingError,
+        runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+          userFacingError,
+          error: error,
+        ),
       );
     }
   }
@@ -208,18 +211,14 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
   }
 
   void _reportAppServerFailure({
-    required String title,
-    required String message,
-    required Object error,
+    required PocketUserFacingError userFacingError,
     String? runtimeErrorMessage,
     bool suppressRuntimeError = false,
     bool suppressSnackBar = false,
   }) {
     _reportChatSessionAppServerFailure(
       this,
-      title: title,
-      message: message,
-      error: error,
+      userFacingError: userFacingError,
       runtimeErrorMessage: runtimeErrorMessage,
       suppressRuntimeError: suppressRuntimeError,
       suppressSnackBar: suppressSnackBar,

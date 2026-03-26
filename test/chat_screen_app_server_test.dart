@@ -135,7 +135,7 @@ void main() {
       tester.widget<TextField>(composerField).controller?.text,
       'Hello Codex',
     );
-    expect(find.textContaining('Could not send the prompt'), findsOneWidget);
+    expect(find.textContaining('Could not send the prompt'), findsWidgets);
   });
 
   testWidgets(

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_recovery_policy.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversation_recovery_state.dart';
@@ -63,7 +64,14 @@ void main() {
       );
       expect(assessment.recoveryState?.alternateThreadId, 'thread_alt');
       expect(assessment.suppressSnackBar, isTrue);
-      expect(assessment.presentation.title, 'Conversation unavailable');
+      expect(
+        assessment.presentation.userFacingError.definition,
+        PocketErrorCatalog.chatSessionSendConversationUnavailable,
+      );
+      expect(
+        assessment.presentation.userFacingError.title,
+        'Conversation unavailable',
+      );
     },
   );
 
@@ -95,7 +103,14 @@ void main() {
       expect(assessment.recoveryState?.actualThreadId, 'thread_new');
       expect(assessment.recoveryState?.alternateThreadId, 'thread_new');
       expect(assessment.suppressSnackBar, isTrue);
-      expect(assessment.presentation.title, 'Conversation changed');
+      expect(
+        assessment.presentation.userFacingError.definition,
+        PocketErrorCatalog.chatSessionSendConversationChanged,
+      );
+      expect(
+        assessment.presentation.userFacingError.title,
+        'Conversation changed',
+      );
     },
   );
 
@@ -110,10 +125,18 @@ void main() {
 
       expect(assessment.recoveryState, isNull);
       expect(assessment.suppressSnackBar, isFalse);
-      expect(assessment.presentation.title, 'Send failed');
       expect(
-        assessment.presentation.message,
+        assessment.presentation.userFacingError.definition,
+        PocketErrorCatalog.chatSessionSendFailed,
+      );
+      expect(assessment.presentation.userFacingError.title, 'Send failed');
+      expect(
+        assessment.presentation.userFacingError.message,
         'Could not send the prompt to the remote Codex session.',
+      );
+      expect(
+        assessment.presentation.runtimeErrorMessage,
+        contains('[${PocketErrorCatalog.chatSessionSendFailed.code}]'),
       );
     },
   );

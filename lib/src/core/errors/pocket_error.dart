@@ -1,4 +1,4 @@
-enum PocketErrorDomain { connectionLifecycle }
+enum PocketErrorDomain { connectionLifecycle, chatSession }
 
 final class PocketErrorDefinition {
   const PocketErrorDefinition({
@@ -282,6 +282,96 @@ abstract final class PocketErrorCatalog {
         'Loading authoritative conversation history failed because Pocket Relay could not attach to the managed remote session even though the owner reported running.',
   );
 
+  // Chat session: send failures (11xx).
+  static const PocketErrorDefinition
+  chatSessionSendConversationChanged = PocketErrorDefinition(
+    code: 'PR-CHAT-1101',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Sending a prompt failed because the remote session returned a different conversation thread than Pocket Relay expected.',
+  );
+  static const PocketErrorDefinition
+  chatSessionSendConversationUnavailable = PocketErrorDefinition(
+    code: 'PR-CHAT-1102',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Sending a prompt failed because the target remote conversation thread was no longer available.',
+  );
+  static const PocketErrorDefinition
+  chatSessionSendFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1103',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Sending a prompt or draft failed for a generic live chat-session reason outside the known conversation-recovery states.',
+  );
+  static const PocketErrorDefinition
+  chatSessionImageSupportCheckFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1104',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Sending a draft with images failed because Pocket Relay could not connect to Codex to validate image-input support.',
+  );
+
+  // Chat session: transcript restore (12xx).
+  static const PocketErrorDefinition
+  chatSessionConversationLoadFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1201',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Loading a saved conversation transcript into the active chat lane failed.',
+  );
+  static const PocketErrorDefinition
+  chatSessionContinueFromPromptFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1202',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Continuing from an earlier prompt failed because Pocket Relay could not rewind the active conversation state from Codex.',
+  );
+  static const PocketErrorDefinition
+  chatSessionBranchConversationFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1203',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Branching the selected conversation failed because Pocket Relay could not fork and restore the new Codex conversation state.',
+  );
+
+  // Chat session: turn control (13xx).
+  static const PocketErrorDefinition
+  chatSessionStopTurnFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1301',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Stopping the active Codex turn failed for the selected live chat lane.',
+  );
+
+  // Chat session: interactive request handling (14xx).
+  static const PocketErrorDefinition
+  chatSessionSubmitUserInputFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1401',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Submitting requested user input back to the active Codex session failed.',
+  );
+  static const PocketErrorDefinition chatSessionApproveRequestFailed =
+      PocketErrorDefinition(
+        code: 'PR-CHAT-1402',
+        domain: PocketErrorDomain.chatSession,
+        meaning: 'Approving a pending live-session request failed.',
+      );
+  static const PocketErrorDefinition chatSessionDenyRequestFailed =
+      PocketErrorDefinition(
+        code: 'PR-CHAT-1403',
+        domain: PocketErrorDomain.chatSession,
+        meaning: 'Denying a pending live-session request failed.',
+      );
+  static const PocketErrorDefinition
+  chatSessionRejectUnsupportedRequestFailed = PocketErrorDefinition(
+    code: 'PR-CHAT-1404',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Rejecting an unsupported app-server request from the active live session failed.',
+  );
+
   static const List<PocketErrorDefinition> connectionLifecycleDefinitions =
       <PocketErrorDefinition>[
         connectionOpenRemoteHostProbeFailed,
@@ -319,8 +409,27 @@ abstract final class PocketErrorCatalog {
         connectionHistorySessionUnavailable,
       ];
 
+  static const List<PocketErrorDefinition> chatSessionDefinitions =
+      <PocketErrorDefinition>[
+        chatSessionSendConversationChanged,
+        chatSessionSendConversationUnavailable,
+        chatSessionSendFailed,
+        chatSessionImageSupportCheckFailed,
+        chatSessionConversationLoadFailed,
+        chatSessionContinueFromPromptFailed,
+        chatSessionBranchConversationFailed,
+        chatSessionStopTurnFailed,
+        chatSessionSubmitUserInputFailed,
+        chatSessionApproveRequestFailed,
+        chatSessionDenyRequestFailed,
+        chatSessionRejectUnsupportedRequestFailed,
+      ];
+
   static const List<PocketErrorDefinition> allDefinitions =
-      connectionLifecycleDefinitions;
+      <PocketErrorDefinition>[
+        ...connectionLifecycleDefinitions,
+        ...chatSessionDefinitions,
+      ];
 
   static PocketErrorDefinition? lookup(String code) {
     for (final definition in allDefinitions) {

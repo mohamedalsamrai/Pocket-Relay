@@ -8,6 +8,7 @@ Future<void> _restoreConversationTranscriptForController(
     controller,
     operation: () =>
         controller.appServerClient.readThreadWithTurns(threadId: threadId),
+    userFacingError: ChatSessionErrors.conversationLoadFailed(),
     loadingRestoreState: ChatHistoricalConversationRestoreState(
       threadId: threadId,
       phase: ChatHistoricalConversationRestorePhase.loading,
@@ -20,8 +21,6 @@ Future<void> _restoreConversationTranscriptForController(
       threadId: threadId,
       phase: ChatHistoricalConversationRestorePhase.failed,
     ),
-    failureTitle: 'Conversation load failed',
-    failureMessage: 'Could not load the saved conversation transcript.',
   );
 }
 
@@ -29,8 +28,7 @@ Future<CodexSessionState?>
 _performHistoryRestoringThreadTransitionForController(
   ChatSessionController controller, {
   required Future<CodexAppServerThreadHistory> Function() operation,
-  required String failureTitle,
-  required String failureMessage,
+  required PocketUserFacingError userFacingError,
   ChatHistoricalConversationRestoreState? loadingRestoreState,
   ChatHistoricalConversationRestoreState? emptyHistoryRestoreState,
   ChatHistoricalConversationRestoreState? failureRestoreState,
@@ -69,9 +67,11 @@ _performHistoryRestoringThreadTransitionForController(
     }
     _reportChatSessionAppServerFailure(
       controller,
-      title: failureTitle,
-      message: failureMessage,
-      error: error,
+      userFacingError: userFacingError,
+      runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+        userFacingError,
+        error: error,
+      ),
     );
     return null;
   }
@@ -177,9 +177,7 @@ Future<bool> _sendTurnInputWithAppServerForController(
     await Future<void>.microtask(() {});
     _reportChatSessionAppServerFailure(
       controller,
-      title: recoveryAssessment.presentation.title,
-      message: recoveryAssessment.presentation.message,
-      error: error,
+      userFacingError: recoveryAssessment.presentation.userFacingError,
       runtimeErrorMessage: recoveryAssessment.presentation.runtimeErrorMessage,
       suppressRuntimeError: controller._sawTrackedSshBootstrapFailure,
       suppressSnackBar:
@@ -289,11 +287,14 @@ Future<void> _stopChatSessionAppServerTurn(
       turnId: turnId,
     );
   } catch (error) {
+    final userFacingError = ChatSessionErrors.stopTurnFailed();
     _reportChatSessionAppServerFailure(
       controller,
-      title: 'Stop failed',
-      message: 'Could not stop the active Codex turn.',
-      error: error,
+      userFacingError: userFacingError,
+      runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+        userFacingError,
+        error: error,
+      ),
     );
   }
 }
@@ -315,20 +316,23 @@ Future<void> _resolveChatSessionApproval(
       approved: approved,
     );
   } catch (error) {
+    final userFacingError = approved
+        ? ChatSessionErrors.approveRequestFailed()
+        : ChatSessionErrors.denyRequestFailed();
     _reportChatSessionAppServerFailure(
       controller,
-      title: approved ? 'Approval failed' : 'Denial failed',
-      message: 'Could not submit the decision for this request.',
-      error: error,
+      userFacingError: userFacingError,
+      runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
+        userFacingError,
+        error: error,
+      ),
     );
   }
 }
 
 void _reportChatSessionAppServerFailure(
   ChatSessionController controller, {
-  required String title,
-  required String message,
-  required Object error,
+  required PocketUserFacingError userFacingError,
   String? runtimeErrorMessage,
   bool suppressRuntimeError = false,
   bool suppressSnackBar = false,
@@ -339,7 +343,7 @@ void _reportChatSessionAppServerFailure(
     CodexRuntimeSessionStateChangedEvent(
       createdAt: now,
       state: CodexRuntimeSessionState.ready,
-      reason: message,
+      reason: userFacingError.message,
       rawMethod: 'app-server/failure',
     ),
   );
@@ -348,13 +352,13 @@ void _reportChatSessionAppServerFailure(
       controller,
       CodexRuntimeErrorEvent(
         createdAt: now,
-        message: runtimeErrorMessage ?? '$title: $error',
+        message: runtimeErrorMessage ?? userFacingError.inlineMessage,
         errorClass: CodexRuntimeErrorClass.transportError,
         rawMethod: 'app-server/failure',
       ),
     );
   }
   if (!suppressSnackBar) {
-    controller._emitSnackBar(message);
+    controller._emitSnackBar(userFacingError.inlineMessage);
   }
 }

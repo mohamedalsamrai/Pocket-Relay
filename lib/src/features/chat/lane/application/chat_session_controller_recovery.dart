@@ -161,13 +161,11 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
         threadId: targetThreadId,
         numTurns: numTurns,
       ),
+      userFacingError: ChatSessionErrors.continueFromPromptFailed(),
       loadingRestoreState: ChatHistoricalConversationRestoreState(
         threadId: targetThreadId,
         phase: ChatHistoricalConversationRestorePhase.loading,
       ),
-      failureTitle: 'Continue from prompt failed',
-      failureMessage:
-          'Could not rewind this conversation to the selected prompt.',
     );
     if (nextState == null) {
       return null;
@@ -202,12 +200,11 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
           threadId: forkedSession.threadId,
         );
       },
+      userFacingError: ChatSessionErrors.branchConversationFailed(),
       loadingRestoreState: ChatHistoricalConversationRestoreState(
         threadId: targetThreadId,
         phase: ChatHistoricalConversationRestorePhase.loading,
       ),
-      failureTitle: 'Branch conversation failed',
-      failureMessage: 'Could not branch this conversation from Codex.',
     );
     return nextState != null;
   }

@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/composer/domain/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_recovery_policy.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_errors.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/runtime/application/runtime_event_mapper.dart';
@@ -253,8 +255,7 @@ class ChatSessionController extends ChangeNotifier {
 
   Future<CodexSessionState?> _performHistoryRestoringThreadTransition({
     required Future<CodexAppServerThreadHistory> Function() operation,
-    required String failureTitle,
-    required String failureMessage,
+    required PocketUserFacingError userFacingError,
     ChatHistoricalConversationRestoreState? loadingRestoreState,
     ChatHistoricalConversationRestoreState? emptyHistoryRestoreState,
     ChatHistoricalConversationRestoreState? failureRestoreState,
@@ -262,8 +263,7 @@ class ChatSessionController extends ChangeNotifier {
     return _performHistoryRestoringThreadTransitionForController(
       this,
       operation: operation,
-      failureTitle: failureTitle,
-      failureMessage: failureMessage,
+      userFacingError: userFacingError,
       loadingRestoreState: loadingRestoreState,
       emptyHistoryRestoreState: emptyHistoryRestoreState,
       failureRestoreState: failureRestoreState,
