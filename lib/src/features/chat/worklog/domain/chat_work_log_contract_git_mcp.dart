@@ -8,6 +8,8 @@ final class ChatGitWorkLogEntryContract extends ChatShellWorkLogEntryContract {
     required this.summaryLabel,
     required this.primaryLabel,
     this.secondaryLabel,
+    super.itemId,
+    super.threadId,
     super.processId,
     super.terminalInput,
     super.terminalOutput,

@@ -115,9 +115,21 @@ String _itemTitle(
   String? existingTitle,
 ) {
   if (event.itemType == CodexCanonicalItemType.commandExecution) {
-    final rawTitle = event.detail?.trim().isNotEmpty == true
-        ? event.detail!
-        : (existingTitle ?? event.title ?? 'Command');
+    final snapshot = event.snapshot;
+    final snapshotCommand = policy._support.stringFromCandidates(<Object?>[
+      snapshot?['command'],
+      (snapshot?['result'] as Map?)?['command'],
+    ]);
+    final rawTitle =
+        existingTitle ??
+        snapshotCommand ??
+        event.title ??
+        (event.rawMethod == 'item/commandExecution/terminalInteraction'
+            ? null
+            : (event.detail?.trim().isNotEmpty == true
+                  ? event.detail!
+                  : null)) ??
+        'Command';
     return policy._blockFactory.normalizeCommandExecutionTitle(rawTitle);
   }
   return existingTitle ??

@@ -300,7 +300,33 @@ void main() {
   testWidgets('routes command terminal openings through the overlay delegate', (
     tester,
   ) async {
-    final appServerClient = FakeCodexAppServerClient();
+    final appServerClient = FakeCodexAppServerClient()
+      ..threadHistoriesById['thread_123'] = const CodexAppServerThreadHistory(
+        id: 'thread_123',
+        turns: <CodexAppServerHistoryTurn>[
+          CodexAppServerHistoryTurn(
+            id: 'turn_1',
+            status: 'completed',
+            items: <CodexAppServerHistoryItem>[
+              CodexAppServerHistoryItem(
+                id: 'command_1',
+                type: 'commandExecution',
+                status: 'completed',
+                raw: <String, dynamic>{
+                  'id': 'command_1',
+                  'type': 'commandExecution',
+                  'status': 'completed',
+                  'command': 'pwd',
+                  'processId': 'proc_1',
+                  'aggregatedOutput': '/repo\n',
+                  'exitCode': 0,
+                },
+              ),
+            ],
+            raw: <String, dynamic>{'id': 'turn_1', 'status': 'completed'},
+          ),
+        ],
+      );
     final overlayDelegate = FakeChatRootOverlayDelegate();
     addTearDown(appServerClient.close);
 

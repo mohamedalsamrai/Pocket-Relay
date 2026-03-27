@@ -20,6 +20,8 @@ sealed class ChatShellWorkLogEntryContract extends ChatWorkLogEntryContract {
   const ChatShellWorkLogEntryContract({
     required super.id,
     required this.commandText,
+    this.itemId,
+    this.threadId,
     this.processId,
     this.terminalInput,
     this.terminalOutput,
@@ -29,6 +31,8 @@ sealed class ChatShellWorkLogEntryContract extends ChatWorkLogEntryContract {
   }) : super(entryKind: CodexWorkLogEntryKind.commandExecution);
 
   final String commandText;
+  final String? itemId;
+  final String? threadId;
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
@@ -55,6 +59,8 @@ final class ChatCommandExecutionWorkLogEntryContract
     required super.id,
     required super.commandText,
     this.outputPreview,
+    super.itemId,
+    super.threadId,
     super.processId,
     super.terminalInput,
     super.terminalOutput,
@@ -74,6 +80,8 @@ final class ChatCommandWaitWorkLogEntryContract
     required super.id,
     required super.commandText,
     this.outputPreview,
+    super.itemId,
+    super.threadId,
     super.processId,
     super.terminalInput,
     super.terminalOutput,

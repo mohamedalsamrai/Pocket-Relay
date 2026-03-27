@@ -29,9 +29,16 @@ Future<void> _openChatWorkLogTerminal(
     return;
   }
 
+  final laneBinding = state.widget.laneBinding;
+  final hydratedTerminal = await laneBinding.sessionController
+      .hydrateWorkLogTerminal(terminal);
+  if (!state.mounted || laneBinding != state.widget.laneBinding) {
+    return;
+  }
+
   await state.widget.overlayDelegate.openWorkLogTerminal(
     context: state.context,
-    terminal: terminal,
+    terminal: hydratedTerminal,
   );
 }
 

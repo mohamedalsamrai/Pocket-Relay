@@ -7,6 +7,9 @@ class ChatWorkLogTerminalContract {
     required this.commandText,
     required this.isRunning,
     required this.isWaiting,
+    this.itemId,
+    this.threadId,
+    this.turnId,
     this.exitCode,
     this.processId,
     this.terminalInput,
@@ -31,6 +34,9 @@ class ChatWorkLogTerminalContract {
       commandText: entry.commandText,
       isRunning: entry.isRunning,
       isWaiting: entry is ChatCommandWaitWorkLogEntryContract,
+      itemId: entry.itemId,
+      threadId: entry.threadId,
+      turnId: entry.turnId,
       exitCode: entry.exitCode,
       processId: entry.processId,
       terminalInput: entry.terminalInput,
@@ -43,10 +49,42 @@ class ChatWorkLogTerminalContract {
   final String commandText;
   final bool isRunning;
   final bool isWaiting;
+  final String? itemId;
+  final String? threadId;
+  final String? turnId;
   final int? exitCode;
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
+
+  ChatWorkLogTerminalContract copyWith({
+    String? activityLabel,
+    String? commandText,
+    bool? isRunning,
+    bool? isWaiting,
+    String? itemId,
+    String? threadId,
+    String? turnId,
+    int? exitCode,
+    String? processId,
+    String? terminalInput,
+    String? terminalOutput,
+  }) {
+    return ChatWorkLogTerminalContract(
+      id: id,
+      activityLabel: activityLabel ?? this.activityLabel,
+      commandText: commandText ?? this.commandText,
+      isRunning: isRunning ?? this.isRunning,
+      isWaiting: isWaiting ?? this.isWaiting,
+      itemId: itemId ?? this.itemId,
+      threadId: threadId ?? this.threadId,
+      turnId: turnId ?? this.turnId,
+      exitCode: exitCode ?? this.exitCode,
+      processId: processId ?? this.processId,
+      terminalInput: terminalInput ?? this.terminalInput,
+      terminalOutput: terminalOutput ?? this.terminalOutput,
+    );
+  }
 
   bool get hasTerminalInput => terminalInput != null;
   bool get hasTerminalOutput => terminalOutput != null;
