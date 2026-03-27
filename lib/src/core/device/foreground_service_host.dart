@@ -238,7 +238,7 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
             error: error,
           );
       _setWarning(warning);
-      return (granted: false, warning: warning);
+      return (granted: true, warning: warning);
     }
   }
 

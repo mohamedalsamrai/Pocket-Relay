@@ -12,31 +12,33 @@ abstract final class PocketErrorDetailFormatter {
       return null;
     }
 
-    return switch (detail) {
-      final value when value.startsWith('Exception: ') => value.substring(
-        'Exception: '.length,
+    final normalized = switch (detail) {
+      final value when value.startsWith('Exception:') => value.substring(
+        'Exception:'.length,
       ),
-      final value when value.startsWith('Bad state: ') => value.substring(
-        'Bad state: '.length,
+      final value when value.startsWith('Bad state:') => value.substring(
+        'Bad state:'.length,
       ),
-      final value when value.startsWith('CodexAppServerException: ') =>
-        value.substring('CodexAppServerException: '.length),
+      final value when value.startsWith('CodexAppServerException:') =>
+        value.substring('CodexAppServerException:'.length),
       final value
           when value.startsWith('CodexAppServerException(') &&
               value.contains('): ') =>
         value.substring(value.indexOf('): ') + 3),
-      final value when value.startsWith('CodexJsonRpcRemoteException: ') =>
-        value.substring('CodexJsonRpcRemoteException: '.length),
+      final value when value.startsWith('CodexJsonRpcRemoteException:') =>
+        value.substring('CodexJsonRpcRemoteException:'.length),
       final value
           when value.startsWith('CodexJsonRpcRemoteException(') &&
               value.contains('): ') =>
         value.substring(value.indexOf('): ') + 3),
       final value
           when stripRemoteOwnerControlFailure &&
-              value.startsWith('Remote owner control command failed: ') =>
-        value.substring('Remote owner control command failed: '.length),
+              value.startsWith('Remote owner control command failed:') =>
+        value.substring('Remote owner control command failed:'.length),
       _ => detail,
     };
+    final trimmedNormalized = normalized.trim();
+    return trimmedNormalized.isEmpty ? null : trimmedNormalized;
   }
 
   static String composeMessage({

@@ -141,6 +141,38 @@ void main() {
     },
   );
 
+  testWidgets(
+    'permission-query failures surface a warning and still enable the service',
+    (tester) async {
+      final controller = _FakeForegroundServiceController();
+      final permissionController =
+          _ThrowingNotificationPermissionQueryController();
+      final warnings = <PocketUserFacingError?>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ForegroundServiceHost(
+            foregroundServiceController: controller,
+            notificationPermissionController: permissionController,
+            supportsForegroundService: true,
+            onWarningChanged: warnings.add,
+            child: const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(permissionController.requestCalls, 0);
+      expect(controller.enabledStates, <bool>[true]);
+      expect(
+        warnings.whereType<PocketUserFacingError>().map((w) => w.definition),
+        contains(
+          PocketErrorCatalog.deviceForegroundServicePermissionQueryFailed,
+        ),
+      );
+    },
+  );
+
   testWidgets('foreground-service enable failures surface a typed warning', (
     tester,
   ) async {
@@ -262,5 +294,21 @@ class _ThrowingNotificationPermissionController
   Future<bool> requestPermission() {
     requestCalls += 1;
     throw MissingPluginException('notification permission channel missing');
+  }
+}
+
+class _ThrowingNotificationPermissionQueryController
+    implements NotificationPermissionController {
+  int requestCalls = 0;
+
+  @override
+  Future<bool> isGranted() {
+    throw MissingPluginException('notification permission channel missing');
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    requestCalls += 1;
+    return true;
   }
 }

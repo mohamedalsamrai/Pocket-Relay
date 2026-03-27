@@ -24,6 +24,16 @@ void main() {
     );
   });
 
+  test('resolvePrimaryMessage falls back when normalized detail is empty', () {
+    expect(
+      PocketErrorDetailFormatter.resolvePrimaryMessage(
+        error: const _StringLikeError('Exception: '),
+        fallbackMessage: 'Fallback message',
+      ),
+      'Fallback message',
+    );
+  });
+
   test('typed errors append unique underlying detail once', () {
     final error =
         PocketUserFacingError(
