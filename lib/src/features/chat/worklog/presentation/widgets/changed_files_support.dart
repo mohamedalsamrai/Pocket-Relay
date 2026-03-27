@@ -46,6 +46,21 @@ Color _accentForOperation(
   };
 }
 
+TextStyle _changedFileCodeTextStyle({
+  required Color color,
+  required double fontSize,
+  required double height,
+  FontWeight fontWeight = FontWeight.w500,
+}) {
+  return TextStyle(
+    color: color,
+    fontFamily: 'monospace',
+    fontSize: fontSize,
+    height: height,
+    fontWeight: fontWeight,
+  );
+}
+
 _DiffLineStyle _styleForDiffLine(
   ChatChangedFileDiffLineKind kind,
   TranscriptPalette cards,
@@ -102,6 +117,47 @@ _DiffLineStyle _styleForDiffLine(
   };
 }
 
+_ReviewRowStyle _styleForReviewRow(
+  ChatChangedFileDiffReviewRowKind kind,
+  TranscriptPalette cards,
+) {
+  final clearRail = Colors.transparent;
+  return switch (kind) {
+    ChatChangedFileDiffReviewRowKind.addition => _ReviewRowStyle(
+      background: Color.alphaBlend(
+        tealAccent(
+          cards.brightness,
+        ).withValues(alpha: cards.isDark ? 0.08 : 0.06),
+        cards.terminalBody,
+      ),
+      foreground: cards.terminalText,
+      railColor: tealAccent(
+        cards.brightness,
+      ).withValues(alpha: cards.isDark ? 0.9 : 0.75),
+      tokenColor: tealAccent(cards.brightness),
+    ),
+    ChatChangedFileDiffReviewRowKind.deletion => _ReviewRowStyle(
+      background: Color.alphaBlend(
+        redAccent(
+          cards.brightness,
+        ).withValues(alpha: cards.isDark ? 0.1 : 0.07),
+        cards.terminalBody,
+      ),
+      foreground: cards.terminalText,
+      railColor: redAccent(
+        cards.brightness,
+      ).withValues(alpha: cards.isDark ? 0.9 : 0.75),
+      tokenColor: redAccent(cards.brightness),
+    ),
+    ChatChangedFileDiffReviewRowKind.context => _ReviewRowStyle(
+      background: cards.terminalBody,
+      foreground: cards.terminalText,
+      railColor: clearRail,
+      tokenColor: cards.textMuted,
+    ),
+  };
+}
+
 class _DiffLineDisplay {
   const _DiffLineDisplay({
     required this.prefix,
@@ -152,5 +208,21 @@ class _DiffLineStyle {
   final Color background;
   final Color foreground;
   final Color prefixColor;
+  final FontWeight fontWeight;
+}
+
+class _ReviewRowStyle {
+  const _ReviewRowStyle({
+    required this.background,
+    required this.foreground,
+    required this.railColor,
+    required this.tokenColor,
+    this.fontWeight = FontWeight.w500,
+  });
+
+  final Color background;
+  final Color foreground;
+  final Color railColor;
+  final Color tokenColor;
   final FontWeight fontWeight;
 }

@@ -2144,12 +2144,14 @@ void main() {
       ),
       findsWidgets,
     );
+    expect(find.text('Raw patch'), findsOneWidget);
+    expect(find.text('Around line 2'), findsOneWidget);
     expect(
       find.textContaining(
         'diff --git a/lib/src/features/chat/transcript/presentation/widgets/transcript/conversation_entry_renderer.dart',
         findRichText: true,
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.text('Additions'), findsOneWidget);
     expect(find.text('Deletions'), findsOneWidget);
@@ -2271,12 +2273,13 @@ void main() {
     expect(find.byTooltip('Close diff'), findsOneWidget);
     expect(find.text('Additions'), findsOneWidget);
     expect(find.text('Deletions'), findsOneWidget);
+    expect(find.text('Similarity 88%'), findsOneWidget);
     expect(
       find.textContaining(
         'diff --git a/lib/old_name.dart b/lib/new_name.dart',
         findRichText: true,
       ),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
@@ -2307,6 +2310,7 @@ void main() {
 
     expect(find.text('Language'), findsOneWidget);
     expect(find.text('Binary'), findsWidgets);
+    expect(find.text('Raw patch'), findsOneWidget);
     expect(
       find.textContaining(
         'Binary files a/assets/logo.png and b/assets/logo.png differ',
@@ -2464,6 +2468,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Load full diff'), findsOneWidget);
+    expect(find.text('Raw patch'), findsOneWidget);
     expect(
       find.text(
         'Showing the first 320 lines to keep the review surface responsive.',
@@ -2478,6 +2483,18 @@ void main() {
 
     expect(find.text('Show preview'), findsOneWidget);
     expect(find.textContaining('line 359', findRichText: true), findsOneWidget);
+
+    await tester.tap(find.text('Raw patch'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Readable view'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'diff --git a/lib/large.dart b/lib/large.dart',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
   });
 }
 
