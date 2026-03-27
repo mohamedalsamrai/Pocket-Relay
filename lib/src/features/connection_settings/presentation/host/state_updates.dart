@@ -118,6 +118,19 @@ void _selectConnectionSettingsSystemTemplate(
   String? templateId,
 ) {
   if (templateId == null) {
+    final nextDraft = _resetConnectionSettingsSystemDraft(
+      state._formState.draft,
+    );
+    state._setStateInternal(() {
+      state._formState = state._formState.copyWith(draft: nextDraft);
+      state._systemTestFailure = null;
+    });
+    _syncConnectionSettingsControllers(
+      state,
+      nextDraft,
+      fields: _systemTemplateControlledFields,
+    );
+    state._scheduleRemoteRuntimeRefresh();
     return;
   }
 
@@ -143,15 +156,7 @@ void _selectConnectionSettingsSystemTemplate(
   _syncConnectionSettingsControllers(
     state,
     nextDraft,
-    fields: const <ConnectionSettingsFieldId>{
-      ConnectionSettingsFieldId.host,
-      ConnectionSettingsFieldId.port,
-      ConnectionSettingsFieldId.username,
-      ConnectionSettingsFieldId.hostFingerprint,
-      ConnectionSettingsFieldId.password,
-      ConnectionSettingsFieldId.privateKeyPem,
-      ConnectionSettingsFieldId.privateKeyPassphrase,
-    },
+    fields: _systemTemplateControlledFields,
   );
   state._scheduleRemoteRuntimeRefresh();
 }
@@ -164,17 +169,27 @@ Future<void> _testConnectionSettingsSystem(
     return;
   }
 
+  final requestedProfile = _connectionSettingsSystemProfile(state);
+  final requestedSecrets = _connectionSettingsSystemSecrets(state);
+
   state._setStateInternal(() {
     state._isTestingSystem = true;
     state._systemTestFailure = null;
   });
 
   try {
-    final result = await onTestSystem(
-      _connectionSettingsSystemProfile(state),
-      _connectionSettingsSystemSecrets(state),
-    );
+    final result = await onTestSystem(requestedProfile, requestedSecrets);
     if (!state.mounted) {
+      return;
+    }
+    if (!_matchesConnectionSettingsSystemRequest(
+      state._formState.draft,
+      requestedProfile: requestedProfile,
+      requestedSecrets: requestedSecrets,
+    )) {
+      state._setStateInternal(() {
+        state._isTestingSystem = false;
+      });
       return;
     }
 
@@ -196,6 +211,16 @@ Future<void> _testConnectionSettingsSystem(
     state._scheduleRemoteRuntimeRefresh(immediate: true);
   } catch (error) {
     if (!state.mounted) {
+      return;
+    }
+    if (!_matchesConnectionSettingsSystemRequest(
+      state._formState.draft,
+      requestedProfile: requestedProfile,
+      requestedSecrets: requestedSecrets,
+    )) {
+      state._setStateInternal(() {
+        state._isTestingSystem = false;
+      });
       return;
     }
     state._setStateInternal(() {
@@ -239,6 +264,17 @@ void _saveConnectionSettingsHost(_ConnectionSettingsHostState state) {
   state.widget.onSubmit(payload);
 }
 
+const Set<ConnectionSettingsFieldId> _systemTemplateControlledFields =
+    <ConnectionSettingsFieldId>{
+      ConnectionSettingsFieldId.host,
+      ConnectionSettingsFieldId.port,
+      ConnectionSettingsFieldId.username,
+      ConnectionSettingsFieldId.hostFingerprint,
+      ConnectionSettingsFieldId.password,
+      ConnectionSettingsFieldId.privateKeyPem,
+      ConnectionSettingsFieldId.privateKeyPassphrase,
+    };
+
 const Set<ConnectionSettingsFieldId> _hostTrustSensitiveFields =
     <ConnectionSettingsFieldId>{
       ConnectionSettingsFieldId.host,
@@ -276,6 +312,38 @@ ConnectionSecrets _connectionSettingsSystemSecrets(
     privateKeyPem: draft.privateKeyPem,
     privateKeyPassphrase: draft.privateKeyPassphrase,
   );
+}
+
+ConnectionSettingsDraft _resetConnectionSettingsSystemDraft(
+  ConnectionSettingsDraft draft,
+) {
+  final defaults = ConnectionProfile.defaults();
+  return draft.copyWith(
+    connectionMode: ConnectionMode.remote,
+    host: '',
+    port: defaults.port.toString(),
+    username: '',
+    hostFingerprint: '',
+    authMode: defaults.authMode,
+    password: '',
+    privateKeyPem: '',
+    privateKeyPassphrase: '',
+  );
+}
+
+bool _matchesConnectionSettingsSystemRequest(
+  ConnectionSettingsDraft draft, {
+  required ConnectionProfile requestedProfile,
+  required ConnectionSecrets requestedSecrets,
+}) {
+  return draft.connectionMode == ConnectionMode.remote &&
+      draft.host.trim() == requestedProfile.host &&
+      int.tryParse(draft.port.trim()) == requestedProfile.port &&
+      draft.username.trim() == requestedProfile.username &&
+      draft.authMode == requestedProfile.authMode &&
+      draft.password == requestedSecrets.password &&
+      draft.privateKeyPem == requestedSecrets.privateKeyPem &&
+      draft.privateKeyPassphrase == requestedSecrets.privateKeyPassphrase;
 }
 
 void _syncConnectionSettingsControllers(

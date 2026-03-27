@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_sheet.dart';
 
@@ -187,6 +188,57 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'shared host ignores stale system test results after the system changes',
+    (tester) async {
+      final pendingSystemTest = Completer<ConnectionSettingsSystemTestResult>();
+
+      await tester.pumpWidget(
+        buildMaterialSettingsApp(
+          onSubmit: (_) {},
+          initialProfile: configuredConnectionProfile().copyWith(
+            hostFingerprint: '',
+          ),
+          onTestSystem: (_, _) => pendingSystemTest.future,
+          builder: (context, viewModel, actions) {
+            return ConnectionSheet(
+              platformBehavior: mobileSettingsBehavior,
+              viewModel: viewModel,
+              actions: actions,
+            );
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey<String>('connection_settings_test_system')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('connection_settings_test_system')),
+      );
+      await tester.pump();
+
+      await tester.enterText(materialTextField('Host'), 'otherbox.local');
+      await tester.pump();
+
+      pendingSystemTest.complete(
+        const ConnectionSettingsSystemTestResult(
+          keyType: 'ssh-ed25519',
+          fingerprint: '11:22:33:44',
+        ),
+      );
+      await tester.pump();
+
+      final hostField = tester.widget<TextField>(
+        find.byKey(settingsFieldKey(ConnectionSettingsFieldId.host)),
+      );
+      expect(hostField.controller!.text, 'otherbox.local');
+      expect(find.text('11:22:33:44'), findsNothing);
+      expect(find.text('SSH fingerprint needed'), findsOneWidget);
     },
   );
 
