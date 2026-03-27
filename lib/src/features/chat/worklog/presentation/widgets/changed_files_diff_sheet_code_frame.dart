@@ -41,6 +41,7 @@ class _DiffCodeFrame extends StatelessWidget {
           : const Color(0xFFFCD34D),
     );
     final shouldShowRawPatch = showRawPatch || review.isEmpty;
+    final canToggleRawPatch = diff.lines.isNotEmpty && !review.isEmpty;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -56,7 +57,7 @@ class _DiffCodeFrame extends StatelessWidget {
             diff: diff,
             cards: cards,
             showRawPatch: shouldShowRawPatch,
-            canToggleRawPatch: diff.lines.isNotEmpty,
+            canToggleRawPatch: canToggleRawPatch,
             onToggleRawPatch: onToggleRawPatch,
           ),
           Expanded(

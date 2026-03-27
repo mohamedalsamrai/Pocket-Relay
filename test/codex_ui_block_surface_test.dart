@@ -2320,6 +2320,43 @@ void main() {
     );
   });
 
+  testWidgets('hides the raw patch toggle when no readable diff view exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: _entrySurface(
+          block: CodexChangedFilesBlock(
+            id: 'diff_metadata_only_1',
+            createdAt: DateTime(2026, 3, 14, 12),
+            title: 'Changed files',
+            files: const <CodexChangedFile>[
+              CodexChangedFile(path: 'lib/empty.dart'),
+            ],
+            unifiedDiff:
+                'diff --git a/lib/empty.dart b/lib/empty.dart\n'
+                'new file mode 100644\n'
+                '--- /dev/null\n'
+                '+++ b/lib/empty.dart\n',
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('empty.dart'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Raw patch'), findsNothing);
+    expect(find.text('Readable view'), findsNothing);
+    expect(
+      find.textContaining(
+        'diff --git a/lib/empty.dart b/lib/empty.dart',
+        findRichText: true,
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'renders created, edited, and deleted file rows with distinct treatments',
     (tester) async {
