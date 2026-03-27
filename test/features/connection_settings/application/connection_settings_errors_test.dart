@@ -42,4 +42,37 @@ void main() {
     );
     expect(error.bodyWithCode, contains('ssh failed'));
   });
+
+  test(
+    'connection cache persistence warnings keep the stable code and detail',
+    () {
+      final error = ConnectionSettingsErrors.modelCatalogCachePersistenceFailed(
+        connectionCacheError: StateError('connection cache failed'),
+      );
+
+      expect(
+        error.definition,
+        PocketErrorCatalog
+            .connectionSettingsModelCatalogConnectionCacheSaveFailed,
+      );
+      expect(error.inlineMessage, contains('connection cache failed'));
+    },
+  );
+
+  test(
+    'combined cache persistence warnings keep the combined code and both details',
+    () {
+      final error = ConnectionSettingsErrors.modelCatalogCachePersistenceFailed(
+        connectionCacheError: StateError('connection cache failed'),
+        lastKnownCacheError: StateError('last-known cache failed'),
+      );
+
+      expect(
+        error.definition,
+        PocketErrorCatalog.connectionSettingsModelCatalogCachePersistenceFailed,
+      );
+      expect(error.inlineMessage, contains('connection cache failed'));
+      expect(error.inlineMessage, contains('last-known cache failed'));
+    },
+  );
 }

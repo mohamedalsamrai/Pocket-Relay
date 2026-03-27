@@ -248,12 +248,29 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
       fetchedAt: DateTime.now().toUtc(),
       models: models,
     );
+    Object? connectionCacheSaveError;
     try {
       await workspaceController.saveConnectionModelCatalog(catalog);
-    } catch (_) {}
+    } catch (error) {
+      connectionCacheSaveError = error;
+    }
+    Object? lastKnownCacheSaveError;
     try {
       await workspaceController.saveLastKnownConnectionModelCatalog(catalog);
-    } catch (_) {}
+    } catch (error) {
+      lastKnownCacheSaveError = error;
+    }
+    if ((connectionCacheSaveError != null || lastKnownCacheSaveError != null) &&
+        mounted &&
+        widget.workspaceController == workspaceController &&
+        widget.laneBinding == laneBinding) {
+      _showTransientError(
+        ConnectionSettingsErrors.modelCatalogCachePersistenceFailed(
+          connectionCacheError: connectionCacheSaveError,
+          lastKnownCacheError: lastKnownCacheSaveError,
+        ),
+      );
+    }
     return catalog;
   }
 

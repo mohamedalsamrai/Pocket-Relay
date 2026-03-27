@@ -667,6 +667,27 @@ abstract final class PocketErrorCatalog {
     meaning:
         'Refreshing models in the connection settings sheet failed because the backend refresh call threw an error.',
   );
+  static const PocketErrorDefinition
+  connectionSettingsModelCatalogConnectionCacheSaveFailed = PocketErrorDefinition(
+    code: 'PR-CONNSET-1103',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Refreshing models in the connection settings sheet succeeded, but Pocket Relay could not save the connection-scoped cached model catalog.',
+  );
+  static const PocketErrorDefinition
+  connectionSettingsModelCatalogLastKnownCacheSaveFailed = PocketErrorDefinition(
+    code: 'PR-CONNSET-1104',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Refreshing models in the connection settings sheet succeeded, but Pocket Relay could not save the shared last-known cached model catalog.',
+  );
+  static const PocketErrorDefinition
+  connectionSettingsModelCatalogCachePersistenceFailed = PocketErrorDefinition(
+    code: 'PR-CONNSET-1105',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Refreshing models in the connection settings sheet succeeded, but Pocket Relay could not save either local model catalog cache.',
+  );
 
   // Connection settings: remote runtime probing (12xx).
   static const PocketErrorDefinition
@@ -823,6 +844,9 @@ abstract final class PocketErrorCatalog {
       <PocketErrorDefinition>[
         connectionSettingsModelCatalogUnavailable,
         connectionSettingsModelCatalogRefreshFailed,
+        connectionSettingsModelCatalogConnectionCacheSaveFailed,
+        connectionSettingsModelCatalogLastKnownCacheSaveFailed,
+        connectionSettingsModelCatalogCachePersistenceFailed,
         connectionSettingsRemoteRuntimeProbeFailed,
       ];
 
