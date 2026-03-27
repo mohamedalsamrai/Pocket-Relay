@@ -13,7 +13,6 @@ import 'package:pocket_relay/src/features/connection_settings/presentation/conne
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
-import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_lifecycle_presentation.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_lifecycle_widgets.dart';
 
@@ -80,14 +79,9 @@ class _ConnectionWorkspaceSavedConnectionsContentState
       workspaceState,
       isTransportConnected: _isTransportConnected,
     );
-    _scheduleMissingRemoteRuntimeProbes(
-      sections: sections,
-    );
+    _scheduleMissingRemoteRuntimeProbes(sections: sections);
 
-    final content = _buildMaterialContent(
-      context,
-      sections: sections,
-    );
+    final content = _buildMaterialContent(context, sections: sections);
 
     final wrappedContent = widget.useSafeArea
         ? SafeArea(bottom: false, child: content)
@@ -398,9 +392,13 @@ class _ConnectionWorkspaceSavedConnectionsContentState
     try {
       final remoteRuntime = await switch (actionId) {
         ConnectionSettingsRemoteServerActionId.start =>
-          widget.workspaceController.startRemoteServer(connectionId: connectionId),
+          widget.workspaceController.startRemoteServer(
+            connectionId: connectionId,
+          ),
         ConnectionSettingsRemoteServerActionId.stop =>
-          widget.workspaceController.stopRemoteServer(connectionId: connectionId),
+          widget.workspaceController.stopRemoteServer(
+            connectionId: connectionId,
+          ),
         ConnectionSettingsRemoteServerActionId.restart =>
           widget.workspaceController.restartRemoteServer(
             connectionId: connectionId,

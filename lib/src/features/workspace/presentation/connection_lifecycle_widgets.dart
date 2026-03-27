@@ -36,7 +36,6 @@ class ConnectionLifecycleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final palette = context.pocketPalette;
 
     return KeyedSubtree(
       key: ValueKey<String>('connections_section_${sectionId.name}'),
@@ -70,10 +69,7 @@ class ConnectionLifecycleSection extends StatelessWidget {
 }
 
 class ConnectionLifecycleFacts extends StatelessWidget {
-  const ConnectionLifecycleFacts({
-    super.key,
-    required this.facts,
-  });
+  const ConnectionLifecycleFacts({super.key, required this.facts});
 
   final List<ConnectionLifecycleFact> facts;
 
@@ -110,8 +106,7 @@ class ConnectionLifecycleFacts extends StatelessWidget {
       ConnectionLifecycleFactTone.accent => theme.colorScheme.primary,
       ConnectionLifecycleFactTone.positive => theme.colorScheme.secondary,
       ConnectionLifecycleFactTone.warning => theme.colorScheme.tertiary,
-      ConnectionLifecycleFactTone.neutral =>
-        theme.colorScheme.onSurfaceVariant,
+      ConnectionLifecycleFactTone.neutral => theme.colorScheme.onSurfaceVariant,
     };
   }
 }
@@ -165,10 +160,7 @@ class ConnectionLifecycleActionBar extends StatelessWidget {
 }
 
 class ConnectionLifecycleDetailActions extends StatelessWidget {
-  const ConnectionLifecycleDetailActions({
-    super.key,
-    required this.actions,
-  });
+  const ConnectionLifecycleDetailActions({super.key, required this.actions});
 
   final List<ConnectionLifecycleButtonAction> actions;
 
