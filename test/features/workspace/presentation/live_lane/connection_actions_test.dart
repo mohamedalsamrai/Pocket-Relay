@@ -52,7 +52,7 @@ void main() {
   );
 
   testWidgets(
-    'live empty lane connect action keeps the placeholder clean and exposes connected-lane controls in overflow',
+    'live empty lane connect action keeps the placeholder clean and exposes visible lifecycle controls',
     (tester) async {
       final clientsById = buildClientsById('conn_primary');
       final client = clientsById['conn_primary']!;
@@ -99,11 +99,14 @@ void main() {
         find.byKey(const ValueKey<String>('lane_connection_action_connect')),
         findsNothing,
       );
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Conversation history'), findsOneWidget);
-      expect(find.text('Disconnect'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_disconnect')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_close')),
+        findsOneWidget,
+      );
       await controller.flushRecoveryPersistence();
     },
   );
@@ -147,13 +150,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('More actions'));
-      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_disconnect')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('lane_connection_action_close')),
+        findsOneWidget,
+      );
 
-      expect(find.text('Disconnect'), findsOneWidget);
-      expect(find.text('Close lane'), findsOneWidget);
-
-      await tester.tap(find.text('Disconnect'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('lane_connection_action_disconnect')),
+      );
       await tester.pumpAndSettle();
 
       expect(client.disconnectCalls, 1);
