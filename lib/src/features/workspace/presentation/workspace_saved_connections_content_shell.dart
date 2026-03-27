@@ -44,7 +44,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
             final index = entry.$1;
             final section = entry.$2;
             return Padding(
-              padding: EdgeInsets.only(bottom: index == sections.length - 1 ? 0 : 20),
+              padding: EdgeInsets.only(
+                bottom: index == sections.length - 1 ? 0 : 20,
+              ),
               child: ConnectionLifecycleSection(
                 sectionId: section.id,
                 title: section.title,
@@ -82,7 +84,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     ConnectionLifecyclePresentation row,
   ) {
     final connectionId = row.connection.id;
-    final isBusy = _isRowBusy(connectionId);
+    final hasPendingOperation = _hasPendingRowOperation(connectionId);
     return switch (row.primaryActionId) {
       ConnectionLifecyclePrimaryActionId.openLane ||
       ConnectionLifecyclePrimaryActionId.goToLane =>
@@ -93,7 +95,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               : row.isLive
               ? ConnectionWorkspaceCopy.goToLaneAction
               : ConnectionWorkspaceCopy.openLaneAction,
-          onPressed: isBusy ? null : () => _openConnection(row.connection),
+          onPressed: hasPendingOperation
+              ? null
+              : () => _openConnection(row.connection),
         ),
       ConnectionLifecyclePrimaryActionId.reconnect =>
         ConnectionLifecycleButtonAction(
@@ -105,7 +109,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               : ConnectionWorkspaceCopy.reconnectActionFor(
                   row.reconnectRequirement!,
                 ),
-          onPressed: isBusy ? null : () => _reconnectConnection(connectionId),
+          onPressed: _isLifecycleActionBlocked(connectionId)
+              ? null
+              : () => _reconnectConnection(connectionId),
         ),
       null => null,
     };
@@ -115,7 +121,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     ConnectionLifecyclePresentation row,
   ) {
     final connectionId = row.connection.id;
-    final isBusy = _isRowBusy(connectionId);
+    final hasPendingOperation = _hasPendingRowOperation(connectionId);
     return <ConnectionLifecycleButtonAction>[
       for (final actionId in row.secondaryActionIds)
         switch (actionId) {
@@ -125,7 +131,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _disconnectingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.disconnectProgress
                   : ConnectionWorkspaceCopy.disconnectAction,
-              onPressed: isBusy ? null : () => _disconnectConnection(connectionId),
+              onPressed: _isLifecycleActionBlocked(connectionId)
+                  ? null
+                  : () => _disconnectConnection(connectionId),
             ),
           ConnectionLifecycleSecondaryActionId.edit =>
             ConnectionLifecycleButtonAction(
@@ -133,13 +141,15 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _editingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.saveProgress
                   : ConnectionWorkspaceCopy.editAction,
-              onPressed: isBusy ? null : () => _editConnection(row.connection),
+              onPressed: hasPendingOperation
+                  ? null
+                  : () => _editConnection(row.connection),
             ),
           ConnectionLifecycleSecondaryActionId.closeLane =>
             ConnectionLifecycleButtonAction(
               key: ValueKey<String>('close_lane_$connectionId'),
               label: ConnectionWorkspaceCopy.closeLaneAction,
-              onPressed: isBusy
+              onPressed: _isLifecycleActionBlocked(connectionId)
                   ? null
                   : () => widget.workspaceController.terminateConnection(
                       connectionId,
@@ -151,14 +161,16 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _deletingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.deleteProgress
                   : ConnectionWorkspaceCopy.deleteAction,
-              onPressed: isBusy ? null : () => _deleteConnection(connectionId),
+              onPressed: hasPendingOperation
+                  ? null
+                  : () => _deleteConnection(connectionId),
               isDestructive: true,
             ),
           _ => const ConnectionLifecycleButtonAction(
-              key: ValueKey<String>('unsupported_action'),
-              label: '',
-              onPressed: null,
-            ),
+            key: ValueKey<String>('unsupported_action'),
+            label: '',
+            onPressed: null,
+          ),
         },
     ].where((action) => action.label.isNotEmpty).toList();
   }
@@ -167,7 +179,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     ConnectionLifecyclePresentation row,
   ) {
     final connectionId = row.connection.id;
-    final isBusy = _isRowBusy(connectionId);
+    final hasPendingOperation = _hasPendingRowOperation(connectionId);
     return <ConnectionLifecycleButtonAction>[
       for (final actionId in row.detailActionIds)
         switch (actionId) {
@@ -177,7 +189,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _checkingHostConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.checkHostProgress
                   : ConnectionWorkspaceCopy.checkHostAction,
-              onPressed: isBusy ? null : () => _checkHost(connectionId),
+              onPressed: hasPendingOperation
+                  ? null
+                  : () => _checkHost(connectionId),
             ),
           ConnectionLifecycleSecondaryActionId.restartServer =>
             ConnectionLifecycleButtonAction(
@@ -193,7 +207,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                   : ConnectionWorkspaceCopy.remoteServerActionLabel(
                       ConnectionSettingsRemoteServerActionId.restart,
                     ),
-              onPressed: isBusy
+              onPressed: hasPendingOperation
                   ? null
                   : () => _runRemoteServerAction(
                       connectionId,
@@ -214,7 +228,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                   : ConnectionWorkspaceCopy.remoteServerActionLabel(
                       ConnectionSettingsRemoteServerActionId.stop,
                     ),
-              onPressed: isBusy
+              onPressed: hasPendingOperation
                   ? null
                   : () => _runRemoteServerAction(
                       connectionId,
@@ -222,15 +236,20 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                     ),
             ),
           _ => const ConnectionLifecycleButtonAction(
-              key: ValueKey<String>('unsupported_detail_action'),
-              label: '',
-              onPressed: null,
-            ),
+            key: ValueKey<String>('unsupported_detail_action'),
+            label: '',
+            onPressed: null,
+          ),
         },
     ].where((action) => action.label.isNotEmpty).toList();
   }
 
-  bool _isRowBusy(String connectionId) {
+  bool _isLifecycleActionBlocked(String connectionId) {
+    return _hasPendingRowOperation(connectionId) ||
+        _isLaneSessionBusy(connectionId);
+  }
+
+  bool _hasPendingRowOperation(String connectionId) {
     return _instantiatingConnectionIds.contains(connectionId) ||
         _reconnectingConnectionIds.contains(connectionId) ||
         _editingConnectionIds.contains(connectionId) ||
@@ -238,5 +257,14 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
         _disconnectingConnectionIds.contains(connectionId) ||
         _checkingHostConnectionIds.contains(connectionId) ||
         _activeRemoteServerActionsByConnectionId.containsKey(connectionId);
+  }
+
+  bool _isLaneSessionBusy(String connectionId) {
+    return widget.workspaceController
+            .bindingForConnectionId(connectionId)
+            ?.sessionController
+            .sessionState
+            .isBusy ==
+        true;
   }
 }

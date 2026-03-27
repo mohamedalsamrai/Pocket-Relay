@@ -167,7 +167,8 @@ abstract final class ConnectionWorkspaceCopy {
     required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
   }) {
     final value =
-        liveReattachPhase == ConnectionWorkspaceLiveReattachPhase.reconnecting ||
+        liveReattachPhase ==
+                ConnectionWorkspaceLiveReattachPhase.reconnecting ||
             transportRecoveryPhase ==
                 ConnectionWorkspaceTransportRecoveryPhase.reconnecting
         ? transportReconnectingFact
@@ -177,9 +178,7 @@ abstract final class ConnectionWorkspaceCopy {
     return '$transportFactLabel: $value';
   }
 
-  static String hostFactFor(
-    ConnectionRemoteHostCapabilityStatus hostStatus,
-  ) {
+  static String hostFactFor(ConnectionRemoteHostCapabilityStatus hostStatus) {
     final value = switch (hostStatus) {
       ConnectionRemoteHostCapabilityStatus.checking => laneHostCheckingStatus,
       ConnectionRemoteHostCapabilityStatus.probeFailed => hostCheckFailedFact,
@@ -208,8 +207,9 @@ abstract final class ConnectionWorkspaceCopy {
       ConnectionWorkspaceReconnectRequirement.savedSettings ||
       ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings =>
         '$settingsFactLabel: $settingsChangesPendingFact',
-      ConnectionWorkspaceReconnectRequirement.transport =>
-        '$settingsFactLabel: $transportDisconnectedFact',
+      ConnectionWorkspaceReconnectRequirement.transport => throw UnsupportedError(
+        'Transport-only reconnect requirements do not produce a settings fact.',
+      ),
     };
   }
 

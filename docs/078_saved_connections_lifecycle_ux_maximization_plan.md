@@ -571,10 +571,9 @@ Why now:
 
 Primary files:
 
-- [`lib/src/features/workspace/application/connection_workspace_inventory.dart`](../lib/src/features/workspace/application/connection_workspace_inventory.dart)
 - [`lib/src/features/workspace/domain/connection_workspace_state.dart`](../lib/src/features/workspace/domain/connection_workspace_state.dart)
-- new workspace presentation-model files under
-  `lib/src/features/workspace/presentation/`
+- [`lib/src/features/workspace/presentation/connection_lifecycle_presentation.dart`](../lib/src/features/workspace/presentation/connection_lifecycle_presentation.dart)
+- [`lib/src/features/workspace/presentation/connection_lifecycle_widgets.dart`](../lib/src/features/workspace/presentation/connection_lifecycle_widgets.dart)
 
 ### Phase 2: Rebuild The Saved-Connections Surface As A Connections Hub
 

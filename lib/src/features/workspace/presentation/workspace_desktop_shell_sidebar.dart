@@ -177,7 +177,8 @@ class _MaterialSidebarConnectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.pocketPalette;
-    final isAttention = row.sectionId == ConnectionLifecycleSectionId.needsAttention;
+    final isAttention =
+        row.sectionId == ConnectionLifecycleSectionId.needsAttention;
     final backgroundColor = isSelected
         ? theme.colorScheme.primary.withValues(alpha: 0.12)
         : isAttention
@@ -201,7 +202,9 @@ class _MaterialSidebarConnectionRow extends StatelessWidget {
           children: [
             Expanded(
               child: InkWell(
-                key: ValueKey<String>('desktop_connection_${row.connection.id}'),
+                key: ValueKey<String>(
+                  'desktop_connection_${row.connection.id}',
+                ),
                 borderRadius: PocketRadii.circular(22),
                 onTap: isOpening ? null : onTap,
                 child: Padding(
@@ -238,7 +241,9 @@ class _MaterialSidebarConnectionRow extends StatelessWidget {
               Tooltip(
                 message: ConnectionWorkspaceCopy.closeLaneAction,
                 child: IconButton(
-                  key: ValueKey<String>('desktop_close_lane_${row.connection.id}'),
+                  key: ValueKey<String>(
+                    'desktop_close_lane_${row.connection.id}',
+                  ),
                   visualDensity: VisualDensity.compact,
                   onPressed: onClose,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -431,7 +436,9 @@ extension on _MaterialDesktopSidebar {
   List<ConnectionLifecycleFact> _sidebarFactsForRow(
     ConnectionLifecyclePresentation row,
   ) {
-    ConnectionLifecycleFact? factMatching(bool Function(ConnectionLifecycleFact) test) {
+    ConnectionLifecycleFact? factMatching(
+      bool Function(ConnectionLifecycleFact) test,
+    ) {
       for (final fact in row.facts) {
         if (test(fact)) {
           return fact;
@@ -441,25 +448,31 @@ extension on _MaterialDesktopSidebar {
     }
 
     final laneFact = factMatching(
-      (fact) => fact.label.startsWith('${ConnectionWorkspaceCopy.laneFactLabel}:'),
+      (fact) =>
+          fact.label.startsWith('${ConnectionWorkspaceCopy.laneFactLabel}:'),
     );
     final settingsFact = factMatching(
-      (fact) =>
-          fact.label.startsWith('${ConnectionWorkspaceCopy.settingsFactLabel}:'),
+      (fact) => fact.label.startsWith(
+        '${ConnectionWorkspaceCopy.settingsFactLabel}:',
+      ),
     );
     final transportFact = factMatching(
-      (fact) =>
-          fact.label.startsWith('${ConnectionWorkspaceCopy.transportFactLabel}:'),
+      (fact) => fact.label.startsWith(
+        '${ConnectionWorkspaceCopy.transportFactLabel}:',
+      ),
     );
     final hostFact = factMatching(
-      (fact) => fact.label.startsWith('${ConnectionWorkspaceCopy.hostFactLabel}:'),
+      (fact) =>
+          fact.label.startsWith('${ConnectionWorkspaceCopy.hostFactLabel}:'),
     );
     final serverFact = factMatching(
       (fact) =>
           fact.label.startsWith('${ConnectionWorkspaceCopy.serverFactLabel}:'),
     );
     final configurationFact = factMatching(
-      (fact) => fact.label == ConnectionWorkspaceCopy.laneConfigurationIncompleteStatus,
+      (fact) =>
+          fact.label ==
+          ConnectionWorkspaceCopy.laneConfigurationIncompleteStatus,
     );
 
     final secondaryFact =
@@ -480,8 +493,7 @@ extension on _MaterialDesktopSidebar {
                 row.remoteRuntime?.server.status !=
                     ConnectionRemoteServerStatus.running
             ? serverFact
-            : null) ??
-        transportFact;
+            : null);
 
     return <ConnectionLifecycleFact>[
       if (laneFact != null) laneFact,
