@@ -52,9 +52,9 @@ TextStyle _changedFileCodeTextStyle({
   required double height,
   FontWeight fontWeight = FontWeight.w500,
 }) {
-  return TextStyle(
+  return PocketTypography.monospaceStyle(
+    base: const TextStyle(),
     color: color,
-    fontFamily: 'monospace',
     fontSize: fontSize,
     height: height,
     fontWeight: fontWeight,
@@ -217,12 +217,10 @@ class _ReviewRowStyle {
     required this.foreground,
     required this.railColor,
     required this.tokenColor,
-    this.fontWeight = FontWeight.w500,
   });
 
   final Color background;
   final Color foreground;
   final Color railColor;
   final Color tokenColor;
-  final FontWeight fontWeight;
 }

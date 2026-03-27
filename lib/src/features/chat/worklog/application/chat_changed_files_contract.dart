@@ -137,13 +137,11 @@ class ChatChangedFileDiffContract {
     required this.operationLabel,
     required this.stats,
     required this.lines,
-    ChatChangedFileDiffReviewContract review =
-        const ChatChangedFileDiffReviewContract(),
+    this.review = const ChatChangedFileDiffReviewContract(),
     ChatChangedFileDiffReviewContract? previewReview,
     this.statusLabel,
     this.previewLineLimit = 320,
-  }) : review = review,
-       previewReview = previewReview ?? review;
+  }) : previewReview = previewReview ?? review;
 
   final String id;
   final ChatChangedFilePresentationContract file;

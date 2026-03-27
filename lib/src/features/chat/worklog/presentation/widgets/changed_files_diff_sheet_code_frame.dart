@@ -145,7 +145,8 @@ class _DiffEditorBar extends StatelessWidget {
                 diff.currentPath,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: PocketTypography.monospaceStyle(
+                  base: const TextStyle(),
                   color: cards.textSecondary,
                   fontSize: 12,
                   height: 1.2,
@@ -522,7 +523,6 @@ class _ReviewRowView extends StatelessWidget {
       color: style.foreground,
       fontSize: 12.2,
       height: 1.5,
-      fontWeight: style.fontWeight,
     );
 
     final contentSpan = ChangedFileSyntaxHighlighter.buildTextSpan(
