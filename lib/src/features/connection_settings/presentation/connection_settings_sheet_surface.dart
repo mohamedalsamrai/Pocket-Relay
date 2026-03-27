@@ -1099,15 +1099,15 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
         return '$host · Workspace not set';
       }
       if (workspaceDir.isNotEmpty) {
-        return 'Remote target · $workspaceDir';
+        return 'Remote workspace · $workspaceDir';
       }
-      return label.isNotEmpty ? label : 'Remote connection';
+      return label.isNotEmpty ? label : 'Remote workspace';
     }
 
     if (workspaceDir.isNotEmpty) {
-      return 'Local Codex · $workspaceDir';
+      return 'Local workspace · $workspaceDir';
     }
-    return label.isNotEmpty ? label : 'Local connection';
+    return label.isNotEmpty ? label : 'Local workspace';
   }
 
   String _fieldValueFor(

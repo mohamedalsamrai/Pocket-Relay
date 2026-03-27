@@ -15,8 +15,7 @@ void main() {
     await tester.pumpWidget(buildShell(controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('Connections'), findsOneWidget);
-    expect(find.text('Inventory'), findsOneWidget);
+    expect(find.text('Workspaces'), findsNWidgets(2));
     expect(
       find.byKey(const ValueKey('desktop_connection_conn_primary')),
       findsOneWidget,
@@ -29,7 +28,7 @@ void main() {
       find.byKey(const ValueKey('desktop_saved_connections')),
       findsOneWidget,
     );
-    expect(find.text('Manage connections'), findsOneWidget);
+    expect(find.text('Manage workspaces'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('desktop_sidebar_toggle')),
       findsOneWidget,
@@ -129,7 +128,7 @@ void main() {
 
       expect(collapsedWidth, lessThan(expandedWidth));
       expect(collapsedWidth, lessThanOrEqualTo(80));
-      expect(find.text('Connections'), findsNothing);
+      expect(find.text('Workspaces'), findsNothing);
 
       await tester.tap(find.byKey(const ValueKey('desktop_saved_connections')));
       await tester.pumpAndSettle();
