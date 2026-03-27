@@ -111,30 +111,11 @@ Future<List<_OversizedFile>> _collectOversizedFiles(
 }
 
 Future<int> _countLines(File file) async {
-  final lines = await file
-      .openRead()
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .length;
-
-  final endsWithNewline = await _endsWithNewline(file);
-  if (endsWithNewline) {
-    return lines;
-  }
   final text = await file.readAsString();
   if (text.isEmpty) {
     return 0;
   }
-  return lines + 1;
-}
-
-Future<bool> _endsWithNewline(File file) async {
-  final length = await file.length();
-  if (length == 0) {
-    return false;
-  }
-  final tail = await file.openRead(length - 1).first;
-  return tail.isNotEmpty && tail.first == 0x0A;
+  return const LineSplitter().convert(text).length;
 }
 
 void _printUsage(IOSink sink) {

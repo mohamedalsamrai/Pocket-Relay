@@ -257,6 +257,7 @@ Move and split:
 - `test/widget_test.dart`
   -> `test/app/app_bootstrap_loading_test.dart`
   -> `test/app/app_catalog_bootstrap_test.dart`
+  -> `test/app/app_menu_actions_test.dart`
   -> `test/app/app_shell_selection_test.dart`
   -> `test/app/app_settings_overlay_test.dart`
   -> `test/app/app_turn_device_integration_test.dart`
