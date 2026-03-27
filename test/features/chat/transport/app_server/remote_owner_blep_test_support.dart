@@ -1,176 +1,186 @@
 import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_ssh_process.dart';
 
-final _BlepDiagnosticsConfig _blepDiagnosticsConfig =
+export 'dart:io';
+export 'package:flutter_test/flutter_test.dart';
+export 'package:pocket_relay/src/core/models/connection_models.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_ssh_process.dart';
+
+final BlepDiagnosticsConfig blepDiagnosticsConfig =
     _resolveBlepDiagnosticsConfig();
 
-void main() {
-  test(
-    'optional BLEP diagnostics isolate OpenSSH and dartssh2 owner behavior',
-    () async {
-      final config = _blepDiagnosticsConfig;
-      final profile = config.profile!;
-      final secrets = config.secrets!;
-      const manualOwnerId = 'blep-diagnostics-manual';
-      const dartOwnerId = 'blep-diagnostics-dart';
-      final ownerControl = const CodexSshRemoteAppServerOwnerControl(
-        readyPollAttempts: 20,
-        readyPollDelay: Duration(milliseconds: 250),
-        stopPollAttempts: 10,
-        stopPollDelay: Duration(milliseconds: 150),
-      );
-      final ownerInspector = const CodexSshRemoteAppServerOwnerInspector();
-
-      addTearDown(() async {
-        await _bestEffortStop(
-          ownerControl,
-          profile: profile,
-          secrets: secrets,
-          ownerId: manualOwnerId,
-        );
-        await _bestEffortStop(
-          ownerControl,
-          profile: profile,
-          secrets: secrets,
-          ownerId: dartOwnerId,
-        );
-      });
-
-      await _bestEffortStop(
-        ownerControl,
-        profile: profile,
-        secrets: secrets,
-        ownerId: manualOwnerId,
-      );
-      await _bestEffortStop(
-        ownerControl,
-        profile: profile,
-        secrets: secrets,
-        ownerId: dartOwnerId,
-      );
-
-      final manualSessionName = buildPocketRelayRemoteOwnerSessionName(
-        ownerId: manualOwnerId,
-      );
-      final manualPort = buildPocketRelayRemoteOwnerPortCandidates(
-        ownerId: manualOwnerId,
-      ).first;
-      final manualStart = _startOwnerViaOpenSsh(
-        alias: config.alias,
-        sessionName: manualSessionName,
-        workspaceDir: profile.workspaceDir,
-        port: manualPort,
-      );
-      if (!manualStart.ok) {
-        fail('OpenSSH start failed.\n${manualStart.detail}');
-      }
-
-      final manualSnapshot = await ownerInspector.inspectOwner(
-        profile: profile,
-        secrets: secrets,
-        ownerId: manualOwnerId,
-        workspaceDir: profile.workspaceDir,
-      );
-      if (manualSnapshot.status != CodexRemoteAppServerOwnerStatus.running) {
-        fail(
-          'Dart inspector did not see the OpenSSH-started owner as running.\n'
-          'snapshot=${_describeSnapshot(manualSnapshot)}\n'
-          'openssh=${manualStart.detail}\n'
-          'remote=${_rawOwnerState(alias: config.alias, sessionName: manualSessionName)}',
-        );
-      }
-
-      final rawSessionName = buildPocketRelayRemoteOwnerSessionName(
-        ownerId: dartOwnerId,
-      );
-      final rawStartCommand = buildSshRemoteOwnerStartCommand(
-        sessionName: rawSessionName,
-        workspaceDir: profile.workspaceDir,
-        codexPath: profile.codexPath,
-        port: buildPocketRelayRemoteOwnerPortCandidates(ownerId: dartOwnerId)
-            .first,
-      );
-      final rawBootstrap = await connectSshBootstrapClient(
-        profile: profile,
-        secrets: secrets,
-        verifyHostKey: (keyType, actualFingerprint) {
-          return _normalizeFingerprint(profile.hostFingerprint) ==
-              _normalizeFingerprint(actualFingerprint);
-        },
-      );
-      await rawBootstrap.authenticate();
-      final rawProcess = await rawBootstrap.launchProcess(rawStartCommand);
-      final rawStdout = await _readStream(rawProcess.stdout);
-      final rawStderr = await _readStream(rawProcess.stderr);
-      await rawProcess.done;
-      final rawDebug = await _runRawSshCommand(
-        profile: profile,
-        secrets: secrets,
-        command: _buildImmediateTmuxDebugCommand(
-          sessionName: rawSessionName,
-          workspaceDir: profile.workspaceDir,
-          port: buildPocketRelayRemoteOwnerPortCandidates(ownerId: dartOwnerId)
-              .first,
-        ),
-      );
-      final rawOpenSshStateBeforeClose = _rawOwnerState(
-        alias: config.alias,
-        sessionName: rawSessionName,
-      );
-      await rawProcess.close();
-      final rawOpenSshStateAfterClose = _rawOwnerState(
-        alias: config.alias,
-        sessionName: rawSessionName,
-      );
-
-      if (!rawOpenSshStateBeforeClose.contains('HAS_SESSION\nyes')) {
-        fail(
-          'Raw dartssh2 start command did not create a visible tmux session even before close.\n'
-          'stdout=$rawStdout\n'
-          'stderr=$rawStderr\n'
-          'exit=${rawProcess.exitCode}\n'
-          'rawDebug=$rawDebug\n'
-          'beforeClose=$rawOpenSshStateBeforeClose\n'
-          'afterClose=$rawOpenSshStateAfterClose',
-        );
-      }
-
-      final dartSnapshot = await ownerControl.startOwner(
-        profile: profile,
-        secrets: secrets,
-        ownerId: dartOwnerId,
-        workspaceDir: profile.workspaceDir,
-      );
-      final dartSessionName = buildPocketRelayRemoteOwnerSessionName(
-        ownerId: dartOwnerId,
-      );
-      final rawDartOwnerState = _rawOwnerState(
-        alias: config.alias,
-        sessionName: dartSessionName,
-      );
-
-      if (dartSnapshot.status != CodexRemoteAppServerOwnerStatus.running) {
-        fail(
-          'dartssh2 startOwner did not produce a running owner.\n'
-          'snapshot=${_describeSnapshot(dartSnapshot)}\n'
-          'rawBeforeClose=$rawOpenSshStateBeforeClose\n'
-          'rawAfterClose=$rawOpenSshStateAfterClose\n'
-          'remote=$rawDartOwnerState',
-        );
-      }
-    },
-    skip: _blepDiagnosticsConfig.skipReason ?? false,
-    timeout: Timeout.factor(4),
+Future<void> verifyOpenSshOwnerInspection() async {
+  final config = blepDiagnosticsConfig;
+  final profile = config.profile!;
+  final secrets = config.secrets!;
+  const ownerId = 'blep-diagnostics-manual';
+  final ownerControl = const CodexSshRemoteAppServerOwnerControl(
+    readyPollAttempts: 20,
+    readyPollDelay: Duration(milliseconds: 250),
+    stopPollAttempts: 10,
+    stopPollDelay: Duration(milliseconds: 150),
   );
+  final ownerInspector = const CodexSshRemoteAppServerOwnerInspector();
+
+  await _bestEffortStop(
+    ownerControl,
+    profile: profile,
+    secrets: secrets,
+    ownerId: ownerId,
+  );
+
+  try {
+    final sessionName = buildPocketRelayRemoteOwnerSessionName(
+      ownerId: ownerId,
+    );
+    final port = buildPocketRelayRemoteOwnerPortCandidates(
+      ownerId: ownerId,
+    ).first;
+    final manualStart = _startOwnerViaOpenSsh(
+      alias: config.alias,
+      sessionName: sessionName,
+      workspaceDir: profile.workspaceDir,
+      port: port,
+    );
+    if (!manualStart.ok) {
+      fail('OpenSSH start failed.\n${manualStart.detail}');
+    }
+
+    final snapshot = await ownerInspector.inspectOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: profile.workspaceDir,
+    );
+    if (snapshot.status != CodexRemoteAppServerOwnerStatus.running) {
+      fail(
+        'Dart inspector did not see the OpenSSH-started owner as running.\n'
+        'snapshot=${_describeSnapshot(snapshot)}\n'
+        'openssh=${manualStart.detail}\n'
+        'remote=${_rawOwnerState(alias: config.alias, sessionName: sessionName)}',
+      );
+    }
+  } finally {
+    await _bestEffortStop(
+      ownerControl,
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+    );
+  }
 }
 
-final class _BlepDiagnosticsConfig {
-  const _BlepDiagnosticsConfig({
+Future<void> verifyDartOwnerStartStatus() async {
+  final config = blepDiagnosticsConfig;
+  final profile = config.profile!;
+  final secrets = config.secrets!;
+  const ownerId = 'blep-diagnostics-dart';
+  final ownerControl = const CodexSshRemoteAppServerOwnerControl(
+    readyPollAttempts: 20,
+    readyPollDelay: Duration(milliseconds: 250),
+    stopPollAttempts: 10,
+    stopPollDelay: Duration(milliseconds: 150),
+  );
+
+  await _bestEffortStop(
+    ownerControl,
+    profile: profile,
+    secrets: secrets,
+    ownerId: ownerId,
+  );
+
+  try {
+    final sessionName = buildPocketRelayRemoteOwnerSessionName(
+      ownerId: ownerId,
+    );
+    final rawStartCommand = buildSshRemoteOwnerStartCommand(
+      sessionName: sessionName,
+      workspaceDir: profile.workspaceDir,
+      codexPath: profile.codexPath,
+      port: buildPocketRelayRemoteOwnerPortCandidates(ownerId: ownerId).first,
+    );
+    final rawBootstrap = await connectSshBootstrapClient(
+      profile: profile,
+      secrets: secrets,
+      verifyHostKey: (keyType, actualFingerprint) {
+        return _normalizeFingerprint(profile.hostFingerprint) ==
+            _normalizeFingerprint(actualFingerprint);
+      },
+    );
+    await rawBootstrap.authenticate();
+    final rawProcess = await rawBootstrap.launchProcess(rawStartCommand);
+    final rawStdout = await _readStream(rawProcess.stdout);
+    final rawStderr = await _readStream(rawProcess.stderr);
+    await rawProcess.done;
+    final rawDebug = await _runRawSshCommand(
+      profile: profile,
+      secrets: secrets,
+      command: _buildImmediateTmuxDebugCommand(
+        sessionName: sessionName,
+        workspaceDir: profile.workspaceDir,
+        port: buildPocketRelayRemoteOwnerPortCandidates(ownerId: ownerId).first,
+      ),
+    );
+    final rawOpenSshStateBeforeClose = _rawOwnerState(
+      alias: config.alias,
+      sessionName: sessionName,
+    );
+    await rawProcess.close();
+    final rawOpenSshStateAfterClose = _rawOwnerState(
+      alias: config.alias,
+      sessionName: sessionName,
+    );
+
+    if (!rawOpenSshStateBeforeClose.contains('HAS_SESSION\nyes')) {
+      fail(
+        'Raw dartssh2 start command did not create a visible tmux session even before close.\n'
+        'stdout=$rawStdout\n'
+        'stderr=$rawStderr\n'
+        'exit=${rawProcess.exitCode}\n'
+        'rawDebug=$rawDebug\n'
+        'beforeClose=$rawOpenSshStateBeforeClose\n'
+        'afterClose=$rawOpenSshStateAfterClose',
+      );
+    }
+
+    final snapshot = await ownerControl.startOwner(
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+      workspaceDir: profile.workspaceDir,
+    );
+    final rawState = _rawOwnerState(
+      alias: config.alias,
+      sessionName: sessionName,
+    );
+
+    if (snapshot.status != CodexRemoteAppServerOwnerStatus.running) {
+      fail(
+        'dartssh2 startOwner did not produce a running owner.\n'
+        'snapshot=${_describeSnapshot(snapshot)}\n'
+        'rawBeforeClose=$rawOpenSshStateBeforeClose\n'
+        'rawAfterClose=$rawOpenSshStateAfterClose\n'
+        'remote=$rawState',
+      );
+    }
+  } finally {
+    await _bestEffortStop(
+      ownerControl,
+      profile: profile,
+      secrets: secrets,
+      ownerId: ownerId,
+    );
+  }
+}
+
+final class BlepDiagnosticsConfig {
+  const BlepDiagnosticsConfig({
     required this.alias,
     this.skipReason,
     this.profile,
@@ -183,10 +193,10 @@ final class _BlepDiagnosticsConfig {
   final ConnectionSecrets? secrets;
 }
 
-_BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
+BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
   const alias = 'blep';
   if (!_runtimeFlagEnabled('POCKET_RELAY_RUN_REAL_REMOTE_SMOKE')) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason:
           'Set POCKET_RELAY_RUN_REAL_REMOTE_SMOKE=1 to run BLEP diagnostics.',
@@ -195,7 +205,7 @@ _BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
 
   final resolved = _resolveSshAlias(alias);
   if (resolved == null) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason: 'SSH alias `blep` is not configured.',
     );
@@ -206,19 +216,19 @@ _BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
   final port = int.tryParse((resolved['port'] ?? '').trim());
   final identityFile = _expandHomePath((resolved['identityfile'] ?? '').trim());
   if (hostname.isEmpty || hostname == alias) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason: 'SSH alias `blep` did not resolve to a concrete host.',
     );
   }
   if (username.isEmpty || port == null) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason: 'SSH alias `blep` did not resolve to a usable user/port.',
     );
   }
   if (identityFile.isEmpty || !File(identityFile).existsSync()) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason:
           'SSH alias `blep` did not resolve to a readable identity file.',
@@ -227,7 +237,7 @@ _BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
 
   final privateKeyPem = File(identityFile).readAsStringSync().trim();
   if (privateKeyPem.isEmpty) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason: 'Resolved SSH identity file for `blep` was empty.',
     );
@@ -238,13 +248,13 @@ _BlepDiagnosticsConfig _resolveBlepDiagnosticsConfig() {
     port: port,
   );
   if (hostFingerprint == null || hostFingerprint.isEmpty) {
-    return const _BlepDiagnosticsConfig(
+    return const BlepDiagnosticsConfig(
       alias: alias,
       skipReason: 'Could not resolve an ED25519 host fingerprint for `blep`.',
     );
   }
 
-  return _BlepDiagnosticsConfig(
+  return BlepDiagnosticsConfig(
     alias: alias,
     profile: ConnectionProfile.defaults().copyWith(
       label: 'blep',
@@ -388,13 +398,14 @@ tmux has-session -t ${_shellQuote(sessionName)} 2>/dev/null && echo HAS_SESSION=
 printf 'LOG\\n'
 cat ${_shellQuote(logFile)} 2>/dev/null || true
 ''';
-  final result = Process.runSync(
-    'ssh',
-    <String>[alias, 'bash -lc ${_shellQuote(script)}'],
-  );
+  final result = Process.runSync('ssh', <String>[
+    alias,
+    'bash -lc ${_shellQuote(script)}',
+  ]);
   return _ShellResult(
     ok: result.exitCode == 0,
-    detail: 'exit=${result.exitCode}\nstdout=${result.stdout}\nstderr=${result.stderr}',
+    detail:
+        'exit=${result.exitCode}\nstdout=${result.stdout}\nstderr=${result.stderr}',
   );
 }
 
@@ -412,10 +423,10 @@ tmux list-panes -t ${_shellQuote(sessionName)} -F 'pid=#{pane_pid} cmd=#{pane_cu
 echo 'LOG'
 cat ${_shellQuote(logFile)} 2>/dev/null || true
 ''';
-  final result = Process.runSync(
-    'ssh',
-    <String>[alias, 'bash -lc ${_shellQuote(script)}'],
-  );
+  final result = Process.runSync('ssh', <String>[
+    alias,
+    'bash -lc ${_shellQuote(script)}',
+  ]);
   return 'exit=${result.exitCode}\nstdout=${result.stdout}\nstderr=${result.stderr}';
 }
 

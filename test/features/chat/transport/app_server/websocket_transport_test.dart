@@ -16,12 +16,16 @@ void main() {
 
     final serverDone = Completer<void>();
     unawaited(
-      server.transform(WebSocketTransformer()).listen((socket) {
-        socket.listen((message) {
-          receivedFrames.add(message as String);
-          socket.add('{"jsonrpc":"2.0","method":"server/ping"}');
-        });
-      }).asFuture<void>().whenComplete(serverDone.complete),
+      server
+          .transform(WebSocketTransformer())
+          .listen((socket) {
+            socket.listen((message) {
+              receivedFrames.add(message as String);
+              socket.add('{"jsonrpc":"2.0","method":"server/ping"}');
+            });
+          })
+          .asFuture<void>()
+          .whenComplete(serverDone.complete),
     );
 
     final transport = await openCodexAppServerWebSocketTransport(
@@ -41,7 +45,9 @@ void main() {
       await transport.protocolMessages.first,
       '{"jsonrpc":"2.0","method":"server/ping"}',
     );
-    expect(receivedFrames, <String>['{"jsonrpc":"2.0","method":"client/ping"}']);
+    expect(receivedFrames, <String>[
+      '{"jsonrpc":"2.0","method":"client/ping"}',
+    ]);
   });
 
   test('websocket transport reports binary frames as diagnostics', () async {
@@ -76,7 +82,8 @@ void main() {
       unawaited(
         server.transform(WebSocketTransformer()).listen((socket) {
           socket.listen((message) {
-            final request = jsonDecode(message as String) as Map<String, dynamic>;
+            final request =
+                jsonDecode(message as String) as Map<String, dynamic>;
             requests.add(request);
             switch (request['method']) {
               case 'initialize':
@@ -132,11 +139,10 @@ void main() {
       final session = await client.startSession();
 
       expect(session.threadId, 'thread_ws');
-      expect(requests.map((request) => request['method']), containsAll(<Object?>[
-        'initialize',
-        'initialized',
-        'thread/start',
-      ]));
+      expect(
+        requests.map((request) => request['method']),
+        containsAll(<Object?>['initialize', 'initialized', 'thread/start']),
+      );
       expect(
         events.whereType<CodexAppServerConnectedEvent>().single.userAgent,
         'codex-app-server-websocket-test',

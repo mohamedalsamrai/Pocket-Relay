@@ -50,34 +50,31 @@ void main() {
     expect(localCalls, 1);
   });
 
-  test(
-    'rejects remote mode for the generic transport opener path',
-    () async {
-      var localCalls = 0;
+  test('rejects remote mode for the generic transport opener path', () async {
+    var localCalls = 0;
 
-      await expectLater(
-        () => openCodexAppServerTransport(
-          profile: _profile(ConnectionMode.remote),
-          secrets: const ConnectionSecrets(password: 'secret'),
-          emitEvent: (_) {},
-          localLauncher:
-              ({required profile, required secrets, required emitEvent}) {
-                localCalls += 1;
-                throw StateError('should not use local launcher');
-              },
+    await expectLater(
+      () => openCodexAppServerTransport(
+        profile: _profile(ConnectionMode.remote),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        emitEvent: (_) {},
+        localLauncher:
+            ({required profile, required secrets, required emitEvent}) {
+              localCalls += 1;
+              throw StateError('should not use local launcher');
+            },
+      ),
+      throwsA(
+        isA<CodexAppServerException>().having(
+          (error) => error.message,
+          'message',
+          contains('managed-owner websocket transport path'),
         ),
-        throwsA(
-          isA<CodexAppServerException>().having(
-            (error) => error.message,
-            'message',
-            contains('managed-owner websocket transport path'),
-          ),
-        ),
-      );
+      ),
+    );
 
-      expect(localCalls, 0);
-    },
-  );
+    expect(localCalls, 0);
+  });
 
   test(
     'opens a transport that delegates local mode to the local launcher',

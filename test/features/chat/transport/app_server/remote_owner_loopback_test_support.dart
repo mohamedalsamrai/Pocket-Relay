@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
@@ -9,346 +8,22 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_ssh_forward.dart';
 
-final String? _systemTmuxPath = _resolveSystemTmuxPathSync();
+export 'dart:async';
+export 'dart:io';
+export 'dart:typed_data';
+export 'package:flutter_test/flutter_test.dart';
+export 'package:pocket_relay/src/core/models/connection_models.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_connection_scoped_transport.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_ssh_forward.dart';
 
-enum _RemoteOwnerTmuxMode { none, shim, system }
+final String? installedSystemTmuxPath = _resolveSystemTmuxPathSync();
 
-void main() {
-  test(
-    'loopback probe reports missing tmux when no system tmux is available',
-    () async {
-      final harness = await _RemoteOwnerLoopbackHarness.create(
-        tmuxMode: _RemoteOwnerTmuxMode.none,
-      );
-      addTearDown(harness.dispose);
+enum RemoteOwnerTmuxMode { none, shim, system }
 
-      final probe = CodexSshRemoteAppServerHostProbe(
-        sshBootstrap: harness.sshBootstrap,
-      );
-
-      final capabilities = await probe.probeHostCapabilities(
-        profile: harness.profile,
-        secrets: harness.secrets,
-      );
-
-      expect(capabilities.supportsContinuity, isFalse);
-      expect(capabilities.issues, <ConnectionRemoteHostCapabilityIssue>{
-        ConnectionRemoteHostCapabilityIssue.tmuxMissing,
-      });
-    },
-    skip: _systemTmuxPath != null
-        ? 'System tmux is installed, so the probe intentionally finds it via explicit system paths.'
-        : false,
-  );
-
-  test('loopback probe reports continuity support with tmux shim', () async {
-    final harness = await _RemoteOwnerLoopbackHarness.create(
-      tmuxMode: _RemoteOwnerTmuxMode.shim,
-    );
-    addTearDown(harness.dispose);
-
-    final probe = CodexSshRemoteAppServerHostProbe(
-      sshBootstrap: harness.sshBootstrap,
-    );
-
-    final capabilities = await probe.probeHostCapabilities(
-      profile: harness.profile,
-      secrets: harness.secrets,
-    );
-
-    expect(capabilities.supportsContinuity, isTrue);
-    expect(capabilities.issues, isEmpty);
-    expect(
-      capabilities.detail,
-      'Remote host supports continuity and can run the managed remote app-server.',
-    );
-  });
-
-  test(
-    'loopback remote owner lifecycle supports websocket attach and session start',
-    () async {
-      final harness = await _RemoteOwnerLoopbackHarness.create(
-        tmuxMode: _RemoteOwnerTmuxMode.shim,
-      );
-      addTearDown(harness.dispose);
-
-      final ownerId = harness.createOwnerId('loopback-owner');
-      final control = harness.createOwnerControl();
-
-      final started = await control.startOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-
-      if (!started.isConnectable) {
-        final log = await harness.readLog();
-        final tmuxState = await harness.debugTmuxState();
-        fail(
-          'Owner did not become connectable. '
-          'status=${started.status} detail=${started.detail} port=${started.endpoint?.port}\n'
-          '$log\n$tmuxState',
-        );
-      }
-      expect(started.endpoint?.host, '127.0.0.1');
-      expect(started.endpoint?.port, isNotNull);
-
-      final client = CodexAppServerClient(
-        transportOpener: buildConnectionScopedCodexAppServerTransportOpener(
-          ownerId: ownerId,
-          remoteOwnerInspector: CodexSshRemoteAppServerOwnerInspector(
-            sshBootstrap: harness.sshBootstrap,
-          ),
-          remoteTransportOpener:
-              ({
-                required profile,
-                required secrets,
-                required remoteHost,
-                required remotePort,
-                required emitEvent,
-              }) {
-                return openSshForwardedCodexAppServerWebSocketTransport(
-                  profile: profile,
-                  secrets: secrets,
-                  remoteHost: remoteHost,
-                  remotePort: remotePort,
-                  emitEvent: emitEvent,
-                  sshBootstrap: harness.sshBootstrap,
-                  connectTimeout: const Duration(seconds: 5),
-                );
-              },
-        ),
-      );
-      addTearDown(client.dispose);
-
-      final events = <CodexAppServerEvent>[];
-      final subscription = client.events.listen(events.add);
-      addTearDown(subscription.cancel);
-
-      await client.connect(profile: harness.profile, secrets: harness.secrets);
-
-      final session = await client.startSession();
-
-      expect(session.threadId, startsWith('thread_'));
-      expect(
-        events.whereType<CodexAppServerConnectedEvent>().single.userAgent,
-        'pocket-relay-loopback-codex',
-      );
-      expect(
-        events
-            .whereType<CodexAppServerSshPortForwardStartedEvent>()
-            .single
-            .remotePort,
-        started.endpoint!.port,
-      );
-
-      await client.dispose();
-
-      final stopped = await control.stopOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-
-      expect(stopped.status.name, anyOf('missing', 'stopped'));
-    },
-  );
-
-  test(
-    'real tmux E2E keeps the owner running across client disconnect and reconnect',
-    () async {
-      final harness = await _RemoteOwnerLoopbackHarness.create(
-        tmuxMode: _RemoteOwnerTmuxMode.system,
-      );
-      addTearDown(harness.dispose);
-
-      final ownerId = harness.createOwnerId('real-tmux-reconnect');
-      final control = harness.createOwnerControl();
-      final started = await control.startOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-
-      if (!started.isConnectable) {
-        final log = await harness.readLog();
-        final tmuxState = await harness.debugTmuxState();
-        fail(
-          'Owner did not become connectable. '
-          'status=${started.status} detail=${started.detail} port=${started.endpoint?.port}\n'
-          '$log\n$tmuxState',
-        );
-      }
-
-      final firstClient = harness.createClient(ownerId: ownerId);
-      addTearDown(firstClient.dispose);
-      await firstClient.connect(
-        profile: harness.profile,
-        secrets: harness.secrets,
-      );
-      final firstSession = await firstClient.startSession();
-
-      await firstClient.disconnect();
-
-      final stillRunning = await control.inspectOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      expect(stillRunning.status.name, 'running');
-
-      final secondClient = harness.createClient(ownerId: ownerId);
-      addTearDown(secondClient.dispose);
-      await secondClient.connect(
-        profile: harness.profile,
-        secrets: harness.secrets,
-      );
-      final resumed = await secondClient.resumeThread(
-        threadId: firstSession.threadId,
-      );
-
-      expect(resumed.threadId, firstSession.threadId);
-      expect(secondClient.threadId, firstSession.threadId);
-
-      final stopped = await control.stopOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      expect(stopped.status.name, anyOf('missing', 'stopped'));
-    },
-    skip: _systemTmuxPath == null
-        ? 'tmux is not installed on this machine.'
-        : false,
-  );
-
-  test(
-    'real tmux E2E emits disconnected when the owner stops during an active session',
-    () async {
-      final harness = await _RemoteOwnerLoopbackHarness.create(
-        tmuxMode: _RemoteOwnerTmuxMode.system,
-      );
-      addTearDown(harness.dispose);
-
-      final ownerId = harness.createOwnerId('real-tmux-disconnect');
-      final control = harness.createOwnerControl();
-      final started = await control.startOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      if (!started.isConnectable) {
-        final log = await harness.readLog();
-        final tmuxState = await harness.debugTmuxState();
-        fail(
-          'Owner did not become connectable. '
-          'status=${started.status} detail=${started.detail} port=${started.endpoint?.port}\n'
-          '$log\n$tmuxState',
-        );
-      }
-
-      final client = harness.createClient(ownerId: ownerId);
-      addTearDown(client.dispose);
-      final disconnectedFuture = client.events
-          .firstWhere((event) => event is CodexAppServerDisconnectedEvent)
-          .then((event) => event as CodexAppServerDisconnectedEvent)
-          .timeout(const Duration(seconds: 10));
-
-      await client.connect(profile: harness.profile, secrets: harness.secrets);
-      await client.startSession();
-
-      final stopped = await control.stopOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      final disconnected = await disconnectedFuture;
-
-      expect(disconnected, isNotNull);
-      expect(stopped.status.name, anyOf('missing', 'stopped'));
-    },
-    skip: _systemTmuxPath == null
-        ? 'tmux is not installed on this machine.'
-        : false,
-  );
-
-  test(
-    'real tmux E2E supports owner restart after forced disconnect',
-    () async {
-      final harness = await _RemoteOwnerLoopbackHarness.create(
-        tmuxMode: _RemoteOwnerTmuxMode.system,
-      );
-      addTearDown(harness.dispose);
-
-      final ownerId = harness.createOwnerId('real-tmux-restart');
-      final control = harness.createOwnerControl();
-      final started = await control.startOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      if (!started.isConnectable) {
-        fail(
-          'Owner did not become connectable. '
-          'status=${started.status} detail=${started.detail} port=${started.endpoint?.port}',
-        );
-      }
-
-      final firstClient = harness.createClient(ownerId: ownerId);
-      addTearDown(firstClient.dispose);
-      final disconnectedFuture = firstClient.events
-          .firstWhere((event) => event is CodexAppServerDisconnectedEvent)
-          .then((event) => event as CodexAppServerDisconnectedEvent)
-          .timeout(const Duration(seconds: 10));
-
-      await firstClient.connect(
-        profile: harness.profile,
-        secrets: harness.secrets,
-      );
-      await firstClient.startSession();
-
-      await control.stopOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      await disconnectedFuture;
-
-      final restarted = await control.startOwner(
-        profile: harness.profile,
-        secrets: harness.secrets,
-        ownerId: ownerId,
-        workspaceDir: harness.profile.workspaceDir,
-      );
-      expect(restarted.isConnectable, isTrue);
-
-      final secondClient = harness.createClient(ownerId: ownerId);
-      addTearDown(secondClient.dispose);
-      await secondClient.connect(
-        profile: harness.profile,
-        secrets: harness.secrets,
-      );
-      final session = await secondClient.startSession();
-
-      expect(session.threadId, startsWith('thread_'));
-    },
-    skip: _systemTmuxPath == null
-        ? 'tmux is not installed on this machine.'
-        : false,
-  );
-}
-
-final class _RemoteOwnerLoopbackHarness {
-  _RemoteOwnerLoopbackHarness._({
+final class RemoteOwnerLoopbackHarness {
+  RemoteOwnerLoopbackHarness._({
     required this.rootDir,
     required this.sessionRoot,
     required this.profile,
@@ -363,7 +38,7 @@ final class _RemoteOwnerLoopbackHarness {
   final Directory sessionRoot;
   final ConnectionProfile profile;
   final Map<String, String> environment;
-  final _RemoteOwnerTmuxMode tmuxMode;
+  final RemoteOwnerTmuxMode tmuxMode;
   final String? systemTmuxPath;
   final File logFile;
   final String? tmuxSocketPath;
@@ -372,8 +47,8 @@ final class _RemoteOwnerLoopbackHarness {
   int _ownerCounter = 0;
   bool _disposed = false;
 
-  static Future<_RemoteOwnerLoopbackHarness> create({
-    required _RemoteOwnerTmuxMode tmuxMode,
+  static Future<RemoteOwnerLoopbackHarness> create({
+    required RemoteOwnerTmuxMode tmuxMode,
   }) async {
     final rootDir = await Directory.systemTemp.createTemp(
       'pocket_relay_remote_owner_loopback_',
@@ -385,7 +60,7 @@ final class _RemoteOwnerLoopbackHarness {
       ..createSync();
     final logFile = File(_joinPath(rootDir.path, 'fake_codex.log'));
     await logFile.writeAsString('');
-    final tmuxSocketPath = tmuxMode == _RemoteOwnerTmuxMode.system
+    final tmuxSocketPath = tmuxMode == RemoteOwnerTmuxMode.system
         ? _joinPath(rootDir.path, 'tmux.socket')
         : null;
 
@@ -407,21 +82,21 @@ final class _RemoteOwnerLoopbackHarness {
       _bashWrapperScript,
     );
 
-    if (tmuxMode == _RemoteOwnerTmuxMode.shim) {
+    if (tmuxMode == RemoteOwnerTmuxMode.shim) {
       await _writeExecutable(
         File(_joinPath(binDir.path, 'tmux')),
         _buildTmuxShim(sessionRoot.path),
       );
     }
-    final systemTmuxPath = tmuxMode == _RemoteOwnerTmuxMode.system
-        ? (_systemTmuxPath ??
+    final resolvedSystemTmuxPath = tmuxMode == RemoteOwnerTmuxMode.system
+        ? (installedSystemTmuxPath ??
               (throw StateError('tmux is required for real-tmux E2E tests.')))
         : null;
-    if (tmuxMode == _RemoteOwnerTmuxMode.system) {
+    if (tmuxMode == RemoteOwnerTmuxMode.system) {
       await _writeExecutable(
         File(_joinPath(binDir.path, 'tmux')),
         _buildSystemTmuxWrapper(
-          systemTmuxPath: systemTmuxPath!,
+          systemTmuxPath: resolvedSystemTmuxPath!,
           socketPath: tmuxSocketPath!,
         ),
       );
@@ -431,7 +106,7 @@ final class _RemoteOwnerLoopbackHarness {
       'POCKET_RELAY_FAKE_CODEX_LOG': logFile.path,
     };
 
-    return _RemoteOwnerLoopbackHarness._(
+    return RemoteOwnerLoopbackHarness._(
       rootDir: rootDir,
       sessionRoot: sessionRoot,
       profile: ConnectionProfile.defaults().copyWith(
@@ -444,7 +119,7 @@ final class _RemoteOwnerLoopbackHarness {
       ),
       environment: environment,
       tmuxMode: tmuxMode,
-      systemTmuxPath: systemTmuxPath,
+      systemTmuxPath: resolvedSystemTmuxPath,
       logFile: logFile,
       tmuxSocketPath: tmuxSocketPath,
     );
@@ -472,7 +147,7 @@ final class _RemoteOwnerLoopbackHarness {
   }
 
   Future<String> debugTmuxState() async {
-    if (tmuxMode != _RemoteOwnerTmuxMode.system ||
+    if (tmuxMode != RemoteOwnerTmuxMode.system ||
         systemTmuxPath == null ||
         tmuxSocketPath == null) {
       return '';
@@ -502,7 +177,7 @@ final class _RemoteOwnerLoopbackHarness {
   }
 
   CodexSshRemoteAppServerOwnerControl createOwnerControl() {
-    final usesRealTmux = tmuxMode == _RemoteOwnerTmuxMode.system;
+    final usesRealTmux = tmuxMode == RemoteOwnerTmuxMode.system;
     return CodexSshRemoteAppServerOwnerControl(
       sshBootstrap: sshBootstrap,
       readyPollAttempts: usesRealTmux ? 100 : 30,
@@ -554,7 +229,7 @@ final class _RemoteOwnerLoopbackHarness {
     }
     _disposed = true;
 
-    if (tmuxMode == _RemoteOwnerTmuxMode.system &&
+    if (tmuxMode == RemoteOwnerTmuxMode.system &&
         systemTmuxPath != null &&
         tmuxSocketPath != null) {
       await Process.run(systemTmuxPath!, <String>[

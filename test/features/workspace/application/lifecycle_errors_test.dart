@@ -16,7 +16,8 @@ void main() {
           server: ConnectionRemoteServerState.notRunning(
             ownerId: 'conn_primary',
             sessionName: 'pocket-relay-conn_primary',
-            detail: 'No managed remote app-server is running for this connection.',
+            detail:
+                'No managed remote app-server is running for this connection.',
           ),
         ),
       );
@@ -44,7 +45,8 @@ void main() {
           server: ConnectionRemoteServerState.notRunning(
             ownerId: 'conn_primary',
             sessionName: 'pocket-relay-conn_primary',
-            detail: 'No managed remote app-server is running for this connection.',
+            detail:
+                'No managed remote app-server is running for this connection.',
           ),
         ),
         error: StateError(

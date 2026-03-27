@@ -91,38 +91,35 @@ void main() {
     expect(client.closeCalls, 1);
   });
 
-  test(
-    'emits an unpinned-host-key event and rejects the connection',
-    () async {
-      final events = <CodexAppServerEvent>[];
+  test('emits an unpinned-host-key event and rejects the connection', () async {
+    final events = <CodexAppServerEvent>[];
 
-      await expectLater(
-        connectAuthenticatedSshBootstrapClient(
-          profile: _profile(),
-          secrets: const ConnectionSecrets(password: 'secret'),
-          emitEvent: events.add,
-          sshBootstrap:
-              ({required profile, required secrets, required verifyHostKey}) {
-                final accepted = verifyHostKey(
-                  'ssh-ed25519',
-                  '7a:9f:d7:dc:2e:f2',
-                );
-                expect(accepted, isFalse);
-                throw SSHHostkeyError('Hostkey verification failed');
-              },
-        ),
-        throwsA(isA<SSHHostkeyError>()),
-      );
+    await expectLater(
+      connectAuthenticatedSshBootstrapClient(
+        profile: _profile(),
+        secrets: const ConnectionSecrets(password: 'secret'),
+        emitEvent: events.add,
+        sshBootstrap:
+            ({required profile, required secrets, required verifyHostKey}) {
+              final accepted = verifyHostKey(
+                'ssh-ed25519',
+                '7a:9f:d7:dc:2e:f2',
+              );
+              expect(accepted, isFalse);
+              throw SSHHostkeyError('Hostkey verification failed');
+            },
+      ),
+      throwsA(isA<SSHHostkeyError>()),
+    );
 
-      expect(events, hasLength(1));
-      expect(events.single, isA<CodexAppServerUnpinnedHostKeyEvent>());
-      final event = events.single as CodexAppServerUnpinnedHostKeyEvent;
-      expect(event.host, 'example.com');
-      expect(event.port, 22);
-      expect(event.keyType, 'ssh-ed25519');
-      expect(event.fingerprint, '7a:9f:d7:dc:2e:f2');
-    },
-  );
+    expect(events, hasLength(1));
+    expect(events.single, isA<CodexAppServerUnpinnedHostKeyEvent>());
+    final event = events.single as CodexAppServerUnpinnedHostKeyEvent;
+    expect(event.host, 'example.com');
+    expect(event.port, 22);
+    expect(event.keyType, 'ssh-ed25519');
+    expect(event.fingerprint, '7a:9f:d7:dc:2e:f2');
+  });
 
   test('emits an authenticated event on success', () async {
     final events = <CodexAppServerEvent>[];
@@ -133,11 +130,7 @@ void main() {
       secrets: const ConnectionSecrets(password: 'secret'),
       emitEvent: events.add,
       sshBootstrap:
-          ({
-            required profile,
-            required secrets,
-            required verifyHostKey,
-          }) async {
+          ({required profile, required secrets, required verifyHostKey}) async {
             final accepted = verifyHostKey('ssh-ed25519', '7a:9f:d7:dc:2e:f2');
             expect(accepted, isTrue);
             return client;
