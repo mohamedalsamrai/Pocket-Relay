@@ -1,6 +1,6 @@
 import 'package:pocket_relay/src/core/errors/pocket_error_detail_formatter.dart';
 
-enum PocketErrorDomain { connectionLifecycle, chatSession }
+enum PocketErrorDomain { connectionLifecycle, chatSession, connectionSettings }
 
 final class PocketErrorDefinition {
   const PocketErrorDefinition({
@@ -560,6 +560,31 @@ abstract final class PocketErrorCatalog {
         'Branching the selected conversation was blocked because there is no selectable conversation target yet.',
   );
 
+  // Connection settings: model refresh (11xx).
+  static const PocketErrorDefinition
+  connectionSettingsModelCatalogUnavailable = PocketErrorDefinition(
+    code: 'PR-CONNSET-1101',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Refreshing models in the connection settings sheet did not produce a backend model catalog.',
+  );
+  static const PocketErrorDefinition
+  connectionSettingsModelCatalogRefreshFailed = PocketErrorDefinition(
+    code: 'PR-CONNSET-1102',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Refreshing models in the connection settings sheet failed because the backend refresh call threw an error.',
+  );
+
+  // Connection settings: remote runtime probing (12xx).
+  static const PocketErrorDefinition
+  connectionSettingsRemoteRuntimeProbeFailed = PocketErrorDefinition(
+    code: 'PR-CONNSET-1201',
+    domain: PocketErrorDomain.connectionSettings,
+    meaning:
+        'Probing the remote target from the connection settings sheet failed before Pocket Relay could determine continuity support.',
+  );
+
   static const List<PocketErrorDefinition> connectionLifecycleDefinitions =
       <PocketErrorDefinition>[
         connectionOpenRemoteHostProbeFailed,
@@ -634,10 +659,18 @@ abstract final class PocketErrorCatalog {
         chatSessionBranchTargetUnavailable,
       ];
 
+  static const List<PocketErrorDefinition> connectionSettingsDefinitions =
+      <PocketErrorDefinition>[
+        connectionSettingsModelCatalogUnavailable,
+        connectionSettingsModelCatalogRefreshFailed,
+        connectionSettingsRemoteRuntimeProbeFailed,
+      ];
+
   static const List<PocketErrorDefinition> allDefinitions =
       <PocketErrorDefinition>[
         ...connectionLifecycleDefinitions,
         ...chatSessionDefinitions,
+        ...connectionSettingsDefinitions,
       ];
 
   static PocketErrorDefinition? lookup(String code) {
