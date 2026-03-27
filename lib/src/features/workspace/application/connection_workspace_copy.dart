@@ -7,17 +7,17 @@ abstract final class ConnectionWorkspaceCopy {
   static const String connectionInventorySectionTitle = 'Inventory';
   static const String savedConnectionsTitle = 'Saved connections';
   static const String savedConnectionsMenuLabel = savedConnectionsTitle;
-  static const String manageConnectionsAction = 'Manage connections';
+  static const String allConnectionsAction = 'All connections';
   static const String conversationHistoryMenuLabel = 'Conversation history';
   static const String currentLaneSectionTitle = 'Current lane';
   static const String openLanesSectionTitle = 'Open lanes';
   static const String needsAttentionSectionTitle = 'Needs attention';
   static const String mobileSavedConnectionsDescription =
-      'Jump back to an open lane or open another saved connection. Connection and server controls stay inside each lane.';
+      'Jump between open lanes, reconnect stalled ones, or open another saved connection.';
   static const String desktopSidebarDescription =
-      'Keep multiple lanes open while every saved connection stays visible in one inventory.';
+      'Jump between lanes here, then open the full connections view for edit, reconnect, and remote host actions.';
   static const String desktopSavedConnectionsDescription =
-      'Open another saved connection or jump back to a lane that is already open. Connection and server controls stay inside each lane.';
+      'Use the full connections view to jump between lanes, edit saved settings, reconnect remote lanes, and manage host checks.';
   static const String addConnectionAction = 'Add connection';
   static const String addConnectionProgress = 'Adding…';
   static const String openLaneAction = 'Open lane';
