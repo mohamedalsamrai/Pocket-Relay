@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error_detail_formatter.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
@@ -11,6 +13,8 @@ import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_remote_runtime_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -23,6 +27,7 @@ part 'controller/bootstrap.dart';
 part 'controller/catalog_connections.dart';
 part 'controller/conversation_selection.dart';
 part 'controller/delete_connection.dart';
+part 'controller/device_continuity_warnings.dart';
 part 'controller/model_catalogs.dart';
 part 'controller/recovery_diagnostics.dart';
 part 'controller/recovery_persistence.dart';
@@ -252,6 +257,18 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _showWorkspaceSavedConnections(this);
   }
 
+  void setForegroundServiceWarning(PocketUserFacingError? warning) {
+    _setWorkspaceForegroundServiceWarning(this, warning);
+  }
+
+  void setBackgroundGraceWarning(PocketUserFacingError? warning) {
+    _setWorkspaceBackgroundGraceWarning(this, warning);
+  }
+
+  void setWakeLockWarning(PocketUserFacingError? warning) {
+    _setWorkspaceWakeLockWarning(this, warning);
+  }
+
   void terminateConnection(String connectionId) {
     _terminateWorkspaceConnection(this, connectionId);
   }
@@ -287,6 +304,18 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _state = nextState;
     notifyListeners();
     unawaited(_enqueueRecoveryPersistence());
+    return true;
+  }
+
+  bool _applyStateWithoutRecoveryPersistence(
+    ConnectionWorkspaceState nextState,
+  ) {
+    if (_isDisposed || nextState == _state) {
+      return false;
+    }
+
+    _state = nextState;
+    notifyListeners();
     return true;
   }
 
@@ -386,11 +415,18 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   void _recordFallbackTransportConnectFailure(
     String connectionId, {
     required DateTime occurredAt,
+    required Object? error,
   }) => _recordWorkspaceFallbackTransportConnectFailure(
     this,
     connectionId,
     occurredAt: occurredAt,
+    error: error,
   );
+
+  void _recordLiveReattachFailure(
+    String connectionId, {
+    required Object? error,
+  }) => _recordWorkspaceLiveReattachFailure(this, connectionId, error: error);
 
   void _beginRecoveryAttempt(
     String connectionId, {
@@ -439,6 +475,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     ConnectionWorkspaceRecoveryDiagnostics Function(
       ConnectionWorkspaceRecoveryDiagnostics current,
     )
+    update, {
+    bool enqueueRecoveryPersistence = false,
+  }) => _updateWorkspaceRecoveryDiagnostics(
+    this,
+    connectionId,
     update,
-  ) => _updateWorkspaceRecoveryDiagnostics(this, connectionId, update);
+    enqueueRecoveryPersistence: enqueueRecoveryPersistence,
+  );
 }

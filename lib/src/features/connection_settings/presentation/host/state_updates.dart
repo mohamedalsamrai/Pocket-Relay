@@ -11,7 +11,7 @@ ConnectionSettingsContract _buildConnectionSettingsHostContract(
     remoteRuntime: state._remoteRuntime,
     availableModelCatalog: state._availableModelCatalog,
     availableModelCatalogSource: state._availableModelCatalogSource,
-    didModelCatalogRefreshFail: state._didModelCatalogRefreshFail,
+    modelCatalogRefreshError: state._modelCatalogRefreshError,
     supportsModelCatalogRefresh: state.widget.onRefreshModelCatalog != null,
     isRefreshingModelCatalog: state._isRefreshingModelCatalog,
     supportsLocalConnectionMode:

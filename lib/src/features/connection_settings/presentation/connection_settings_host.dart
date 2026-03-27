@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_errors.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_presenter.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
-import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_presenter.dart';
 
 part 'host/host_models.dart';
 part 'host/model_catalog_refresh.dart';
@@ -63,7 +65,7 @@ class _ConnectionSettingsHostState extends State<ConnectionSettingsHost> {
   late ConnectionSettingsFormState _formState;
   ConnectionModelCatalog? _availableModelCatalog;
   ConnectionSettingsModelCatalogSource? _availableModelCatalogSource;
-  bool _didModelCatalogRefreshFail = false;
+  PocketUserFacingError? _modelCatalogRefreshError;
   bool _isRefreshingModelCatalog = false;
   ConnectionRemoteRuntimeState? _remoteRuntime;
   Timer? _remoteRuntimeRefreshDebounce;

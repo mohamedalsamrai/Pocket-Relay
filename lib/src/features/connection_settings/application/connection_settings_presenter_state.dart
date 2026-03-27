@@ -5,7 +5,7 @@ class _ConnectionSettingsPresentationState {
     required this.draft,
     required this.availableModelCatalog,
     required this.availableModelCatalogSource,
-    required this.didModelCatalogRefreshFail,
+    required this.modelCatalogRefreshError,
     required this.supportsModelCatalogRefresh,
     required this.isRefreshingModelCatalog,
     required this.isRemote,
@@ -28,7 +28,7 @@ class _ConnectionSettingsPresentationState {
     required ConnectionSettingsFormState formState,
     ConnectionModelCatalog? availableModelCatalog,
     ConnectionSettingsModelCatalogSource? availableModelCatalogSource,
-    bool didModelCatalogRefreshFail = false,
+    PocketUserFacingError? modelCatalogRefreshError,
     bool supportsModelCatalogRefresh = false,
     bool isRefreshingModelCatalog = false,
   }) {
@@ -112,7 +112,7 @@ class _ConnectionSettingsPresentationState {
       draft: draft,
       availableModelCatalog: availableModelCatalog,
       availableModelCatalogSource: availableModelCatalogSource,
-      didModelCatalogRefreshFail: didModelCatalogRefreshFail,
+      modelCatalogRefreshError: modelCatalogRefreshError,
       supportsModelCatalogRefresh: supportsModelCatalogRefresh,
       isRefreshingModelCatalog: isRefreshingModelCatalog,
       isRemote: isRemote,
@@ -133,7 +133,7 @@ class _ConnectionSettingsPresentationState {
   final ConnectionSettingsDraft draft;
   final ConnectionModelCatalog? availableModelCatalog;
   final ConnectionSettingsModelCatalogSource? availableModelCatalogSource;
-  final bool didModelCatalogRefreshFail;
+  final PocketUserFacingError? modelCatalogRefreshError;
   final bool supportsModelCatalogRefresh;
   final bool isRefreshingModelCatalog;
   final bool isRemote;
