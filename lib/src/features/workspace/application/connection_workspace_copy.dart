@@ -4,7 +4,6 @@ import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_
 
 abstract final class ConnectionWorkspaceCopy {
   static const String workspaceTitle = 'Connections';
-  static const String connectionInventorySectionTitle = 'Inventory';
   static const String savedConnectionsTitle = 'Saved connections';
   static const String savedConnectionsMenuLabel = savedConnectionsTitle;
   static const String allConnectionsAction = 'All connections';
@@ -14,8 +13,6 @@ abstract final class ConnectionWorkspaceCopy {
   static const String needsAttentionSectionTitle = 'Needs attention';
   static const String mobileSavedConnectionsDescription =
       'Jump between open lanes, reconnect stalled ones, or open another saved connection.';
-  static const String desktopSidebarDescription =
-      'Jump between lanes here, then open the full connections view for edit, reconnect, and remote host actions.';
   static const String desktopSavedConnectionsDescription =
       'Use the full connections view to jump between lanes, edit saved settings, reconnect remote lanes, and manage host checks.';
   static const String addConnectionAction = 'Add connection';
@@ -34,15 +31,11 @@ abstract final class ConnectionWorkspaceCopy {
   static const String restartServerAction = 'Restart server';
   static const String restartServerProgress = 'Restarting…';
   static const String closeLaneAction = 'Close lane';
-  static const String openConnectionBadge = 'Open';
-  static const String currentConnectionBadge = 'Current';
-  static const String savedSettingsReconnectBadge = 'Changes pending';
   static const String savedSettingsReconnectAction = 'Apply changes';
   static const String savedSettingsReconnectProgress = 'Applying changes…';
   static const String savedSettingsReconnectMenuAction = 'Apply saved settings';
   static const String savedSettingsReconnectMenuProgress =
       'Applying saved settings…';
-  static const String transportReconnectBadge = 'Reconnect needed';
   static const String transportReconnectAction = 'Reconnect';
   static const String transportReconnectProgress = 'Reconnecting…';
   static const String transportReconnectMenuAction = 'Reconnect lane';
@@ -55,19 +48,8 @@ abstract final class ConnectionWorkspaceCopy {
       'Restoring conversation';
   static const String restoringConversationNoticeMessage =
       'Pocket Relay is restoring this transcript from Codex after live reattach could not continue directly. Your draft is preserved below.';
-  static const String remoteServerRunningSummary = 'Server running';
-  static const String remoteServerStoppedSummary = 'Server stopped';
-  static const String remoteServerUnhealthySummary = 'Server unhealthy';
-  static const String remoteHostUnsupportedSummary = 'Host unsupported';
-  static const String remoteHostProbeFailedSummary = 'Host check failed';
-  static const String remoteHostCheckingSummary = 'Checking host';
-  static const String remoteServerCheckingSummary = 'Checking server';
-  static const String laneConnectedStatus = 'Connected';
-  static const String laneDisconnectedStatus = 'Disconnected';
-  static const String laneConnectingStatus = 'Connecting';
   static const String laneConfigurationIncompleteStatus =
       'Connection not configured';
-  static const String laneLocalReadyStatus = 'Local workspace ready';
   static const String laneServerRunningStatus = 'Server running';
   static const String laneServerStoppedStatus = 'Server stopped';
   static const String laneServerUnhealthyStatus = 'Server unhealthy';
@@ -75,21 +57,6 @@ abstract final class ConnectionWorkspaceCopy {
   static const String laneHostCheckingStatus = 'Checking host';
   static const String laneServerCheckingStatus = 'Checking server';
   static const String laneHostCheckFailedStatus = 'Host check failed';
-  static const String laneContinuityUnavailableStatus =
-      'Remote continuity unavailable';
-  static const String laneReconnectNeededStatus = 'Reconnect needed';
-  static const String laneChangesPendingStatus = 'Changes pending';
-  static const String laneReconnectingStatus = 'Reconnecting';
-  static const String laneBootstrapDetail =
-      'Open lane does not connect automatically. Check this host to continue from here.';
-  static const String laneConfigurationIncompleteDetail =
-      'Finish the connection definition before this lane can continue.';
-  static const String laneHostCheckingDetail =
-      'Pocket Relay is checking whether this host can support continuity for this lane.';
-  static const String laneServerCheckingDetail =
-      'Pocket Relay is checking the managed remote session for this lane.';
-  static const String laneDisconnectedDetail =
-      'Connect this lane to Codex to continue.';
   static const String connectAction = 'Connect';
   static const String connectProgress = 'Connecting…';
   static const String disconnectAction = 'Disconnect';
@@ -134,18 +101,6 @@ abstract final class ConnectionWorkspaceCopy {
       ConnectionMode.local when workspaceDir.isNotEmpty =>
         'Local Codex · $workspaceDir',
       ConnectionMode.local => 'Local Codex · $workspaceNotSet',
-    };
-  }
-
-  static String reconnectBadgeFor(
-    ConnectionWorkspaceReconnectRequirement requirement,
-  ) {
-    return switch (requirement) {
-      ConnectionWorkspaceReconnectRequirement.savedSettings =>
-        savedSettingsReconnectBadge,
-      ConnectionWorkspaceReconnectRequirement.transport ||
-      ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings =>
-        transportReconnectBadge,
     };
   }
 
@@ -254,36 +209,7 @@ abstract final class ConnectionWorkspaceCopy {
       ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings =>
         '$settingsFactLabel: $settingsChangesPendingFact',
       ConnectionWorkspaceReconnectRequirement.transport =>
-        '$settingsFactLabel: $transportReconnectBadge',
-    };
-  }
-
-  static String? savedConnectionRemoteStatusSummary(
-    ConnectionProfile profile,
-    ConnectionRemoteRuntimeState? remoteRuntime,
-  ) {
-    if (profile.connectionMode == ConnectionMode.local ||
-        remoteRuntime == null) {
-      return null;
-    }
-
-    return switch (remoteRuntime.hostCapability.status) {
-      ConnectionRemoteHostCapabilityStatus.checking =>
-        remoteHostCheckingSummary,
-      ConnectionRemoteHostCapabilityStatus.probeFailed =>
-        remoteHostProbeFailedSummary,
-      ConnectionRemoteHostCapabilityStatus.unsupported =>
-        remoteHostUnsupportedSummary,
-      ConnectionRemoteHostCapabilityStatus.unknown => null,
-      ConnectionRemoteHostCapabilityStatus.supported => switch (remoteRuntime
-          .server
-          .status) {
-        ConnectionRemoteServerStatus.checking => remoteServerCheckingSummary,
-        ConnectionRemoteServerStatus.notRunning => remoteServerStoppedSummary,
-        ConnectionRemoteServerStatus.unhealthy => remoteServerUnhealthySummary,
-        ConnectionRemoteServerStatus.running => remoteServerRunningSummary,
-        ConnectionRemoteServerStatus.unknown => null,
-      },
+        '$settingsFactLabel: $transportDisconnectedFact',
     };
   }
 
