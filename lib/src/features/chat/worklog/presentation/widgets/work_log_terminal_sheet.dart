@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
+import 'package:pocket_relay/src/core/theme/pocket_typography.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
 import 'package:pocket_relay/src/core/widgets/modal_sheet_scaffold.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_item_primitives.dart';
@@ -72,11 +73,11 @@ class WorkLogTerminalSheet extends StatelessWidget {
                                 padding: EdgeInsets.zero,
                                 child: SelectableText(
                                   _terminalTranscriptText(terminal),
-                                  style: TextStyle(
+                                  style: PocketTypography.monospace(
+                                    context,
                                     color: cards.textPrimary,
                                     fontSize: 12.5,
                                     height: 1.45,
-                                    fontFamily: 'monospace',
                                   ),
                                 ),
                               ),
