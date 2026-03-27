@@ -374,6 +374,21 @@ class ToggleableFailingConnectionWorkspaceRecoveryStore
   }
 }
 
+class ThrowingConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  const ThrowingConnectionWorkspaceRecoveryStore(this.error);
+
+  final Object error;
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async {
+    throw error;
+  }
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {}
+}
+
 ConnectionProfile workspaceProfile(String label, String host) {
   return ConnectionProfile.defaults().copyWith(
     label: label,

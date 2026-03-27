@@ -661,6 +661,13 @@ abstract final class PocketErrorCatalog {
     meaning:
         'Pocket Relay failed to initialize the workspace shell during app bootstrap.',
   );
+  static const PocketErrorDefinition
+  appBootstrapRecoveryStateLoadFailed = PocketErrorDefinition(
+    code: 'PR-BOOT-1102',
+    domain: PocketErrorDomain.appBootstrap,
+    meaning:
+        'Pocket Relay could not restore the previously persisted local workspace recovery state during app bootstrap, so startup continued without that recovery snapshot.',
+  );
 
   static const List<PocketErrorDefinition> connectionLifecycleDefinitions =
       <PocketErrorDefinition>[
@@ -756,7 +763,10 @@ abstract final class PocketErrorCatalog {
       ];
 
   static const List<PocketErrorDefinition> appBootstrapDefinitions =
-      <PocketErrorDefinition>[appBootstrapWorkspaceInitializationFailed];
+      <PocketErrorDefinition>[
+        appBootstrapWorkspaceInitializationFailed,
+        appBootstrapRecoveryStateLoadFailed,
+      ];
 
   static const List<PocketErrorDefinition> allDefinitions =
       <PocketErrorDefinition>[

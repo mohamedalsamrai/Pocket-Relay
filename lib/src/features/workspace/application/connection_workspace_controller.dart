@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error_detail_formatter.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
@@ -13,6 +14,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_remote_runtime_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';

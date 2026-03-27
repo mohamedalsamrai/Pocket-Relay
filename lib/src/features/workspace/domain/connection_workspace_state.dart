@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 
 enum ConnectionWorkspaceViewport { liveLane, savedConnections }
@@ -192,6 +193,7 @@ class ConnectionWorkspaceState {
     required this.liveConnectionIds,
     required this.selectedConnectionId,
     required this.viewport,
+    required this.recoveryLoadWarning,
     required this.savedSettingsReconnectRequiredConnectionIds,
     required this.transportReconnectRequiredConnectionIds,
     required this.transportRecoveryPhasesByConnectionId,
@@ -206,6 +208,7 @@ class ConnectionWorkspaceState {
       liveConnectionIds = const <String>[],
       selectedConnectionId = null,
       viewport = ConnectionWorkspaceViewport.liveLane,
+      recoveryLoadWarning = null,
       savedSettingsReconnectRequiredConnectionIds = const <String>{},
       transportReconnectRequiredConnectionIds = const <String>{},
       transportRecoveryPhasesByConnectionId =
@@ -222,6 +225,7 @@ class ConnectionWorkspaceState {
   final List<String> liveConnectionIds;
   final String? selectedConnectionId;
   final ConnectionWorkspaceViewport viewport;
+  final PocketUserFacingError? recoveryLoadWarning;
   final Set<String> savedSettingsReconnectRequiredConnectionIds;
   final Set<String> transportReconnectRequiredConnectionIds;
   final Map<String, ConnectionWorkspaceTransportRecoveryPhase>
@@ -315,6 +319,7 @@ class ConnectionWorkspaceState {
     List<String>? liveConnectionIds,
     String? selectedConnectionId,
     ConnectionWorkspaceViewport? viewport,
+    PocketUserFacingError? recoveryLoadWarning,
     Set<String>? savedSettingsReconnectRequiredConnectionIds,
     Set<String>? transportReconnectRequiredConnectionIds,
     Map<String, ConnectionWorkspaceTransportRecoveryPhase>?
@@ -325,6 +330,7 @@ class ConnectionWorkspaceState {
     recoveryDiagnosticsByConnectionId,
     Map<String, ConnectionRemoteRuntimeState>? remoteRuntimeByConnectionId,
     bool clearSelectedConnectionId = false,
+    bool clearRecoveryLoadWarning = false,
   }) {
     return ConnectionWorkspaceState(
       isLoading: isLoading ?? this.isLoading,
@@ -334,6 +340,9 @@ class ConnectionWorkspaceState {
           ? null
           : (selectedConnectionId ?? this.selectedConnectionId),
       viewport: viewport ?? this.viewport,
+      recoveryLoadWarning: clearRecoveryLoadWarning
+          ? null
+          : (recoveryLoadWarning ?? this.recoveryLoadWarning),
       savedSettingsReconnectRequiredConnectionIds:
           savedSettingsReconnectRequiredConnectionIds ??
           this.savedSettingsReconnectRequiredConnectionIds,
@@ -362,6 +371,7 @@ class ConnectionWorkspaceState {
         listEquals(other.liveConnectionIds, liveConnectionIds) &&
         other.selectedConnectionId == selectedConnectionId &&
         other.viewport == viewport &&
+        other.recoveryLoadWarning == recoveryLoadWarning &&
         setEquals(
           other.savedSettingsReconnectRequiredConnectionIds,
           savedSettingsReconnectRequiredConnectionIds,
@@ -395,6 +405,7 @@ class ConnectionWorkspaceState {
     Object.hashAll(liveConnectionIds),
     selectedConnectionId,
     viewport,
+    recoveryLoadWarning,
     Object.hashAllUnordered(savedSettingsReconnectRequiredConnectionIds),
     Object.hashAllUnordered(transportReconnectRequiredConnectionIds),
     Object.hashAllUnordered(

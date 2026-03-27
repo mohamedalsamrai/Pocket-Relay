@@ -167,6 +167,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     final recoveryDiagnostics = workspaceState.recoveryDiagnosticsFor(
       widget.laneBinding.connectionId,
     );
+    final recoveryLoadWarning = workspaceState.recoveryLoadWarning;
     final remoteRuntime = workspaceState.remoteRuntimeFor(
       widget.laneBinding.connectionId,
     );
@@ -188,6 +189,13 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       diagnostics: recoveryDiagnostics,
       remoteRuntime: remoteRuntime,
     );
+    final startupWarningNotice = _recoveryLoadWarningNoticeFor(
+      recoveryLoadWarning,
+    );
+    final laneNotice = _composedLaneNotice(
+      primaryNotice: recoveryNotice,
+      secondaryNotice: startupWarningNotice,
+    );
     final emptyStateContent = _buildLaneEmptyStateContent(
       profile: profile,
       reconnectRequirement: reconnectRequirement,
@@ -196,7 +204,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       remoteRuntime: remoteRuntime,
       isLaneBusy: isLaneBusy,
       isRestartInProgress: isRestartInProgress,
-      recoveryNotice: recoveryNotice,
+      recoveryNotice: laneNotice,
     );
     final chatRoot = ChatRootAdapter(
       laneBinding: widget.laneBinding,
@@ -217,7 +225,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
               remoteRuntime: remoteRuntime,
               isLaneBusy: isLaneBusy,
               isRestartInProgress: isRestartInProgress,
-              recoveryNotice: recoveryNotice,
+              recoveryNotice: laneNotice,
             ),
       supplementalEmptyStateContent: emptyStateContent,
     );
@@ -580,6 +588,36 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     );
   }
 
+  Widget? _recoveryLoadWarningNoticeFor(PocketUserFacingError? warning) {
+    if (warning == null) {
+      return null;
+    }
+
+    return _WorkspaceLaneTransportNotice(
+      title: warning.title,
+      message: warning.bodyWithCode,
+      isLoading: false,
+      icon: Icons.history_toggle_off_rounded,
+    );
+  }
+
+  Widget? _composedLaneNotice({
+    required Widget? primaryNotice,
+    required Widget? secondaryNotice,
+  }) {
+    if (primaryNotice == null) {
+      return secondaryNotice;
+    }
+    if (secondaryNotice == null) {
+      return primaryNotice;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [primaryNotice, const SizedBox(height: 12), secondaryNotice],
+    );
+  }
+
   Widget? _buildLaneConnectionStrip(
     BuildContext context, {
     required ConnectionProfile profile,
@@ -818,11 +856,13 @@ class _WorkspaceLaneTransportNotice extends StatelessWidget {
     required this.title,
     required this.message,
     required this.isLoading,
+    this.icon = Icons.portable_wifi_off_rounded,
   });
 
   final String title;
   final String message;
   final bool isLoading;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -852,7 +892,7 @@ class _WorkspaceLaneTransportNotice extends StatelessWidget {
                 ),
               )
             else
-              Icon(Icons.portable_wifi_off_rounded, color: foregroundColor),
+              Icon(icon, color: foregroundColor),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
