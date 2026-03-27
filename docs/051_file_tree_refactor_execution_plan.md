@@ -400,9 +400,10 @@ From `lib/src/features/chat/infrastructure/app_server/`:
 
 Run:
 
-- `flutter test test/codex_app_server_client_test.dart`
-- `flutter test test/codex_app_server_ssh_process_test.dart`
-- `flutter test test/codex_json_rpc_codec_test.dart`
+- `flutter test test/features/chat/transport/app_server/client_connect_test.dart`
+- `flutter test test/features/chat/transport/app_server/client_session_test.dart`
+- `flutter test test/features/chat/transport/app_server/ssh_process_test.dart`
+- `flutter test test/features/chat/transport/app_server/json_rpc_codec_test.dart`
 - `flutter test test/chat_screen_app_server_test.dart`
 
 ### Risk

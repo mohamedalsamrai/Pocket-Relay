@@ -47,7 +47,7 @@ typedef _Options = ({bool failOnOversized, int limit, String rootPath});
 typedef _OversizedFile = ({int lineCount, String path});
 
 _Options? _parseArgs(List<String> args) {
-  var failOnOversized = false;
+  var failOnOversized = true;
   var limit = _defaultLimit;
   var rootPath = 'test';
 
@@ -56,6 +56,8 @@ _Options? _parseArgs(List<String> args) {
     switch (arg) {
       case '--fail':
         failOnOversized = true;
+      case '--report-only':
+        failOnOversized = false;
       case '--limit':
         if (index + 1 >= args.length) {
           return null;
@@ -138,6 +140,6 @@ Future<bool> _endsWithNewline(File file) async {
 void _printUsage(IOSink sink) {
   sink.writeln(
     'Usage: dart run tool/check_test_file_sizes.dart '
-    '[--limit <lines>] [--root <dir>] [--fail]',
+    '[--limit <lines>] [--root <dir>] [--fail] [--report-only]',
   );
 }

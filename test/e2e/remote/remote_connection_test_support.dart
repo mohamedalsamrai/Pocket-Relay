@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app/pocket_relay_app.dart';
@@ -8,209 +7,237 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
+import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_mobile_shell.dart';
 
-final _RealRemoteAppE2eConfig _realRemoteAppE2eConfig =
+export 'dart:convert';
+export 'dart:io';
+export 'package:flutter/material.dart';
+export 'package:flutter_test/flutter_test.dart';
+export 'package:pocket_relay/src/app/pocket_relay_app.dart';
+export 'package:pocket_relay/src/core/models/connection_models.dart';
+export 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
+export 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
+export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
+export 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
+export 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+export 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
+export 'package:pocket_relay/src/features/workspace/presentation/workspace_mobile_shell.dart';
+
+final RealRemoteAppE2eConfig realRemoteAppE2eConfig =
     _resolveRealRemoteAppE2eConfig();
 
-void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+final class RealRemoteAppHarness {
+  RealRemoteAppHarness({
+    required this.tester,
+    required this.connection,
+    required this.ownerControl,
+    required this.workspaceController,
+  });
 
-  testWidgets(
-    'optional real-host production UI flow starts the managed server and opens a live remote lane',
-    (tester) async {
-      final config = _realRemoteAppE2eConfig;
-      final connection = config.connection!;
-      final profile = connection.profile;
-      final secrets = connection.secrets;
-      final connectionId = connection.id;
-      final ownerControl = const CodexSshRemoteAppServerOwnerControl(
-        readyPollAttempts: 80,
-        readyPollDelay: Duration(milliseconds: 250),
-        stopPollAttempts: 30,
-        stopPollDelay: Duration(milliseconds: 150),
-      );
+  final WidgetTester tester;
+  final SavedConnection connection;
+  final CodexSshRemoteAppServerOwnerControl ownerControl;
+  final ConnectionWorkspaceController workspaceController;
 
-      await _bestEffortStopOwner(
-        ownerControl,
-        profile: profile,
-        secrets: secrets,
-        ownerId: connectionId,
-        workspaceDir: profile.workspaceDir,
-      );
+  ConnectionProfile get profile => connection.profile;
+  ConnectionSecrets get secrets => connection.secrets;
+  String get connectionId => connection.id;
 
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
-        await _bestEffortStopOwner(
-          ownerControl,
-          profile: profile,
-          secrets: secrets,
-          ownerId: connectionId,
-          workspaceDir: profile.workspaceDir,
+  Future<void> openSavedConnectionsPage() async {
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('workspace_page_view')),
+      description: 'workspace page view',
+    );
+    await tester.drag(
+      find.byKey(const ValueKey('workspace_page_view')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('saved_connections_page')),
+      description: 'saved connections page',
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(ValueKey<String>('saved_connection_$connectionId')),
+      description: 'saved connection row for $connectionId',
+    );
+  }
+
+  Future<void> waitForSettledRemoteProbe() async {
+    await _pumpUntilCondition(
+      tester,
+      description: 'settled remote runtime probe',
+      condition: () {
+        final runtime = workspaceController.state.remoteRuntimeFor(
+          connectionId,
         );
-      });
-
-      await tester.pumpWidget(
-        PocketRelayApp(
-          connectionRepository: MemoryCodexConnectionRepository(
-            initialConnections: <SavedConnection>[connection],
-          ),
-          modelCatalogStore: MemoryConnectionModelCatalogStore(),
-          recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-        ),
-      );
-
-      await _pumpUntilFound(
-        tester,
-        find.byType(ConnectionWorkspaceMobileShell),
-        description: 'mobile workspace shell',
-      );
-
-      final shell = tester.widget<ConnectionWorkspaceMobileShell>(
-        find.byType(ConnectionWorkspaceMobileShell),
-      );
-      final workspaceController = shell.workspaceController;
-
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('workspace_page_view')),
-        description: 'workspace page view',
-      );
-      await tester.drag(
-        find.byKey(const ValueKey('workspace_page_view')),
-        const Offset(-500, 0),
-      );
-      await tester.pumpAndSettle();
-
-      await _pumpUntilFound(
-        tester,
-        find.byKey(const ValueKey('saved_connections_page')),
-        description: 'saved connections page',
-      );
-      await _pumpUntilFound(
-        tester,
-        find.byKey(ValueKey<String>('saved_connection_$connectionId')),
-        description: 'saved connection row for $connectionId',
-      );
-
-      await _pumpUntilCondition(
-        tester,
-        description: 'settled remote runtime probe',
-        condition: () {
-          final runtime = workspaceController.state.remoteRuntimeFor(
-            connectionId,
-          );
-          if (runtime == null) {
-            return false;
-          }
-          return runtime.hostCapability.status !=
-                  ConnectionRemoteHostCapabilityStatus.unknown &&
-              runtime.hostCapability.status !=
-                  ConnectionRemoteHostCapabilityStatus.checking;
-        },
-        timeout: const Duration(seconds: 30),
-        failureDetail: () => _describeWorkspaceState(
-          workspaceController,
-          connectionId: connectionId,
-        ),
-      );
-
-      final initialRuntime = workspaceController.state.remoteRuntimeFor(
-        connectionId,
-      )!;
-      if (!initialRuntime.hostCapability.isSupported) {
-        fail(
-          'Remote host is not ready for continuity.\n'
-          '${_describeWorkspaceState(workspaceController, connectionId: connectionId)}',
-        );
-      }
-
-      final openLaneButton = find.byKey(
-        ValueKey<String>('open_connection_$connectionId'),
-      );
-      await tester.ensureVisible(openLaneButton);
-      await tester.tap(openLaneButton);
-      await tester.pumpAndSettle();
-
-      await _pumpUntilCondition(
-        tester,
-        description: 'selected live lane',
-        condition: () =>
-            workspaceController.state.isShowingLiveLane &&
-            workspaceController.state.selectedConnectionId == connectionId &&
-            workspaceController.bindingForConnectionId(connectionId) != null,
-        timeout: const Duration(seconds: 15),
-        failureDetail: () => _describeWorkspaceState(
-          workspaceController,
-          connectionId: connectionId,
-        ),
-      );
-
-      await _driveLiveLaneOnline(
-        tester,
-        workspaceController: workspaceController,
+        if (runtime == null) {
+          return false;
+        }
+        return runtime.hostCapability.status !=
+                ConnectionRemoteHostCapabilityStatus.unknown &&
+            runtime.hostCapability.status !=
+                ConnectionRemoteHostCapabilityStatus.checking;
+      },
+      timeout: const Duration(seconds: 30),
+      failureDetail: () => _describeWorkspaceState(
+        workspaceController,
         connectionId: connectionId,
+      ),
+    );
+  }
+
+  ConnectionRemoteRuntimeState requireSupportedRemoteRuntime() {
+    final runtime = workspaceController.state.remoteRuntimeFor(connectionId)!;
+    if (!runtime.hostCapability.isSupported) {
+      fail(
+        'Remote host is not ready for continuity.\n'
+        '${_describeWorkspaceState(workspaceController, connectionId: connectionId)}',
       );
+    }
+    return runtime;
+  }
 
-      final laneBinding = workspaceController.bindingForConnectionId(
-        connectionId,
-      )!;
-      final sessionController = laneBinding.sessionController;
-      const prompt = 'Reply with exactly: ok';
+  Future<void> openLiveLane() async {
+    final openLaneButton = find.byKey(
+      ValueKey<String>('open_connection_$connectionId'),
+    );
+    await tester.ensureVisible(openLaneButton);
+    await tester.tap(openLaneButton);
+    await tester.pumpAndSettle();
 
-      final composerInput = find.byKey(const ValueKey('composer_input'));
-      final sendButton = find.byKey(const ValueKey('send'));
-      await _pumpUntilFound(
-        tester,
-        composerInput,
-        description: 'chat composer input',
-      );
-      await tester.enterText(composerInput, prompt);
-      await tester.pump();
+    await _pumpUntilCondition(
+      tester,
+      description: 'selected live lane',
+      condition: () =>
+          workspaceController.state.isShowingLiveLane &&
+          workspaceController.state.selectedConnectionId == connectionId &&
+          workspaceController.bindingForConnectionId(connectionId) != null,
+      timeout: const Duration(seconds: 15),
+      failureDetail: () => _describeWorkspaceState(
+        workspaceController,
+        connectionId: connectionId,
+      ),
+    );
+  }
 
-      await tester.ensureVisible(sendButton);
-      await tester.tap(sendButton);
-      await tester.pump();
+  Future<void> driveLiveLaneOnline() {
+    return _driveLiveLaneOnline(
+      tester,
+      workspaceController: workspaceController,
+      connectionId: connectionId,
+    );
+  }
 
-      await _pumpUntilCondition(
-        tester,
-        description: 'connected lane with active thread',
-        condition: () {
-          final sessionState = sessionController.sessionState;
-          final threadId =
-              sessionState.currentThreadId?.trim() ??
-              sessionState.rootThreadId?.trim() ??
-              '';
-          return laneBinding.appServerClient.isConnected && threadId.isNotEmpty;
-        },
-        timeout: const Duration(minutes: 2),
-        failureDetail: () => _describeWorkspaceState(
-          workspaceController,
-          connectionId: connectionId,
-          tester: tester,
-        ),
-      );
+  ConnectionLaneBinding get laneBinding =>
+      workspaceController.bindingForConnectionId(connectionId)!;
 
-      final sessionThreadId =
-          sessionController.sessionState.currentThreadId?.trim().isNotEmpty ==
-              true
-          ? sessionController.sessionState.currentThreadId!.trim()
-          : sessionController.sessionState.rootThreadId!.trim();
+  Future<String> sendPromptAndWaitForThread(String prompt) async {
+    final sessionController = laneBinding.sessionController;
+    final composerInput = find.byKey(const ValueKey('composer_input'));
+    final sendButton = find.byKey(const ValueKey('send'));
+    await _pumpUntilFound(
+      tester,
+      composerInput,
+      description: 'chat composer input',
+    );
+    await tester.enterText(composerInput, prompt);
+    await tester.pump();
 
-      expect(laneBinding.appServerClient.isConnected, isTrue);
-      expect(sessionThreadId, isNotEmpty);
-      expect(sessionController.sessionState.connectionStatus, isNotNull);
+    await tester.ensureVisible(sendButton);
+    await tester.tap(sendButton);
+    await tester.pump();
 
-      final thread = await laneBinding.appServerClient.readThread(
-        threadId: sessionThreadId,
-      );
-      expect(thread.id, sessionThreadId);
-    },
-    skip: _realRemoteAppE2eConfig.skipReason != null,
-    timeout: const Timeout(Duration(minutes: 5)),
+    await _pumpUntilCondition(
+      tester,
+      description: 'connected lane with active thread',
+      condition: () {
+        final sessionState = sessionController.sessionState;
+        final threadId =
+            sessionState.currentThreadId?.trim() ??
+            sessionState.rootThreadId?.trim() ??
+            '';
+        return laneBinding.appServerClient.isConnected && threadId.isNotEmpty;
+      },
+      timeout: const Duration(minutes: 2),
+      failureDetail: () => _describeWorkspaceState(
+        workspaceController,
+        connectionId: connectionId,
+        tester: tester,
+      ),
+    );
+
+    final sessionState = sessionController.sessionState;
+    return sessionState.currentThreadId?.trim().isNotEmpty == true
+        ? sessionState.currentThreadId!.trim()
+        : sessionState.rootThreadId!.trim();
+  }
+}
+
+Future<RealRemoteAppHarness> pumpRealRemoteAppHarness(
+  WidgetTester tester,
+) async {
+  final config = realRemoteAppE2eConfig;
+  final connection = config.connection!;
+  final ownerControl = const CodexSshRemoteAppServerOwnerControl(
+    readyPollAttempts: 80,
+    readyPollDelay: Duration(milliseconds: 250),
+    stopPollAttempts: 30,
+    stopPollDelay: Duration(milliseconds: 150),
+  );
+
+  await _bestEffortStopOwner(
+    ownerControl,
+    profile: connection.profile,
+    secrets: connection.secrets,
+    ownerId: connection.id,
+    workspaceDir: connection.profile.workspaceDir,
+  );
+
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await _bestEffortStopOwner(
+      ownerControl,
+      profile: connection.profile,
+      secrets: connection.secrets,
+      ownerId: connection.id,
+      workspaceDir: connection.profile.workspaceDir,
+    );
+  });
+
+  await tester.pumpWidget(
+    PocketRelayApp(
+      connectionRepository: MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[connection],
+      ),
+      modelCatalogStore: MemoryConnectionModelCatalogStore(),
+      recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
+    ),
+  );
+
+  await _pumpUntilFound(
+    tester,
+    find.byType(ConnectionWorkspaceMobileShell),
+    description: 'mobile workspace shell',
+  );
+
+  final shell = tester.widget<ConnectionWorkspaceMobileShell>(
+    find.byType(ConnectionWorkspaceMobileShell),
+  );
+
+  return RealRemoteAppHarness(
+    tester: tester,
+    connection: connection,
+    ownerControl: ownerControl,
+    workspaceController: shell.workspaceController,
   );
 }
 
@@ -448,16 +475,16 @@ List<String> _snackBarTexts(WidgetTester tester) {
       .toList(growable: false);
 }
 
-final class _RealRemoteAppE2eConfig {
-  const _RealRemoteAppE2eConfig({this.skipReason, this.connection});
+final class RealRemoteAppE2eConfig {
+  const RealRemoteAppE2eConfig({this.skipReason, this.connection});
 
   final String? skipReason;
   final SavedConnection? connection;
 }
 
-_RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
+RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
   if (!_runtimeFlagEnabled('POCKET_RELAY_RUN_REAL_REMOTE_APP_E2E')) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'Set POCKET_RELAY_RUN_REAL_REMOTE_APP_E2E=1 to run the real-host app E2E.',
     );
@@ -499,7 +526,7 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
       ? null
       : _resolveSshAlias(alias);
   if (!hasDirectConnectionSettings && resolvedAlias == null) {
-    return _RealRemoteAppE2eConfig(
+    return RealRemoteAppE2eConfig(
       skipReason: 'SSH alias `$alias` is not configured.',
     );
   }
@@ -523,13 +550,13 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
   final privateKeyPem = _resolvePrivateKeyPem(identityFile);
 
   if (hostname.isEmpty || username.isEmpty || port == null) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'The real-host E2E could not resolve a usable host, user, and port.',
     );
   }
   if (privateKeyPem.isEmpty) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'The real-host E2E could not resolve readable private key material.',
     );
@@ -539,7 +566,7 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
       ? hostFingerprintOverride
       : _readEd25519Fingerprint(hostname: hostname, port: port);
   if (hostFingerprint.isEmpty) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'The real-host E2E could not resolve an ED25519 host fingerprint.',
     );
@@ -549,7 +576,7 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
       ? workspaceDirOverride
       : _probeRemoteWorkspaceDir(alias, username);
   if (workspaceDir.isEmpty) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'The real-host E2E could not resolve a usable remote workspace directory.',
     );
@@ -559,7 +586,7 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
       ? codexPathOverride
       : _probeRemoteCodexPath(alias);
   if (codexPath.isEmpty) {
-    return const _RealRemoteAppE2eConfig(
+    return const RealRemoteAppE2eConfig(
       skipReason:
           'The real-host E2E could not resolve the remote codex executable.',
     );
@@ -567,7 +594,7 @@ _RealRemoteAppE2eConfig _resolveRealRemoteAppE2eConfig() {
 
   final connectionId =
       'conn_real_remote_app_e2e_${DateTime.now().microsecondsSinceEpoch}';
-  return _RealRemoteAppE2eConfig(
+  return RealRemoteAppE2eConfig(
     connection: SavedConnection(
       id: connectionId,
       profile: ConnectionProfile.defaults().copyWith(

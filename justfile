@@ -142,7 +142,7 @@ widgetbook-ios:
 
 alias wb-ios := widgetbook-ios
 
-# Report oversized test entry files without failing the migration.
+# Fail when any test entry file exceeds the 500-line cap.
 test-size-audit:
     dart run tool/check_test_file_sizes.dart
 
