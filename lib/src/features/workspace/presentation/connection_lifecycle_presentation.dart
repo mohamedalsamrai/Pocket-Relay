@@ -346,7 +346,9 @@ bool _liveReattachPhaseNeedsAttention(
   ConnectionWorkspaceLiveReattachPhase? phase,
 ) {
   return switch (phase) {
-    null || ConnectionWorkspaceLiveReattachPhase.liveReattached => false,
+    null ||
+    ConnectionWorkspaceLiveReattachPhase.liveReattached ||
+    ConnectionWorkspaceLiveReattachPhase.fallbackRestore => false,
     _ => true,
   };
 }
