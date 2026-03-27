@@ -74,6 +74,8 @@ void main() {
       final initialLoadCount =
           repository.loadConnectionCallsById['conn_secondary'] ?? 0;
 
+      await tester.ensureVisible(find.byKey(const ValueKey('edit_conn_secondary')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
       await tester.pump();
 

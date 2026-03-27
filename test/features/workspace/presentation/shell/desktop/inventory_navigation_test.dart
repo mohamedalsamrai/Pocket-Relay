@@ -160,8 +160,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.isShowingSavedConnections, isTrue);
+    await tester.scrollUntilVisible(
+      find.byKey(
+        const ValueKey('saved_connection_conn_secondary'),
+        skipOffstage: false,
+      ),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('saved_connection_conn_secondary')),
+      find.byKey(
+        const ValueKey('saved_connection_conn_secondary'),
+        skipOffstage: false,
+      ),
       findsOneWidget,
     );
     expect(clientsById['conn_primary']?.disconnectCalls, 0);

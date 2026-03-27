@@ -9,6 +9,9 @@ abstract final class ConnectionWorkspaceCopy {
   static const String savedConnectionsMenuLabel = savedConnectionsTitle;
   static const String manageConnectionsAction = 'Manage connections';
   static const String conversationHistoryMenuLabel = 'Conversation history';
+  static const String currentLaneSectionTitle = 'Current lane';
+  static const String openLanesSectionTitle = 'Open lanes';
+  static const String needsAttentionSectionTitle = 'Needs attention';
   static const String mobileSavedConnectionsDescription =
       'Jump back to an open lane or open another saved connection. Connection and server controls stay inside each lane.';
   static const String desktopSidebarDescription =
@@ -102,6 +105,21 @@ abstract final class ConnectionWorkspaceCopy {
   static const String emptyWorkspaceTitle = 'No saved connections yet.';
   static const String emptyWorkspaceMessage =
       'Add your first connection to open a new lane.';
+  static const String laneFactLabel = 'Lane';
+  static const String laneCurrentFact = 'Current';
+  static const String laneOpenFact = 'Open';
+  static const String laneClosedFact = 'Closed';
+  static const String transportFactLabel = 'Transport';
+  static const String transportConnectedFact = 'Connected';
+  static const String transportDisconnectedFact = 'Disconnected';
+  static const String transportReconnectingFact = 'Reconnecting';
+  static const String hostFactLabel = 'Host';
+  static const String hostSupportedFact = 'Supported';
+  static const String hostUnsupportedFact = 'Unsupported';
+  static const String hostCheckFailedFact = 'Check failed';
+  static const String serverFactLabel = 'Server';
+  static const String settingsFactLabel = 'Settings';
+  static const String settingsChangesPendingFact = 'Changes pending';
   static String connectionSubtitle(ConnectionProfile profile) {
     final host = profile.host.trim();
     final workspaceDir = profile.workspaceDir.trim();
@@ -176,6 +194,67 @@ abstract final class ConnectionWorkspaceCopy {
       ConnectionWorkspaceReconnectRequirement.transport ||
       ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings =>
         transportReconnectMenuProgress,
+    };
+  }
+
+  static String laneFactFor({required bool isLive, required bool isCurrent}) {
+    final value = switch ((isLive, isCurrent)) {
+      (true, true) => laneCurrentFact,
+      (true, false) => laneOpenFact,
+      (false, _) => laneClosedFact,
+    };
+    return '$laneFactLabel: $value';
+  }
+
+  static String transportFactFor({
+    required bool isConnected,
+    required ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhase,
+    required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
+  }) {
+    final value =
+        liveReattachPhase == ConnectionWorkspaceLiveReattachPhase.reconnecting ||
+            transportRecoveryPhase ==
+                ConnectionWorkspaceTransportRecoveryPhase.reconnecting
+        ? transportReconnectingFact
+        : isConnected
+        ? transportConnectedFact
+        : transportDisconnectedFact;
+    return '$transportFactLabel: $value';
+  }
+
+  static String hostFactFor(
+    ConnectionRemoteHostCapabilityStatus hostStatus,
+  ) {
+    final value = switch (hostStatus) {
+      ConnectionRemoteHostCapabilityStatus.checking => laneHostCheckingStatus,
+      ConnectionRemoteHostCapabilityStatus.probeFailed => hostCheckFailedFact,
+      ConnectionRemoteHostCapabilityStatus.unsupported => hostUnsupportedFact,
+      ConnectionRemoteHostCapabilityStatus.supported => hostSupportedFact,
+      ConnectionRemoteHostCapabilityStatus.unknown => laneHostUnknownStatus,
+    };
+    return '$hostFactLabel: $value';
+  }
+
+  static String serverFactFor(ConnectionRemoteServerStatus serverStatus) {
+    final value = switch (serverStatus) {
+      ConnectionRemoteServerStatus.checking => laneServerCheckingStatus,
+      ConnectionRemoteServerStatus.notRunning => laneServerStoppedStatus,
+      ConnectionRemoteServerStatus.unhealthy => laneServerUnhealthyStatus,
+      ConnectionRemoteServerStatus.running => laneServerRunningStatus,
+      ConnectionRemoteServerStatus.unknown => laneHostUnknownStatus,
+    };
+    return '$serverFactLabel: $value';
+  }
+
+  static String settingsFactFor(
+    ConnectionWorkspaceReconnectRequirement requirement,
+  ) {
+    return switch (requirement) {
+      ConnectionWorkspaceReconnectRequirement.savedSettings ||
+      ConnectionWorkspaceReconnectRequirement.transportWithSavedSettings =>
+        '$settingsFactLabel: $settingsChangesPendingFact',
+      ConnectionWorkspaceReconnectRequirement.transport =>
+        '$settingsFactLabel: $transportReconnectBadge',
     };
   }
 
