@@ -82,6 +82,38 @@ void main() {
   });
 
   testWidgets(
+    'renders proposed plan code fences and inline code with monospace styling',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTestApp(
+          child: entrySurface(
+            block: CodexProposedPlanBlock(
+              id: 'plan_code_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Proposed plan',
+              markdown:
+                  '# Validate plan\n\n'
+                  'Run `dart test` before shipping.\n\n'
+                  '```dart\n'
+                  'final answer = 42;\n'
+                  '```',
+            ),
+          ),
+        ),
+      );
+
+      final inlineCodeStyle = findStyleForText(tester, 'dart test');
+      final fencedCodeStyle = findStyleForText(tester, 'final answer = 42;');
+
+      expect(inlineCodeStyle, isNotNull);
+      expect(inlineCodeStyle?.fontFamily, PocketFontFamilies.monospace);
+      expect(inlineCodeStyle?.backgroundColor, const Color(0xFFE8E0CF));
+      expect(fencedCodeStyle, isNotNull);
+      expect(fencedCodeStyle?.fontFamily, PocketFontFamilies.monospace);
+    },
+  );
+
+  testWidgets(
     'renders context-compaction blocks as dedicated transcript surfaces',
     (tester) async {
       await tester.pumpWidget(
