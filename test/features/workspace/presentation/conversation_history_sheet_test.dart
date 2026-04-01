@@ -116,6 +116,138 @@ void main() {
     },
   );
 
+  testWidgets(
+    'uses the preview label without surfacing the raw thread id in the row',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildSheet(
+          future: Future<List<CodexWorkspaceConversationSummary>>.value(
+            <CodexWorkspaceConversationSummary>[
+              CodexWorkspaceConversationSummary(
+                threadId: 'thread_hidden',
+                preview: 'Saved backend thread',
+                cwd: '/workspace',
+                promptCount: 2,
+                firstPromptAt: DateTime(2026, 3, 20, 9),
+                lastActivityAt: DateTime(2026, 3, 20, 10),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saved backend thread'), findsOneWidget);
+      expect(find.text('thread_hidden'), findsNothing);
+      expect(find.textContaining('Updated 2026-03-20 10:00'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'sort toggle switches between latest update and newest created ordering',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildSheet(
+          future: Future<List<CodexWorkspaceConversationSummary>>.value(
+            <CodexWorkspaceConversationSummary>[
+              CodexWorkspaceConversationSummary(
+                threadId: 'thread_recently_updated',
+                preview: 'Recently updated',
+                cwd: '/workspace',
+                promptCount: 4,
+                firstPromptAt: DateTime(2026, 3, 20, 9),
+                lastActivityAt: DateTime(2026, 3, 22, 12),
+              ),
+              CodexWorkspaceConversationSummary(
+                threadId: 'thread_newest_created',
+                preview: 'Newest conversation',
+                cwd: '/workspace',
+                promptCount: 1,
+                firstPromptAt: DateTime(2026, 3, 21, 10),
+                lastActivityAt: DateTime(2026, 3, 21, 11),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip(
+          'Sorting by latest update. Tap to sort by newest conversation.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.text('Recently updated')).dy,
+        lessThan(tester.getTopLeft(find.text('Newest conversation')).dy),
+      );
+      expect(find.textContaining('Updated 2026-03-22 12:00'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('conversation_history_sort_toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byTooltip(
+          'Sorting by newest conversation. Tap to sort by latest update.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.text('Newest conversation')).dy,
+        lessThan(tester.getTopLeft(find.text('Recently updated')).dy),
+      );
+      expect(find.textContaining('Created 2026-03-21 10:00'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'newest created sort keeps unknown created times behind known created times',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildSheet(
+          future: Future<List<CodexWorkspaceConversationSummary>>.value(
+            <CodexWorkspaceConversationSummary>[
+              CodexWorkspaceConversationSummary(
+                threadId: 'thread_unknown_created',
+                preview: 'Created time unknown',
+                cwd: '/workspace',
+                promptCount: 2,
+                firstPromptAt: null,
+                lastActivityAt: DateTime(2026, 3, 25, 14),
+              ),
+              CodexWorkspaceConversationSummary(
+                threadId: 'thread_known_created',
+                preview: 'Created time known',
+                cwd: '/workspace',
+                promptCount: 1,
+                firstPromptAt: DateTime(2026, 3, 21, 10),
+                lastActivityAt: DateTime(2026, 3, 21, 11),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('conversation_history_sort_toggle')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('Created time known')).dy,
+        lessThan(tester.getTopLeft(find.text('Created time unknown')).dy),
+      );
+      expect(
+        find.textContaining('2 prompts · Created time unknown'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('shows the error state when conversation loading fails', (
     tester,
   ) async {

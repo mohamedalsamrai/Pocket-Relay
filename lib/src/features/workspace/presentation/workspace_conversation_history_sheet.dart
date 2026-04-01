@@ -7,7 +7,36 @@ import 'package:pocket_relay/src/features/workspace/domain/workspace_conversatio
 
 enum ConnectionWorkspaceConversationHistoryPresentation { mobile, desktop }
 
-class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
+enum _ConversationHistorySortMode { latestActivity, newestCreated }
+
+abstract final class _ConversationHistoryCopy {
+  static const String bodyDescription =
+      'Pick a saved conversation to resume in this lane.';
+  static const String closeAction = 'Close conversation history';
+  static const String openConnectionSettingsAction = 'Open connection settings';
+  static const String emptyTitle = 'No matching conversations';
+  static const String emptyBody =
+      'No workspace conversations are available yet.';
+  static const String updatedLabel = 'Updated';
+  static const String createdLabel = 'Created';
+  static const String unknownTime = 'time unknown';
+
+  static String promptCountLabel(int promptCount) {
+    final promptLabel = promptCount == 1 ? 'prompt' : 'prompts';
+    return '$promptCount $promptLabel';
+  }
+
+  static String sortTooltip(_ConversationHistorySortMode sortMode) {
+    return switch (sortMode) {
+      _ConversationHistorySortMode.latestActivity =>
+        'Sorting by latest update. Tap to sort by newest conversation.',
+      _ConversationHistorySortMode.newestCreated =>
+        'Sorting by newest conversation. Tap to sort by latest update.',
+    };
+  }
+}
+
+class ConnectionWorkspaceConversationHistorySheet extends StatefulWidget {
   const ConnectionWorkspaceConversationHistorySheet({
     super.key,
     required this.title,
@@ -18,9 +47,6 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
         ConnectionWorkspaceConversationHistoryPresentation.mobile,
   });
 
-  static const _bodyDescription =
-      'Pick a saved conversation to resume in this lane.';
-
   final String title;
   final Future<List<WorkspaceConversationSummary>> future;
   final ValueChanged<WorkspaceConversationSummary> onResumeConversation;
@@ -28,10 +54,25 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
   final ConnectionWorkspaceConversationHistoryPresentation presentation;
 
   @override
+  State<ConnectionWorkspaceConversationHistorySheet> createState() =>
+      _ConnectionWorkspaceConversationHistorySheetState();
+}
+
+class _ConnectionWorkspaceConversationHistorySheetState
+    extends State<ConnectionWorkspaceConversationHistorySheet> {
+  static final _oldestConversationSentinel =
+      DateTime.fromMillisecondsSinceEpoch(0);
+
+  var _sortMode = _ConversationHistorySortMode.latestActivity;
+  List<WorkspaceConversationSummary>? _lastSortedSource;
+  _ConversationHistorySortMode? _lastSortedMode;
+  List<WorkspaceConversationSummary>? _lastSortedConversations;
+
+  @override
   Widget build(BuildContext context) {
     final cards = TranscriptPalette.of(context);
 
-    return switch (presentation) {
+    return switch (widget.presentation) {
       ConnectionWorkspaceConversationHistoryPresentation.mobile =>
         ModalSheetScaffold(
           headerPadding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
@@ -45,11 +86,21 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
   }
 
   String _subtitleFor(WorkspaceConversationSummary conversation) {
-    final activity = conversation.lastActivityAt?.toLocal();
-    final activityLabel = activity == null
-        ? 'Unknown activity time'
-        : _timestampLabel(activity);
-    return '${conversation.promptCount} prompts · $activityLabel\n${conversation.normalizedThreadId}';
+    final labelPrefix = switch (_sortMode) {
+      _ConversationHistorySortMode.latestActivity =>
+        _ConversationHistoryCopy.updatedLabel,
+      _ConversationHistorySortMode.newestCreated =>
+        _ConversationHistoryCopy.createdLabel,
+    };
+    final timestamp = switch (_sortMode) {
+      _ConversationHistorySortMode.latestActivity =>
+        conversation.lastActivityAt,
+      _ConversationHistorySortMode.newestCreated => conversation.firstPromptAt,
+    };
+    final timestampLabel = timestamp == null
+        ? '$labelPrefix ${_ConversationHistoryCopy.unknownTime}'
+        : '$labelPrefix ${_timestampLabel(timestamp.toLocal())}';
+    return '${_ConversationHistoryCopy.promptCountLabel(conversation.promptCount)} · $timestampLabel';
   }
 
   String _timestampLabel(DateTime value) {
@@ -60,6 +111,72 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
     return '${value.year}-$twoDigitMonth-$twoDigitDay $twoDigitHour:$twoDigitMinute';
   }
 
+  void _toggleSortMode() {
+    setState(() {
+      _lastSortedMode = null;
+      _lastSortedSource = null;
+      _lastSortedConversations = null;
+      _sortMode = switch (_sortMode) {
+        _ConversationHistorySortMode.latestActivity =>
+          _ConversationHistorySortMode.newestCreated,
+        _ConversationHistorySortMode.newestCreated =>
+          _ConversationHistorySortMode.latestActivity,
+      };
+    });
+  }
+
+  String get _sortTooltip => _ConversationHistoryCopy.sortTooltip(_sortMode);
+
+  IconData get _sortIcon => switch (_sortMode) {
+    _ConversationHistorySortMode.latestActivity => Icons.update_rounded,
+    _ConversationHistorySortMode.newestCreated => Icons.schedule_rounded,
+  };
+
+  DateTime _sortTimestampFor(WorkspaceConversationSummary conversation) {
+    return switch (_sortMode) {
+      _ConversationHistorySortMode.latestActivity =>
+        conversation.lastActivityAt ?? _oldestConversationSentinel,
+      _ConversationHistorySortMode.newestCreated =>
+        conversation.firstPromptAt ?? _oldestConversationSentinel,
+    };
+  }
+
+  List<WorkspaceConversationSummary> _sortedConversations(
+    List<WorkspaceConversationSummary> conversations,
+  ) {
+    if (_lastSortedConversations != null &&
+        identical(_lastSortedSource, conversations) &&
+        _lastSortedMode == _sortMode) {
+      return _lastSortedConversations!;
+    }
+
+    final sorted = conversations.toList();
+    sorted.sort((left, right) {
+      final byTime = _sortTimestampFor(
+        right,
+      ).compareTo(_sortTimestampFor(left));
+      if (byTime != 0) {
+        return byTime;
+      }
+      return left.normalizedThreadId.compareTo(right.normalizedThreadId);
+    });
+
+    _lastSortedSource = conversations;
+    _lastSortedMode = _sortMode;
+    _lastSortedConversations = sorted;
+
+    return sorted;
+  }
+
+  Widget _buildSortButton({Color? color}) {
+    return IconButton(
+      key: const ValueKey<String>('conversation_history_sort_toggle'),
+      tooltip: _sortTooltip,
+      onPressed: _toggleSortMode,
+      icon: Icon(_sortIcon, color: color),
+    );
+  }
+
   Widget _buildMobileHeader(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -68,15 +185,24 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
       children: [
         const ModalSheetDragHandle(),
         const SizedBox(height: 16),
-        Text(
-          title,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                widget.title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _buildSortButton(color: theme.colorScheme.onSurfaceVariant),
+          ],
         ),
         const SizedBox(height: 6),
         Text(
-          _bodyDescription,
+          _ConversationHistoryCopy.bodyDescription,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -131,14 +257,14 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                widget.title,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                _bodyDescription,
+                _ConversationHistoryCopy.bodyDescription,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -147,8 +273,9 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 16),
+        _buildSortButton(color: cards.textMuted),
         IconButton(
-          tooltip: 'Close conversation history',
+          tooltip: _ConversationHistoryCopy.closeAction,
           onPressed: () => Navigator.of(context).pop(),
           icon: Icon(Icons.close, color: cards.textMuted),
         ),
@@ -162,7 +289,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
       children: [
         Expanded(
           child: FutureBuilder<List<WorkspaceConversationSummary>>(
-            future: future,
+            future: widget.future,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 return const Center(
@@ -181,18 +308,20 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
                 return _ConversationHistoryMessage(
                   title: error.title,
                   body: error.bodyWithCode,
-                  actionLabel: onOpenConnectionSettings == null
+                  actionLabel: widget.onOpenConnectionSettings == null
                       ? null
-                      : 'Open connection settings',
-                  onAction: onOpenConnectionSettings,
+                      : _ConversationHistoryCopy.openConnectionSettingsAction,
+                  onAction: widget.onOpenConnectionSettings,
                 );
               }
 
-              final conversations = snapshot.data ?? const [];
+              final conversations = _sortedConversations(
+                snapshot.data ?? const <WorkspaceConversationSummary>[],
+              );
               if (conversations.isEmpty) {
                 return const _ConversationHistoryMessage(
-                  title: 'No matching conversations',
-                  body: 'No workspace conversations are available yet.',
+                  title: _ConversationHistoryCopy.emptyTitle,
+                  body: _ConversationHistoryCopy.emptyBody,
                 );
               }
 
@@ -212,7 +341,7 @@ class ConnectionWorkspaceConversationHistorySheet extends StatelessWidget {
                       key: ValueKey<String>(
                         'workspace_conversation_${conversation.normalizedThreadId}',
                       ),
-                      onTap: () => onResumeConversation(conversation),
+                      onTap: () => widget.onResumeConversation(conversation),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 10,
