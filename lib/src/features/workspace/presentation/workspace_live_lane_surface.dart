@@ -553,6 +553,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         title: fallbackError.title,
         message: fallbackError.bodyWithCode,
         isLoading: true,
+        tone: _WorkspaceLaneTransportNoticeTone.informational,
       );
     }
 
@@ -598,6 +599,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       title: title,
       message: message,
       isLoading: isLoading,
+      tone: isLoading
+          ? _WorkspaceLaneTransportNoticeTone.informational
+          : _WorkspaceLaneTransportNoticeTone.warning,
     );
   }
 
@@ -641,6 +645,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       message: warning.bodyWithCode,
       isLoading: false,
       icon: icon,
+      tone: _WorkspaceLaneTransportNoticeTone.warning,
     );
   }
 
@@ -900,31 +905,44 @@ class _WorkspaceLaneConnectionStrip extends StatelessWidget {
   }
 }
 
+enum _WorkspaceLaneTransportNoticeTone { informational, warning }
+
 class _WorkspaceLaneTransportNotice extends StatelessWidget {
   const _WorkspaceLaneTransportNotice({
     required this.title,
     required this.message,
     required this.isLoading,
+    required this.tone,
     this.icon = Icons.portable_wifi_off_rounded,
   });
 
   final String title;
   final String message;
   final bool isLoading;
+  final _WorkspaceLaneTransportNoticeTone tone;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final foregroundColor = theme.colorScheme.onSecondaryContainer;
+    final (containerColor, borderColor, foregroundColor) = switch (tone) {
+      _WorkspaceLaneTransportNoticeTone.informational => (
+        theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.94),
+        theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
+        theme.colorScheme.onSurface,
+      ),
+      _WorkspaceLaneTransportNoticeTone.warning => (
+        theme.colorScheme.secondaryContainer.withValues(alpha: 0.94),
+        theme.colorScheme.secondary.withValues(alpha: 0.22),
+        theme.colorScheme.onSecondaryContainer,
+      ),
+    };
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.94),
+        color: containerColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.secondary.withValues(alpha: 0.22),
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
