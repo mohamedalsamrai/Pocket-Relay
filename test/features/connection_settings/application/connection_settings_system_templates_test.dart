@@ -144,6 +144,10 @@ void main() {
     expect(templates.single.profile.port, 2200);
     expect(templates.single.profile.username, 'alice');
     expect(templates.single.profile.workspaceDir, isEmpty);
+    expect(
+      templates.single.profile.agentAdapter,
+      ConnectionProfile.defaults().agentAdapter,
+    );
     expect(templates.single.profile.codexPath, isEmpty);
     expect(templates.single.profile.hostFingerprint, '11:22:33:44');
   });

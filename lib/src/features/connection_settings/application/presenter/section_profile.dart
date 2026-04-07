@@ -5,7 +5,7 @@ ConnectionSettingsSectionContract _buildProfileSection(
 ) {
   if (state.isSystemSettings) {
     return const ConnectionSettingsSectionContract(
-      title: 'System',
+      title: '',
       fields: <ConnectionSettingsTextFieldContract>[],
     );
   }

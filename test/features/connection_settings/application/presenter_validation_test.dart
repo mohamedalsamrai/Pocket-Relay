@@ -182,6 +182,7 @@ void main() {
       final payload = contract.saveAction.submitPayload;
 
       expect(contract.title, 'System');
+      expect(contract.profileSection.title, isEmpty);
       expect(contract.profileSection.fields, isEmpty);
       expect(payload, isNotNull);
       expect(payload!.profile.label, isEmpty);
