@@ -1,4 +1,6 @@
 import 'ui_block_surface_test_support.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_contract.dart';
+import 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart';
 
 void main() {
   testWidgets(
@@ -136,6 +138,39 @@ void main() {
     expect(openedTerminal?.commandText, 'git status');
     expect(openedTerminal?.terminalOutput, ' M lib/main.dart\n');
   });
+
+  test(
+    'carries grouped command activity previews into terminal payloads without fabricating transcript output',
+    () {
+      final projected =
+          itemProjector.project(
+                TranscriptWorkLogGroupBlock(
+                  id: 'worklog_command_summary_terminal',
+                  createdAt: DateTime(2026, 3, 14, 12),
+                  entries: <TranscriptWorkLogEntry>[
+                    TranscriptWorkLogEntry(
+                      id: 'entry_command_summary_terminal',
+                      createdAt: DateTime(2026, 3, 14, 12),
+                      entryKind: TranscriptWorkLogEntryKind.commandExecution,
+                      title: 'sleep 5',
+                      preview: 'still running',
+                      isRunning: true,
+                      snapshot: const <String, Object?>{
+                        'processId': 'proc_wait',
+                        'stdin': '',
+                      },
+                    ),
+                  ],
+                ),
+              )
+              as ChatExecWaitItemContract;
+      final terminal = ChatWorkLogTerminalContract.fromEntry(projected.entry);
+
+      expect(terminal.commandText, 'sleep 5');
+      expect(terminal.terminalOutput, isNull);
+      expect(terminal.activitySummary, 'still running');
+    },
+  );
 
   testWidgets('renders MCP tool calls as MCP-specific work-log rows', (
     tester,

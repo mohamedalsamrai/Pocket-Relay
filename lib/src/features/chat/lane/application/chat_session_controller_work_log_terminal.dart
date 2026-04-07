@@ -1,5 +1,7 @@
 part of 'chat_session_controller.dart';
 
+const _terminalItemSupport = TranscriptItemSupport();
+
 Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   ChatSessionController controller,
   ChatWorkLogTerminalContract terminal,
@@ -71,6 +73,10 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
   final terminalInput =
       _nonBlankTerminalStringPreservingWhitespace(snapshot?['stdin']) ??
       terminal.terminalInput;
+  final terminalOutput =
+      _terminalOutputFromSnapshot(snapshot) ??
+      _activeTerminalOutput(item.body, terminalInput) ??
+      terminal.terminalOutput;
   return terminal.copyWith(
     commandText: _terminalString(item.title) ?? terminal.commandText,
     isRunning: item.isRunning,
@@ -78,9 +84,14 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
     exitCode: item.exitCode ?? terminal.exitCode,
     processId: _terminalProcessId(snapshot) ?? terminal.processId,
     terminalInput: terminalInput,
-    terminalOutput:
-        _activeTerminalOutput(item.body, terminalInput) ??
-        terminal.terminalOutput,
+    terminalOutput: terminalOutput,
+    activitySummary:
+        _terminalActivitySummaryFromActiveItem(
+          item,
+          terminalInput: terminalInput,
+          terminalOutput: terminalOutput,
+        ) ??
+        terminal.activitySummary,
   );
 }
 
@@ -110,6 +121,8 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
   final normalizedStatus = _terminalString(raw['status'])?.toLowerCase();
   final exitCode = _terminalExitCode(raw) ?? terminal.exitCode;
   final result = _terminalObject(raw['result']);
+  final terminalOutput =
+      _terminalOutputFromSnapshot(raw) ?? terminal.terminalOutput;
   return terminal.copyWith(
     commandText:
         _terminalString(raw['command'] ?? result?['command']) ??
@@ -124,7 +137,13 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
     terminalInput:
         _nonBlankTerminalStringPreservingWhitespace(raw['stdin']) ??
         terminal.terminalInput,
-    terminalOutput: _terminalOutputFromHistory(raw) ?? terminal.terminalOutput,
+    terminalOutput: terminalOutput,
+    activitySummary:
+        _terminalActivitySummaryFromSnapshot(
+          raw,
+          terminalOutput: terminalOutput,
+        ) ??
+        terminal.activitySummary,
   );
 }
 
@@ -170,11 +189,104 @@ String? _nonBlankTerminalStringPreservingWhitespace(Object? value) {
   return value;
 }
 
-String? _terminalOutputFromHistory(Map<String, dynamic> raw) {
-  final result = _terminalObject(raw['result']);
-  return _nonBlankTerminalStringPreservingWhitespace(
-    raw['aggregatedOutput'] ?? raw['aggregated_output'] ?? result?['output'],
+String? _terminalOutputFromSnapshot(Map<String, dynamic>? value) {
+  final result = _terminalObject(value?['result']);
+  final aggregatedOutput = _nonBlankTerminalStringPreservingWhitespace(
+    value?['aggregatedOutput'] ??
+        value?['aggregated_output'] ??
+        result?['output'],
   );
+  if (aggregatedOutput != null) {
+    return aggregatedOutput;
+  }
+
+  return _combinedTerminalStreamOutput(
+    stdout: value?['stdout'] ?? result?['stdout'],
+    stderr: value?['stderr'] ?? result?['stderr'],
+  );
+}
+
+String? _combinedTerminalStreamOutput({
+  required Object? stdout,
+  required Object? stderr,
+}) {
+  final stdoutText = _nonBlankTerminalStringPreservingWhitespace(stdout);
+  final stderrText = _nonBlankTerminalStringPreservingWhitespace(stderr);
+  if (stdoutText == null && stderrText == null) {
+    return null;
+  }
+  if (stdoutText == null) {
+    return stderrText;
+  }
+  if (stderrText == null) {
+    return stdoutText;
+  }
+
+  return stdoutText.endsWith('\n') || stderrText.startsWith('\n')
+      ? '$stdoutText$stderrText'
+      : '$stdoutText\n$stderrText';
+}
+
+String? _terminalActivitySummaryFromSnapshot(
+  Map<String, dynamic>? value, {
+  String? terminalOutput,
+}) {
+  if (value == null || terminalOutput != null) {
+    return null;
+  }
+
+  final extractedSummary = _nonBlankTerminalStringPreservingWhitespace(
+    _terminalItemSupport.extractTextFromSnapshot(value),
+  );
+  if (extractedSummary != null) {
+    return extractedSummary;
+  }
+
+  final result = _terminalObject(value['result']);
+  return _nonBlankTerminalStringPreservingWhitespace(
+    _terminalItemSupport.extractTextFromSnapshot(
+          result == null
+              ? null
+              : <String, dynamic>{
+                  'summary': result['summary'],
+                  'content': result['content'],
+                  'text': result['text'],
+                  'review': result['message'],
+                },
+        ) ??
+        result?['message'] ??
+        value['message'],
+  );
+}
+
+String? _terminalActivitySummaryFromActiveItem(
+  TranscriptSessionActiveItem item, {
+  required String? terminalInput,
+  required String? terminalOutput,
+}) {
+  final snapshotSummary = _terminalActivitySummaryFromSnapshot(
+    item.snapshot,
+    terminalOutput: terminalOutput,
+  );
+  if (snapshotSummary != null) {
+    return snapshotSummary;
+  }
+  if (terminalOutput != null) {
+    return null;
+  }
+
+  final value = _nonBlankTerminalStringPreservingWhitespace(item.body);
+  if (value == null) {
+    return null;
+  }
+
+  final title = _terminalString(item.title);
+  if ((title != null && value.trim() == title.trim()) ||
+      value == terminalInput) {
+    return null;
+  }
+
+  return value;
 }
 
 String? _trimmedTerminalIdentifier(String? value) {

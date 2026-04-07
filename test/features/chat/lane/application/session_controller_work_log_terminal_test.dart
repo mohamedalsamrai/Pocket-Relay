@@ -345,6 +345,143 @@ void main() {
   );
 
   test(
+    'hydrateWorkLogTerminal combines split stdout and stderr history',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_streams'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_streams',
+              turns: <CodexAppServerHistoryTurn>[
+                CodexAppServerHistoryTurn(
+                  id: 'turn_streams',
+                  status: 'completed',
+                  items: <CodexAppServerHistoryItem>[
+                    CodexAppServerHistoryItem(
+                      id: 'command_streams',
+                      type: 'commandExecution',
+                      status: 'completed',
+                      raw: <String, dynamic>{
+                        'id': 'command_streams',
+                        'type': 'commandExecution',
+                        'status': 'completed',
+                        'command': 'build.sh',
+                        'stdout': 'step 1\n',
+                        'stderr': 'warning: cache miss\n',
+                      },
+                    ),
+                  ],
+                  raw: <String, dynamic>{
+                    'id': 'turn_streams',
+                    'status': 'completed',
+                  },
+                ),
+              ],
+            );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_streams',
+          activityLabel: 'Ran command',
+          commandText: 'build.sh',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_streams',
+          threadId: 'thread_streams',
+          turnId: 'turn_streams',
+        ),
+      );
+
+      expect(hydrated.terminalOutput, 'step 1\nwarning: cache miss\n');
+      expect(hydrated.activitySummary, isNull);
+    },
+  );
+
+  test(
+    'hydrateWorkLogTerminal keeps summary-only history distinct from terminal output',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_summary'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_summary',
+              turns: <CodexAppServerHistoryTurn>[
+                CodexAppServerHistoryTurn(
+                  id: 'turn_summary',
+                  status: 'completed',
+                  items: <CodexAppServerHistoryItem>[
+                    CodexAppServerHistoryItem(
+                      id: 'command_summary',
+                      type: 'commandExecution',
+                      status: 'completed',
+                      raw: <String, dynamic>{
+                        'id': 'command_summary',
+                        'type': 'commandExecution',
+                        'status': 'completed',
+                        'command': 'deploy.sh',
+                        'result': <String, dynamic>{
+                          'summary': 'Waiting on remote deployment slot',
+                        },
+                      },
+                    ),
+                  ],
+                  raw: <String, dynamic>{
+                    'id': 'turn_summary',
+                    'status': 'completed',
+                  },
+                ),
+              ],
+            );
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_summary',
+          activityLabel: 'Ran command',
+          commandText: 'deploy.sh',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_summary',
+          threadId: 'thread_summary',
+          turnId: 'turn_summary',
+        ),
+      );
+
+      expect(hydrated.terminalOutput, isNull);
+      expect(hydrated.activitySummary, 'Waiting on remote deployment slot');
+    },
+  );
+
+  test(
     'hydrateWorkLogTerminal preserves failed status without an exit code',
     () async {
       final appServerClient = FakeCodexAppServerClient()

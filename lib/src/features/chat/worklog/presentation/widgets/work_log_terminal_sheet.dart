@@ -42,6 +42,9 @@ const String _terminalCommandPrefix = r'$ ';
 const String _terminalInputPrefix = '> ';
 const String _waitingForOutputMessage = 'Waiting for terminal output...';
 const String _emptyOutputMessage = 'No terminal output captured.';
+const String _activityWithoutTranscriptMessage =
+    'Runtime activity was recorded, but no terminal transcript was available.';
+const String _latestActivityPrefix = 'Latest activity: ';
 
 class WorkLogTerminalSheet extends StatelessWidget {
   const WorkLogTerminalSheet({super.key, required this.terminal});
@@ -224,6 +227,17 @@ String _terminalTranscriptText(ChatWorkLogTerminalContract terminal) {
   }
   if (terminal.terminalOutput case final output?) {
     _writeBodyBlock(buffer, output);
+  } else if (terminal.activitySummary case final activitySummary?) {
+    buffer
+      ..writeln()
+      ..write(
+        terminal.isWaiting
+            ? _waitingForOutputMessage
+            : _activityWithoutTranscriptMessage,
+      )
+      ..writeln()
+      ..writeln()
+      ..write('$_latestActivityPrefix$activitySummary');
   } else if (!terminal.hasTerminalInput) {
     buffer
       ..writeln()

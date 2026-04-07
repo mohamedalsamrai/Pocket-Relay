@@ -15,6 +15,7 @@ class ChatWorkLogTerminalContract {
     this.processId,
     this.terminalInput,
     this.terminalOutput,
+    this.activitySummary,
   });
 
   factory ChatWorkLogTerminalContract.fromEntry(
@@ -43,6 +44,13 @@ class ChatWorkLogTerminalContract {
       processId: entry.processId,
       terminalInput: entry.terminalInput,
       terminalOutput: entry.terminalOutput,
+      activitySummary: switch (entry) {
+        ChatCommandExecutionWorkLogEntryContract(:final outputPreview) =>
+          outputPreview,
+        ChatCommandWaitWorkLogEntryContract(:final outputPreview) =>
+          outputPreview,
+        _ => null,
+      },
     );
   }
 
@@ -59,6 +67,7 @@ class ChatWorkLogTerminalContract {
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
+  final String? activitySummary;
 
   ChatWorkLogTerminalContract copyWith({
     String? activityLabel,
@@ -73,6 +82,7 @@ class ChatWorkLogTerminalContract {
     String? processId,
     String? terminalInput,
     String? terminalOutput,
+    String? activitySummary,
   }) {
     return ChatWorkLogTerminalContract(
       id: id,
@@ -88,11 +98,13 @@ class ChatWorkLogTerminalContract {
       processId: processId ?? this.processId,
       terminalInput: terminalInput ?? this.terminalInput,
       terminalOutput: terminalOutput ?? this.terminalOutput,
+      activitySummary: activitySummary ?? this.activitySummary,
     );
   }
 
   bool get hasTerminalInput => terminalInput != null;
   bool get hasTerminalOutput => terminalOutput != null;
+  bool get hasActivitySummary => activitySummary != null;
 
   String get statusBadgeLabel {
     if (isWaiting) {
