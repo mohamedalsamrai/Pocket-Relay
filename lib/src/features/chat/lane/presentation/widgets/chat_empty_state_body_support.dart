@@ -37,22 +37,16 @@ extension on ChatEmptyStateBody {
       return ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
-          children: items.indexed
-              .map((entry) {
-                final index = entry.$1;
-                final item = entry.$2;
-                return Column(
-                  children: [
-                    Padding(
-                      padding: PocketSpacing.panelPadding,
-                      child: _EmptyStateDetailRow(item: item),
-                    ),
-                    if (index != items.length - 1)
-                      Divider(height: 1, thickness: 1, color: divider),
-                  ],
-                );
-              })
-              .toList(growable: false),
+          children: <Widget>[
+            for (final (index, item) in items.indexed) ...[
+              Padding(
+                padding: PocketSpacing.panelPadding,
+                child: _EmptyStateDetailRow(item: item),
+              ),
+              if (index != items.length - 1)
+                Divider(height: 1, thickness: 1, color: divider),
+            ],
+          ],
         ),
       );
     }
@@ -70,22 +64,16 @@ extension on ChatEmptyStateBody {
         borderColor: border,
         radius: PocketRadii.xl,
         child: Column(
-          children: items.indexed
-              .map((entry) {
-                final index = entry.$1;
-                final item = entry.$2;
-                return Column(
-                  children: [
-                    Padding(
-                      padding: PocketSpacing.panelPadding,
-                      child: _EmptyStateDetailRow(item: item),
-                    ),
-                    if (index != items.length - 1)
-                      Divider(height: 1, thickness: 1, color: divider),
-                  ],
-                );
-              })
-              .toList(growable: false),
+          children: <Widget>[
+            for (final (index, item) in items.indexed) ...[
+              Padding(
+                padding: PocketSpacing.panelPadding,
+                child: _EmptyStateDetailRow(item: item),
+              ),
+              if (index != items.length - 1)
+                Divider(height: 1, thickness: 1, color: divider),
+            ],
+          ],
         ),
       ),
     );
