@@ -1,9 +1,53 @@
 import '../support/workspace_surface_test_support.dart';
 
-const _informationalNoticeKey = ValueKey<String>(
-  'lane_transport_notice_informational',
-);
-const _warningNoticeKey = ValueKey<String>('lane_transport_notice_warning');
+void _expectInformationalNotice(WidgetTester tester, String title) {
+  final theme = Theme.of(tester.element(find.text(title)));
+  final decoration = _noticeDecorationFor(tester, title);
+
+  expect(
+    decoration.color,
+    theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.94),
+  );
+  expect(
+    (decoration.border! as Border).top.color,
+    theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
+  );
+}
+
+void _expectWarningNotice(WidgetTester tester, String title) {
+  final theme = Theme.of(tester.element(find.text(title)));
+  final decoration = _noticeDecorationFor(tester, title);
+
+  expect(
+    decoration.color,
+    theme.colorScheme.secondaryContainer.withValues(alpha: 0.94),
+  );
+  expect(
+    (decoration.border! as Border).top.color,
+    theme.colorScheme.secondary.withValues(alpha: 0.22),
+  );
+}
+
+BoxDecoration _noticeDecorationFor(WidgetTester tester, String title) {
+  final noticeDecoratedBox = find
+      .ancestor(
+        of: find.text(title),
+        matching: find.byWidgetPredicate((widget) {
+          if (widget is! DecoratedBox) {
+            return false;
+          }
+          final decoration = widget.decoration;
+          return decoration is BoxDecoration &&
+              decoration.borderRadius == BorderRadius.circular(20);
+        }),
+      )
+      .evaluate()
+      .map((element) => element.widget)
+      .whereType<DecoratedBox>()
+      .first;
+
+  return noticeDecoratedBox.decoration as BoxDecoration;
+}
 
 void main() {
   testWidgets(
@@ -135,8 +179,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Live transport lost'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Live transport lost');
       expect(find.text('Reconnect'), findsOneWidget);
 
       final reconnectGate = Completer<void>();
@@ -150,8 +193,7 @@ void main() {
         ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
       );
       expect(find.text('Reconnecting to remote session'), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsNothing);
+      _expectInformationalNotice(tester, 'Reconnecting to remote session');
       expect(find.text('Reconnecting…'), findsNothing);
       expect(find.text('Reconnect'), findsOneWidget);
 
@@ -160,8 +202,6 @@ void main() {
 
       expect(find.text('Live transport lost'), findsNothing);
       expect(find.text('Reconnecting to remote session'), findsNothing);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
-      expect(find.byKey(_warningNoticeKey), findsNothing);
       expect(
         controller.state.requiresTransportReconnect('conn_primary'),
         isFalse,

@@ -938,7 +938,6 @@ class _WorkspaceLaneTransportNotice extends StatelessWidget {
     };
 
     return DecoratedBox(
-      key: ValueKey<String>('lane_transport_notice_${tone.name}'),
       decoration: BoxDecoration(
         color: containerColor,
         borderRadius: BorderRadius.circular(20),

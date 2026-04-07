@@ -1,9 +1,53 @@
 import '../support/workspace_surface_test_support.dart';
 
-const _informationalNoticeKey = ValueKey<String>(
-  'lane_transport_notice_informational',
-);
-const _warningNoticeKey = ValueKey<String>('lane_transport_notice_warning');
+void _expectInformationalNotice(WidgetTester tester, String title) {
+  final theme = Theme.of(tester.element(find.text(title)));
+  final decoration = _noticeDecorationFor(tester, title);
+
+  expect(
+    decoration.color,
+    theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.94),
+  );
+  expect(
+    (decoration.border! as Border).top.color,
+    theme.colorScheme.outlineVariant.withValues(alpha: 0.72),
+  );
+}
+
+void _expectWarningNotice(WidgetTester tester, String title) {
+  final theme = Theme.of(tester.element(find.text(title)));
+  final decoration = _noticeDecorationFor(tester, title);
+
+  expect(
+    decoration.color,
+    theme.colorScheme.secondaryContainer.withValues(alpha: 0.94),
+  );
+  expect(
+    (decoration.border! as Border).top.color,
+    theme.colorScheme.secondary.withValues(alpha: 0.22),
+  );
+}
+
+BoxDecoration _noticeDecorationFor(WidgetTester tester, String title) {
+  final noticeDecoratedBox = find
+      .ancestor(
+        of: find.text(title),
+        matching: find.byWidgetPredicate((widget) {
+          if (widget is! DecoratedBox) {
+            return false;
+          }
+          final decoration = widget.decoration;
+          return decoration is BoxDecoration &&
+              decoration.borderRadius == BorderRadius.circular(20);
+        }),
+      )
+      .evaluate()
+      .map((element) => element.widget)
+      .whereType<DecoratedBox>()
+      .first;
+
+  return noticeDecoratedBox.decoration as BoxDecoration;
+}
 
 void main() {
   testWidgets(
@@ -63,8 +107,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Remote session unavailable'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Remote session unavailable');
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionTransportUnavailable.code}]',
@@ -150,8 +193,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Restoring conversation from history'), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsNothing);
+      _expectInformationalNotice(tester, 'Restoring conversation from history');
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionLiveReattachFallbackRestore.code}]',
@@ -238,8 +280,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote continuity unavailable'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Remote continuity unavailable');
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionReconnectContinuityUnsupported.code}]',
@@ -319,8 +360,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote continuity unavailable'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Remote continuity unavailable');
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionRuntimeProbeFailed.code}]',
@@ -402,8 +442,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server stopped'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Remote server stopped');
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -483,8 +522,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server unhealthy'), findsOneWidget);
-      expect(find.byKey(_warningNoticeKey), findsOneWidget);
-      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      _expectWarningNotice(tester, 'Remote server unhealthy');
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionReconnectServerUnhealthy.code}]',
