@@ -145,6 +145,50 @@ void main() {
     expect(payload.secrets.password, 'secret');
   });
 
+  test(
+    'system settings keep the hidden label empty instead of defaulting it',
+    () {
+      final savedSystem = SavedSystem(
+        id: 'system_primary',
+        profile: const SystemProfile(
+          host: 'devbox.local',
+          port: 22,
+          username: 'vince',
+          authMode: AuthMode.password,
+          hostFingerprint: '',
+        ),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+      final initialProfile = connectionProfileFromSystem(savedSystem);
+      final initialSecrets = savedSystem.secrets;
+      final formState =
+          ConnectionSettingsFormState.initial(
+            profile: initialProfile,
+            secrets: initialSecrets,
+          ).copyWith(
+            draft: ConnectionSettingsDraft.fromConnection(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(hostFingerprint: 'aa:bb:cc:dd'),
+            showValidationErrors: true,
+          );
+
+      final contract = presenter.present(
+        initialProfile: initialProfile,
+        initialSecrets: initialSecrets,
+        formState: formState,
+        isSystemSettings: true,
+      );
+      final payload = contract.saveAction.submitPayload;
+
+      expect(contract.title, 'System');
+      expect(contract.profileSection.title, isEmpty);
+      expect(contract.profileSection.fields, isEmpty);
+      expect(payload, isNotNull);
+      expect(payload!.profile.label, isEmpty);
+    },
+  );
+
   test('surfaces reusable systems as a picker when matching systems exist', () {
     final initialProfile = configuredConnectionProfile();
     const initialSecrets = ConnectionSecrets(password: 'secret');
@@ -216,7 +260,6 @@ void main() {
     expect(contract.systemTrust!.actionLabel, 'Test system');
     expect(contract.systemTrust!.isActionEnabled, isTrue);
   });
-
   test(
     'includes model and reasoning effort in the normalized save payload',
     () {

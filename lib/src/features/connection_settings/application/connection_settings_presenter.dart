@@ -63,7 +63,7 @@ class ConnectionSettingsPresenter {
     );
 
     return ConnectionSettingsContract(
-      title: 'Workspace',
+      title: isSystemSettings ? 'System' : 'Workspace',
       profileSection: _buildProfileSection(presentationState),
       connectionModeSection: _buildConnectionModeSection(presentationState),
       systemPicker: _buildSystemPicker(presentationState),
@@ -117,8 +117,11 @@ class ConnectionSettingsPresenter {
     );
   }
 
-  String _normalizedLabel(String label) {
+  String _normalizedLabel(String label, {required bool isSystemSettings}) {
     final trimmed = label.trim();
-    return trimmed.isEmpty ? 'Workspace' : trimmed;
+    if (trimmed.isNotEmpty || isSystemSettings) {
+      return trimmed;
+    }
+    return 'Workspace';
   }
 }

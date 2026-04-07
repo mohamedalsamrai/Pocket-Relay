@@ -323,6 +323,27 @@ SystemProfile systemProfileFromConnectionProfile(ConnectionProfile profile) {
   );
 }
 
+ConnectionProfile connectionProfileFromSystem(SavedSystem? system) {
+  final systemProfile = system?.profile ?? SystemProfile.defaults();
+  final defaults = ConnectionProfile.defaults();
+  return ConnectionProfile(
+    label: '',
+    host: systemProfile.host,
+    port: systemProfile.port,
+    username: systemProfile.username,
+    workspaceDir: '',
+    agentAdapter: defaults.agentAdapter,
+    agentCommand: '',
+    authMode: systemProfile.authMode,
+    hostFingerprint: systemProfile.hostFingerprint,
+    dangerouslyBypassSandbox: defaults.dangerouslyBypassSandbox,
+    ephemeralSession: defaults.ephemeralSession,
+    model: defaults.model,
+    reasoningEffort: defaults.reasoningEffort,
+    connectionMode: defaults.connectionMode,
+  );
+}
+
 ConnectionProfile connectionProfileFromWorkspace({
   required WorkspaceProfile workspace,
   SavedSystem? system,

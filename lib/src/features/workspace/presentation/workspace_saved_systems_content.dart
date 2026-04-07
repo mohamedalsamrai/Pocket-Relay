@@ -311,18 +311,7 @@ class _ConnectionWorkspaceSavedSystemsContentState
   Future<ConnectionSettingsSubmitPayload?> _openSystemSettings({
     SavedSystem? system,
   }) {
-    final initialProfile = connectionProfileFromWorkspace(
-      workspace: WorkspaceProfile(
-        label: 'Workspace',
-        connectionMode: ConnectionMode.remote,
-        systemId: null,
-        workspaceDir: '',
-        codexPath: 'codex',
-        dangerouslyBypassSandbox: false,
-        ephemeralSession: false,
-      ),
-      system: system,
-    );
+    final initialProfile = connectionProfileFromSystem(system);
     final initialSecrets = system?.secrets ?? const ConnectionSecrets();
 
     if (widget.platformBehavior.isDesktopExperience) {

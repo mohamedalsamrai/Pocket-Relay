@@ -50,18 +50,7 @@ deriveConnectionSettingsSystemTemplatesFromSystems(
     for (final system in systems)
       ConnectionSettingsSystemTemplate(
         id: system.id,
-        profile: connectionProfileFromWorkspace(
-          workspace: WorkspaceProfile(
-            label: 'Workspace',
-            connectionMode: ConnectionMode.remote,
-            systemId: null,
-            workspaceDir: '',
-            codexPath: 'codex',
-            dangerouslyBypassSandbox: false,
-            ephemeralSession: false,
-          ),
-          system: system,
-        ),
+        profile: connectionProfileFromSystem(system),
         secrets: system.secrets,
       ),
   ];
