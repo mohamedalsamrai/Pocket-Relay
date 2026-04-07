@@ -234,7 +234,10 @@ class _ConnectionWorkspaceSavedSystemsContentState
         return;
       }
       await widget.workspaceController.createSystem(
-        profile: systemProfileFromConnectionProfile(payload.profile),
+        profile: systemProfileFromConnectionProfile(
+          payload.profile,
+          includeLabel: true,
+        ),
         secrets: payload.secrets,
       );
     } finally {
@@ -266,7 +269,10 @@ class _ConnectionWorkspaceSavedSystemsContentState
       }
       await widget.workspaceController.saveSavedSystem(
         systemId: systemId,
-        profile: systemProfileFromConnectionProfile(payload.profile),
+        profile: systemProfileFromConnectionProfile(
+          payload.profile,
+          includeLabel: true,
+        ),
         secrets: payload.secrets,
       );
     } finally {

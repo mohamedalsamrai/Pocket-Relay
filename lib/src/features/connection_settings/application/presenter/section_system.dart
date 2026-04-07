@@ -102,9 +102,10 @@ ConnectionSettingsSystemOptionContract _systemOptionContract(
   ConnectionSettingsSystemTemplate template,
 ) {
   final profile = template.profile;
-  final username = profile.username.trim();
-  final host = profile.host.trim();
-  final hostLabel = profile.port == 22 ? host : '$host:${profile.port}';
+  final identityLabel = _systemIdentityLabel(profile);
+  final normalizedLabel = profile.label.trim();
+  final hasCustomLabel =
+      normalizedLabel.isNotEmpty && normalizedLabel != identityLabel;
   final signInLabel = switch (profile.authMode) {
     AuthMode.password => 'Password sign-in',
     AuthMode.privateKey => 'Private key sign-in',
@@ -114,7 +115,24 @@ ConnectionSettingsSystemOptionContract _systemOptionContract(
       : 'Trusted fingerprint saved';
   return ConnectionSettingsSystemOptionContract(
     id: template.id,
-    label: '$hostLabel as $username',
-    description: '$signInLabel · $trustLabel',
+    label: hasCustomLabel ? normalizedLabel : identityLabel,
+    description: hasCustomLabel
+        ? '$identityLabel · $signInLabel · $trustLabel'
+        : '$signInLabel · $trustLabel',
   );
+}
+
+String _systemIdentityLabel(ConnectionProfile profile) {
+  final host = profile.host.trim();
+  final username = profile.username.trim();
+  if (host.isEmpty) {
+    return 'System not set';
+  }
+
+  final hostWithPort = profile.port == 22 ? host : '$host:${profile.port}';
+  if (username.isEmpty) {
+    return hostWithPort;
+  }
+
+  return '$username@$hostWithPort';
 }

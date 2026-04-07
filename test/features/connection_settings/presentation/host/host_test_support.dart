@@ -106,7 +106,9 @@ ValueKey<String> settingsFieldKey(ConnectionSettingsFieldId fieldId) {
 
 ConnectionSettingsFieldId settingsFieldIdForLabel(String label) {
   return switch (label) {
-    'Profile label' || 'Workspace name' => ConnectionSettingsFieldId.label,
+    'Profile label' ||
+    'Workspace name' ||
+    'System name' => ConnectionSettingsFieldId.label,
     'Host' => ConnectionSettingsFieldId.host,
     'Port' || 'SSH port' => ConnectionSettingsFieldId.port,
     'Username' || 'SSH username' => ConnectionSettingsFieldId.username,

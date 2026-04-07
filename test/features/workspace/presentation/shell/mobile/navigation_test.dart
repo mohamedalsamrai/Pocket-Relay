@@ -106,6 +106,20 @@ void main() {
           secrets: const ConnectionSecrets(password: 'secret-2'),
         ),
       ],
+      initialSystems: <SavedSystem>[
+        const SavedSystem(
+          id: 'system_primary',
+          profile: SystemProfile(
+            label: 'Primary Build Box',
+            host: 'primary.local',
+            port: 22,
+            username: 'vince',
+            authMode: AuthMode.password,
+            hostFingerprint: 'SHA256:primary',
+          ),
+          secrets: ConnectionSecrets(password: 'secret-1'),
+        ),
+      ],
     );
     final controller = buildWorkspaceController(
       clientsById: clientsById,
@@ -131,7 +145,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Password sign-in · Fingerprint saved'), findsOneWidget);
+    expect(find.text('Primary Build Box'), findsOneWidget);
+    expect(
+      find.text('vince@primary.local · Password sign-in · Fingerprint saved'),
+      findsOneWidget,
+    );
     expect(find.text('Fingerprint saved'), findsNothing);
   });
 

@@ -4,9 +4,16 @@ ConnectionSettingsSectionContract _buildProfileSection(
   _ConnectionSettingsPresentationState state,
 ) {
   if (state.isSystemSettings) {
-    return const ConnectionSettingsSectionContract(
-      title: '',
-      fields: <ConnectionSettingsTextFieldContract>[],
+    return ConnectionSettingsSectionContract(
+      title: 'Name',
+      fields: <ConnectionSettingsTextFieldContract>[
+        ConnectionSettingsTextFieldContract(
+          id: ConnectionSettingsFieldId.label,
+          label: 'System name',
+          value: state.draft.label,
+          hintText: 'Main dev box',
+        ),
+      ],
     );
   }
 

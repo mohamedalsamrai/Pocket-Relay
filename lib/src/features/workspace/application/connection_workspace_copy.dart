@@ -146,6 +146,7 @@ abstract final class ConnectionWorkspaceCopy {
   }
 
   static String systemSubtitle(SystemProfile profile) {
+    final identityLabel = profile.connectionIdentityLabel;
     final authLabel = switch (profile.authMode) {
       AuthMode.password => 'Password sign-in',
       AuthMode.privateKey => 'Private key sign-in',
@@ -153,7 +154,9 @@ abstract final class ConnectionWorkspaceCopy {
     final trustLabel = profile.hostFingerprint.trim().isEmpty
         ? 'Fingerprint not saved'
         : 'Fingerprint saved';
-    return '$authLabel · $trustLabel';
+    return profile.hasCustomLabel
+        ? '$identityLabel · $authLabel · $trustLabel'
+        : '$authLabel · $trustLabel';
   }
 
   static String reconnectBadgeFor(

@@ -230,7 +230,8 @@ bool _hasChanges({
   bool isSystemSettings = false,
 }) {
   if (isSystemSettings) {
-    return draft.host.trim() != initialProfile.host ||
+    return draft.label.trim() != initialProfile.label ||
+        draft.host.trim() != initialProfile.host ||
         draft.port.trim() != initialProfile.port.toString() ||
         draft.username.trim() != initialProfile.username ||
         draft.hostFingerprint.trim() != initialProfile.hostFingerprint ||

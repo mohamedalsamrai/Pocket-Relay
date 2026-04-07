@@ -2,6 +2,7 @@ part of 'connection_models.dart';
 
 class SystemProfile {
   const SystemProfile({
+    this.label = '',
     required this.host,
     required this.port,
     required this.username,
@@ -9,6 +10,7 @@ class SystemProfile {
     required this.hostFingerprint,
   });
 
+  final String label;
   final String host;
   final int port;
   final String username;
@@ -17,6 +19,7 @@ class SystemProfile {
 
   factory SystemProfile.defaults() {
     return const SystemProfile(
+      label: '',
       host: '',
       port: 22,
       username: '',
@@ -25,11 +28,34 @@ class SystemProfile {
     );
   }
 
+  bool get hasCustomLabel {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isEmpty) {
+      return false;
+    }
+
+    final identityLabel = _derivedIdentityLabel(usePlaceholder: false);
+    return identityLabel.isEmpty || normalizedLabel != identityLabel;
+  }
+
   String get displayLabel {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isNotEmpty) {
+      return normalizedLabel;
+    }
+
+    return _derivedIdentityLabel(usePlaceholder: true);
+  }
+
+  String get connectionIdentityLabel {
+    return _derivedIdentityLabel(usePlaceholder: true);
+  }
+
+  String _derivedIdentityLabel({required bool usePlaceholder}) {
     final normalizedHost = host.trim();
     final normalizedUsername = username.trim();
     if (normalizedHost.isEmpty) {
-      return 'System not set';
+      return usePlaceholder ? 'System not set' : '';
     }
 
     final hostWithPort = port == 22 ? normalizedHost : '$normalizedHost:$port';
@@ -50,6 +76,7 @@ class SystemProfile {
   }
 
   SystemProfile copyWith({
+    String? label,
     String? host,
     int? port,
     String? username,
@@ -57,6 +84,7 @@ class SystemProfile {
     String? hostFingerprint,
   }) {
     return SystemProfile(
+      label: label ?? this.label,
       host: host ?? this.host,
       port: port ?? this.port,
       username: username ?? this.username,
@@ -67,10 +95,23 @@ class SystemProfile {
 
   factory SystemProfile.fromJson(Map<String, dynamic> json) {
     final defaults = SystemProfile.defaults();
+    final host = json['host'] as String? ?? defaults.host;
+    final port = (json['port'] as num?)?.toInt() ?? defaults.port;
+    final username = json['username'] as String? ?? defaults.username;
+    final normalizedLabel = (json['label'] as String?)?.trim();
     return SystemProfile(
-      host: json['host'] as String? ?? defaults.host,
-      port: (json['port'] as num?)?.toInt() ?? defaults.port,
-      username: json['username'] as String? ?? defaults.username,
+      label: normalizedLabel == null || normalizedLabel.isEmpty
+          ? SystemProfile(
+              host: host,
+              port: port,
+              username: username,
+              authMode: defaults.authMode,
+              hostFingerprint: defaults.hostFingerprint,
+            )._derivedIdentityLabel(usePlaceholder: false)
+          : normalizedLabel,
+      host: host,
+      port: port,
+      username: username,
       authMode: _authModeFromName(
         json['authMode'] as String?,
         fallback: defaults.authMode,
@@ -82,6 +123,7 @@ class SystemProfile {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'label': label,
       'host': host,
       'port': port,
       'username': username,
@@ -93,6 +135,7 @@ class SystemProfile {
   @override
   bool operator ==(Object other) {
     return other is SystemProfile &&
+        other.label == label &&
         other.host == host &&
         other.port == port &&
         other.username == username &&
@@ -102,7 +145,7 @@ class SystemProfile {
 
   @override
   int get hashCode =>
-      Object.hash(host, port, username, authMode, hostFingerprint);
+      Object.hash(label, host, port, username, authMode, hostFingerprint);
 }
 
 class SavedSystemSummary {

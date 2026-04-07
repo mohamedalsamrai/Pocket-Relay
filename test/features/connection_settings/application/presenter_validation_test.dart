@@ -145,49 +145,53 @@ void main() {
     expect(payload.secrets.password, 'secret');
   });
 
-  test(
-    'system settings keep the hidden label empty instead of defaulting it',
-    () {
-      final savedSystem = SavedSystem(
-        id: 'system_primary',
-        profile: const SystemProfile(
-          host: 'devbox.local',
-          port: 22,
-          username: 'vince',
-          authMode: AuthMode.password,
-          hostFingerprint: '',
-        ),
-        secrets: const ConnectionSecrets(password: 'secret'),
-      );
-      final initialProfile = connectionProfileFromSystem(savedSystem);
-      final initialSecrets = savedSystem.secrets;
-      final formState =
-          ConnectionSettingsFormState.initial(
+  test('system settings expose and preserve an explicit system name', () {
+    final savedSystem = SavedSystem(
+      id: 'system_primary',
+      profile: const SystemProfile(
+        label: 'Build Box',
+        host: 'devbox.local',
+        port: 22,
+        username: 'vince',
+        authMode: AuthMode.password,
+        hostFingerprint: '',
+      ),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+    final initialProfile = connectionProfileFromSystem(savedSystem);
+    final initialSecrets = savedSystem.secrets;
+    final formState =
+        ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        ).copyWith(
+          draft: ConnectionSettingsDraft.fromConnection(
             profile: initialProfile,
             secrets: initialSecrets,
-          ).copyWith(
-            draft: ConnectionSettingsDraft.fromConnection(
-              profile: initialProfile,
-              secrets: initialSecrets,
-            ).copyWith(hostFingerprint: 'aa:bb:cc:dd'),
-            showValidationErrors: true,
-          );
+          ).copyWith(hostFingerprint: 'aa:bb:cc:dd'),
+          showValidationErrors: true,
+        );
 
-      final contract = presenter.present(
-        initialProfile: initialProfile,
-        initialSecrets: initialSecrets,
-        formState: formState,
-        isSystemSettings: true,
-      );
-      final payload = contract.saveAction.submitPayload;
+    final contract = presenter.present(
+      initialProfile: initialProfile,
+      initialSecrets: initialSecrets,
+      formState: formState,
+      isSystemSettings: true,
+    );
+    final payload = contract.saveAction.submitPayload;
 
-      expect(contract.title, 'System');
-      expect(contract.profileSection.title, isEmpty);
-      expect(contract.profileSection.fields, isEmpty);
-      expect(payload, isNotNull);
-      expect(payload!.profile.label, isEmpty);
-    },
-  );
+    expect(contract.title, 'System');
+    expect(contract.profileSection.title, 'Name');
+    expect(
+      settingsField(
+        contract.profileSection,
+        ConnectionSettingsFieldId.label,
+      ).label,
+      'System name',
+    );
+    expect(payload, isNotNull);
+    expect(payload!.profile.label, 'Build Box');
+  });
 
   test('surfaces reusable systems as a picker when matching systems exist', () {
     final initialProfile = configuredConnectionProfile();
@@ -226,9 +230,10 @@ void main() {
 
     expect(contract.systemPicker, isNotNull);
     expect(contract.systemPicker!.selectedSystemId, 'system_primary');
+    expect(contract.systemPicker!.options.single.label, 'Primary Workspace');
     expect(
-      contract.systemPicker!.options.single.label,
-      'devbox.local as vince',
+      contract.systemPicker!.options.single.description,
+      'vince@devbox.local · Password sign-in · Trusted fingerprint saved',
     );
   });
 

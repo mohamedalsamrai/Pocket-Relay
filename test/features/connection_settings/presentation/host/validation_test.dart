@@ -224,7 +224,7 @@ void main() {
   });
 
   testWidgets(
-    'system settings can submit when hidden workspace fields start empty',
+    'system settings edit and submit a real system name while workspace fields stay empty',
     (tester) async {
       ConnectionSettingsSubmitPayload? payload;
 
@@ -237,6 +237,7 @@ void main() {
             SavedSystem(
               id: 'system_primary',
               profile: const SystemProfile(
+                label: 'Build Box',
                 host: 'devbox.local',
                 port: 22,
                 username: 'vince',
@@ -250,12 +251,13 @@ void main() {
         ),
       );
 
-      expect(find.text('Workspace name'), findsNothing);
+      expect(find.text('System name'), findsOneWidget);
       expect(
         find.text('The hostname or IP address of this system.'),
         findsOneWidget,
       );
 
+      await tester.enterText(materialTextField('System name'), 'Build Box 2');
       await tester.enterText(materialTextField('Username'), 'vincent');
       await tester.tap(
         find.byKey(const ValueKey<String>('connection_settings_save_top')),
@@ -263,7 +265,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(payload, isNotNull);
-      expect(payload!.profile.label, isEmpty);
+      expect(payload!.profile.label, 'Build Box 2');
       expect(payload!.profile.username, 'vincent');
       expect(payload!.profile.workspaceDir, isEmpty);
       expect(payload!.profile.codexPath, isEmpty);
@@ -277,7 +279,7 @@ void main() {
     final template = ConnectionSettingsSystemTemplate(
       id: 'system_primary',
       profile: ConnectionProfile.defaults().copyWith(
-        label: 'Primary Workspace',
+        label: 'Primary System',
         host: 'buildbox.local',
         port: 2200,
         username: 'alice',
@@ -309,7 +311,7 @@ void main() {
       find.byKey(const ValueKey<String>('connection_settings_system_picker')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('buildbox.local:2200 as alice').last);
+    await tester.tap(find.textContaining('Primary System').last);
     await tester.pumpAndSettle();
 
     expect(
@@ -320,6 +322,7 @@ void main() {
       find.byKey(settingsFieldKey(ConnectionSettingsFieldId.password)),
       findsNothing,
     );
+    expect(find.text('Primary System'), findsWidgets);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('connection_settings_save_top')),
@@ -343,7 +346,7 @@ void main() {
       final template = ConnectionSettingsSystemTemplate(
         id: 'system_primary',
         profile: ConnectionProfile.defaults().copyWith(
-          label: 'Primary Workspace',
+          label: 'Primary System',
           host: 'buildbox.local',
           port: 2200,
           username: 'alice',
@@ -377,9 +380,7 @@ void main() {
         find.byKey(const ValueKey<String>('connection_settings_system_picker')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.textContaining('buildbox.local:2200 as alice').last,
-      );
+      await tester.tap(find.textContaining('Primary System').last);
       await tester.pumpAndSettle();
 
       await tester.tap(
