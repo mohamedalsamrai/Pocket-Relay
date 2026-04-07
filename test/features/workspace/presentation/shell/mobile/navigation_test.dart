@@ -135,6 +135,48 @@ void main() {
     expect(find.text('Fingerprint saved'), findsNothing);
   });
 
+  testWidgets('systems rows span the full content width', (tester) async {
+    tester.view.physicalSize = const Size(430, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+    final controller = buildWorkspaceController(clientsById: clientsById);
+    addTearDown(() async {
+      controller.dispose();
+      await closeClients(clientsById);
+    });
+
+    await controller.initialize();
+    final systemIds = controller.state.systemCatalog.orderedSystemIds;
+    await tester.pumpWidget(buildShell(controller));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const ValueKey('workspace_page_view')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('workspace_page_view')),
+      const Offset(-500, 0),
+    );
+    await tester.pumpAndSettle();
+
+    final expectedWidth = 430.0 - 32.0;
+    final firstWidth = tester
+        .getSize(
+          find.byKey(ValueKey<String>('saved_system_${systemIds.first}')),
+        )
+        .width;
+    final secondWidth = tester
+        .getSize(find.byKey(ValueKey<String>('saved_system_${systemIds.last}')))
+        .width;
+
+    expect(firstWidth, moreOrLessEquals(expectedWidth, epsilon: 0.1));
+    expect(secondWidth, moreOrLessEquals(expectedWidth, epsilon: 0.1));
+  });
+
   testWidgets(
     'system compatibility moves from workspace rows to the systems page',
     (tester) async {
