@@ -132,7 +132,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Password sign-in · Fingerprint saved'), findsOneWidget);
-    expect(find.textContaining('Fingerprint saved'), findsOneWidget);
+    expect(find.text('Fingerprint saved'), findsNothing);
   });
 
   testWidgets(
