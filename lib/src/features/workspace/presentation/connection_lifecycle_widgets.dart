@@ -214,51 +214,54 @@ class ConnectionLifecycleRow extends StatelessWidget {
     final palette = context.pocketPalette;
     final theme = Theme.of(context);
 
-    return PocketPanelSurface(
+    return SizedBox(
       key: rowKey,
-      backgroundColor: palette.surface.withValues(alpha: 0.9),
-      borderColor: palette.surfaceBorder,
-      padding: PocketSpacing.panelPadding,
-      radius: 12,
-      boxShadow: <BoxShadow>[
-        BoxShadow(
-          color: palette.shadowColor,
-          blurRadius: 18,
-          offset: const Offset(0, 6),
-        ),
-      ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+      width: double.infinity,
+      child: PocketPanelSurface(
+        backgroundColor: palette.surface.withValues(alpha: 0.9),
+        borderColor: palette.surfaceBorder,
+        padding: PocketSpacing.panelPadding,
+        radius: 12,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: palette.shadowColor,
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (facts.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ConnectionLifecycleFacts(facts: facts),
-          ],
-          if (detailActions.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ConnectionLifecycleDetailActions(actions: detailActions),
-          ],
-          if (primaryAction != null || secondaryActions.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ConnectionLifecycleActionBar(
-              primaryAction: primaryAction,
-              secondaryActions: secondaryActions,
-            ),
-          ],
         ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (facts.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ConnectionLifecycleFacts(facts: facts),
+            ],
+            if (detailActions.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ConnectionLifecycleDetailActions(actions: detailActions),
+            ],
+            if (primaryAction != null || secondaryActions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ConnectionLifecycleActionBar(
+                primaryAction: primaryAction,
+                secondaryActions: secondaryActions,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
