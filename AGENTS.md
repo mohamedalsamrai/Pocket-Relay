@@ -291,6 +291,10 @@ Repo rules for future agents.
 - Do not commit directly on protected branches.
 - Protected branches are `master` and `main`.
 - New feature work must happen on a feature branch and land through a PR.
+- PRs should be opened ready-for-review by default.
+- A draft PR requires explicit operator instruction in the current turn.
+- Do not switch a PR between draft and ready-for-review without explicit
+  operator instruction in the current turn.
 - PRs into protected branches must merge with merge commits.
 - Do not rebase-merge or squash-merge PRs into protected branches.
 - A direct commit on a protected branch requires explicit operator permission
