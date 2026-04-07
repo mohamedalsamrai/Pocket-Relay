@@ -1,5 +1,10 @@
 import '../support/workspace_surface_test_support.dart';
 
+const _informationalNoticeKey = ValueKey<String>(
+  'lane_transport_notice_informational',
+);
+const _warningNoticeKey = ValueKey<String>('lane_transport_notice_warning');
+
 void main() {
   testWidgets(
     'live lane shows remote-session-unavailable notice when transport reconnect fails',
@@ -58,6 +63,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Remote session unavailable'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionTransportUnavailable.code}]',
@@ -143,6 +150,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Restoring conversation from history'), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsNothing);
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionLiveReattachFallbackRestore.code}]',
@@ -229,6 +238,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote continuity unavailable'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionReconnectContinuityUnsupported.code}]',
@@ -308,6 +319,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote continuity unavailable'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionRuntimeProbeFailed.code}]',
@@ -389,6 +402,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server stopped'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(find.text('Reconnect'), findsOneWidget);
       expect(
         controller.selectedLaneBinding!.composerDraftHost.draft.text,
@@ -468,6 +483,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Remote server unhealthy'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(
         find.textContaining(
           '[${PocketErrorCatalog.connectionReconnectServerUnhealthy.code}]',

@@ -1,5 +1,10 @@
 import '../support/workspace_surface_test_support.dart';
 
+const _informationalNoticeKey = ValueKey<String>(
+  'lane_transport_notice_informational',
+);
+const _warningNoticeKey = ValueKey<String>('lane_transport_notice_warning');
+
 void main() {
   testWidgets(
     'transport reconnect keeps last-known model catalog fallback available in live settings',
@@ -130,6 +135,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Live transport lost'), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
       expect(find.text('Reconnect'), findsOneWidget);
 
       final reconnectGate = Completer<void>();
@@ -143,6 +150,8 @@ void main() {
         ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
       );
       expect(find.text('Reconnecting to remote session'), findsOneWidget);
+      expect(find.byKey(_informationalNoticeKey), findsOneWidget);
+      expect(find.byKey(_warningNoticeKey), findsNothing);
       expect(find.text('Reconnecting…'), findsNothing);
       expect(find.text('Reconnect'), findsOneWidget);
 
@@ -151,6 +160,8 @@ void main() {
 
       expect(find.text('Live transport lost'), findsNothing);
       expect(find.text('Reconnecting to remote session'), findsNothing);
+      expect(find.byKey(_informationalNoticeKey), findsNothing);
+      expect(find.byKey(_warningNoticeKey), findsNothing);
       expect(
         controller.state.requiresTransportReconnect('conn_primary'),
         isFalse,
