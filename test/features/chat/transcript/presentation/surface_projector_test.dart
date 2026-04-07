@@ -124,6 +124,34 @@ void main() {
       );
     });
 
+    test('uses the tuned default main transcript window budget', () {
+      final transcriptBlocks = List<TranscriptUiBlock>.generate(
+        123,
+        (index) => TranscriptTextBlock(
+          id: 'assistant_$index',
+          kind: TranscriptUiBlockKind.assistantMessage,
+          createdAt: DateTime(2026, 3, 15, 12, 0, index % 60),
+          title: 'Codex',
+          body: 'Assistant message $index',
+        ),
+      );
+      final sessionState = TranscriptSessionState.initial()
+          .copyWithProjectedTranscript(blocks: transcriptBlocks);
+
+      final surface = projector.project(
+        profile: configuredProfile(),
+        sessionState: sessionState,
+      );
+
+      expect(surface.totalMainItemCount, 123);
+      expect(surface.visibleMainItemCount, 120);
+      expect(surface.hiddenOlderMainItemCount, 3);
+      expect(
+        (surface.mainItems.first as ChatAssistantMessageItemContract).block.id,
+        'assistant_3',
+      );
+    });
+
     test(
       'keeps active pending user-input ids limited to the visible request when multiple pending inputs exist',
       () {
