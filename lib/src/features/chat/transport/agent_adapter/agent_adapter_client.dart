@@ -63,6 +63,13 @@ abstract interface class AgentAdapterClient {
     AgentAdapterReasoningEffort? effort,
   });
 
+  Future<AgentAdapterTurn> steerActiveTurn({
+    required String threadId,
+    required String turnId,
+    String? text,
+    AgentAdapterTurnInput? input,
+  });
+
   Future<void> answerUserInput({
     required String requestId,
     required Map<String, List<String>> answers,

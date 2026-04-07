@@ -141,6 +141,22 @@ class CodexAppServerRequestApi {
     );
   }
 
+  Future<CodexAppServerTurn> steerActiveTurn(
+    CodexAppServerConnection connection, {
+    required String threadId,
+    required String turnId,
+    String? text,
+    CodexAppServerTurnInput? input,
+  }) {
+    return _steerActiveTurn(
+      connection,
+      threadId: threadId,
+      turnId: turnId,
+      text: text,
+      input: input,
+    );
+  }
+
   Future<void> answerUserInput(
     CodexAppServerConnection connection, {
     required String requestId,

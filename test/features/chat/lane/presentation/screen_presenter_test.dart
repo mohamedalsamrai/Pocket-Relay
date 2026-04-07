@@ -180,6 +180,37 @@ void main() {
       },
     );
 
+    test(
+      'disables send while a turn is running when the adapter cannot steer active turns',
+      () {
+        final activeTurn = TranscriptActiveTurnState(
+          turnId: 'turn_1',
+          timer: TranscriptSessionTurnTimer(
+            turnId: 'turn_1',
+            startedAt: DateTime(2026, 3, 15, 12),
+          ),
+        );
+        final sessionState = TranscriptSessionState.initial()
+            .copyWith(connectionStatus: TranscriptRuntimeSessionState.running)
+            .copyWithProjectedTranscript(activeTurn: activeTurn);
+
+        final contract = presenter.present(
+          isLoading: false,
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+          sessionState: sessionState,
+          conversationRecoveryState: null,
+          composerDraft: const ChatComposerDraft(text: 'Keep draft'),
+          agentAdapterCapabilities: const AgentAdapterCapabilities(),
+          transcriptFollow: defaultTranscriptFollowContract,
+        );
+
+        expect(contract.composer.draftText, 'Keep draft');
+        expect(contract.composer.isSendActionEnabled, isFalse);
+        expect(contract.turnIndicator?.timer, same(activeTurn.timer));
+      },
+    );
+
     test('disables conversation reset actions while the session is busy', () {
       final activeTurn = TranscriptActiveTurnState(
         turnId: 'turn_1',

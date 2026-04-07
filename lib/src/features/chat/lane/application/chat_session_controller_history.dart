@@ -129,29 +129,39 @@ Future<bool> _sendTurnInputWithAppServerForController(
   controller._sawTrackedUnpinnedHostKeyFailure = false;
   try {
     final threadId = await _ensureChatSessionAppServerThread(controller);
+    final activeTurnId = controller._activeTurnIdForSteering();
     controller._clearConversationRecovery();
     controller._applySessionState(
       controller._sessionState.copyWith(
         connectionStatus: TranscriptRuntimeSessionState.running,
       ),
     );
-    final turn = await controller.agentAdapterClient.sendUserMessage(
-      threadId: threadId,
-      text: text,
-      input: input,
-      model: controller._selectedModelOverride(),
-      effort: controller._profile.reasoningEffort,
-    );
+    final turn = activeTurnId == null
+        ? await controller.agentAdapterClient.sendUserMessage(
+            threadId: threadId,
+            text: text,
+            input: input,
+            model: controller._selectedModelOverride(),
+            effort: controller._profile.reasoningEffort,
+          )
+        : await controller.agentAdapterClient.steerActiveTurn(
+            threadId: threadId,
+            turnId: activeTurnId,
+            text: text,
+            input: input,
+          );
     controller._suppressTrackedThreadReuse = false;
-    _applyChatSessionRuntimeEvent(
-      controller,
-      TranscriptRuntimeTurnStartedEvent(
-        createdAt: DateTime.now(),
-        threadId: turn.threadId,
-        turnId: turn.turnId,
-        rawMethod: 'turn/start(response)',
-      ),
-    );
+    if (activeTurnId == null) {
+      _applyChatSessionRuntimeEvent(
+        controller,
+        TranscriptRuntimeTurnStartedEvent(
+          createdAt: DateTime.now(),
+          threadId: turn.threadId,
+          turnId: turn.turnId,
+          rawMethod: 'turn/start(response)',
+        ),
+      );
+    }
     return true;
   } catch (error) {
     final recoveryAssessment = controller._conversationRecoveryPolicy
@@ -164,8 +174,7 @@ Future<bool> _sendTurnInputWithAppServerForController(
     if (recoveryAssessment.recoveryState != null) {
       controller._setConversationRecovery(recoveryAssessment.recoveryState!);
     }
-    if (controller._sessionState.activeTurn == null &&
-        controller._sessionState.pendingLocalUserMessageBlockIds.isNotEmpty) {
+    if (controller._sessionState.pendingLocalUserMessageBlockIds.isNotEmpty) {
       controller._applySessionState(
         controller._sessionReducer.clearLocalUserMessageCorrelationState(
           controller._sessionState,

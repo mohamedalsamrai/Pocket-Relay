@@ -523,6 +523,13 @@ abstract final class PocketErrorCatalog {
     meaning:
         'Sending a draft was blocked because the effective model does not support image inputs.',
   );
+  static const PocketErrorDefinition
+  chatSessionLiveTurnSteeringUnsupported = PocketErrorDefinition(
+    code: 'PR-CHAT-1510',
+    domain: PocketErrorDomain.chatSession,
+    meaning:
+        'Sending additional user input was blocked because the current agent adapter does not support steering an already running live turn.',
+  );
 
   // Chat session: recovery guardrails (16xx).
   static const PocketErrorDefinition
@@ -820,6 +827,7 @@ abstract final class PocketErrorCatalog {
         chatSessionSshPasswordRequired,
         chatSessionPrivateKeyRequired,
         chatSessionImageInputUnsupported,
+        chatSessionLiveTurnSteeringUnsupported,
         chatSessionFreshConversationBlocked,
         chatSessionClearTranscriptBlocked,
         chatSessionAlternateSessionUnavailable,

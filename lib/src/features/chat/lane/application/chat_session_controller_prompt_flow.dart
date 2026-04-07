@@ -80,6 +80,9 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
       _setConversationRecovery(recoveryState);
       return false;
     }
+    if (!_canSendAdditionalInputToCurrentTurn()) {
+      return false;
+    }
 
     _applySessionState(
       _sessionReducer.addUserMessage(_sessionState, text: normalizedPrompt),
@@ -116,6 +119,9 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
     );
     if (recoveryState != null) {
       _setConversationRecovery(recoveryState);
+      return false;
+    }
+    if (!_canSendAdditionalInputToCurrentTurn()) {
       return false;
     }
 
@@ -169,6 +175,18 @@ extension _ChatSessionControllerPromptFlow on ChatSessionController {
         ),
       );
     }
+  }
+
+  bool _canSendAdditionalInputToCurrentTurn() {
+    if (_activeTurnIdForSteering() == null ||
+        agentAdapterCapabilities.supportsLiveTurnSteering) {
+      return true;
+    }
+
+    _emitUserFacingError(
+      ChatSessionGuardrailErrors.liveTurnSteeringUnsupported(),
+    );
+    return false;
   }
 
   PocketUserFacingError? _validateProfileForSend() {

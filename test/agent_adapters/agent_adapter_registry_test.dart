@@ -9,6 +9,7 @@ void main() {
     expect(capabilities.supportsConversationHistory, isTrue);
     expect(capabilities.supportsConversationRollback, isTrue);
     expect(capabilities.supportsConversationForking, isTrue);
+    expect(capabilities.supportsLiveTurnSteering, isTrue);
     expect(capabilities.supportsModelCatalog, isTrue);
     expect(capabilities.supportsModelCatalogRefresh, isTrue);
     expect(capabilities.supportsReasoningEffort, isTrue);
@@ -22,14 +23,17 @@ void main() {
     expect(capabilities.supportsEphemeralSessions, isTrue);
   });
 
-  test('Codex exposes its reference model catalog through the adapter registry', () {
-    final catalog = referenceModelCatalogForAgentAdapter(
-      AgentAdapterKind.codex,
-      connectionId: 'registry-test',
-    );
+  test(
+    'Codex exposes its reference model catalog through the adapter registry',
+    () {
+      final catalog = referenceModelCatalogForAgentAdapter(
+        AgentAdapterKind.codex,
+        connectionId: 'registry-test',
+      );
 
-    expect(catalog.connectionId, 'registry-test');
-    expect(catalog.models, isNotEmpty);
-    expect(catalog.defaultModel?.model, 'gpt-5.3-codex');
-  });
+      expect(catalog.connectionId, 'registry-test');
+      expect(catalog.models, isNotEmpty);
+      expect(catalog.defaultModel?.model, 'gpt-5.3-codex');
+    },
+  );
 }

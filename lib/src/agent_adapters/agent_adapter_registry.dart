@@ -40,6 +40,7 @@ const AgentAdapterDefinition _codexAgentAdapterDefinition =
         supportsConversationHistory: true,
         supportsConversationRollback: true,
         supportsConversationForking: true,
+        supportsLiveTurnSteering: true,
         supportsLocalConnections: true,
         supportsModelCatalog: true,
         supportsModelCatalogRefresh: true,

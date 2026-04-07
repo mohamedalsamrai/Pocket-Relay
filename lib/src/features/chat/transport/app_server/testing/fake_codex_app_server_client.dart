@@ -88,6 +88,24 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
           CodexReasoningEffort? effort,
         })
       >[];
+  final List<String> steeredMessages = <String>[];
+  final List<
+    ({
+      String threadId,
+      String turnId,
+      CodexAppServerTurnInput input,
+      String text,
+    })
+  >
+  steeredTurns =
+      <
+        ({
+          String threadId,
+          String turnId,
+          CodexAppServerTurnInput input,
+          String text,
+        })
+      >[];
   final List<({String? threadId, String? turnId})> abortTurnCalls =
       <({String? threadId, String? turnId})>[];
   final List<({String requestId, bool approved})> approvalDecisions =
@@ -136,6 +154,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Object? startSessionError;
   Object? forkThreadError;
   Object? sendUserMessageError;
+  Object? steerActiveTurnError;
   Object? readThreadWithTurnsError;
   Object? rollbackThreadError;
   Object? listModelsError;
@@ -150,6 +169,7 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   int disconnectCalls = 0;
   String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
+  Completer<void>? steerActiveTurnGate;
   Completer<void>? readThreadWithTurnsGate;
   Completer<void>? rollbackThreadGate;
   final Map<String, Completer<void>> readThreadWithTurnsGatesByThreadId =
@@ -557,6 +577,34 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   }
 
   @override
+  Future<CodexAppServerTurn> steerActiveTurn({
+    required String threadId,
+    required String turnId,
+    String? text,
+    AgentAdapterTurnInput? input,
+  }) async {
+    if (steerActiveTurnGate case final gate? when !gate.isCompleted) {
+      await gate.future;
+    }
+    if (steerActiveTurnError != null) {
+      throw steerActiveTurnError!;
+    }
+    final effectiveInput =
+        codexTurnInputFromAgentAdapter(input) ??
+        CodexAppServerTurnInput.text(text ?? '');
+    steeredMessages.add(effectiveInput.text);
+    steeredTurns.add((
+      threadId: threadId,
+      turnId: turnId,
+      input: effectiveInput,
+      text: effectiveInput.text,
+    ));
+    _threadId = threadId;
+    _activeTurnId = turnId;
+    return CodexAppServerTurn(threadId: threadId, turnId: turnId);
+  }
+
+  @override
   Future<void> resolveApproval({
     required String requestId,
     required bool approved,
@@ -659,6 +707,8 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
     switch (event) {
       case CodexAppServerRequestEvent(:final requestId, :final method):
         pendingServerRequestMethodsById[requestId] = method;
+      case CodexAppServerNotificationEvent(:final method, :final params):
+        _updateRuntimePointers(method: method, params: params);
       case CodexAppServerDisconnectedEvent():
         pendingServerRequestMethodsById.clear();
       default:
@@ -673,6 +723,51 @@ class FakeCodexAppServerClient extends CodexAppServerClient {
   Future<void> close() async {
     await _eventsController.close();
   }
+
+  void _updateRuntimePointers({
+    required String method,
+    required Object? params,
+  }) {
+    final payload = _asObject(params);
+    switch (method) {
+      case 'session/exited':
+      case 'session/closed':
+        _threadId = null;
+        _activeTurnId = null;
+      case 'thread/started':
+        final thread = _asObject(payload?['thread']);
+        _threadId = _asString(thread?['id']) ?? _asString(payload?['threadId']);
+        _activeTurnId = null;
+      case 'thread/closed':
+        final threadId = _asString(payload?['threadId']);
+        if (threadId == null || threadId == _threadId) {
+          _threadId = null;
+          _activeTurnId = null;
+        }
+      case 'turn/started':
+        _threadId = _asString(payload?['threadId']) ?? _threadId;
+        final turn = _asObject(payload?['turn']);
+        _activeTurnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
+      case 'turn/completed':
+      case 'turn/aborted':
+        final turn = _asObject(payload?['turn']);
+        final turnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
+        if (turnId == null || turnId == _activeTurnId) {
+          _activeTurnId = null;
+        }
+    }
+  }
+
+  Map<String, Object?>? _asObject(Object? value) {
+    if (value is Map<Object?, Object?>) {
+      return value.map(
+        (key, value) => MapEntry<String, Object?>(key.toString(), value),
+      );
+    }
+    return null;
+  }
+
+  String? _asString(Object? value) => value is String ? value : null;
 
   void _removePendingServerRequest(
     String requestId, {

@@ -127,6 +127,49 @@ void main() {
   );
 
   test(
+    'sendPrompt blocks active-turn input when the adapter does not support steering',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        injectedAgentAdapterCapabilities: const AgentAdapterCapabilities(),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendPrompt('Blocked while running');
+
+      expect(sent, isFalse);
+      expect(
+        await snackBarMessage,
+        '[${PocketErrorCatalog.chatSessionLiveTurnSteeringUnsupported.code}] Active turn input unavailable. This agent adapter does not support sending more input while a turn is already running. Wait for the current turn to finish or stop it first.',
+      );
+      expect(appServerClient.sentMessages, <String>['First prompt']);
+      expect(appServerClient.steeredMessages, isEmpty);
+      expect(
+        controller.transcriptBlocks.whereType<TranscriptUserMessageBlock>(),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'sendPrompt reuses the response-owned thread before thread notifications arrive',
     () async {
       final appServerClient = FakeCodexAppServerClient();
@@ -161,10 +204,8 @@ void main() {
 
       expect(await controller.sendPrompt('Second prompt'), isTrue);
       expect(appServerClient.startSessionCalls, 1);
-      expect(appServerClient.sentMessages, <String>[
-        'First prompt',
-        'Second prompt',
-      ]);
+      expect(appServerClient.sentMessages, <String>['First prompt']);
+      expect(appServerClient.steeredMessages, <String>['Second prompt']);
     },
   );
 

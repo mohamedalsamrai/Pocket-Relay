@@ -59,6 +59,19 @@ void main() {
     expect(error.inlineMessage, contains('gpt-text-only'));
   });
 
+  test('live turn steering unsupported maps to a stable code', () {
+    final error = ChatSessionGuardrailErrors.liveTurnSteeringUnsupported();
+
+    expect(
+      error.definition,
+      PocketErrorCatalog.chatSessionLiveTurnSteeringUnsupported,
+    );
+    expect(
+      error.inlineMessage,
+      '[${PocketErrorCatalog.chatSessionLiveTurnSteeringUnsupported.code}] Active turn input unavailable. This agent adapter does not support sending more input while a turn is already running. Wait for the current turn to finish or stop it first.',
+    );
+  });
+
   test('recovery guardrails use distinct continue and branch codes', () {
     expect(
       ChatSessionGuardrailErrors.continueBlockedByActiveTurn().definition,

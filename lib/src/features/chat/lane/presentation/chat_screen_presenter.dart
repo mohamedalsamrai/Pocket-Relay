@@ -59,9 +59,13 @@ class ChatScreenPresenter {
         !sessionState.isBusy &&
         conversationRecoveryNotice == null &&
         historicalConversationRestoreNotice == null;
+    final allowsCurrentTurnSubmission =
+        sessionState.activeTurn == null ||
+        resolvedAgentAdapterCapabilities.supportsLiveTurnSteering;
     final canSend =
         isConfigured &&
         !isLoading &&
+        allowsCurrentTurnSubmission &&
         conversationRecoveryNotice == null &&
         historicalConversationRestoreNotice == null;
     final header = _headerProjector.project(
@@ -123,8 +127,7 @@ class ChatScreenPresenter {
           isConfigured &&
           resolvedAgentAdapterCapabilities.supportsImageInput &&
           effectiveModelSupportsImages,
-      composerPlaceholder:
-          'Message ${agentAdapterLabel(profile.agentAdapter)}',
+      composerPlaceholder: 'Message ${agentAdapterLabel(profile.agentAdapter)}',
       conversationRecoveryNotice: conversationRecoveryNotice,
       historicalConversationRestoreNotice: historicalConversationRestoreNotice,
       turnIndicator: switch (sessionState.activeTurn?.timer) {

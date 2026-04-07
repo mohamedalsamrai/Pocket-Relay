@@ -3,6 +3,7 @@ class AgentAdapterCapabilities {
     this.supportsConversationHistory = false,
     this.supportsConversationRollback = false,
     this.supportsConversationForking = false,
+    this.supportsLiveTurnSteering = false,
     this.supportsLocalConnections = false,
     this.supportsModelCatalog = false,
     this.supportsModelCatalogRefresh = false,
@@ -20,6 +21,7 @@ class AgentAdapterCapabilities {
   final bool supportsConversationHistory;
   final bool supportsConversationRollback;
   final bool supportsConversationForking;
+  final bool supportsLiveTurnSteering;
   final bool supportsLocalConnections;
   final bool supportsModelCatalog;
   final bool supportsModelCatalogRefresh;
