@@ -13,6 +13,7 @@ import 'package:pocket_relay/src/features/connection_settings/presentation/conne
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_sheet_surface.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/connection_lifecycle_presentation.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_lifecycle_widgets.dart';
 
 const double _savedSystemsPanelRadius = 12;
@@ -120,7 +121,7 @@ class _ConnectionWorkspaceSavedSystemsContentState
                 subtitle: ConnectionWorkspaceCopy.systemSubtitle(
                   system.profile,
                 ),
-                facts: const [],
+                facts: _factsForSystem(system),
                 secondaryActions: <ConnectionLifecycleButtonAction>[
                   ConnectionLifecycleButtonAction(
                     key: ValueKey<String>('edit_system_${system.id}'),
@@ -151,6 +152,71 @@ class _ConnectionWorkspaceSavedSystemsContentState
           }),
       ],
     );
+  }
+
+  List<ConnectionLifecycleFact> _factsForSystem(SavedSystemSummary system) {
+    final facts = <ConnectionLifecycleFact>[];
+    final capabilityStatus = _resolvedCapabilityStatusForSystem(system);
+    final capabilityLabel = capabilityStatus == null
+        ? null
+        : ConnectionWorkspaceCopy.systemCapabilityLabelFor(capabilityStatus);
+    if (capabilityLabel != null && capabilityStatus != null) {
+      facts.add(
+        ConnectionLifecycleFact(
+          label: capabilityLabel,
+          tone: _toneForHostCapabilityStatus(capabilityStatus),
+        ),
+      );
+    }
+    return facts;
+  }
+
+  ConnectionRemoteHostCapabilityStatus? _resolvedCapabilityStatusForSystem(
+    SavedSystemSummary system,
+  ) {
+    final hostIdentityKey = system.profile.remoteHostIdentityKey;
+    if (hostIdentityKey == null) {
+      return null;
+    }
+
+    final statuses = <ConnectionRemoteHostCapabilityStatus>{};
+    final state = widget.workspaceController.state;
+    for (final connectionId in state.catalog.orderedConnectionIds) {
+      final connection = state.catalog.connectionForId(connectionId);
+      if (connection == null ||
+          connection.profile.remoteHostIdentityKey != hostIdentityKey) {
+        continue;
+      }
+      final status = state
+          .remoteRuntimeFor(connectionId)
+          ?.hostCapability
+          .status;
+      if (status == null ||
+          status == ConnectionRemoteHostCapabilityStatus.unknown) {
+        continue;
+      }
+      statuses.add(status);
+    }
+
+    // Only surface a system-level status when the known workspace runtimes
+    // agree on the machine state for this host.
+    return statuses.length == 1 ? statuses.single : null;
+  }
+
+  ConnectionLifecycleFactTone _toneForHostCapabilityStatus(
+    ConnectionRemoteHostCapabilityStatus status,
+  ) {
+    return switch (status) {
+      ConnectionRemoteHostCapabilityStatus.supported =>
+        ConnectionLifecycleFactTone.positive,
+      ConnectionRemoteHostCapabilityStatus.checking =>
+        ConnectionLifecycleFactTone.accent,
+      ConnectionRemoteHostCapabilityStatus.probeFailed ||
+      ConnectionRemoteHostCapabilityStatus.unsupported =>
+        ConnectionLifecycleFactTone.warning,
+      ConnectionRemoteHostCapabilityStatus.unknown =>
+        ConnectionLifecycleFactTone.neutral,
+    };
   }
 
   Future<void> _createSystem() async {
