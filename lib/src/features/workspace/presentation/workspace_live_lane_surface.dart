@@ -10,6 +10,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/chat_chrome_men
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_adapter.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
+import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
@@ -168,6 +169,9 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     final recoveryDiagnostics = workspaceState.recoveryDiagnosticsFor(
       widget.laneBinding.connectionId,
     );
+    final turnLivenessAssessment = workspaceState.turnLivenessAssessmentFor(
+      widget.laneBinding.connectionId,
+    );
     final recoveryLoadWarning = workspaceState.recoveryLoadWarning;
     final deviceContinuityWarnings = workspaceState.deviceContinuityWarnings;
     final remoteRuntime = workspaceState.remoteRuntimeFor(
@@ -190,6 +194,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       phase: transportRecoveryPhase,
       diagnostics: recoveryDiagnostics,
       remoteRuntime: remoteRuntime,
+      turnLivenessAssessment: turnLivenessAssessment,
     );
     final startupWarningNotice = _recoveryLoadWarningNoticeFor(
       recoveryLoadWarning,
@@ -530,12 +535,40 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
     required ConnectionWorkspaceTransportRecoveryPhase? phase,
     required ConnectionWorkspaceRecoveryDiagnostics? diagnostics,
     required ConnectionRemoteRuntimeState? remoteRuntime,
+    required ConnectionWorkspaceTurnLivenessAssessment? turnLivenessAssessment,
   }) {
     final sessionController = widget.laneBinding.sessionController;
-    if ((phase == null && liveReattachPhase == null) ||
-        sessionController.historicalConversationRestoreState != null ||
+    final historyRestoreIsLoading =
+        sessionController.historicalConversationRestoreState?.phase ==
+        ChatHistoricalConversationRestorePhase.loading;
+    if ((phase == null &&
+            liveReattachPhase == null &&
+            turnLivenessAssessment == null) ||
+        historyRestoreIsLoading ||
         sessionController.conversationRecoveryState != null) {
       return null;
+    }
+
+    final isRecoveryStillInFlight = switch (liveReattachPhase ?? phase) {
+      ConnectionWorkspaceLiveReattachPhase.transportLost ||
+      ConnectionWorkspaceLiveReattachPhase.reconnecting ||
+      ConnectionWorkspaceTransportRecoveryPhase.lost ||
+      ConnectionWorkspaceTransportRecoveryPhase.reconnecting => true,
+      _ => false,
+    };
+    final showsTransportUnavailableNotice =
+        liveReattachPhase ==
+            ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
+        liveReattachPhase ==
+            ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy ||
+        phase == ConnectionWorkspaceTransportRecoveryPhase.unavailable;
+    final shouldUseTurnLivenessAssessmentNotice =
+        !isRecoveryStillInFlight &&
+        !showsTransportUnavailableNotice &&
+        turnLivenessAssessment != null;
+    if (shouldUseTurnLivenessAssessmentNotice &&
+        turnLivenessAssessment != null) {
+      return _turnLivenessNoticeFor(turnLivenessAssessment);
     }
 
     if (liveReattachPhase ==
@@ -602,6 +635,45 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       tone: isLoading
           ? _WorkspaceLaneTransportNoticeTone.informational
           : _WorkspaceLaneTransportNoticeTone.warning,
+    );
+  }
+
+  Widget _turnLivenessNoticeFor(
+    ConnectionWorkspaceTurnLivenessAssessment assessment,
+  ) {
+    final (title, message, tone, icon) = switch (assessment.status) {
+      ConnectionWorkspaceTurnLivenessStatus.stillLive => (
+        ConnectionWorkspaceCopy.turnStillLiveNoticeTitle,
+        ConnectionWorkspaceCopy.turnStillLiveNoticeMessage,
+        _WorkspaceLaneTransportNoticeTone.informational,
+        Icons.link_rounded,
+      ),
+      ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway => (
+        ConnectionWorkspaceCopy.turnFinishedWhileAwayNoticeTitle,
+        ConnectionWorkspaceCopy.turnFinishedWhileAwayNoticeMessage,
+        _WorkspaceLaneTransportNoticeTone.informational,
+        Icons.history_rounded,
+      ),
+      ConnectionWorkspaceTurnLivenessStatus.continuityLost => (
+        ConnectionWorkspaceCopy.turnContinuityLostNoticeTitle,
+        ConnectionWorkspaceCopy.turnContinuityLostNoticeMessage,
+        _WorkspaceLaneTransportNoticeTone.warning,
+        Icons.warning_amber_rounded,
+      ),
+      ConnectionWorkspaceTurnLivenessStatus.unknown => (
+        ConnectionWorkspaceCopy.turnLivenessUnknownNoticeTitle,
+        ConnectionWorkspaceCopy.turnLivenessUnknownNoticeMessage,
+        _WorkspaceLaneTransportNoticeTone.warning,
+        Icons.help_outline_rounded,
+      ),
+    };
+
+    return _WorkspaceLaneTransportNotice(
+      title: title,
+      message: message,
+      isLoading: false,
+      tone: tone,
+      icon: icon,
     );
   }
 

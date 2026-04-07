@@ -94,6 +94,17 @@ Future<void> _reconnectWorkspaceConnection(
           connectionId,
           ConnectionWorkspaceTransportRecoveryPhase.unavailable,
         );
+        if (preservedLaneState.threadId case final threadId?) {
+          controller._setTurnLivenessAssessment(
+            connectionId,
+            ConnectionWorkspaceTurnLivenessAssessment(
+              status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+              evidence:
+                  ConnectionWorkspaceTurnLivenessEvidence.ownerUnavailable,
+              threadId: threadId,
+            ),
+          );
+        }
         controller._completeRecoveryAttempt(
           connectionId,
           completedAt: controller._now(),
@@ -113,6 +124,17 @@ Future<void> _reconnectWorkspaceConnection(
           connectionId,
           ConnectionWorkspaceTransportRecoveryPhase.unavailable,
         );
+        if (preservedLaneState.threadId case final threadId?) {
+          controller._setTurnLivenessAssessment(
+            connectionId,
+            ConnectionWorkspaceTurnLivenessAssessment(
+              status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+              evidence:
+                  ConnectionWorkspaceTurnLivenessEvidence.transportUnavailable,
+              threadId: threadId,
+            ),
+          );
+        }
         controller._completeRecoveryAttempt(
           connectionId,
           completedAt: controller._now(),
@@ -260,6 +282,17 @@ Future<void> _reconnectWorkspaceConnection(
           connectionId,
           ConnectionWorkspaceTransportRecoveryPhase.unavailable,
         );
+        if (preservedLaneState.threadId case final threadId?) {
+          controller._setTurnLivenessAssessment(
+            connectionId,
+            ConnectionWorkspaceTurnLivenessAssessment(
+              status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+              evidence:
+                  ConnectionWorkspaceTurnLivenessEvidence.ownerUnavailable,
+              threadId: threadId,
+            ),
+          );
+        }
         controller._completeRecoveryAttempt(
           connectionId,
           completedAt: controller._now(),
@@ -279,6 +312,17 @@ Future<void> _reconnectWorkspaceConnection(
           connectionId,
           ConnectionWorkspaceTransportRecoveryPhase.unavailable,
         );
+        if (preservedLaneState.threadId case final threadId?) {
+          controller._setTurnLivenessAssessment(
+            connectionId,
+            ConnectionWorkspaceTurnLivenessAssessment(
+              status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+              evidence:
+                  ConnectionWorkspaceTurnLivenessEvidence.transportUnavailable,
+              threadId: threadId,
+            ),
+          );
+        }
         controller._completeRecoveryAttempt(
           connectionId,
           completedAt: controller._now(),
@@ -337,17 +381,28 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
       return;
     }
 
-    if (_shouldFallbackToHistoryRestoreAfterLiveReattach(
+    final assessment = await _resolveWorkspaceTurnLivenessAfterReconnect(
       binding,
-      hadVisibleConversationState: hadVisibleConversationState,
-    )) {
-      controller._clearTransportReconnectRequired(connectionId);
+      threadId: threadId,
+      liveReattachSucceeded: true,
+    );
+    final shouldRestoreFromHistory =
+        assessment.status ==
+            ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway ||
+        _shouldFallbackToHistoryRestoreAfterLiveReattach(
+          binding,
+          hadVisibleConversationState: hadVisibleConversationState,
+        );
+    controller._clearTransportReconnectRequired(connectionId);
+
+    if (shouldRestoreFromHistory) {
       controller._setLiveReattachPhase(
         connectionId,
         ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
       );
       await binding.sessionController.selectConversationForResume(threadId);
       if (!controller._isDisposed) {
+        controller._setTurnLivenessAssessment(connectionId, assessment);
         controller._completeConversationRecoveryAttempt(
           connectionId,
           binding,
@@ -357,14 +412,24 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
       return;
     }
 
-    controller._clearTransportReconnectRequired(connectionId);
     controller._setLiveReattachPhase(
       connectionId,
       ConnectionWorkspaceLiveReattachPhase.liveReattached,
     );
-    controller._completeLiveReattachRecoveryAttempt(
+    controller._setTurnLivenessAssessment(connectionId, assessment);
+    controller._completeRecoveryAttempt(
       connectionId,
       completedAt: controller._now(),
+      outcome: switch (assessment.status) {
+        ConnectionWorkspaceTurnLivenessStatus.stillLive =>
+          ConnectionWorkspaceRecoveryOutcome.liveReattached,
+        ConnectionWorkspaceTurnLivenessStatus.unknown =>
+          ConnectionWorkspaceRecoveryOutcome.livenessUnknown,
+        ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway =>
+          ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceTurnLivenessStatus.continuityLost =>
+          ConnectionWorkspaceRecoveryOutcome.continuityLost,
+      },
     );
   } catch (error) {
     controller._recordLiveReattachFailure(connectionId, error: error);
@@ -372,13 +437,33 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
       return;
     }
 
+    final assessment = await _resolveWorkspaceTurnLivenessAfterReconnect(
+      binding,
+      threadId: threadId,
+      liveReattachSucceeded: false,
+    );
     controller._clearTransportReconnectRequired(connectionId);
+    final shouldRestoreFromHistory =
+        assessment.status ==
+            ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway ||
+        !hadVisibleConversationState;
+    if (!shouldRestoreFromHistory) {
+      controller._clearLiveReattachPhase(connectionId);
+      controller._setTurnLivenessAssessment(connectionId, assessment);
+      controller._completeRecoveryAttempt(
+        connectionId,
+        completedAt: controller._now(),
+        outcome: ConnectionWorkspaceRecoveryOutcome.continuityLost,
+      );
+      return;
+    }
     controller._setLiveReattachPhase(
       connectionId,
       ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
     );
     await binding.sessionController.selectConversationForResume(threadId);
     if (!controller._isDisposed) {
+      controller._setTurnLivenessAssessment(connectionId, assessment);
       controller._completeConversationRecoveryAttempt(
         connectionId,
         binding,
@@ -407,4 +492,163 @@ bool _workspaceLaneHasVisibleLiveConversationState(
       sessionState.pendingApprovalRequests.isNotEmpty ||
       sessionState.pendingUserInputRequests.isNotEmpty ||
       binding.sessionController.transcriptBlocks.isNotEmpty;
+}
+
+bool _workspaceLaneHasProvenLiveTurnState(ConnectionLaneBinding binding) {
+  final sessionState = binding.sessionController.sessionState;
+  return sessionState.activeTurn != null ||
+      sessionState.pendingApprovalRequests.isNotEmpty ||
+      sessionState.pendingUserInputRequests.isNotEmpty ||
+      binding.agentAdapterClient.activeTurnId?.trim().isNotEmpty == true;
+}
+
+void _syncWorkspaceTurnLivenessAssessment(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) {
+  final assessment = controller._state.turnLivenessAssessmentFor(connectionId);
+  if (assessment == null) {
+    return;
+  }
+
+  final sessionState = binding.sessionController.sessionState;
+  final currentThreadId =
+      sessionState.currentThreadId?.trim().isNotEmpty == true
+      ? sessionState.currentThreadId!.trim()
+      : sessionState.rootThreadId?.trim();
+  if (assessment.threadId != null &&
+      currentThreadId != null &&
+      assessment.threadId != currentThreadId) {
+    controller._clearTurnLivenessAssessment(connectionId);
+    return;
+  }
+
+  switch (assessment.status) {
+    case ConnectionWorkspaceTurnLivenessStatus.stillLive:
+      if (!_workspaceLaneHasProvenLiveTurnState(binding)) {
+        controller._clearTurnLivenessAssessment(connectionId);
+      }
+    case ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway ||
+        ConnectionWorkspaceTurnLivenessStatus.continuityLost ||
+        ConnectionWorkspaceTurnLivenessStatus.unknown:
+      if (binding.agentAdapterClient.activeTurnId?.trim().isNotEmpty == true) {
+        controller._clearTurnLivenessAssessment(connectionId);
+      }
+  }
+}
+
+Future<ConnectionWorkspaceTurnLivenessAssessment>
+_resolveWorkspaceTurnLivenessAfterReconnect(
+  ConnectionLaneBinding binding, {
+  required String threadId,
+  required bool liveReattachSucceeded,
+}) async {
+  final sessionAssessment = _workspaceTurnLivenessAssessmentFromSession(
+    binding,
+    threadId: threadId,
+  );
+  if (sessionAssessment != null) {
+    return sessionAssessment;
+  }
+
+  AgentAdapterThreadHistory? threadHistory;
+  try {
+    threadHistory = await binding.agentAdapterClient.readThreadWithTurns(
+      threadId: threadId,
+    );
+  } catch (_) {
+    threadHistory = null;
+  }
+
+  final latestTurn = _latestWorkspaceHistoryTurn(threadHistory, threadId);
+  final latestStatus = latestTurn?.status?.trim().toLowerCase();
+  if (liveReattachSucceeded && latestStatus == 'running') {
+    return ConnectionWorkspaceTurnLivenessAssessment(
+      status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+      evidence:
+          ConnectionWorkspaceTurnLivenessEvidence.threadHistoryRunningTurn,
+      threadId: threadId,
+      turnId: latestTurn?.id,
+    );
+  }
+  if (_isTerminalWorkspaceHistoryTurnStatus(latestStatus)) {
+    return ConnectionWorkspaceTurnLivenessAssessment(
+      status: ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway,
+      evidence:
+          ConnectionWorkspaceTurnLivenessEvidence.threadHistoryTerminalTurn,
+      threadId: threadId,
+      turnId: latestTurn?.id,
+    );
+  }
+  if (!liveReattachSucceeded) {
+    return ConnectionWorkspaceTurnLivenessAssessment(
+      status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+      evidence: ConnectionWorkspaceTurnLivenessEvidence.liveReattachFailed,
+      threadId: threadId,
+      turnId: latestTurn?.id,
+    );
+  }
+
+  return ConnectionWorkspaceTurnLivenessAssessment(
+    status: ConnectionWorkspaceTurnLivenessStatus.unknown,
+    evidence: ConnectionWorkspaceTurnLivenessEvidence.adapterUnverifiable,
+    threadId: threadId,
+    turnId: latestTurn?.id,
+  );
+}
+
+ConnectionWorkspaceTurnLivenessAssessment?
+_workspaceTurnLivenessAssessmentFromSession(
+  ConnectionLaneBinding binding, {
+  required String threadId,
+}) {
+  final sessionState = binding.sessionController.sessionState;
+  final activeTurn = sessionState.activeTurn;
+  if (activeTurn != null) {
+    return ConnectionWorkspaceTurnLivenessAssessment(
+      status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+      evidence: ConnectionWorkspaceTurnLivenessEvidence.activeTurnReattached,
+      threadId: threadId,
+      turnId: activeTurn.turnId,
+    );
+  }
+  if (sessionState.pendingApprovalRequests.isNotEmpty ||
+      sessionState.pendingUserInputRequests.isNotEmpty ||
+      binding.agentAdapterClient.activeTurnId?.trim().isNotEmpty == true) {
+    return ConnectionWorkspaceTurnLivenessAssessment(
+      status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+      evidence:
+          ConnectionWorkspaceTurnLivenessEvidence.pendingTurnRequestReattached,
+      threadId: threadId,
+      turnId: binding.agentAdapterClient.activeTurnId?.trim(),
+    );
+  }
+  return null;
+}
+
+AgentAdapterHistoryTurn? _latestWorkspaceHistoryTurn(
+  AgentAdapterThreadHistory? history,
+  String threadId,
+) {
+  if (history == null || history.turns.isEmpty) {
+    return null;
+  }
+
+  for (final turn in history.turns.reversed) {
+    final turnThreadId = turn.threadId?.trim();
+    if (turnThreadId == null ||
+        turnThreadId.isEmpty ||
+        turnThreadId == threadId) {
+      return turn;
+    }
+  }
+  return history.turns.last;
+}
+
+bool _isTerminalWorkspaceHistoryTurnStatus(String? status) {
+  return switch (status) {
+    'completed' || 'failed' || 'aborted' || 'cancelled' => true,
+    _ => false,
+  };
 }

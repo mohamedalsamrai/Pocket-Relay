@@ -16,6 +16,7 @@ void _registerWorkspaceLiveBinding(
 ) {
   controller._unregisterLiveBinding(connectionId);
   void listener() {
+    _syncWorkspaceTurnLivenessAssessment(controller, connectionId, binding);
     if (controller._state.selectedConnectionId != connectionId) {
       return;
     }
@@ -42,6 +43,7 @@ void _registerWorkspaceLiveBinding(
           )) {
             controller._clearTransportReconnectRequired(connectionId);
             controller._clearLiveReattachPhase(connectionId);
+            controller._clearTurnLivenessAssessment(connectionId);
             break;
           }
           controller._recordTransportLoss(
@@ -58,6 +60,7 @@ void _registerWorkspaceLiveBinding(
             connectionId,
             ConnectionWorkspaceLiveReattachPhase.transportLost,
           );
+          controller._clearTurnLivenessAssessment(connectionId);
           break;
         case AgentAdapterConnectedEvent():
           final wasRecovering = controller._state.requiresTransportReconnect(

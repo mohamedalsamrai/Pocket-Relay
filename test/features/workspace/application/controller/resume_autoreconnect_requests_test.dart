@@ -155,7 +155,7 @@ void main() {
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_primary'),
-        ConnectionWorkspaceLiveReattachPhase.liveReattached,
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
       );
       final resumedDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_primary',
@@ -167,7 +167,7 @@ void main() {
       );
       expect(
         resumedDiagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
       );
       expect(clientsByConnectionId['conn_primary'], hasLength(1));
       expect(clientsByConnectionId['conn_primary']!.first.connectCalls, 1);
@@ -183,7 +183,7 @@ void main() {
       );
       expect(
         clientsByConnectionId['conn_primary']!.first.readThreadCalls,
-        <String>['thread_123'],
+        <String>['thread_123', 'thread_123', 'thread_123'],
       );
       expect(nextBinding!.composerDraftHost.draft.text, 'Recover me');
       expect(

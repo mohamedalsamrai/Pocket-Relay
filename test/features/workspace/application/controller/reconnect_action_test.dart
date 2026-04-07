@@ -91,6 +91,22 @@ void main() {
         controller.dispose();
         await closeClients(clientsById);
       });
+      clientsById['conn_primary']!
+              .resumeThreadReplayEventsByThreadId['thread_saved'] =
+          const <CodexAppServerEvent>[
+            CodexAppServerNotificationEvent(
+              method: 'turn/started',
+              params: <String, Object?>{
+                'threadId': 'thread_saved',
+                'turn': <String, Object?>{
+                  'id': 'turn_live',
+                  'status': 'running',
+                  'model': 'gpt-5.4',
+                  'effort': 'high',
+                },
+              },
+            ),
+          ];
 
       await controller.initialize();
       final binding = controller.bindingForConnectionId('conn_primary')!;
@@ -128,6 +144,16 @@ void main() {
             .lastRecoveryOutcome,
         ConnectionWorkspaceRecoveryOutcome.liveReattached,
       );
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.activeTurnReattached,
+          threadId: 'thread_saved',
+          turnId: 'turn_live',
+        ),
+      );
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
     },
   );
@@ -164,6 +190,7 @@ void main() {
       expect(clientsById['conn_primary']!.startSessionCalls, 0);
       expect(clientsById['conn_primary']!.readThreadCalls, <String>[
         'thread_saved',
+        'thread_saved',
       ]);
       expect(
         controller.state.liveReattachPhaseFor('conn_primary'),
@@ -181,7 +208,146 @@ void main() {
             .lastLiveReattachFailureDetail,
         contains('resume failed'),
       );
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.threadHistoryTerminalTurn,
+          threadId: 'thread_saved',
+          turnId: 'turn_saved',
+        ),
+      );
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+    },
+  );
+
+  test(
+    'reconnectConnection marks liveness unknown when reconnect succeeds but the adapter cannot prove whether the turn is still live',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          CodexAppServerThreadHistory(
+            id: 'thread_saved',
+            sourceKind: 'app-server',
+            turns: const <CodexAppServerHistoryTurn>[
+              CodexAppServerHistoryTurn(
+                id: 'turn_unknown',
+                items: <CodexAppServerHistoryItem>[
+                  CodexAppServerHistoryItem(
+                    id: 'item_user',
+                    type: 'user_message',
+                    status: 'completed',
+                    raw: <String, dynamic>{
+                      'id': 'item_user',
+                      'type': 'user_message',
+                      'status': 'completed',
+                      'content': <Object>[
+                        <String, Object?>{'text': 'Restore this'},
+                      ],
+                    },
+                  ),
+                  CodexAppServerHistoryItem(
+                    id: 'item_assistant',
+                    type: 'agent_message',
+                    status: 'completed',
+                    raw: <String, dynamic>{
+                      'id': 'item_assistant',
+                      'type': 'agent_message',
+                      'status': 'completed',
+                      'content': <Object>[
+                        <String, Object?>{'text': 'Restored answer'},
+                      ],
+                    },
+                  ),
+                ],
+                raw: <String, dynamic>{
+                  'id': 'turn_unknown',
+                  'items': <Object>[
+                    <String, Object?>{
+                      'id': 'item_user',
+                      'type': 'user_message',
+                      'status': 'completed',
+                      'content': <Object>[
+                        <String, Object?>{'text': 'Restore this'},
+                      ],
+                    },
+                    <String, Object?>{
+                      'id': 'item_assistant',
+                      'type': 'agent_message',
+                      'status': 'completed',
+                      'content': <Object>[
+                        <String, Object?>{'text': 'Restored answer'},
+                      ],
+                    },
+                  ],
+                },
+              ),
+            ],
+          );
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.unknown,
+          evidence: ConnectionWorkspaceTurnLivenessEvidence.adapterUnverifiable,
+          threadId: 'thread_saved',
+          turnId: 'turn_unknown',
+        ),
+      );
+    },
+  );
+
+  test(
+    'reconnectConnection marks continuity lost when live reattach fails and history cannot prove a finished turn',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          const CodexAppServerThreadHistory(
+            id: 'thread_saved',
+            sourceKind: 'app-server',
+          );
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.startSessionError =
+          const CodexAppServerException('resume failed');
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+          evidence: ConnectionWorkspaceTurnLivenessEvidence.liveReattachFailed,
+          threadId: 'thread_saved',
+        ),
+      );
     },
   );
 
