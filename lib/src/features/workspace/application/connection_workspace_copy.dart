@@ -122,8 +122,8 @@ abstract final class ConnectionWorkspaceCopy {
   static const String transportConnectedFact = 'Connected';
   static const String transportDisconnectedFact = 'Disconnected';
   static const String transportReconnectingFact = 'Reconnecting';
-  static const String hostSupportedFact = 'Supported';
-  static const String hostUnsupportedFact = 'Unsupported';
+  static const String hostSupportedFact = 'System supported';
+  static const String hostUnsupportedFact = 'System unsupported';
   static const String serverFactLabel = 'Server';
   static const String settingsFactLabel = 'Settings';
   static const String settingsChangesPendingFact = 'Changes pending';

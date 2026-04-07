@@ -186,7 +186,10 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(of: sidebarRow, matching: find.text('Unsupported')),
+      find.descendant(
+        of: sidebarRow,
+        matching: find.text('System unsupported'),
+      ),
       findsNothing,
     );
   });

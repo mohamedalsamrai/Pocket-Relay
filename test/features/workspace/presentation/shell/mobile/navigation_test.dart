@@ -191,7 +191,10 @@ void main() {
         findsNothing,
       );
       expect(
-        find.descendant(of: workspaceRow, matching: find.text('Unsupported')),
+        find.descendant(
+          of: workspaceRow,
+          matching: find.text('System unsupported'),
+        ),
         findsNothing,
       );
 
@@ -204,7 +207,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(ValueKey<String>('saved_system_$systemId')),
-          matching: find.text('Unsupported'),
+          matching: find.text('System unsupported'),
         ),
         findsOneWidget,
       );
