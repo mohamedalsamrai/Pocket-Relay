@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
@@ -25,10 +26,15 @@ enum ConnectionLifecycleSecondaryActionId {
 
 @immutable
 class ConnectionLifecycleFact {
-  const ConnectionLifecycleFact({required this.label, required this.tone});
+  const ConnectionLifecycleFact({
+    required this.label,
+    required this.tone,
+    required this.icon,
+  });
 
   final String label;
   final ConnectionLifecycleFactTone tone;
+  final IconData icon;
 }
 
 @immutable
@@ -40,7 +46,7 @@ class ConnectionLifecyclePresentation {
     required this.facts,
     required this.primaryActionId,
     required this.secondaryActionIds,
-    required this.detailActionIds,
+    required this.overflowActionIds,
     required this.isLive,
     required this.isCurrent,
     required this.isAttention,
@@ -57,7 +63,7 @@ class ConnectionLifecyclePresentation {
   final List<ConnectionLifecycleFact> facts;
   final ConnectionLifecyclePrimaryActionId? primaryActionId;
   final List<ConnectionLifecycleSecondaryActionId> secondaryActionIds;
-  final List<ConnectionLifecycleSecondaryActionId> detailActionIds;
+  final List<ConnectionLifecycleSecondaryActionId> overflowActionIds;
   final bool isLive;
   final bool isCurrent;
   final bool isAttention;
@@ -167,11 +173,15 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
       tone: isLive
           ? ConnectionLifecycleFactTone.positive
           : ConnectionLifecycleFactTone.neutral,
+      icon: isLive
+          ? Icons.play_circle_fill_rounded
+          : Icons.pause_circle_outline_rounded,
     ),
     if (!profile.isReady)
       const ConnectionLifecycleFact(
         label: ConnectionWorkspaceCopy.laneConfigurationIncompleteStatus,
         tone: ConnectionLifecycleFactTone.warning,
+        icon: Icons.error_outline_rounded,
       ),
     if (profile.isRemote && isLive)
       ConnectionLifecycleFact(
@@ -189,6 +199,15 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
             : isTransportConnected
             ? ConnectionLifecycleFactTone.positive
             : ConnectionLifecycleFactTone.warning,
+        icon:
+            liveReattachPhase ==
+                    ConnectionWorkspaceLiveReattachPhase.reconnecting ||
+                transportRecoveryPhase ==
+                    ConnectionWorkspaceTransportRecoveryPhase.reconnecting
+            ? Icons.sync_rounded
+            : isTransportConnected
+            ? Icons.link_rounded
+            : Icons.link_off_rounded,
       ),
     if (profile.isRemote &&
         remoteRuntime != null &&
@@ -209,6 +228,13 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
           ConnectionRemoteServerStatus.unhealthy =>
             ConnectionLifecycleFactTone.warning,
         },
+        icon: switch (remoteRuntime.server.status) {
+          ConnectionRemoteServerStatus.running => Icons.terminal_rounded,
+          ConnectionRemoteServerStatus.checking => Icons.hourglass_top_rounded,
+          ConnectionRemoteServerStatus.notRunning => Icons.stop_circle_outlined,
+          ConnectionRemoteServerStatus.unhealthy => Icons.warning_amber_rounded,
+          ConnectionRemoteServerStatus.unknown => Icons.help_outline_rounded,
+        },
       ),
     if (reconnectRequirement ==
             ConnectionWorkspaceReconnectRequirement.savedSettings ||
@@ -217,6 +243,7 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
       ConnectionLifecycleFact(
         label: ConnectionWorkspaceCopy.settingsFactFor(reconnectRequirement!),
         tone: ConnectionLifecycleFactTone.warning,
+        icon: Icons.tune_rounded,
       ),
   ];
 
@@ -229,12 +256,12 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
     if (isLive && profile.isRemote && isTransportConnected)
       ConnectionLifecycleSecondaryActionId.disconnect,
     ConnectionLifecycleSecondaryActionId.edit,
+  ];
+  final overflowActionIds = <ConnectionLifecycleSecondaryActionId>[
     if (isLive)
       ConnectionLifecycleSecondaryActionId.closeLane
     else
       ConnectionLifecycleSecondaryActionId.delete,
-  ];
-  final detailActionIds = <ConnectionLifecycleSecondaryActionId>[
     if (profile.isRemote && profile.isReady)
       ConnectionLifecycleSecondaryActionId.checkHost,
     if (profile.isRemote &&
@@ -258,7 +285,7 @@ ConnectionLifecyclePresentation _buildConnectionLifecyclePresentation(
     facts: facts,
     primaryActionId: primaryActionId,
     secondaryActionIds: secondaryActionIds,
-    detailActionIds: detailActionIds,
+    overflowActionIds: overflowActionIds,
     isLive: isLive,
     isCurrent: isCurrent,
     isAttention: isAttention,

@@ -35,6 +35,7 @@ abstract final class ConnectionWorkspaceCopy {
   static const String saveProgress = 'Saving…';
   static const String deleteAction = 'Delete';
   static const String deleteProgress = 'Deleting…';
+  static const String moreRowActionsAction = 'More actions';
   static const String startServerAction = 'Start server';
   static const String startServerProgress = 'Starting…';
   static const String stopServerAction = 'Stop server';

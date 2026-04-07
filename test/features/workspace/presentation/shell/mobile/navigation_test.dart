@@ -282,6 +282,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(
+        find.byKey(ValueKey<String>('saved_system_more_$systemId')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey<String>('delete_system_$systemId')));
       await tester.pumpAndSettle();
 
