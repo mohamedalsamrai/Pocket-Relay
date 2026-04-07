@@ -3,6 +3,13 @@ part of '../connection_settings_presenter.dart';
 ConnectionSettingsSectionContract _buildProfileSection(
   _ConnectionSettingsPresentationState state,
 ) {
+  if (state.isSystemSettings) {
+    return const ConnectionSettingsSectionContract(
+      title: 'System',
+      fields: <ConnectionSettingsTextFieldContract>[],
+    );
+  }
+
   final draft = state.draft;
   return ConnectionSettingsSectionContract(
     title: 'Workspace',
@@ -76,8 +83,9 @@ ConnectionSettingsSectionContract? _buildRemoteConnectionSection(
         label: 'Host',
         value: draft.host,
         hintText: 'devbox.local',
-        helperText:
-            'The hostname or IP address of the system that hosts this workspace.',
+        helperText: state.isSystemSettings
+            ? 'The hostname or IP address of this system.'
+            : 'The hostname or IP address of the system that hosts this workspace.',
         errorText: state.hostError,
       ),
       ConnectionSettingsTextFieldContract(

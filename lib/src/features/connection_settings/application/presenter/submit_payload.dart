@@ -10,7 +10,10 @@ ConnectionSettingsSubmitPayload _buildSubmitPayload({
   final capabilities = state.agentAdapterCapabilities;
   return ConnectionSettingsSubmitPayload(
     profile: initialProfile.copyWith(
-      label: presenter._normalizedLabel(draft.label),
+      label: presenter._normalizedLabel(
+        draft.label,
+        isSystemSettings: state.isSystemSettings,
+      ),
       connectionMode: draft.connectionMode,
       agentAdapter: draft.agentAdapter,
       host: draft.host.trim(),
@@ -28,8 +31,7 @@ ConnectionSettingsSubmitPayload _buildSubmitPayload({
           : null,
       authMode: draft.authMode,
       hostFingerprint: draft.hostFingerprint.trim(),
-      dangerouslyBypassSandbox:
-          capabilities.supportsDangerouslyBypassSandbox
+      dangerouslyBypassSandbox: capabilities.supportsDangerouslyBypassSandbox
           ? draft.dangerouslyBypassSandbox
           : false,
       ephemeralSession: capabilities.supportsEphemeralSessions

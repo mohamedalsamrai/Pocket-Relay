@@ -64,10 +64,14 @@ ConnectionSettingsSystemTrustContract? _buildSystemTrust(
     return ConnectionSettingsSystemTrustContract(
       title: 'System trust',
       state: ConnectionSettingsSystemTrustStateKind.ready,
-      statusLabel: isSavedSystem
+      statusLabel: state.isSystemSettings
+          ? 'SSH fingerprint ready'
+          : isSavedSystem
           ? 'SSH fingerprint saved'
           : 'SSH fingerprint ready',
-      detail: isSavedSystem
+      detail: state.isSystemSettings
+          ? 'This SSH fingerprint will be saved with this system.'
+          : isSavedSystem
           ? 'This system already has a saved SSH fingerprint and can be reused across workspaces.'
           : 'This SSH fingerprint came from the latest system test and will be saved with this workspace.',
       actionLabel: 'Retest system',
@@ -82,7 +86,11 @@ ConnectionSettingsSystemTrustContract? _buildSystemTrust(
     state: ConnectionSettingsSystemTrustStateKind.needsTest,
     statusLabel: 'SSH fingerprint needed',
     detail: state.supportsSystemTesting
-        ? 'Test this system to fetch its SSH fingerprint before saving the workspace.'
+        ? state.isSystemSettings
+              ? 'Test this system to fetch its SSH fingerprint before saving this system.'
+              : 'Test this system to fetch its SSH fingerprint before saving the workspace.'
+        : state.isSystemSettings
+        ? 'System testing is not available from this surface, so this system cannot save a fingerprint yet.'
         : 'System testing is not available from this surface, so this workspace cannot save a fingerprint yet.',
     actionLabel: 'Test system',
     isActionEnabled: state.canTestSystem,

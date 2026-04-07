@@ -159,7 +159,7 @@ void main() {
       expect(find.text('SSH fingerprint needed'), findsOneWidget);
       expect(
         find.text(
-          'Test this system to fetch its SSH fingerprint before saving the workspace.',
+          'Test this system to fetch its SSH fingerprint before saving this system.',
         ),
         findsOneWidget,
       );
@@ -233,12 +233,27 @@ void main() {
           onSubmit: (nextPayload) {
             payload = nextPayload;
           },
-          initialProfile: configuredConnectionProfile().copyWith(
-            workspaceDir: '',
-            codexPath: '',
+          initialProfile: connectionProfileFromSystem(
+            SavedSystem(
+              id: 'system_primary',
+              profile: const SystemProfile(
+                host: 'devbox.local',
+                port: 22,
+                username: 'vince',
+                authMode: AuthMode.password,
+                hostFingerprint: 'aa:bb:cc:dd',
+              ),
+              secrets: const ConnectionSecrets(password: 'secret'),
+            ),
           ),
           surfaceMode: ConnectionSettingsSurfaceMode.system,
         ),
+      );
+
+      expect(find.text('Workspace name'), findsNothing);
+      expect(
+        find.text('The hostname or IP address of this system.'),
+        findsOneWidget,
       );
 
       await tester.enterText(materialTextField('Username'), 'vincent');
@@ -248,6 +263,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(payload, isNotNull);
+      expect(payload!.profile.label, isEmpty);
       expect(payload!.profile.username, 'vincent');
       expect(payload!.profile.workspaceDir, isEmpty);
       expect(payload!.profile.codexPath, isEmpty);

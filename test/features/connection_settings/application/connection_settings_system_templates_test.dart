@@ -118,4 +118,33 @@ void main() {
       expect(nextDraft.codexPath, 'codex-mcp');
     },
   );
+
+  test('derives system templates without synthesizing a workspace label', () {
+    final templates =
+        deriveConnectionSettingsSystemTemplatesFromSystems(<SavedSystem>[
+          SavedSystem(
+            id: 'system_primary',
+            profile: const SystemProfile(
+              host: 'devbox.local',
+              port: 2200,
+              username: 'alice',
+              authMode: AuthMode.privateKey,
+              hostFingerprint: '11:22:33:44',
+            ),
+            secrets: const ConnectionSecrets(
+              privateKeyPem:
+                  '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
+            ),
+          ),
+        ]);
+
+    expect(templates, hasLength(1));
+    expect(templates.single.profile.label, isEmpty);
+    expect(templates.single.profile.host, 'devbox.local');
+    expect(templates.single.profile.port, 2200);
+    expect(templates.single.profile.username, 'alice');
+    expect(templates.single.profile.workspaceDir, isEmpty);
+    expect(templates.single.profile.codexPath, isEmpty);
+    expect(templates.single.profile.hostFingerprint, '11:22:33:44');
+  });
 }
