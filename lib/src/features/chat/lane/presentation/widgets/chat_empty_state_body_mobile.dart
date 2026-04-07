@@ -2,6 +2,7 @@ part of 'chat_empty_state_body.dart';
 
 extension on ChatEmptyStateBody {
   Widget _buildMobileShell(BuildContext context) {
+    final flattenDetailsPanel = _shouldFlattenSupplementalDetailsPanel();
     final content = Padding(
       padding: const EdgeInsets.all(28),
       child: Column(
@@ -33,7 +34,12 @@ extension on ChatEmptyStateBody {
             supplementalContent!,
           ],
           const SizedBox(height: 22),
-          _buildDetailsPanel(context, items: _mobileDetails(), maxWidth: 520),
+          _buildDetailsPanel(
+            context,
+            items: _mobileDetails(),
+            maxWidth: 520,
+            panelized: !flattenDetailsPanel,
+          ),
         ],
       ),
     );

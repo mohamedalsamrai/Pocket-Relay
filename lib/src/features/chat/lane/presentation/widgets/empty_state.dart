@@ -12,6 +12,7 @@ class EmptyState extends StatelessWidget {
     required this.onConfigure,
     this.onSelectConnectionMode,
     this.supplementalContent,
+    this.flattenSupplementalDetailsPanel = false,
   });
 
   final bool isConfigured;
@@ -20,6 +21,7 @@ class EmptyState extends StatelessWidget {
   final VoidCallback onConfigure;
   final ValueChanged<ConnectionMode>? onSelectConnectionMode;
   final Widget? supplementalContent;
+  final bool flattenSupplementalDetailsPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class EmptyState extends StatelessWidget {
       onConfigure: onConfigure,
       onSelectConnectionMode: onSelectConnectionMode,
       supplementalContent: supplementalContent,
+      flattenSupplementalDetailsPanel: flattenSupplementalDetailsPanel,
     );
   }
 }

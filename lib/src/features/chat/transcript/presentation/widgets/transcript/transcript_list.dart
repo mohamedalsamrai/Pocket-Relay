@@ -27,6 +27,7 @@ class TranscriptList extends StatefulWidget {
     this.onSaveHostFingerprint,
     this.onContinueFromUserMessage,
     this.supplementalEmptyStateContent,
+    this.flattenSupplementalEmptyStateDetails = false,
   });
 
   final ChatTranscriptSurfaceContract surface;
@@ -49,6 +50,7 @@ class TranscriptList extends StatefulWidget {
   final Future<void> Function(String blockId)? onSaveHostFingerprint;
   final Future<void> Function(String blockId)? onContinueFromUserMessage;
   final Widget? supplementalEmptyStateContent;
+  final bool flattenSupplementalEmptyStateDetails;
 
   @override
   State<TranscriptList> createState() => _TranscriptListState();
@@ -104,6 +106,8 @@ class _TranscriptListState extends State<TranscriptList> {
         onConfigure: widget.onConfigure,
         onSelectConnectionMode: widget.onSelectConnectionMode,
         supplementalContent: widget.supplementalEmptyStateContent,
+        flattenSupplementalDetailsPanel:
+            widget.flattenSupplementalEmptyStateDetails,
       );
     }
 

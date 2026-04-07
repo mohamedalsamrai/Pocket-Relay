@@ -19,6 +19,7 @@ class ChatEmptyStateBody extends StatelessWidget {
     required this.onConfigure,
     this.onSelectConnectionMode,
     this.supplementalContent,
+    this.flattenSupplementalDetailsPanel = false,
   });
 
   final bool isConfigured;
@@ -27,6 +28,7 @@ class ChatEmptyStateBody extends StatelessWidget {
   final VoidCallback onConfigure;
   final ValueChanged<ConnectionMode>? onSelectConnectionMode;
   final Widget? supplementalContent;
+  final bool flattenSupplementalDetailsPanel;
 
   @override
   Widget build(BuildContext context) {

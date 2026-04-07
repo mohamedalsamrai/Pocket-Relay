@@ -123,6 +123,7 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
     this.onSaveHostFingerprint,
     this.onContinueFromUserMessage,
     this.supplementalEmptyStateContent,
+    this.flattenSupplementalEmptyStateDetails = false,
   });
 
   final ChatScreenContract screen;
@@ -145,6 +146,7 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
   final Future<void> Function(String blockId)? onSaveHostFingerprint;
   final Future<void> Function(String blockId)? onContinueFromUserMessage;
   final Widget? supplementalEmptyStateContent;
+  final bool flattenSupplementalEmptyStateDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +168,8 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
       onSaveHostFingerprint: onSaveHostFingerprint,
       onContinueFromUserMessage: onContinueFromUserMessage,
       supplementalEmptyStateContent: supplementalEmptyStateContent,
+      flattenSupplementalEmptyStateDetails:
+          flattenSupplementalEmptyStateDetails,
     );
     if (screen.timelineSummaries.length <= 1) {
       return transcriptList;
