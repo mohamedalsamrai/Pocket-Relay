@@ -155,13 +155,7 @@ class _ConnectionWorkspaceSavedSystemsContentState
   }
 
   List<ConnectionLifecycleFact> _factsForSystem(SavedSystemSummary system) {
-    final facts = <ConnectionLifecycleFact>[
-      if (system.profile.hostFingerprint.trim().isNotEmpty)
-        const ConnectionLifecycleFact(
-          label: 'Fingerprint saved',
-          tone: ConnectionLifecycleFactTone.positive,
-        ),
-    ];
+    final facts = <ConnectionLifecycleFact>[];
     final capabilityStatus = _resolvedCapabilityStatusForSystem(system);
     final capabilityLabel = capabilityStatus == null
         ? null
