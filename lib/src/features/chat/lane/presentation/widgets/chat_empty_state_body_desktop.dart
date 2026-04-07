@@ -2,6 +2,7 @@ part of 'chat_empty_state_body.dart';
 
 extension on ChatEmptyStateBody {
   Widget _buildDesktopShell(BuildContext context, double availableWidth) {
+    final flattenDetailsPanel = _shouldFlattenSupplementalDetailsPanel();
     final supportsLocalConnectionMode =
         platformBehavior.supportsLocalConnectionMode;
     final content = Padding(
@@ -41,6 +42,7 @@ extension on ChatEmptyStateBody {
               context,
               items: _desktopDetails(),
               maxWidth: 560,
+              panelized: !flattenDetailsPanel,
             ),
           ] else if (supportsLocalConnectionMode) ...[
             _buildDesktopRoutePanel(context, availableWidth),

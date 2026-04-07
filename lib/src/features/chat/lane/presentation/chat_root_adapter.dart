@@ -30,6 +30,7 @@ class ChatRootAdapter extends StatefulWidget {
     this.supplementalStatusRegion,
     this.supplementalComposerNotice,
     this.supplementalEmptyStateContent,
+    this.flattenSupplementalEmptyStateDetails = false,
     this.laneRestartAction,
     this.onRestartLane,
   });
@@ -44,6 +45,7 @@ class ChatRootAdapter extends StatefulWidget {
   final Widget? supplementalStatusRegion;
   final Widget? supplementalComposerNotice;
   final Widget? supplementalEmptyStateContent;
+  final bool flattenSupplementalEmptyStateDetails;
   final ChatLaneRestartActionContract? laneRestartAction;
   final Future<void> Function()? onRestartLane;
 
@@ -106,6 +108,8 @@ class _ChatRootAdapterState extends State<ChatRootAdapter> {
             onRequestWorkLogTerminal: _requestWorkLogTerminal,
             onContinueFromUserMessage: _continueFromUserMessage,
             supplementalEmptyStateContent: widget.supplementalEmptyStateContent,
+            flattenSupplementalEmptyStateDetails:
+                widget.flattenSupplementalEmptyStateDetails,
           ),
           composerRegion: _ChatComposerRegionHost(
             sessionScreen: sessionScreen,
@@ -226,6 +230,7 @@ class _ChatTranscriptRegionHost extends StatelessWidget {
     required this.onRequestWorkLogTerminal,
     required this.onContinueFromUserMessage,
     this.supplementalEmptyStateContent,
+    this.flattenSupplementalEmptyStateDetails = false,
   });
 
   final ChatScreenSessionContract sessionScreen;
@@ -240,6 +245,7 @@ class _ChatTranscriptRegionHost extends StatelessWidget {
   onRequestWorkLogTerminal;
   final Future<void> Function(String blockId) onContinueFromUserMessage;
   final Widget? supplementalEmptyStateContent;
+  final bool flattenSupplementalEmptyStateDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -272,6 +278,8 @@ class _ChatTranscriptRegionHost extends StatelessWidget {
           onSaveHostFingerprint: sessionController.saveObservedHostFingerprint,
           onContinueFromUserMessage: onContinueFromUserMessage,
           supplementalEmptyStateContent: supplementalEmptyStateContent,
+          flattenSupplementalEmptyStateDetails:
+              flattenSupplementalEmptyStateDetails,
         );
       },
     );

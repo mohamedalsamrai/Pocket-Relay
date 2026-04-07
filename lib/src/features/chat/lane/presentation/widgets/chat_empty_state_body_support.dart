@@ -28,7 +28,35 @@ extension on ChatEmptyStateBody {
     BuildContext context, {
     required List<_EmptyStateDetail> items,
     required double maxWidth,
+    bool panelized = true,
   }) {
+    if (!panelized) {
+      final divider = context.pocketPalette.surfaceBorder.withValues(
+        alpha: 0.4,
+      );
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Column(
+          children: items.indexed
+              .map((entry) {
+                final index = entry.$1;
+                final item = entry.$2;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: PocketSpacing.panelPadding,
+                      child: _EmptyStateDetailRow(item: item),
+                    ),
+                    if (index != items.length - 1)
+                      Divider(height: 1, thickness: 1, color: divider),
+                  ],
+                );
+              })
+              .toList(growable: false),
+        ),
+      );
+    }
+
     final (background, border, divider) = (
       context.pocketPalette.subtleSurface.withValues(alpha: 0.72),
       context.pocketPalette.surfaceBorder.withValues(alpha: 0.9),
@@ -120,6 +148,12 @@ extension on ChatEmptyStateBody {
     }
 
     return SizedBox(width: double.infinity, child: button);
+  }
+
+  bool _shouldFlattenSupplementalDetailsPanel() {
+    return flattenSupplementalDetailsPanel &&
+        isConfigured &&
+        supplementalContent != null;
   }
 }
 

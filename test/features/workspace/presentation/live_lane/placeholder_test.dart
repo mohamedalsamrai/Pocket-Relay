@@ -217,6 +217,7 @@ void main() {
         find.byKey(const ValueKey<String>('lane_connection_action_connect')),
         findsOneWidget,
       );
+      expect(find.byType(PocketPanelSurface), findsOneWidget);
     },
   );
 

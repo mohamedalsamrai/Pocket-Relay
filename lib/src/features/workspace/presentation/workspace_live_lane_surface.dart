@@ -236,6 +236,7 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
               recoveryNotice: laneNotice,
             ),
       supplementalEmptyStateContent: emptyStateContent,
+      flattenSupplementalEmptyStateDetails: true,
     );
     return chatRoot;
   }
