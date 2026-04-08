@@ -11,11 +11,13 @@ Future<void> _reconnectWorkspaceLane(
     return;
   }
 
-  controller._beginRecoveryAttempt(
-    normalizedConnectionId,
-    startedAt: controller._now(),
-    origin: ConnectionWorkspaceRecoveryOrigin.manualReconnect,
-  );
+  if (controller._state.requiresTransportReconnect(normalizedConnectionId)) {
+    controller._beginRecoveryAttempt(
+      normalizedConnectionId,
+      startedAt: controller._now(),
+      origin: ConnectionWorkspaceRecoveryOrigin.manualReconnect,
+    );
+  }
   await _reconnectWorkspaceConnection(controller, normalizedConnectionId);
 }
 

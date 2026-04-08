@@ -212,6 +212,10 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
         : LiveLaneNoticeHost(
             workspaceController: widget.workspaceController,
             connectionId: widget.laneBinding.connectionId,
+            isVisible:
+                workspaceState.isShowingLiveLane &&
+                workspaceState.selectedConnectionId ==
+                    widget.laneBinding.connectionId,
             contract: laneNoticeContract,
           );
     final emptyStateContent = _buildLaneEmptyStateContent(

@@ -11,11 +11,13 @@ class LiveLaneNoticeHost extends StatefulWidget {
     super.key,
     required this.workspaceController,
     required this.connectionId,
+    required this.isVisible,
     required this.contract,
   });
 
   final ConnectionWorkspaceController workspaceController;
   final String connectionId;
+  final bool isVisible;
   final LiveLaneNoticeContract contract;
 
   @override
@@ -42,7 +44,8 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   void didUpdateWidget(covariant LiveLaneNoticeHost oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.connectionId == widget.connectionId &&
-        oldWidget.contract == widget.contract) {
+        oldWidget.contract == widget.contract &&
+        oldWidget.isVisible == widget.isVisible) {
       return;
     }
     _syncDismissal(widget.contract);
@@ -58,7 +61,7 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appLifecycleState = state;
-    if (_isForegroundVisible) {
+    if (_isDismissalVisible) {
       _resumeDismissal();
     } else {
       _pauseDismissal();
@@ -68,6 +71,8 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   bool get _isForegroundVisible =>
       _appLifecycleState == null ||
       _appLifecycleState == AppLifecycleState.resumed;
+
+  bool get _isDismissalVisible => _isForegroundVisible && widget.isVisible;
 
   void _syncDismissal(LiveLaneNoticeContract contract) {
     final dismissibleEntry = contract.dismissibleEntry;
@@ -82,7 +87,11 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
       _dismissRemaining = dismissibleEntry.dismissAfterVisibleDuration;
     }
 
-    _resumeDismissal();
+    if (_isDismissalVisible) {
+      _resumeDismissal();
+    } else {
+      _pauseDismissal();
+    }
   }
 
   void _cancelDismissal() {
@@ -116,7 +125,7 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
     final dismissKey = _dismissKey;
     final remaining = _dismissRemaining;
     final dismissAction = widget.contract.dismissibleEntry?.dismissAction;
-    if (!_isForegroundVisible ||
+    if (!_isDismissalVisible ||
         dismissKey == null ||
         remaining == null ||
         dismissAction == null ||

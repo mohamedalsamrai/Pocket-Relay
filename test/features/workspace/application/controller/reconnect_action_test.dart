@@ -433,6 +433,44 @@ void main() {
   );
 
   test(
+    'reconnectConnection does not leave a manual recovery attempt in flight for saved-settings-only reconnects',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await controller.saveLiveConnectionEdits(
+        connectionId: 'conn_primary',
+        profile: workspaceProfile('Primary Renamed', 'primary.changed'),
+        secrets: const ConnectionSecrets(password: 'updated-secret'),
+      );
+
+      expect(
+        controller.state.requiresSavedSettingsReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+
+      await controller.reconnectConnection('conn_primary');
+
+      final diagnostics = controller.state.recoveryDiagnosticsFor(
+        'conn_primary',
+      );
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(diagnostics?.lastRecoveryOrigin, isNull);
+      expect(diagnostics?.lastRecoveryStartedAt, isNull);
+      expect(diagnostics?.lastRecoveryCompletedAt, isNull);
+    },
+  );
+
+  test(
     'reconnectConnection preserves reconnect-required state if transport drops during history assessment',
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');
