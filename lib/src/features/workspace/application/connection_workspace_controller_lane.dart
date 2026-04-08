@@ -11,6 +11,11 @@ Future<void> _reconnectWorkspaceLane(
     return;
   }
 
+  controller._beginRecoveryAttempt(
+    normalizedConnectionId,
+    startedAt: controller._now(),
+    origin: ConnectionWorkspaceRecoveryOrigin.manualReconnect,
+  );
   await _reconnectWorkspaceConnection(controller, normalizedConnectionId);
 }
 

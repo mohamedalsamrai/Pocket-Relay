@@ -126,6 +126,11 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   ConnectionWorkspaceState get state => _state;
   Future<void> flushRecoveryPersistence() => _enqueueRecoveryPersistence();
+
+  void dismissTurnLivenessNotice(String connectionId) {
+    _clearTurnLivenessAssessment(connectionId);
+  }
+
   AgentAdapterRemoteRuntimeDelegate createRemoteRuntimeDelegate(
     AgentAdapterKind kind,
   ) {

@@ -12,7 +12,11 @@ enum ConnectionWorkspaceReconnectRequirement {
   transportWithSavedSettings,
 }
 
-enum ConnectionWorkspaceRecoveryOrigin { foregroundResume, coldStart }
+enum ConnectionWorkspaceRecoveryOrigin {
+  foregroundResume,
+  coldStart,
+  manualReconnect,
+}
 
 enum ConnectionWorkspaceTransportLossReason {
   disconnected,

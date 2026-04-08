@@ -552,6 +552,54 @@ void _syncWorkspaceTurnLivenessAssessment(
   }
 }
 
+void _syncWorkspaceRecoveredTransportState(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) {
+  if (!controller._state.requiresTransportReconnect(connectionId) ||
+      !binding.agentAdapterClient.isConnected) {
+    return;
+  }
+
+  final liveReattachPhase = controller._state.liveReattachPhaseFor(connectionId);
+  if (liveReattachPhase ==
+          ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
+      liveReattachPhase ==
+          ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy) {
+    return;
+  }
+
+  final diagnostics = controller._state.recoveryDiagnosticsFor(connectionId);
+  final recoveryAttemptInFlight =
+      diagnostics?.lastRecoveryStartedAt != null &&
+      diagnostics?.lastRecoveryCompletedAt == null;
+  if (recoveryAttemptInFlight) {
+    return;
+  }
+
+  final sessionController = binding.sessionController;
+  if (sessionController.conversationRecoveryState != null ||
+      sessionController.historicalConversationRestoreState != null) {
+    return;
+  }
+
+  final sessionState = sessionController.sessionState;
+  final hasConversationIdentity =
+      sessionState.currentThreadId?.trim().isNotEmpty == true ||
+      sessionState.rootThreadId?.trim().isNotEmpty == true;
+  final hasRecoveredActivity =
+      _workspaceLaneHasProvenLiveTurnState(binding) ||
+      (hasConversationIdentity &&
+          _workspaceLaneHasVisibleLiveConversationState(binding));
+  if (!hasRecoveredActivity) {
+    return;
+  }
+
+  controller._clearTransportReconnectRequired(connectionId);
+  controller._clearLiveReattachPhase(connectionId);
+}
+
 Future<ConnectionWorkspaceTurnLivenessAssessment>
 _resolveWorkspaceTurnLivenessAfterReconnect(
   ConnectionLaneBinding binding, {
