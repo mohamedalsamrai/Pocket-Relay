@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:collection/collection.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
@@ -21,6 +22,8 @@ import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_
 part 'workspace_desktop_shell_sidebar.dart';
 part 'workspace_desktop_shell_sidebar_collapsed.dart';
 part 'workspace_desktop_shell_sidebar_expanded.dart';
+part 'workspace_desktop_shell_sidebar_rows.dart';
+part 'workspace_desktop_shell_sidebar_sections.dart';
 
 class ConnectionWorkspaceDesktopShell extends StatefulWidget {
   const ConnectionWorkspaceDesktopShell({
