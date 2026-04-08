@@ -32,6 +32,7 @@ const double _sectionDividerSpacing = 24;
 const double _fieldSpacing = 12;
 const double _subsectionSpacing = 14;
 const double _modelRefreshSpacing = 16;
+const double _modelDefaultsSplitLayoutBreakpoint = 640;
 
 class ConnectionSettingsSheetSurface extends StatelessWidget {
   const ConnectionSettingsSheetSurface({
