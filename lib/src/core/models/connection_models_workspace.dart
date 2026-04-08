@@ -313,8 +313,12 @@ WorkspaceProfile workspaceProfileFromConnectionProfile(
   );
 }
 
-SystemProfile systemProfileFromConnectionProfile(ConnectionProfile profile) {
+SystemProfile systemProfileFromConnectionProfile(
+  ConnectionProfile profile, {
+  bool includeLabel = false,
+}) {
   return SystemProfile(
+    label: includeLabel ? profile.label.trim() : '',
     host: profile.host,
     port: profile.port,
     username: profile.username,
@@ -327,7 +331,7 @@ ConnectionProfile connectionProfileFromSystem(SavedSystem? system) {
   final systemProfile = system?.profile ?? SystemProfile.defaults();
   final defaults = ConnectionProfile.defaults();
   return ConnectionProfile(
-    label: '',
+    label: system?.profile.label.trim() ?? '',
     host: systemProfile.host,
     port: systemProfile.port,
     username: systemProfile.username,

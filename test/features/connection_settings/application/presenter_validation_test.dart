@@ -145,17 +145,66 @@ void main() {
     expect(payload.secrets.password, 'secret');
   });
 
+  test('system settings expose and preserve an explicit system name', () {
+    final savedSystem = SavedSystem(
+      id: 'system_primary',
+      profile: const SystemProfile(
+        label: 'Build Box',
+        host: 'devbox.local',
+        port: 22,
+        username: 'vince',
+        authMode: AuthMode.password,
+        hostFingerprint: '',
+      ),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+    final initialProfile = connectionProfileFromSystem(savedSystem);
+    final initialSecrets = savedSystem.secrets;
+    final formState =
+        ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        ).copyWith(
+          draft: ConnectionSettingsDraft.fromConnection(
+            profile: initialProfile,
+            secrets: initialSecrets,
+          ).copyWith(hostFingerprint: 'aa:bb:cc:dd'),
+          showValidationErrors: true,
+        );
+
+    final contract = presenter.present(
+      initialProfile: initialProfile,
+      initialSecrets: initialSecrets,
+      formState: formState,
+      isSystemSettings: true,
+    );
+    final payload = contract.saveAction.submitPayload;
+
+    expect(contract.title, 'System');
+    expect(contract.profileSection.title, 'Name');
+    expect(
+      settingsField(
+        contract.profileSection,
+        ConnectionSettingsFieldId.label,
+      ).label,
+      'System name',
+    );
+    expect(payload, isNotNull);
+    expect(payload!.profile.label, 'Build Box');
+  });
+
   test(
-    'system settings keep the hidden label empty instead of defaulting it',
+    'system settings keep identity-derived fallback names implicit until the user renames the system',
     () {
       final savedSystem = SavedSystem(
         id: 'system_primary',
         profile: const SystemProfile(
+          label: '',
           host: 'devbox.local',
-          port: 22,
+          port: 2200,
           username: 'vince',
           authMode: AuthMode.password,
-          hostFingerprint: '',
+          hostFingerprint: 'aa:bb:cc:dd',
         ),
         secrets: const ConnectionSecrets(password: 'secret'),
       );
@@ -169,7 +218,7 @@ void main() {
             draft: ConnectionSettingsDraft.fromConnection(
               profile: initialProfile,
               secrets: initialSecrets,
-            ).copyWith(hostFingerprint: 'aa:bb:cc:dd'),
+            ).copyWith(host: 'devbox-2.local', hostFingerprint: '11:22:33:44'),
             showValidationErrors: true,
           );
 
@@ -181,11 +230,10 @@ void main() {
       );
       final payload = contract.saveAction.submitPayload;
 
-      expect(contract.title, 'System');
-      expect(contract.profileSection.title, isEmpty);
-      expect(contract.profileSection.fields, isEmpty);
+      expect(initialProfile.label, isEmpty);
       expect(payload, isNotNull);
       expect(payload!.profile.label, isEmpty);
+      expect(payload.profile.host, 'devbox-2.local');
     },
   );
 
@@ -226,9 +274,10 @@ void main() {
 
     expect(contract.systemPicker, isNotNull);
     expect(contract.systemPicker!.selectedSystemId, 'system_primary');
+    expect(contract.systemPicker!.options.single.label, 'Primary Workspace');
     expect(
-      contract.systemPicker!.options.single.label,
-      'devbox.local as vince',
+      contract.systemPicker!.options.single.description,
+      'vince@devbox.local · Password sign-in · Trusted fingerprint saved',
     );
   });
 

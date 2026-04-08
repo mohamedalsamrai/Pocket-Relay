@@ -119,12 +119,13 @@ void main() {
     },
   );
 
-  test('derives system templates without synthesizing a workspace label', () {
+  test('derives system templates that preserve explicit system names', () {
     final templates =
         deriveConnectionSettingsSystemTemplatesFromSystems(<SavedSystem>[
           SavedSystem(
             id: 'system_primary',
             profile: const SystemProfile(
+              label: 'Build Box',
               host: 'devbox.local',
               port: 2200,
               username: 'alice',
@@ -139,7 +140,7 @@ void main() {
         ]);
 
     expect(templates, hasLength(1));
-    expect(templates.single.profile.label, isEmpty);
+    expect(templates.single.profile.label, 'Build Box');
     expect(templates.single.profile.host, 'devbox.local');
     expect(templates.single.profile.port, 2200);
     expect(templates.single.profile.username, 'alice');

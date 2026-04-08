@@ -241,6 +241,48 @@ void main() {
   );
 
   test(
+    'loadSystemCatalog keeps a missing stored system label implicit while still deriving the legacy ssh identity for display',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        systemIndexKey(),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': <String>['system_seed'],
+        }),
+      );
+      await preferences.setString(
+        systemProfileKey('system_seed'),
+        jsonEncode(<String, Object?>{
+          'host': 'relay.example.com',
+          'port': 2200,
+          'username': 'vince',
+          'authMode': AuthMode.password.name,
+          'hostFingerprint': 'SHA256:shared',
+        }),
+      );
+      final repository = buildSecureConnectionRepository(
+        secureStorage: FakeFlutterSecureStorage(<String, String>{}),
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final systemCatalog = await repository.loadSystemCatalog();
+      final system = await repository.loadSystem('system_seed');
+
+      expect(systemCatalog.orderedSystemIds, <String>['system_seed']);
+      expect(systemCatalog.orderedSystems.single.profile.label, isEmpty);
+      expect(
+        systemCatalog.orderedSystems.single.profile.hasCustomLabel,
+        isFalse,
+      );
+      expect(system.profile.label, isEmpty);
+      expect(system.profile.displayLabel, 'vince@relay.example.com:2200');
+      expect(system.profile.hasCustomLabel, isFalse);
+    },
+  );
+
+  test(
     'loadCatalog ignores orphaned legacy secrets when the legacy profile is missing',
     () async {
       final secureStorage = FakeFlutterSecureStorage(<String, String>{

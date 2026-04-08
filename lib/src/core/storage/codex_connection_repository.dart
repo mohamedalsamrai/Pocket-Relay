@@ -417,6 +417,7 @@ SavedSystem _normalizeSystem(SavedSystem system) {
   return SavedSystem(
     id: normalizedSystemId,
     profile: profile.copyWith(
+      label: profile.label.trim(),
       host: profile.host.trim(),
       username: profile.username.trim(),
       hostFingerprint: profile.hostFingerprint.trim(),

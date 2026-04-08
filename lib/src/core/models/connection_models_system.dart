@@ -2,6 +2,7 @@ part of 'connection_models.dart';
 
 class SystemProfile {
   const SystemProfile({
+    this.label = '',
     required this.host,
     required this.port,
     required this.username,
@@ -9,6 +10,7 @@ class SystemProfile {
     required this.hostFingerprint,
   });
 
+  final String label;
   final String host;
   final int port;
   final String username;
@@ -17,6 +19,7 @@ class SystemProfile {
 
   factory SystemProfile.defaults() {
     return const SystemProfile(
+      label: '',
       host: '',
       port: 22,
       username: '',
@@ -25,11 +28,66 @@ class SystemProfile {
     );
   }
 
+  bool get hasCustomLabel {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isEmpty) {
+      return false;
+    }
+
+    final identityLabel = connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: false,
+    );
+    return identityLabel.isEmpty || normalizedLabel != identityLabel;
+  }
+
   String get displayLabel {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isNotEmpty) {
+      return normalizedLabel;
+    }
+
+    return connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: true,
+    );
+  }
+
+  String get connectionIdentityLabel {
+    return connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: true,
+    );
+  }
+
+  static String connectionIdentityLabelForProfile(
+    ConnectionProfile profile, {
+    bool usePlaceholder = true,
+  }) {
+    return connectionIdentityLabelForFields(
+      host: profile.host,
+      port: profile.port,
+      username: profile.username,
+      usePlaceholder: usePlaceholder,
+    );
+  }
+
+  static String connectionIdentityLabelForFields({
+    required String host,
+    required int port,
+    required String username,
+    required bool usePlaceholder,
+  }) {
     final normalizedHost = host.trim();
     final normalizedUsername = username.trim();
     if (normalizedHost.isEmpty) {
-      return 'System not set';
+      return usePlaceholder ? 'System not set' : '';
     }
 
     final hostWithPort = port == 22 ? normalizedHost : '$normalizedHost:$port';
@@ -50,6 +108,7 @@ class SystemProfile {
   }
 
   SystemProfile copyWith({
+    String? label,
     String? host,
     int? port,
     String? username,
@@ -57,6 +116,7 @@ class SystemProfile {
     String? hostFingerprint,
   }) {
     return SystemProfile(
+      label: label ?? this.label,
       host: host ?? this.host,
       port: port ?? this.port,
       username: username ?? this.username,
@@ -67,10 +127,14 @@ class SystemProfile {
 
   factory SystemProfile.fromJson(Map<String, dynamic> json) {
     final defaults = SystemProfile.defaults();
+    final host = json['host'] as String? ?? defaults.host;
+    final port = (json['port'] as num?)?.toInt() ?? defaults.port;
+    final username = json['username'] as String? ?? defaults.username;
     return SystemProfile(
-      host: json['host'] as String? ?? defaults.host,
-      port: (json['port'] as num?)?.toInt() ?? defaults.port,
-      username: json['username'] as String? ?? defaults.username,
+      label: _storedLabelFromJson(json),
+      host: host,
+      port: port,
+      username: username,
       authMode: _authModeFromName(
         json['authMode'] as String?,
         fallback: defaults.authMode,
@@ -82,6 +146,7 @@ class SystemProfile {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'label': label,
       'host': host,
       'port': port,
       'username': username,
@@ -93,6 +158,7 @@ class SystemProfile {
   @override
   bool operator ==(Object other) {
     return other is SystemProfile &&
+        other.label == label &&
         other.host == host &&
         other.port == port &&
         other.username == username &&
@@ -102,7 +168,34 @@ class SystemProfile {
 
   @override
   int get hashCode =>
-      Object.hash(host, port, username, authMode, hostFingerprint);
+      Object.hash(label, host, port, username, authMode, hostFingerprint);
+
+  static String _storedLabelFromJson(Map<String, dynamic> json) {
+    final rawLabel = json['label'];
+    if (rawLabel is String) {
+      return rawLabel.trim();
+    }
+
+    return _firstNonBlankTrimmedString(<Object?>[
+          json['name'],
+          json['displayLabel'],
+          json['identityLabel'],
+        ]) ??
+        '';
+  }
+
+  static String? _firstNonBlankTrimmedString(Iterable<Object?> candidates) {
+    for (final candidate in candidates) {
+      if (candidate is! String) {
+        continue;
+      }
+      final trimmed = candidate.trim();
+      if (trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    }
+    return null;
+  }
 }
 
 class SavedSystemSummary {

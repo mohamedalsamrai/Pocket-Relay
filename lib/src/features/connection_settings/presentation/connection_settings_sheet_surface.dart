@@ -358,6 +358,15 @@ class ConnectionSettingsSheetSurface extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (contract.profileSection.fields.isNotEmpty) ...[
+          _buildSection(
+            context,
+            key: const ValueKey<String>('connection_settings_section_name'),
+            title: contract.profileSection.title,
+            child: _buildFieldColumn(context, contract.profileSection.fields),
+          ),
+          if (contract.remoteConnectionSection != null) _buildSectionDivider(),
+        ],
         if (contract.remoteConnectionSection case final remoteSection?)
           _buildSection(
             context,
