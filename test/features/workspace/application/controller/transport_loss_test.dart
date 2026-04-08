@@ -287,4 +287,70 @@ void main() {
       expect(controller.bindingForConnectionId('conn_primary'), same(binding));
     },
   );
+
+  test(
+    'manual reconnect clears transport recovery when the binding is already reconnected without a fresh connected event',
+    () async {
+      final clientsById = <String, FakeCodexAppServerClient>{
+        'conn_primary': _PretendConnectedWithoutEventClient(),
+        'conn_secondary': FakeCodexAppServerClient(),
+      };
+      final client =
+          clientsById['conn_primary']! as _PretendConnectedWithoutEventClient;
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await client.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        ConnectionWorkspaceTransportRecoveryPhase.lost,
+      );
+
+      client.connectedWithoutEvent = true;
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(client.connectCalls, 1);
+      expect(controller.bindingForConnectionId('conn_primary'), same(binding));
+      expect(controller.state.requiresReconnect('conn_primary'), isFalse);
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_primary'),
+        isNull,
+      );
+      expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
+      expect(
+        controller.state
+            .recoveryDiagnosticsFor('conn_primary')!
+            .lastRecoveryOutcome,
+        ConnectionWorkspaceRecoveryOutcome.transportRestored,
+      );
+    },
+  );
+}
+
+class _PretendConnectedWithoutEventClient extends FakeCodexAppServerClient {
+  bool connectedWithoutEvent = false;
+
+  @override
+  bool get isConnected => connectedWithoutEvent || super.isConnected;
 }

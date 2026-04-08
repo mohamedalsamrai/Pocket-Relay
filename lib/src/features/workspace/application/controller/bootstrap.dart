@@ -97,120 +97,12 @@ Future<void> _initializeWorkspaceController(
     origin: ConnectionWorkspaceRecoveryOrigin.coldStart,
   );
   controller._applyState(
-    controller._state.copyWith(
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds: <String>{
-              ...controller._state.transportReconnectRequiredConnectionIds,
-              firstConnectionId,
-            },
-          ),
-      transportRecoveryPhasesByConnectionId:
-          _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
-                <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                  ...controller._state.transportRecoveryPhasesByConnectionId,
-                  firstConnectionId:
-                      ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
-                },
-          ),
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: controller._state.catalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
-            <String, ConnectionWorkspaceLiveReattachPhase>{
-              ...controller._state.liveReattachPhasesByConnectionId,
-              firstConnectionId:
-                  ConnectionWorkspaceLiveReattachPhase.reconnecting,
-            },
-      ),
-      recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-        catalog: controller._state.catalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        recoveryDiagnosticsByConnectionId:
-            controller._state.recoveryDiagnosticsByConnectionId,
-      ),
+    _withWorkspaceTransportReconnectStaged(
+      controller._state,
+      firstConnectionId,
     ),
   );
-  try {
-    await _connectWorkspaceBindingTransport(firstBinding);
-  } on CodexRemoteAppServerAttachException catch (error) {
-    if (!controller._isDisposed) {
-      _applyWorkspaceRemoteAttachRuntime(
-        controller,
-        connectionId: firstConnectionId,
-        snapshot: error.snapshot,
-      );
-      controller._recordFallbackTransportConnectFailure(
-        firstConnectionId,
-        occurredAt: controller._now(),
-        error: error,
-      );
-      controller._setLiveReattachPhase(
-        firstConnectionId,
-        switch (error.snapshot.status) {
-          CodexRemoteAppServerOwnerStatus.missing ||
-          CodexRemoteAppServerOwnerStatus.stopped =>
-            ConnectionWorkspaceLiveReattachPhase.ownerMissing,
-          CodexRemoteAppServerOwnerStatus.unhealthy ||
-          CodexRemoteAppServerOwnerStatus.running =>
-            ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy,
-        },
-      );
-      controller._setTransportRecoveryPhase(
-        firstConnectionId,
-        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
-      );
-      controller._setTurnLivenessAssessment(
-        firstConnectionId,
-        ConnectionWorkspaceTurnLivenessAssessment(
-          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
-          evidence: ConnectionWorkspaceTurnLivenessEvidence.ownerUnavailable,
-          threadId: recoveryState!.selectedThreadId!,
-        ),
-      );
-      controller._completeRecoveryAttempt(
-        firstConnectionId,
-        completedAt: controller._now(),
-        outcome: ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
-      );
-    }
-    return;
-  } catch (error) {
-    if (!controller._isDisposed) {
-      controller._recordFallbackTransportConnectFailure(
-        firstConnectionId,
-        occurredAt: controller._now(),
-        error: error,
-      );
-      controller._clearLiveReattachPhase(firstConnectionId);
-      controller._setTransportRecoveryPhase(
-        firstConnectionId,
-        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
-      );
-      controller._setTurnLivenessAssessment(
-        firstConnectionId,
-        ConnectionWorkspaceTurnLivenessAssessment(
-          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
-          evidence:
-              ConnectionWorkspaceTurnLivenessEvidence.transportUnavailable,
-          threadId: recoveryState!.selectedThreadId!,
-        ),
-      );
-      controller._completeRecoveryAttempt(
-        firstConnectionId,
-        completedAt: controller._now(),
-        outcome: ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
-      );
-    }
-    return;
-  }
-
-  await _recoverWorkspaceConversationAfterTransportReconnect(
+  await _attemptWorkspaceTransportReconnect(
     controller,
     firstConnectionId,
     firstBinding,

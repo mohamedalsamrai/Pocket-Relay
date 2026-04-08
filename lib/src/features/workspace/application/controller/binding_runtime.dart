@@ -42,8 +42,7 @@ void _registerWorkspaceLiveBinding(
           if (controller._intentionalTransportDisconnectConnectionIds.remove(
             connectionId,
           )) {
-            controller._clearTransportReconnectRequired(connectionId);
-            controller._clearLiveReattachPhase(connectionId);
+            _clearWorkspaceTransportReconnectState(controller, connectionId);
             controller._clearTurnLivenessAssessment(connectionId);
             break;
           }
@@ -83,12 +82,11 @@ void _registerWorkspaceLiveBinding(
                 ConnectionWorkspaceLiveReattachPhase.reconnecting,
               );
             } else {
-              controller._clearTransportReconnectRequired(connectionId);
-              controller._clearLiveReattachPhase(connectionId);
-              controller._completeRecoveryAttempt(
+              _finalizeWorkspaceRecoveredTransportState(
+                controller,
                 connectionId,
                 completedAt: controller._now(),
-                outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
+                recordRecoveryOutcome: true,
               );
             }
           }
