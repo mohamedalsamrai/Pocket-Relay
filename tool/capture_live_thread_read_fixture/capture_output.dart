@@ -21,7 +21,10 @@ Map<String, Object?> buildThreadCaptureSummary(
     'threadId': extractThreadId(payload) ?? fallbackThreadId,
     'turnCount': turns.length,
     'itemCountsByTurn': turns
-        .map((turn) => asObjectList(turn['items'])?.length ?? 0)
+        .map((turn) {
+          final items = turn['items'];
+          return items is List ? items.length : 0;
+        })
         .toList(growable: false),
   };
 }

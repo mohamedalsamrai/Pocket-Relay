@@ -27,7 +27,7 @@ final class CaptureOptions {
 
   static CaptureOptions? parse(List<String> args) {
     var prefsPath =
-        '${Platform.environment['HOME']}/.local/share/com.example.pocket_relay/shared_preferences.json';
+        '${_defaultHomeDirectory(Platform.environment)}/.local/share/com.example.pocket_relay/shared_preferences.json';
     var profileKey = 'pocket_relay.profile';
     var handoffKey = 'pocket_relay.conversation_handoff';
     String? threadId;
@@ -75,12 +75,20 @@ final class CaptureOptions {
           if (index + 1 >= args.length) {
             return null;
           }
-          initializeTimeoutSeconds = int.parse(args[++index]);
+          final value = int.tryParse(args[++index]);
+          if (value == null) {
+            return null;
+          }
+          initializeTimeoutSeconds = value;
         case '--read-timeout-seconds':
           if (index + 1 >= args.length) {
             return null;
           }
-          readTimeoutSeconds = int.parse(args[++index]);
+          final value = int.tryParse(args[++index]);
+          if (value == null) {
+            return null;
+          }
+          readTimeoutSeconds = value;
         case '--sanitized-output':
           if (index + 1 >= args.length) {
             return null;
@@ -126,6 +134,10 @@ String? _normalizeOptionalString(String? value) {
   }
   final normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
+}
+
+String _defaultHomeDirectory(Map<String, String> environment) {
+  return environment['HOME'] ?? environment['USERPROFILE'] ?? '';
 }
 
 void printCaptureUsage(IOSink sink) {
