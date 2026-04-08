@@ -337,18 +337,6 @@ void _completeWorkspaceConversationRecoveryAttempt(
   );
 }
 
-void _completeWorkspaceLiveReattachRecoveryAttempt(
-  ConnectionWorkspaceController controller,
-  String connectionId, {
-  required DateTime completedAt,
-}) {
-  controller._completeRecoveryAttempt(
-    connectionId,
-    completedAt: completedAt,
-    outcome: ConnectionWorkspaceRecoveryOutcome.liveReattached,
-  );
-}
-
 void _updateWorkspaceRecoveryDiagnostics(
   ConnectionWorkspaceController controller,
   String connectionId,

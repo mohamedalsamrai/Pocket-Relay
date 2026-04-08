@@ -132,6 +132,15 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   ConnectionWorkspaceRecoveryState? get debugLatestUnsavedRecoveryState =>
       _latestUnsavedRecoveryStateSnapshot();
 
+  void dismissFinishedWhileAwayNotice(String connectionId) {
+    final assessment = _state.turnLivenessAssessmentFor(connectionId);
+    if (assessment?.status !=
+        ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway) {
+      return;
+    }
+    _clearTurnLivenessAssessment(connectionId);
+  }
+
   AgentAdapterRemoteRuntimeDelegate createRemoteRuntimeDelegate(
     AgentAdapterKind kind,
   ) {
@@ -533,15 +542,6 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     this,
     connectionId,
     binding,
-    completedAt: completedAt,
-  );
-
-  void _completeLiveReattachRecoveryAttempt(
-    String connectionId, {
-    required DateTime completedAt,
-  }) => _completeWorkspaceLiveReattachRecoveryAttempt(
-    this,
-    connectionId,
     completedAt: completedAt,
   );
 
