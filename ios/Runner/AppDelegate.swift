@@ -158,7 +158,7 @@ final class BackgroundExecutionCoordinator {
     let request = UNNotificationRequest(
       identifier: turnCompletionNotificationIdentifier,
       content: content,
-      trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+      trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
     )
 
     let notificationCenter = notificationCenter()

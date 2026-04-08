@@ -35,7 +35,7 @@ object TurnCompletionNotification {
                 setStyle(NotificationCompat.BigTextStyle().bigText(resolvedBody))
             }
         }
-        .setSmallIcon(R.mipmap.ic_launcher)
+        .setSmallIcon(R.drawable.ic_turn_completion_notification)
         .setContentIntent(launchContentIntent(context))
         .setAutoCancel(true)
         .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)

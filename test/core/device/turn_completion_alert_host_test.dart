@@ -183,6 +183,113 @@ void main() {
     },
   );
 
+  testWidgets(
+    'keeps a background alert while another turn is still active in the background',
+    (tester) async {
+      final completionAlerts = StreamController<TurnCompletionAlertRequest>();
+      final controller = _FakeTurnCompletionAlertController();
+      final permissionController = _FakeNotificationPermissionController();
+      addTearDown(() {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+      });
+      addTearDown(completionAlerts.close);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TurnCompletionAlertHost(
+            completionAlerts: completionAlerts.stream,
+            hasActiveTurn: false,
+            turnCompletionAlertController: controller,
+            notificationPermissionController: permissionController,
+            supportsForegroundSignal: true,
+            supportsBackgroundAlerts: true,
+            child: const SizedBox(),
+          ),
+        ),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+
+      completionAlerts.add(
+        const TurnCompletionAlertRequest(
+          id: 'conn_primary:turn_1',
+          title: 'Turn completed',
+        ),
+      );
+      await tester.pump();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TurnCompletionAlertHost(
+            completionAlerts: completionAlerts.stream,
+            hasActiveTurn: true,
+            turnCompletionAlertController: controller,
+            notificationPermissionController: permissionController,
+            supportsForegroundSignal: true,
+            supportsBackgroundAlerts: true,
+            child: const SizedBox(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(controller.backgroundAlerts, hasLength(1));
+      expect(controller.clearCalls, 0);
+    },
+  );
+
+  testWidgets('prunes old handled alert ids with a bounded cache', (
+    tester,
+  ) async {
+    final completionAlerts = StreamController<TurnCompletionAlertRequest>();
+    final controller = _FakeTurnCompletionAlertController();
+    final permissionController = _FakeNotificationPermissionController();
+    addTearDown(() {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    });
+    addTearDown(completionAlerts.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TurnCompletionAlertHost(
+          completionAlerts: completionAlerts.stream,
+          hasActiveTurn: false,
+          turnCompletionAlertController: controller,
+          notificationPermissionController: permissionController,
+          supportsForegroundSignal: true,
+          supportsBackgroundAlerts: true,
+          child: const SizedBox(),
+        ),
+      ),
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+
+    for (var index = 0; index < 51; index++) {
+      completionAlerts.add(
+        TurnCompletionAlertRequest(
+          id: 'conn_primary:turn_$index',
+          title: 'Turn completed',
+        ),
+      );
+    }
+    await tester.pump();
+
+    completionAlerts.add(
+      const TurnCompletionAlertRequest(
+        id: 'conn_primary:turn_0',
+        title: 'Turn completed',
+      ),
+    );
+    await tester.pump();
+
+    expect(controller.backgroundAlerts, hasLength(52));
+  });
+
   testWidgets('falls back safely when notification permission is denied', (
     tester,
   ) async {

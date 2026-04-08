@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -105,12 +106,15 @@ class TurnCompletionAlertHost extends StatefulWidget {
 class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
     with WidgetsBindingObserver {
   final Set<String> _handledAlertIds = <String>{};
+  final Queue<String> _handledAlertIdOrder = Queue<String>();
   StreamSubscription<TurnCompletionAlertRequest>? _completionAlertsSubscription;
   AppLifecycleState? _appLifecycleState;
   bool _showsBackgroundAlert = false;
   bool _isRequestingNotificationPermission = false;
   bool _notificationPermissionDeniedForCurrentForegroundSession = false;
   int _notificationPermissionRequestEpoch = 0;
+
+  static const int _maxHandledAlertIds = 50;
 
   bool get _supportsForegroundSignal {
     return widget.supportsForegroundSignal ??
@@ -185,7 +189,7 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   void _syncCompletionAlertState() {
-    if (_showsBackgroundAlert && (_isForeground || widget.hasActiveTurn)) {
+    if (_showsBackgroundAlert && _isForeground) {
       _showsBackgroundAlert = false;
       unawaited(_clearBackgroundAlertSafely());
     }
@@ -208,7 +212,7 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   Future<void> _handleCompletionAlert(TurnCompletionAlertRequest alert) async {
-    if (!_handledAlertIds.add(alert.id)) {
+    if (!_rememberHandledAlertId(alert.id)) {
       return;
     }
 
@@ -246,6 +250,20 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
         ),
       );
     }
+  }
+
+  bool _rememberHandledAlertId(String alertId) {
+    if (_handledAlertIds.contains(alertId)) {
+      return false;
+    }
+
+    _handledAlertIds.add(alertId);
+    _handledAlertIdOrder.addLast(alertId);
+    while (_handledAlertIdOrder.length > _maxHandledAlertIds) {
+      final removedAlertId = _handledAlertIdOrder.removeFirst();
+      _handledAlertIds.remove(removedAlertId);
+    }
+    return true;
   }
 
   Future<void> _requestNotificationPermissionIfNeeded(int requestEpoch) async {
