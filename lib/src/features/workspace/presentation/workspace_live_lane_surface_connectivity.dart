@@ -41,7 +41,9 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         ConnectionSettingsRemoteServerActionId.restart =>
           workspaceController.restartRemoteServer(connectionId: connectionId),
       };
-      if (!mounted) {
+      if (!mounted ||
+          widget.workspaceController != workspaceController ||
+          widget.laneBinding.connectionId != connectionId) {
         return;
       }
 
@@ -54,14 +56,16 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         );
       }
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          widget.workspaceController != workspaceController ||
+          widget.laneBinding.connectionId != connectionId) {
         return;
       }
 
       _showTransientError(
         ConnectionLifecycleErrors.remoteServerActionFailure(
           actionId,
-          remoteRuntime: widget.workspaceController.state.remoteRuntimeFor(
+          remoteRuntime: workspaceController.state.remoteRuntimeFor(
             connectionId,
           ),
           error: error,
@@ -102,7 +106,9 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
           connectionId,
         );
       }
-      if (!mounted) {
+      if (!mounted ||
+          widget.workspaceController != workspaceController ||
+          widget.laneBinding != laneBinding) {
         return;
       }
       _showTransientError(
