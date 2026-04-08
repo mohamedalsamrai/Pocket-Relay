@@ -49,5 +49,20 @@ void main() {
       expect(host.contract.isAutoFollowEnabled, isTrue);
       expect(host.contract.request, isNull);
     });
+
+    test('manual jump-to-latest requests reuse the shared follow contract', () {
+      final host = ChatTranscriptFollowHost();
+
+      host.updateAutoFollowEligibility(isNearBottom: false);
+      host.requestFollow(
+        source: ChatTranscriptFollowRequestSource.jumpToLatest,
+      );
+
+      expect(host.contract.isAutoFollowEnabled, isTrue);
+      expect(
+        host.contract.request?.source,
+        ChatTranscriptFollowRequestSource.jumpToLatest,
+      );
+    });
   });
 }

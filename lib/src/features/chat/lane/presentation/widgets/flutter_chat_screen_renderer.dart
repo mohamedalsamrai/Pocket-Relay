@@ -10,6 +10,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/chat_sc
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_session_state.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/transcript_list.dart';
+import 'package:pocket_relay/src/features/chat/transcript_follow/presentation/chat_transcript_follow_contract.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_work_log_terminal_contract.dart';
 
@@ -114,6 +115,7 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
     required this.onSelectTimeline,
     required this.onSelectConnectionMode,
     required this.onAutoFollowEligibilityChanged,
+    required this.onRequestTranscriptFollow,
     this.surfaceChangeToken,
     this.onOpenChangedFileDiff,
     this.onOpenWorkLogTerminal,
@@ -132,6 +134,8 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
   final ValueChanged<String> onSelectTimeline;
   final ValueChanged<ConnectionMode> onSelectConnectionMode;
   final ValueChanged<bool> onAutoFollowEligibilityChanged;
+  final ValueChanged<ChatTranscriptFollowRequestSource>
+  onRequestTranscriptFollow;
   final Object? surfaceChangeToken;
   final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final void Function(ChatWorkLogTerminalContract terminal)?
@@ -160,6 +164,7 @@ class FlutterChatTranscriptRegion extends StatelessWidget {
       },
       onSelectConnectionMode: onSelectConnectionMode,
       onAutoFollowEligibilityChanged: onAutoFollowEligibilityChanged,
+      onRequestTranscriptFollow: onRequestTranscriptFollow,
       onApproveRequest: onApproveRequest,
       onDenyRequest: onDenyRequest,
       onOpenChangedFileDiff: onOpenChangedFileDiff,

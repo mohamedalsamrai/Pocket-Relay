@@ -2,6 +2,7 @@ enum ChatTranscriptFollowRequestSource {
   sendPrompt,
   newThread,
   clearTranscript,
+  jumpToLatest,
 }
 
 class ChatTranscriptFollowRequestContract {
