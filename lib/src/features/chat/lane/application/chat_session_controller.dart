@@ -35,6 +35,7 @@ part 'chat_session_controller_prompt_flow.dart';
 part 'chat_session_controller_recovery.dart';
 part 'chat_session_controller_support.dart';
 part 'chat_session_controller_thread_metadata.dart';
+part 'chat_session_controller_turn_completion.dart';
 part 'chat_session_controller_work_log_terminal.dart';
 
 class ChatSessionController extends ChangeNotifier {
@@ -77,7 +78,7 @@ class ChatSessionController extends ChangeNotifier {
       _secrets = initial.secrets;
       _isLoading = false;
     }
-    _appServerEventSubscription = this.agentAdapterClient.events.listen(
+    _appServerEventSubscription = agentAdapterClient.events.listen(
       _handleAppServerEvent,
     );
   }
@@ -96,6 +97,8 @@ class ChatSessionController extends ChangeNotifier {
       const ChatConversationRecoveryPolicy();
   final bool _supportsLocalConnectionMode;
   final _snackBarMessagesController = StreamController<String>.broadcast();
+  final _turnCompletedEventsController =
+      StreamController<ChatSessionTurnCompletedEvent>.broadcast();
 
   ConnectionProfile _profile = ConnectionProfile.defaults();
   ConnectionSecrets _secrets = const ConnectionSecrets();
@@ -121,6 +124,8 @@ class ChatSessionController extends ChangeNotifier {
   Future<void>? _modelCatalogHydrationFuture;
 
   Stream<String> get snackBarMessages => _snackBarMessagesController.stream;
+  Stream<ChatSessionTurnCompletedEvent> get turnCompletedEvents =>
+      _turnCompletedEventsController.stream;
 
   ConnectionProfile get profile => _profile;
   ConnectionSecrets get secrets => _secrets;
@@ -258,6 +263,7 @@ class ChatSessionController extends ChangeNotifier {
     _appServerEventSubscription?.cancel();
     unawaited(agentAdapterClient.disconnect());
     unawaited(_snackBarMessagesController.close());
+    unawaited(_turnCompletedEventsController.close());
     super.dispose();
   }
 

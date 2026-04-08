@@ -9,6 +9,8 @@ class PocketPlatformBehavior {
     required this.supportsWakeLock,
     required this.supportsFiniteBackgroundGrace,
     required this.supportsActiveTurnForegroundService,
+    required this.supportsForegroundTurnCompletionSignal,
+    required this.supportsBackgroundTurnCompletionAlerts,
     required this.usesDesktopKeyboardSubmit,
     required this.supportsCollapsibleDesktopSidebar,
   });
@@ -40,6 +42,18 @@ class PocketPlatformBehavior {
           !isWeb && resolvedPlatform == TargetPlatform.iOS,
       supportsActiveTurnForegroundService:
           !isWeb && resolvedPlatform == TargetPlatform.android,
+      supportsForegroundTurnCompletionSignal:
+          !isWeb &&
+          switch (resolvedPlatform) {
+            TargetPlatform.android || TargetPlatform.iOS => true,
+            _ => false,
+          },
+      supportsBackgroundTurnCompletionAlerts:
+          !isWeb &&
+          switch (resolvedPlatform) {
+            TargetPlatform.android || TargetPlatform.iOS => true,
+            _ => false,
+          },
       usesDesktopKeyboardSubmit: isDesktopExperience,
       supportsCollapsibleDesktopSidebar:
           !isWeb && resolvedPlatform == TargetPlatform.macOS,
@@ -51,6 +65,8 @@ class PocketPlatformBehavior {
   final bool supportsWakeLock;
   final bool supportsFiniteBackgroundGrace;
   final bool supportsActiveTurnForegroundService;
+  final bool supportsForegroundTurnCompletionSignal;
+  final bool supportsBackgroundTurnCompletionAlerts;
   final bool usesDesktopKeyboardSubmit;
   final bool supportsCollapsibleDesktopSidebar;
 

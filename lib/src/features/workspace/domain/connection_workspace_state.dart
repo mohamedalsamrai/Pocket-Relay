@@ -258,30 +258,36 @@ class ConnectionWorkspaceDeviceContinuityWarnings {
     this.foregroundServiceWarning,
     this.backgroundGraceWarning,
     this.wakeLockWarning,
+    this.turnCompletionAlertWarning,
   });
 
   final PocketUserFacingError? foregroundServiceWarning;
   final PocketUserFacingError? backgroundGraceWarning;
   final PocketUserFacingError? wakeLockWarning;
+  final PocketUserFacingError? turnCompletionAlertWarning;
 
   bool get isEmpty =>
       foregroundServiceWarning == null &&
       backgroundGraceWarning == null &&
-      wakeLockWarning == null;
+      wakeLockWarning == null &&
+      turnCompletionAlertWarning == null;
 
-  List<PocketUserFacingError> get activeWarnings => <PocketUserFacingError>[
-    if (foregroundServiceWarning case final warning?) warning,
-    if (backgroundGraceWarning case final warning?) warning,
-    if (wakeLockWarning case final warning?) warning,
-  ];
+  List<PocketUserFacingError> get activeWarnings => <PocketUserFacingError?>[
+    foregroundServiceWarning,
+    backgroundGraceWarning,
+    wakeLockWarning,
+    turnCompletionAlertWarning,
+  ].whereType<PocketUserFacingError>().toList(growable: false);
 
   ConnectionWorkspaceDeviceContinuityWarnings copyWith({
     PocketUserFacingError? foregroundServiceWarning,
     PocketUserFacingError? backgroundGraceWarning,
     PocketUserFacingError? wakeLockWarning,
+    PocketUserFacingError? turnCompletionAlertWarning,
     bool clearForegroundServiceWarning = false,
     bool clearBackgroundGraceWarning = false,
     bool clearWakeLockWarning = false,
+    bool clearTurnCompletionAlertWarning = false,
   }) {
     return ConnectionWorkspaceDeviceContinuityWarnings(
       foregroundServiceWarning: clearForegroundServiceWarning
@@ -293,6 +299,9 @@ class ConnectionWorkspaceDeviceContinuityWarnings {
       wakeLockWarning: clearWakeLockWarning
           ? null
           : (wakeLockWarning ?? this.wakeLockWarning),
+      turnCompletionAlertWarning: clearTurnCompletionAlertWarning
+          ? null
+          : (turnCompletionAlertWarning ?? this.turnCompletionAlertWarning),
     );
   }
 
@@ -301,7 +310,8 @@ class ConnectionWorkspaceDeviceContinuityWarnings {
     return other is ConnectionWorkspaceDeviceContinuityWarnings &&
         other.foregroundServiceWarning == foregroundServiceWarning &&
         other.backgroundGraceWarning == backgroundGraceWarning &&
-        other.wakeLockWarning == wakeLockWarning;
+        other.wakeLockWarning == wakeLockWarning &&
+        other.turnCompletionAlertWarning == turnCompletionAlertWarning;
   }
 
   @override
@@ -309,6 +319,7 @@ class ConnectionWorkspaceDeviceContinuityWarnings {
     foregroundServiceWarning,
     backgroundGraceWarning,
     wakeLockWarning,
+    turnCompletionAlertWarning,
   );
 }
 

@@ -51,4 +51,52 @@ abstract final class DeviceCapabilityErrors {
           'Pocket Relay could not change the display wake lock that protects an active turn while the app stays in the foreground.',
     ).withNormalizedUnderlyingError(error);
   }
+
+  static PocketUserFacingError turnCompletionAlertPermissionQueryFailed({
+    Object? error,
+  }) {
+    return const PocketUserFacingError(
+      definition:
+          PocketErrorCatalog.deviceTurnCompletionAlertPermissionQueryFailed,
+      title: 'Completion alerts unavailable',
+      message:
+          'Pocket Relay could not verify notification permission for finished-turn completion alerts.',
+    ).withNormalizedUnderlyingError(error);
+  }
+
+  static PocketUserFacingError turnCompletionAlertPermissionRequestFailed({
+    Object? error,
+  }) {
+    return const PocketUserFacingError(
+      definition:
+          PocketErrorCatalog.deviceTurnCompletionAlertPermissionRequestFailed,
+      title: 'Completion alerts unavailable',
+      message:
+          'Pocket Relay could not request notification permission for finished-turn completion alerts.',
+    ).withNormalizedUnderlyingError(error);
+  }
+
+  static PocketUserFacingError turnCompletionAlertNotificationUpdateFailed({
+    Object? error,
+  }) {
+    return const PocketUserFacingError(
+      definition:
+          PocketErrorCatalog.deviceTurnCompletionAlertNotificationUpdateFailed,
+      title: 'Completion alerts unavailable',
+      message:
+          'Pocket Relay could not post or clear the finished-turn completion alert notification.',
+    ).withNormalizedUnderlyingError(error);
+  }
+
+  static PocketUserFacingError turnCompletionAlertForegroundSignalFailed({
+    Object? error,
+  }) {
+    return const PocketUserFacingError(
+      definition:
+          PocketErrorCatalog.deviceTurnCompletionAlertForegroundSignalFailed,
+      title: 'Completion alerts unavailable',
+      message:
+          'Pocket Relay could not emit the in-app completion signal for a finished live turn.',
+    ).withNormalizedUnderlyingError(error);
+  }
 }

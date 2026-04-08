@@ -64,6 +64,27 @@ class MainActivity : FlutterActivity() {
                     )
                 }
 
+                "showTurnCompletionNotification" -> {
+                    val title = call.argument<String>("title")?.trim()
+                    val body = call.argument<String>("body")
+                    if (title.isNullOrEmpty()) {
+                        result.error(
+                            "invalid-arguments",
+                            "Expected a non-empty title.",
+                            null,
+                        )
+                        return@setMethodCallHandler
+                    }
+
+                    TurnCompletionNotification.show(applicationContext, title, body)
+                    result.success(null)
+                }
+
+                "clearTurnCompletionNotification" -> {
+                    TurnCompletionNotification.clear(applicationContext)
+                    result.success(null)
+                }
+
                 else -> result.notImplemented()
             }
         }

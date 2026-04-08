@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:pocket_relay/src/core/device/background_grace_host.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
+import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_background_grace_host.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_foreground_service_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_wake_lock_host.dart';
 
@@ -143,6 +145,9 @@ class _PocketRelayBootstrapState extends State<PocketRelayBootstrap> {
       foregroundServiceController:
           dependencies.foregroundServiceController ??
           const MethodChannelForegroundServiceController(),
+      notificationPermissionController:
+          dependencies.notificationPermissionController ??
+          const MethodChannelNotificationPermissionController(),
       supportsForegroundService:
           platformPolicy.supportsActiveTurnForegroundService,
       child: WorkspaceTurnBackgroundGraceHost(
@@ -153,18 +158,34 @@ class _PocketRelayBootstrapState extends State<PocketRelayBootstrap> {
         supportsBackgroundGrace: platformPolicy.supportsFiniteBackgroundGrace,
         child: WorkspaceAppLifecycleHost(
           workspaceController: _workspaceController,
-          child: WorkspaceTurnWakeLockHost(
+          child: WorkspaceTurnCompletionAlertHost(
             workspaceController: _workspaceController,
-            displayWakeLockController:
-                dependencies.displayWakeLockController ??
-                const WakelockPlusDisplayWakeLockController(),
-            supportsWakeLock: platformPolicy.supportsWakeLock,
-            child: PocketRelayShell(
+            turnCompletionAlertController:
+                dependencies.turnCompletionAlertController ??
+                const PlatformTurnCompletionAlertController(),
+            notificationPermissionController:
+                dependencies.notificationPermissionController ??
+                const MethodChannelNotificationPermissionController(),
+            supportsForegroundSignal:
+                platformPolicy.supportsForegroundTurnCompletionSignal,
+            supportsBackgroundAlerts:
+                platformPolicy.supportsBackgroundTurnCompletionAlerts,
+            requestNotificationPermissionWhileForegrounded:
+                platformPolicy.supportsBackgroundTurnCompletionAlerts &&
+                !platformPolicy.supportsActiveTurnForegroundService,
+            child: WorkspaceTurnWakeLockHost(
               workspaceController: _workspaceController,
-              platformPolicy: platformPolicy,
-              conversationHistoryRepository:
-                  dependencies.conversationHistoryRepository,
-              settingsOverlayDelegate: dependencies.settingsOverlayDelegate,
+              displayWakeLockController:
+                  dependencies.displayWakeLockController ??
+                  const WakelockPlusDisplayWakeLockController(),
+              supportsWakeLock: platformPolicy.supportsWakeLock,
+              child: PocketRelayShell(
+                workspaceController: _workspaceController,
+                platformPolicy: platformPolicy,
+                conversationHistoryRepository:
+                    dependencies.conversationHistoryRepository,
+                settingsOverlayDelegate: dependencies.settingsOverlayDelegate,
+              ),
             ),
           ),
         ),

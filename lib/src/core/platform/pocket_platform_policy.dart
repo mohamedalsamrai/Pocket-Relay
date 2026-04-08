@@ -28,4 +28,10 @@ class PocketPlatformPolicy {
 
   bool get supportsActiveTurnForegroundService =>
       behavior.supportsActiveTurnForegroundService;
+
+  bool get supportsForegroundTurnCompletionSignal =>
+      behavior.supportsForegroundTurnCompletionSignal;
+
+  bool get supportsBackgroundTurnCompletionAlerts =>
+      behavior.supportsBackgroundTurnCompletionAlerts;
 }

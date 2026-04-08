@@ -3,6 +3,7 @@ import 'package:pocket_relay/src/agent_adapters/agent_adapter_remote_runtime_del
 import 'package:pocket_relay/src/core/device/background_grace_host.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
+import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
@@ -32,7 +33,9 @@ class PocketRelayApp extends StatelessWidget {
     this.remoteAppServerOwnerInspector,
     this.backgroundGraceController,
     this.foregroundServiceController,
+    this.notificationPermissionController,
     this.displayWakeLockController,
+    this.turnCompletionAlertController,
     this.platformPolicy,
     this.settingsOverlayDelegate =
         const ModalConnectionSettingsOverlayDelegate(),
@@ -53,7 +56,9 @@ class PocketRelayApp extends StatelessWidget {
   final CodexRemoteAppServerOwnerInspector? remoteAppServerOwnerInspector;
   final BackgroundGraceController? backgroundGraceController;
   final ForegroundServiceController? foregroundServiceController;
+  final NotificationPermissionController? notificationPermissionController;
   final DisplayWakeLockController? displayWakeLockController;
+  final TurnCompletionAlertController? turnCompletionAlertController;
   final PocketPlatformPolicy? platformPolicy;
   final ConnectionSettingsOverlayDelegate settingsOverlayDelegate;
 
@@ -78,7 +83,9 @@ class PocketRelayApp extends StatelessWidget {
           remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
           backgroundGraceController: backgroundGraceController,
           foregroundServiceController: foregroundServiceController,
+          notificationPermissionController: notificationPermissionController,
           displayWakeLockController: displayWakeLockController,
+          turnCompletionAlertController: turnCompletionAlertController,
           platformPolicy: platformPolicy,
           settingsOverlayDelegate: settingsOverlayDelegate,
         ),

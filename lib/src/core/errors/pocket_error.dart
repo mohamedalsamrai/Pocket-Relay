@@ -717,6 +717,34 @@ abstract final class PocketErrorCatalog {
     meaning:
         'Pocket Relay could not enable or disable the display wake lock used to preserve an active turn while the app remains in the foreground.',
   );
+  static const PocketErrorDefinition
+  deviceTurnCompletionAlertPermissionQueryFailed = PocketErrorDefinition(
+    code: 'PR-DEVICE-1106',
+    domain: PocketErrorDomain.deviceCapability,
+    meaning:
+        'Pocket Relay could not verify notification permission before trying to post a finished-turn completion alert.',
+  );
+  static const PocketErrorDefinition
+  deviceTurnCompletionAlertPermissionRequestFailed = PocketErrorDefinition(
+    code: 'PR-DEVICE-1107',
+    domain: PocketErrorDomain.deviceCapability,
+    meaning:
+        'Pocket Relay could not request notification permission needed for finished-turn completion alerts.',
+  );
+  static const PocketErrorDefinition
+  deviceTurnCompletionAlertNotificationUpdateFailed = PocketErrorDefinition(
+    code: 'PR-DEVICE-1108',
+    domain: PocketErrorDomain.deviceCapability,
+    meaning:
+        'Pocket Relay could not post, replace, or clear the finished-turn completion alert notification.',
+  );
+  static const PocketErrorDefinition
+  deviceTurnCompletionAlertForegroundSignalFailed = PocketErrorDefinition(
+    code: 'PR-DEVICE-1109',
+    domain: PocketErrorDomain.deviceCapability,
+    meaning:
+        'Pocket Relay could not emit the in-app finished-turn completion signal while the app remained in the foreground.',
+  );
 
   // Chat session: image attachment (15xx).
   static const PocketErrorDefinition chatSessionImageAttachmentEmpty =
@@ -871,6 +899,10 @@ abstract final class PocketErrorCatalog {
         deviceForegroundServiceEnableFailed,
         deviceBackgroundGraceEnableFailed,
         deviceWakeLockEnableFailed,
+        deviceTurnCompletionAlertPermissionQueryFailed,
+        deviceTurnCompletionAlertPermissionRequestFailed,
+        deviceTurnCompletionAlertNotificationUpdateFailed,
+        deviceTurnCompletionAlertForegroundSignalFailed,
       ];
 
   static const List<PocketErrorDefinition> allDefinitions =

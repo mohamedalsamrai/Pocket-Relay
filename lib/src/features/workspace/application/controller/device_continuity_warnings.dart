@@ -39,6 +39,19 @@ void _setWorkspaceWakeLockWarning(
   );
 }
 
+void _setWorkspaceTurnCompletionAlertWarning(
+  ConnectionWorkspaceController controller,
+  PocketUserFacingError? warning,
+) {
+  _updateWorkspaceDeviceContinuityWarnings(
+    controller,
+    (current) => current.copyWith(
+      turnCompletionAlertWarning: warning,
+      clearTurnCompletionAlertWarning: warning == null,
+    ),
+  );
+}
+
 void _updateWorkspaceDeviceContinuityWarnings(
   ConnectionWorkspaceController controller,
   ConnectionWorkspaceDeviceContinuityWarnings Function(

@@ -34,6 +34,8 @@ class ConnectionWorkspaceSavedConnectionsContent extends StatefulWidget {
       supportsWakeLock: true,
       supportsFiniteBackgroundGrace: false,
       supportsActiveTurnForegroundService: false,
+      supportsForegroundTurnCompletionSignal: true,
+      supportsBackgroundTurnCompletionAlerts: true,
       usesDesktopKeyboardSubmit: false,
       supportsCollapsibleDesktopSidebar: false,
     ),

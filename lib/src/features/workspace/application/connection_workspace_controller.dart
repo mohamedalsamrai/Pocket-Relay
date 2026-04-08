@@ -323,6 +323,10 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _setWorkspaceWakeLockWarning(this, warning);
   }
 
+  void setTurnCompletionAlertWarning(PocketUserFacingError? warning) {
+    _setWorkspaceTurnCompletionAlertWarning(this, warning);
+  }
+
   void terminateConnection(String connectionId) {
     _terminateWorkspaceConnection(this, connectionId);
   }

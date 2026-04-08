@@ -5,4 +5,6 @@
     <string name="active_turn_notification_channel_description">Keeps a live Codex turn running while you leave Pocket Relay.</string>
     <string name="active_turn_notification_title">Pocket Relay active turn</string>
     <string name="active_turn_notification_body">A live Codex turn is still running.</string>
+    <string name="turn_completion_notification_channel_name">Turn completion</string>
+    <string name="turn_completion_notification_channel_description">Signals when a live Codex turn finishes while Pocket Relay is not in the foreground.</string>
 </resources>

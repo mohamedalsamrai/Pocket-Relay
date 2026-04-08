@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app/pocket_relay_app.dart';
 import 'package:pocket_relay/src/agent_adapters/agent_adapter_remote_runtime_delegate.dart';
 import 'package:pocket_relay/src/core/device/background_grace_host.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
+import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
+import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
@@ -64,6 +66,8 @@ PocketRelayApp buildCatalogApp({
   CodexConnectionRepository? connectionRepository,
   DisplayWakeLockController? displayWakeLockController,
   BackgroundGraceController? backgroundGraceController,
+  NotificationPermissionController? notificationPermissionController,
+  TurnCompletionAlertController? turnCompletionAlertController,
   AgentAdapterClient? agentAdapterClient,
   @Deprecated('Use agentAdapterClient instead.')
   AgentAdapterClient? appServerClient,
@@ -74,6 +78,7 @@ PocketRelayApp buildCatalogApp({
   @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
   CodexRemoteAppServerOwnerInspector? remoteAppServerOwnerInspector,
   ConnectionSettingsOverlayDelegate? settingsOverlayDelegate,
+  PocketPlatformPolicy? platformPolicy,
 }) {
   assert(
     agentAdapterClient != null || appServerClient != null,
@@ -91,6 +96,8 @@ PocketRelayApp buildCatalogApp({
     recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
     displayWakeLockController: displayWakeLockController,
     backgroundGraceController: backgroundGraceController,
+    notificationPermissionController: notificationPermissionController,
+    turnCompletionAlertController: turnCompletionAlertController,
     agentAdapterClient: resolvedAgentAdapterClient!,
     agentAdapterRemoteRuntimeDelegateFactory:
         agentAdapterRemoteRuntimeDelegateFactory,
@@ -112,6 +119,7 @@ PocketRelayApp buildCatalogApp({
     settingsOverlayDelegate:
         settingsOverlayDelegate ??
         const ModalConnectionSettingsOverlayDelegate(),
+    platformPolicy: platformPolicy,
   );
 }
 
