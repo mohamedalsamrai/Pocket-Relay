@@ -24,12 +24,12 @@ void main() {
       expect(find.text('Bad port'), findsNothing);
 
       await tester.enterText(materialTextField('Port'), '70000');
-      await tester.enterText(materialTextField('Port'), '2222');
       await tester.tap(
         find.byKey(const ValueKey<String>('connection_settings_save_top')),
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Bad port'), findsOneWidget);
       expect(payload, isNull);
     },
   );
