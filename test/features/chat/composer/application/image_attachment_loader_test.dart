@@ -82,7 +82,7 @@ void main() {
               .having(
                 (error) => error.userFacingError.definition,
                 'definition',
-                PocketErrorCatalog.chatSessionImageAttachmentTooLargeForRemote,
+                PocketErrorCatalog.chatComposerImageAttachmentTooLargeForRemote,
               )
               .having(
                 (error) => error.message,
@@ -107,7 +107,7 @@ void main() {
         isA<ChatComposerImageAttachmentLoadException>().having(
           (error) => error.userFacingError.definition,
           'definition',
-          PocketErrorCatalog.chatSessionImageAttachmentUnsupportedType,
+          PocketErrorCatalog.chatComposerImageAttachmentUnsupportedType,
         ),
       ),
     );
@@ -126,7 +126,7 @@ void main() {
         isA<ChatComposerImageAttachmentLoadException>().having(
           (error) => error.userFacingError.definition,
           'definition',
-          PocketErrorCatalog.chatSessionImageAttachmentEmpty,
+          PocketErrorCatalog.chatComposerImageAttachmentEmpty,
         ),
       ),
     );
@@ -149,7 +149,7 @@ void main() {
         isA<ChatComposerImageAttachmentLoadException>().having(
           (error) => error.userFacingError.definition,
           'definition',
-          PocketErrorCatalog.chatSessionImageAttachmentTooLarge,
+          PocketErrorCatalog.chatComposerImageAttachmentTooLarge,
         ),
       ),
     );
@@ -168,7 +168,7 @@ void main() {
         isA<ChatComposerImageAttachmentLoadException>().having(
           (error) => error.userFacingError.definition,
           'definition',
-          PocketErrorCatalog.chatSessionImageAttachmentDecodeFailed,
+          PocketErrorCatalog.chatComposerImageAttachmentDecodeFailed,
         ),
       ),
     );

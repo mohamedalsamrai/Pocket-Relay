@@ -23,4 +23,18 @@ void main() {
     expect(definition, isNotNull);
     expect(definition, PocketErrorCatalog.connectionReconnectServerStopped);
   });
+
+  test(
+    'compatibility aliases still resolve to the chat composer definitions',
+    () {
+      expect(
+        PocketErrorCatalog.chatSessionImageAttachmentUnexpectedFailure,
+        same(PocketErrorCatalog.chatComposerImageAttachmentUnexpectedFailure),
+      );
+      expect(
+        PocketErrorCatalog.chatComposerImageAttachmentUnexpectedFailure.domain,
+        PocketErrorDomain.chatComposer,
+      );
+    },
+  );
 }
