@@ -1,5 +1,121 @@
 part of '../connection_workspace_controller.dart';
 
+ConnectionWorkspaceState _withWorkspaceTransportReconnectStaged(
+  ConnectionWorkspaceState state,
+  String connectionId,
+) {
+  return state.copyWith(
+    transportReconnectRequiredConnectionIds:
+        _sanitizeWorkspaceReconnectRequiredIds(
+          catalog: state.catalog,
+          liveConnectionIds: state.liveConnectionIds,
+          reconnectRequiredConnectionIds: <String>{
+            ...state.transportReconnectRequiredConnectionIds,
+            connectionId,
+          },
+        ),
+    transportRecoveryPhasesByConnectionId:
+        _sanitizeWorkspaceTransportRecoveryPhases(
+          catalog: state.catalog,
+          liveConnectionIds: state.liveConnectionIds,
+          transportRecoveryPhasesByConnectionId:
+              <String, ConnectionWorkspaceTransportRecoveryPhase>{
+                ...state.transportRecoveryPhasesByConnectionId,
+                connectionId:
+                    ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
+              },
+        ),
+    liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
+      catalog: state.catalog,
+      liveConnectionIds: state.liveConnectionIds,
+      liveReattachPhasesByConnectionId:
+          <String, ConnectionWorkspaceLiveReattachPhase>{
+            ...state.liveReattachPhasesByConnectionId,
+            connectionId: ConnectionWorkspaceLiveReattachPhase.reconnecting,
+          },
+    ),
+    recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
+      catalog: state.catalog,
+      liveConnectionIds: state.liveConnectionIds,
+      recoveryDiagnosticsByConnectionId:
+          state.recoveryDiagnosticsByConnectionId,
+    ),
+  );
+}
+
+ConnectionWorkspaceState _withWorkspaceTransportReconnectCleared(
+  ConnectionWorkspaceState state,
+  String connectionId,
+) {
+  return state.copyWith(
+    transportReconnectRequiredConnectionIds:
+        _sanitizeWorkspaceReconnectRequiredIds(
+          catalog: state.catalog,
+          liveConnectionIds: state.liveConnectionIds,
+          reconnectRequiredConnectionIds: <String>{
+            ...state.transportReconnectRequiredConnectionIds,
+          }..remove(connectionId),
+        ),
+    transportRecoveryPhasesByConnectionId:
+        _sanitizeWorkspaceTransportRecoveryPhases(
+          catalog: state.catalog,
+          liveConnectionIds: state.liveConnectionIds,
+          transportRecoveryPhasesByConnectionId:
+              <String, ConnectionWorkspaceTransportRecoveryPhase>{
+                for (final entry
+                    in state.transportRecoveryPhasesByConnectionId.entries)
+                  if (entry.key != connectionId) entry.key: entry.value,
+              },
+        ),
+    liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
+      catalog: state.catalog,
+      liveConnectionIds: state.liveConnectionIds,
+      liveReattachPhasesByConnectionId:
+          <String, ConnectionWorkspaceLiveReattachPhase>{
+            for (final entry in state.liveReattachPhasesByConnectionId.entries)
+              if (entry.key != connectionId) entry.key: entry.value,
+          },
+    ),
+    recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
+      catalog: state.catalog,
+      liveConnectionIds: state.liveConnectionIds,
+      recoveryDiagnosticsByConnectionId:
+          state.recoveryDiagnosticsByConnectionId,
+    ),
+  );
+}
+
+void _clearWorkspaceTransportReconnectState(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+) {
+  if (controller._isDisposed) {
+    return;
+  }
+
+  controller._applyState(
+    _withWorkspaceTransportReconnectCleared(controller._state, connectionId),
+  );
+}
+
+void _finalizeWorkspaceRecoveredTransportState(
+  ConnectionWorkspaceController controller,
+  String connectionId, {
+  required DateTime completedAt,
+  required bool recordRecoveryOutcome,
+}) {
+  _clearWorkspaceTransportReconnectState(controller, connectionId);
+  if (!recordRecoveryOutcome || controller._isDisposed) {
+    return;
+  }
+
+  controller._completeRecoveryAttempt(
+    connectionId,
+    completedAt: completedAt,
+    outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
+  );
+}
+
 void _clearWorkspaceLiveReattachPhase(
   ConnectionWorkspaceController controller,
   String connectionId,
