@@ -32,6 +32,7 @@ void main() {
               platformBehavior: PocketPlatformBehavior.resolve(),
               onConfigure: () {},
               onAutoFollowEligibilityChanged: (_) {},
+              onRequestTranscriptFollow: (_) {},
             ),
           ),
         ),
@@ -69,6 +70,7 @@ void main() {
               platformBehavior: PocketPlatformBehavior.resolve(),
               onConfigure: () {},
               onAutoFollowEligibilityChanged: (_) {},
+              onRequestTranscriptFollow: (_) {},
             ),
           ),
         ),
@@ -149,6 +151,7 @@ void main() {
             platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
+            onRequestTranscriptFollow: (_) {},
             surfaceChangeToken: 'plan_1',
           ),
         ),
@@ -175,6 +178,7 @@ void main() {
             platformBehavior: PocketPlatformBehavior.resolve(),
             onConfigure: () {},
             onAutoFollowEligibilityChanged: (_) {},
+            onRequestTranscriptFollow: (_) {},
             surfaceChangeToken: 'plan_2',
           ),
         ),
@@ -211,6 +215,7 @@ void main() {
             onAutoFollowEligibilityChanged: (value) {
               isNearBottom = value;
             },
+            onRequestTranscriptFollow: (_) {},
             surfaceChangeToken: 'initial',
           ),
         ),
@@ -245,6 +250,7 @@ void main() {
             onAutoFollowEligibilityChanged: (value) {
               isNearBottom = value;
             },
+            onRequestTranscriptFollow: (_) {},
             surfaceChangeToken: 'initial',
           ),
         ),
@@ -255,6 +261,51 @@ void main() {
         scrollableState.position.pixels,
         closeTo(scrollableState.position.maxScrollExtent, 1),
       );
+    },
+  );
+
+  testWidgets(
+    'shows a jump-to-latest affordance when transcript follow is disabled',
+    (tester) async {
+      ChatTranscriptFollowRequestSource? requestedSource;
+      final blocks = List<TranscriptUiBlock>.generate(
+        24,
+        (index) => TranscriptTextBlock(
+          id: 'assistant_$index',
+          kind: TranscriptUiBlockKind.assistantMessage,
+          createdAt: DateTime(2026, 3, 14, 12, 0, index),
+          title: 'Codex',
+          body: 'Assistant message $index',
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildTestApp(
+          child: SizedBox(
+            height: 240,
+            child: TranscriptList(
+              surface: surfaceContract(mainItems: blocks),
+              followBehavior: followBehavior(isAutoFollowEnabled: false),
+              platformBehavior: PocketPlatformBehavior.resolve(),
+              onConfigure: () {},
+              onAutoFollowEligibilityChanged: (_) {},
+              onRequestTranscriptFollow: (source) {
+                requestedSource = source;
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('transcript_jump_to_latest')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('transcript_jump_to_latest')));
+      await tester.pump();
+
+      expect(requestedSource, ChatTranscriptFollowRequestSource.jumpToLatest);
     },
   );
 }

@@ -270,6 +270,9 @@ class _ChatTranscriptRegionHost extends StatelessWidget {
               isNearBottom: isNearBottom,
             );
           },
+          onRequestTranscriptFollow: (source) {
+            laneBinding.transcriptFollowHost.requestFollow(source: source);
+          },
           onApproveRequest: sessionController.approveRequest,
           onDenyRequest: sessionController.denyRequest,
           onOpenChangedFileDiff: onRequestChangedFileDiff,

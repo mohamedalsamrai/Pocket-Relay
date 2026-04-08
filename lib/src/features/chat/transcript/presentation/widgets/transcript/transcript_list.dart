@@ -18,6 +18,7 @@ class TranscriptList extends StatefulWidget {
     required this.onConfigure,
     this.onSelectConnectionMode,
     required this.onAutoFollowEligibilityChanged,
+    required this.onRequestTranscriptFollow,
     this.surfaceChangeToken,
     this.onOpenChangedFileDiff,
     this.onOpenWorkLogTerminal,
@@ -36,6 +37,8 @@ class TranscriptList extends StatefulWidget {
   final VoidCallback onConfigure;
   final ValueChanged<ConnectionMode>? onSelectConnectionMode;
   final ValueChanged<bool> onAutoFollowEligibilityChanged;
+  final ValueChanged<ChatTranscriptFollowRequestSource>
+  onRequestTranscriptFollow;
   final Object? surfaceChangeToken;
   final void Function(ChatChangedFileDiffContract diff)? onOpenChangedFileDiff;
   final void Function(ChatWorkLogTerminalContract terminal)?
@@ -61,6 +64,8 @@ class _TranscriptListState extends State<TranscriptList> {
 
   bool get _hasVisibleConversation => !widget.surface.showsEmptyState;
   Object get _surfaceChangeToken => widget.surfaceChangeToken ?? widget.surface;
+  bool get _showsJumpToLatestButton =>
+      _hasVisibleConversation && !widget.followBehavior.isAutoFollowEnabled;
 
   @override
   void didUpdateWidget(covariant TranscriptList oldWidget) {
@@ -114,43 +119,66 @@ class _TranscriptListState extends State<TranscriptList> {
     return Column(
       children: [
         Expanded(
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handleTranscriptScrollNotification,
-            child: ListView.separated(
-              controller: _scrollController,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
-              itemBuilder: (context, index) {
-                if (widget.surface.hasHiddenOlderMainItems && index == 0) {
-                  return _TranscriptWindowLimitNotice(
-                    visibleMainItemCount: widget.surface.visibleMainItemCount,
-                    totalMainItemCount: widget.surface.totalMainItemCount,
-                  );
-                }
+          child: Stack(
+            children: [
+              NotificationListener<ScrollNotification>(
+                onNotification: _handleTranscriptScrollNotification,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+                  itemBuilder: (context, index) {
+                    if (widget.surface.hasHiddenOlderMainItems && index == 0) {
+                      return _TranscriptWindowLimitNotice(
+                        visibleMainItemCount:
+                            widget.surface.visibleMainItemCount,
+                        totalMainItemCount: widget.surface.totalMainItemCount,
+                      );
+                    }
 
-                final item = widget
-                    .surface
-                    .mainItems[index - _transcriptListLeadingItemCount];
-                return ConversationEntryRenderer(
-                  key: ValueKey<String>('transcript_${item.id}'),
-                  item: item,
-                  showsDesktopContextMenu:
-                      widget.platformBehavior.isDesktopExperience,
-                  onConfigure: widget.onConfigure,
-                  onApproveRequest: widget.onApproveRequest,
-                  onDenyRequest: widget.onDenyRequest,
-                  onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
-                  onOpenWorkLogTerminal: widget.onOpenWorkLogTerminal,
-                  onSubmitUserInput: widget.onSubmitUserInput,
-                  onSaveHostFingerprint: widget.onSaveHostFingerprint,
-                  onContinueFromUserMessage: widget.onContinueFromUserMessage,
-                );
-              },
-              separatorBuilder: (context, index) => const SizedBox(height: 8),
-              itemCount:
-                  widget.surface.mainItems.length +
-                  _transcriptListLeadingItemCount,
-            ),
+                    final item = widget
+                        .surface
+                        .mainItems[index - _transcriptListLeadingItemCount];
+                    return ConversationEntryRenderer(
+                      key: ValueKey<String>('transcript_${item.id}'),
+                      item: item,
+                      showsDesktopContextMenu:
+                          widget.platformBehavior.isDesktopExperience,
+                      onConfigure: widget.onConfigure,
+                      onApproveRequest: widget.onApproveRequest,
+                      onDenyRequest: widget.onDenyRequest,
+                      onOpenChangedFileDiff: widget.onOpenChangedFileDiff,
+                      onOpenWorkLogTerminal: widget.onOpenWorkLogTerminal,
+                      onSubmitUserInput: widget.onSubmitUserInput,
+                      onSaveHostFingerprint: widget.onSaveHostFingerprint,
+                      onContinueFromUserMessage:
+                          widget.onContinueFromUserMessage,
+                    );
+                  },
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemCount:
+                      widget.surface.mainItems.length +
+                      _transcriptListLeadingItemCount,
+                ),
+              ),
+              if (_showsJumpToLatestButton)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 12,
+                  child: Align(
+                    child: _JumpToLatestButton(
+                      onPressed: () {
+                        widget.onRequestTranscriptFollow(
+                          ChatTranscriptFollowRequestSource.jumpToLatest,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         if (widget.surface.pinnedItems.isNotEmpty)
@@ -248,6 +276,26 @@ class _TranscriptListState extends State<TranscriptList> {
 
     return activeMetrics.maxScrollExtent - activeMetrics.pixels <=
         widget.followBehavior.resumeDistance;
+  }
+}
+
+class _JumpToLatestButton extends StatelessWidget {
+  const _JumpToLatestButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      key: const ValueKey('transcript_jump_to_latest'),
+      onPressed: onPressed,
+      icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+      label: const Text('Jump to latest'),
+      style: FilledButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        shape: const StadiumBorder(),
+      ),
+    );
   }
 }
 
