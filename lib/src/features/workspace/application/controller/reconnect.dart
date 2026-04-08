@@ -393,6 +393,13 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
           binding,
           hadVisibleConversationState: hadVisibleConversationState,
         );
+    if (!_canFinalizeWorkspaceTurnRecoveryAssessment(
+      controller,
+      connectionId,
+      binding,
+    )) {
+      return;
+    }
     controller._clearTransportReconnectRequired(connectionId);
 
     if (shouldRestoreFromHistory) {
@@ -442,6 +449,13 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
       threadId: threadId,
       liveReattachSucceeded: false,
     );
+    if (!_canFinalizeWorkspaceTurnRecoveryAssessment(
+      controller,
+      connectionId,
+      binding,
+    )) {
+      return;
+    }
     controller._clearTransportReconnectRequired(connectionId);
     final shouldRestoreFromHistory =
         assessment.status ==
@@ -562,8 +576,11 @@ _resolveWorkspaceTurnLivenessAfterReconnect(
   }
 
   final latestTurn = _latestWorkspaceHistoryTurn(threadHistory, threadId);
-  final latestStatus = latestTurn?.status?.trim().toLowerCase();
-  if (liveReattachSucceeded && latestStatus == 'running') {
+  final latestStatus = _normalizedWorkspaceHistoryTurnStatus(
+    latestTurn?.status,
+  );
+  if (liveReattachSucceeded &&
+      _isStillLiveWorkspaceHistoryTurnStatus(latestStatus)) {
     return ConnectionWorkspaceTurnLivenessAssessment(
       status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
       evidence:
@@ -643,12 +660,45 @@ AgentAdapterHistoryTurn? _latestWorkspaceHistoryTurn(
       return turn;
     }
   }
-  return history.turns.last;
+  return null;
+}
+
+bool _canFinalizeWorkspaceTurnRecoveryAssessment(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) {
+  if (controller._isDisposed || !binding.agentAdapterClient.isConnected) {
+    return false;
+  }
+
+  return controller._state.requiresTransportReconnect(connectionId) &&
+      controller._state.transportRecoveryPhaseFor(connectionId) ==
+          ConnectionWorkspaceTransportRecoveryPhase.reconnecting;
+}
+
+String? _normalizedWorkspaceHistoryTurnStatus(String? status) {
+  final trimmed = status?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  return trimmed.toLowerCase();
+}
+
+bool _isStillLiveWorkspaceHistoryTurnStatus(String? status) {
+  return switch (status) {
+    'running' || 'active' || 'inprogress' || 'in_progress' => true,
+    _ => false,
+  };
 }
 
 bool _isTerminalWorkspaceHistoryTurnStatus(String? status) {
   return switch (status) {
-    'completed' || 'failed' || 'aborted' || 'cancelled' => true,
+    'completed' ||
+    'failed' ||
+    'aborted' ||
+    'cancelled' ||
+    'interrupted' => true,
     _ => false,
   };
 }

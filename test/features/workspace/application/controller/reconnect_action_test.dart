@@ -352,6 +352,132 @@ void main() {
   );
 
   test(
+    'reconnectConnection ignores unrelated history turns when assessing reconnect liveness',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _conversationThreadWithStatus(
+            threadId: 'thread_saved',
+            turnId: 'turn_other',
+            status: 'completed',
+            turnThreadId: 'thread_other',
+          );
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.startSessionError =
+          const CodexAppServerException('resume failed');
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+          evidence: ConnectionWorkspaceTurnLivenessEvidence.liveReattachFailed,
+          threadId: 'thread_saved',
+        ),
+      );
+    },
+  );
+
+  test(
+    'reconnectConnection treats interrupted history turns as finished while away',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          _conversationThreadWithStatus(
+            threadId: 'thread_saved',
+            turnId: 'turn_interrupted',
+            status: 'interrupted',
+          );
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      clientsById['conn_primary']!.startSessionError =
+          const CodexAppServerException('resume failed');
+      await clientsById['conn_primary']!.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.reconnectConnection('conn_primary');
+
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.threadHistoryTerminalTurn,
+          threadId: 'thread_saved',
+          turnId: 'turn_interrupted',
+        ),
+      );
+    },
+  );
+
+  test(
+    'reconnectConnection preserves reconnect-required state if transport drops during history assessment',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      final client = clientsById['conn_primary']!
+        ..threadHistoriesById['thread_saved'] = savedConversationThread(
+          threadId: 'thread_saved',
+        );
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      client.readThreadCalls.clear();
+      await client.disconnect();
+      await Future<void>.delayed(Duration.zero);
+
+      client.readThreadWithTurnsGate = Completer<void>();
+      final reconnectFuture = controller.reconnectConnection('conn_primary');
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(client.readThreadCalls, contains('thread_saved'));
+
+      await client.disconnect();
+      await Future<void>.delayed(Duration.zero);
+      client.readThreadWithTurnsGate!.complete();
+      await reconnectFuture;
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+      expect(
+        controller.state.liveReattachPhaseFor('conn_primary'),
+        ConnectionWorkspaceLiveReattachPhase.transportLost,
+      );
+    },
+  );
+
+  test(
     'reconnectConnection replaces the targeted live binding and clears reconnect-required state',
     () async {
       final repository = MemoryCodexConnectionRepository(
@@ -499,5 +625,57 @@ void main() {
       );
       expect(controller.state.requiresReconnect('conn_primary'), isFalse);
     },
+  );
+}
+
+CodexAppServerThreadHistory _conversationThreadWithStatus({
+  required String threadId,
+  required String turnId,
+  required String status,
+  String? turnThreadId,
+}) {
+  return CodexAppServerThreadHistory(
+    id: threadId,
+    sourceKind: 'app-server',
+    turns: <CodexAppServerHistoryTurn>[
+      CodexAppServerHistoryTurn(
+        id: turnId,
+        threadId: turnThreadId,
+        status: status,
+        items: const <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant',
+            type: 'agent_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ),
+        ],
+        raw: <String, dynamic>{
+          'id': turnId,
+          'threadId': turnThreadId,
+          'status': status,
+        },
+      ),
+    ],
   );
 }

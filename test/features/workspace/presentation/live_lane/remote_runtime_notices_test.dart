@@ -220,6 +220,83 @@ void main() {
   );
 
   testWidgets(
+    'live lane treats inProgress history status as the same live turn after reconnect',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      client.threadHistoriesById['thread_saved'] =
+          _conversationThreadWithStatus(
+            threadId: 'thread_saved',
+            turnId: 'turn_live',
+            status: 'inProgress',
+          );
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.selectedLaneBinding!.sessionController
+          .selectConversationForResume('thread_saved');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Same live turn is still running'), findsOneWidget);
+      _expectInformationalNotice(tester, 'Same live turn is still running');
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.threadHistoryRunningTurn,
+          threadId: 'thread_saved',
+          turnId: 'turn_live',
+        ),
+      );
+    },
+  );
+
+  testWidgets(
     'live lane shows a finished-while-away notice when recovery restores a completed turn from history',
     (tester) async {
       final repository = MemoryCodexConnectionRepository(
@@ -804,66 +881,10 @@ void main() {
 CodexAppServerThreadHistory _savedConversationThread({
   required String threadId,
 }) {
-  return CodexAppServerThreadHistory(
-    id: threadId,
-    name: 'Saved conversation',
-    sourceKind: 'app-server',
-    turns: const <CodexAppServerHistoryTurn>[
-      CodexAppServerHistoryTurn(
-        id: 'turn_saved',
-        status: 'completed',
-        items: <CodexAppServerHistoryItem>[
-          CodexAppServerHistoryItem(
-            id: 'item_user',
-            type: 'user_message',
-            status: 'completed',
-            raw: <String, dynamic>{
-              'id': 'item_user',
-              'type': 'user_message',
-              'status': 'completed',
-              'content': <Object>[
-                <String, Object?>{'text': 'Restore this'},
-              ],
-            },
-          ),
-          CodexAppServerHistoryItem(
-            id: 'item_assistant',
-            type: 'agent_message',
-            status: 'completed',
-            raw: <String, dynamic>{
-              'id': 'item_assistant',
-              'type': 'agent_message',
-              'status': 'completed',
-              'content': <Object>[
-                <String, Object?>{'text': 'Restored answer'},
-              ],
-            },
-          ),
-        ],
-        raw: <String, dynamic>{
-          'id': 'turn_saved',
-          'status': 'completed',
-          'items': <Object>[
-            <String, Object?>{
-              'id': 'item_user',
-              'type': 'user_message',
-              'status': 'completed',
-              'content': <Object>[
-                <String, Object?>{'text': 'Restore this'},
-              ],
-            },
-            <String, Object?>{
-              'id': 'item_assistant',
-              'type': 'agent_message',
-              'status': 'completed',
-              'content': <Object>[
-                <String, Object?>{'text': 'Restored answer'},
-              ],
-            },
-          ],
-        },
-      ),
-    ],
+  return _conversationThreadWithStatus(
+    threadId: threadId,
+    turnId: 'turn_saved',
+    status: 'completed',
   );
 }
 
@@ -907,6 +928,74 @@ CodexAppServerThreadHistory _inconclusiveConversationThread({
         ],
         raw: <String, dynamic>{
           'id': 'turn_unknown',
+          'items': <Object>[
+            <String, Object?>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+            <String, Object?>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ],
+        },
+      ),
+    ],
+  );
+}
+
+CodexAppServerThreadHistory _conversationThreadWithStatus({
+  required String threadId,
+  required String turnId,
+  required String status,
+}) {
+  return CodexAppServerThreadHistory(
+    id: threadId,
+    name: 'Saved conversation',
+    sourceKind: 'app-server',
+    turns: <CodexAppServerHistoryTurn>[
+      CodexAppServerHistoryTurn(
+        id: turnId,
+        status: status,
+        items: const <CodexAppServerHistoryItem>[
+          CodexAppServerHistoryItem(
+            id: 'item_user',
+            type: 'user_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_user',
+              'type': 'user_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restore this'},
+              ],
+            },
+          ),
+          CodexAppServerHistoryItem(
+            id: 'item_assistant',
+            type: 'agent_message',
+            status: 'completed',
+            raw: <String, dynamic>{
+              'id': 'item_assistant',
+              'type': 'agent_message',
+              'status': 'completed',
+              'content': <Object>[
+                <String, Object?>{'text': 'Restored answer'},
+              ],
+            },
+          ),
+        ],
+        raw: <String, dynamic>{
+          'id': turnId,
+          'status': status,
           'items': <Object>[
             <String, Object?>{
               'id': 'item_user',
