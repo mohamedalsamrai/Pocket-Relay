@@ -117,6 +117,14 @@ void _applyChatSessionRuntimeEvent(
       event,
     ),
   );
+  if (event is TranscriptRuntimeTurnCompletedEvent && event.turnId != null) {
+    controller._turnCompletedEventsController.add(
+      ChatSessionTurnCompletedEvent(
+        turnId: event.turnId!,
+        threadId: event.threadId,
+      ),
+    );
+  }
   if (event is TranscriptRuntimeThreadStartedEvent) {
     unawaited(_hydrateChatSessionThreadMetadataIfNeeded(controller, event));
   }
