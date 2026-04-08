@@ -37,14 +37,6 @@ String buildPocketRelayRemoteOwnerSessionName({required String ownerId}) {
   return 'pocket-relay-$suffix';
 }
 
-String buildPocketRelayRemoteOwnerLogFilePath({required String sessionName}) {
-  final normalized = sessionName.trim();
-  if (normalized.isEmpty) {
-    throw ArgumentError.value(sessionName, 'sessionName', 'must not be empty');
-  }
-  return '/tmp/$normalized.log';
-}
-
 String _buildPocketRelayRemoteOwnerLogShellFunctions() {
   return '''
 resolve_pocket_relay_log_dir() {
