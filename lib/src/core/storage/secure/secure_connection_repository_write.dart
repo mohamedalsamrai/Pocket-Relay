@@ -156,13 +156,9 @@ Future<void> secureDeleteSystem(
   }
 
   final workspaceCatalog = await secureLoadWorkspaceCatalog(state);
-  if (workspaceCountForSystem(
-        workspaceCatalog.orderedWorkspaces.map(
-          (summary) => SavedWorkspace(id: summary.id, profile: summary.profile),
-        ),
-        normalizedSystemId,
-      ) >
-      0) {
+  if (workspaceCatalog.orderedWorkspaces.any(
+    (summary) => summary.profile.systemId == normalizedSystemId,
+  )) {
     throw StateError(
       'Cannot delete a system that is still used by a workspace.',
     );

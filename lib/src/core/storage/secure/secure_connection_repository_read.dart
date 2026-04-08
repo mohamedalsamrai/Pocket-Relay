@@ -45,13 +45,17 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
     if (rawProfile is! String || rawProfile.trim().isEmpty) {
       continue;
     }
-    normalizedOrderedIds.add(workspaceId);
-    workspacesById[workspaceId] = SavedWorkspaceSummary(
-      id: workspaceId,
-      profile: WorkspaceProfile.fromJson(
-        jsonDecode(rawProfile) as Map<String, dynamic>,
-      ),
-    );
+    try {
+      workspacesById[workspaceId] = SavedWorkspaceSummary(
+        id: workspaceId,
+        profile: WorkspaceProfile.fromJson(
+          jsonDecode(rawProfile) as Map<String, dynamic>,
+        ),
+      );
+      normalizedOrderedIds.add(workspaceId);
+    } catch (_) {
+      continue;
+    }
   }
 
   if (!listEquals(normalizedOrderedIds, orderedIds)) {
@@ -93,13 +97,17 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
     if (rawProfile is! String || rawProfile.trim().isEmpty) {
       continue;
     }
-    normalizedOrderedIds.add(systemId);
-    systemsById[systemId] = SavedSystemSummary(
-      id: systemId,
-      profile: SystemProfile.fromJson(
-        jsonDecode(rawProfile) as Map<String, dynamic>,
-      ),
-    );
+    try {
+      systemsById[systemId] = SavedSystemSummary(
+        id: systemId,
+        profile: SystemProfile.fromJson(
+          jsonDecode(rawProfile) as Map<String, dynamic>,
+        ),
+      );
+      normalizedOrderedIds.add(systemId);
+    } catch (_) {
+      continue;
+    }
   }
 
   if (!listEquals(normalizedOrderedIds, orderedIds)) {

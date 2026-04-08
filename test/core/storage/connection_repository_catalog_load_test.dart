@@ -283,6 +283,105 @@ void main() {
   );
 
   test(
+    'loadWorkspaceCatalog ignores malformed persisted workspace profiles and rewrites the ordered index',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        workspaceIndexKey(),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': <String>['workspace_good', 'workspace_bad'],
+        }),
+      );
+      await preferences.setString(
+        workspaceProfileKey('workspace_good'),
+        jsonEncode(
+          workspaceProfileFromConnectionProfile(
+            ConnectionProfile.defaults().copyWith(
+              label: 'Good workspace',
+              workspaceDir: '/workspace/good',
+            ),
+            systemId: null,
+          ).toJson(),
+        ),
+      );
+      await preferences.setString(
+        workspaceProfileKey('workspace_bad'),
+        '{not json',
+      );
+      final repository = buildSecureConnectionRepository(
+        secureStorage: FakeFlutterSecureStorage(<String, String>{}),
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final workspaceCatalog = await repository.loadWorkspaceCatalog();
+
+      expect(workspaceCatalog.orderedWorkspaceIds, <String>['workspace_good']);
+      expect(
+        workspaceCatalog.workspaceForId('workspace_good')?.profile.workspaceDir,
+        '/workspace/good',
+      );
+      expect(workspaceCatalog.workspaceForId('workspace_bad'), isNull);
+      expect(
+        await preferences.getString(workspaceIndexKey()),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': <String>['workspace_good'],
+        }),
+      );
+    },
+  );
+
+  test(
+    'loadSystemCatalog ignores malformed persisted system profiles and rewrites the ordered index',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        systemIndexKey(),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': <String>['system_good', 'system_bad'],
+        }),
+      );
+      await preferences.setString(
+        systemProfileKey('system_good'),
+        jsonEncode(
+          systemProfileFromConnectionProfile(
+            ConnectionProfile.defaults().copyWith(
+              host: 'relay.example.com',
+              username: 'vince',
+              label: 'Relay',
+            ),
+          ).toJson(),
+        ),
+      );
+      await preferences.setString(systemProfileKey('system_bad'), '{not json');
+      final repository = buildSecureConnectionRepository(
+        secureStorage: FakeFlutterSecureStorage(<String, String>{}),
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+      );
+
+      final systemCatalog = await repository.loadSystemCatalog();
+
+      expect(systemCatalog.orderedSystemIds, <String>['system_good']);
+      expect(
+        systemCatalog.systemForId('system_good')?.profile.host,
+        'relay.example.com',
+      );
+      expect(systemCatalog.systemForId('system_bad'), isNull);
+      expect(
+        await preferences.getString(systemIndexKey()),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': <String>['system_good'],
+        }),
+      );
+    },
+  );
+
+  test(
     'loadCatalog ignores orphaned legacy secrets when the legacy profile is missing',
     () async {
       final secureStorage = FakeFlutterSecureStorage(<String, String>{
