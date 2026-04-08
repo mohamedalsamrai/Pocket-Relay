@@ -86,7 +86,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('edit_conn_secondary')));
       await tester.pump();
 
-      final editButton = tester.widget<OutlinedButton>(
+      final editButton = tester.widget<IconButton>(
         find.byKey(const ValueKey('edit_conn_secondary')),
       );
       expect(editButton.onPressed, isNull);
@@ -252,21 +252,26 @@ void main() {
       await tester.pumpWidget(buildDormantRosterApp(controller));
       await tester.pump();
 
-      final goToLaneButton = tester.widget<FilledButton>(
+      final goToLaneButton = tester.widget<IconButton>(
         find.byKey(const ValueKey('open_connection_conn_primary')),
       );
-      final disconnectButton = tester.widget<OutlinedButton>(
+      final disconnectButton = tester.widget<IconButton>(
         find.byKey(const ValueKey('disconnect_conn_primary')),
       );
-      final closeLaneButton = tester.widget<OutlinedButton>(
+      await tester.tap(
+        find.byKey(const ValueKey('saved_connection_more_conn_primary')),
+      );
+      await tester.pumpAndSettle();
+
+      final closeLaneButton = tester.widget<PopupMenuItem>(
         find.byKey(const ValueKey('close_lane_conn_primary')),
       );
-      final restartServerButton = tester.widget<TextButton>(
+      final restartServerButton = tester.widget<PopupMenuItem>(
         find.byKey(
           const ValueKey('saved_connection_remote_server_restart_conn_primary'),
         ),
       );
-      final stopServerButton = tester.widget<TextButton>(
+      final stopServerButton = tester.widget<PopupMenuItem>(
         find.byKey(
           const ValueKey('saved_connection_remote_server_stop_conn_primary'),
         ),
@@ -274,9 +279,9 @@ void main() {
 
       expect(goToLaneButton.onPressed, isNotNull);
       expect(disconnectButton.onPressed, isNull);
-      expect(closeLaneButton.onPressed, isNull);
-      expect(restartServerButton.onPressed, isNull);
-      expect(stopServerButton.onPressed, isNull);
+      expect(closeLaneButton.enabled, isFalse);
+      expect(restartServerButton.enabled, isFalse);
+      expect(stopServerButton.enabled, isFalse);
     },
   );
 }

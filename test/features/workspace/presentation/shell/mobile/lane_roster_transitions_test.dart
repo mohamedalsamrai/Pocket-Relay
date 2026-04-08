@@ -49,8 +49,24 @@ void main() {
     expect(find.text('Workspaces'), findsWidgets);
     expect(find.byType(Scaffold), findsWidgets);
     expect(find.widgetWithText(FilledButton, 'New workspace'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Open lane'), findsWidgets);
-    expect(find.widgetWithText(OutlinedButton, 'Edit'), findsWidgets);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byKey(const ValueKey('open_connection_conn_secondary')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('edit_conn_secondary')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      find.byKey(const ValueKey('saved_connection_more_conn_secondary')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('instantiating from the roster opens a new live lane', (

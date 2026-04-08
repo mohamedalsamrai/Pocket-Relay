@@ -68,7 +68,10 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                         facts: row.facts,
                         primaryAction: _primaryActionForRow(row),
                         secondaryActions: _secondaryActionsForRow(row),
-                        detailActions: _detailActionsForRow(row),
+                        overflowActions: _overflowActionsForRow(row),
+                        overflowMenuKey: ValueKey<String>(
+                          'saved_connection_more_${row.connection.id}',
+                        ),
                       ),
                     );
                   }),
@@ -95,6 +98,10 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               : row.isLive
               ? ConnectionWorkspaceCopy.goToLaneAction
               : ConnectionWorkspaceCopy.openLaneAction,
+          icon: row.isLive
+              ? Icons.arrow_forward_rounded
+              : Icons.play_arrow_rounded,
+          isInProgress: _instantiatingConnectionIds.contains(connectionId),
           onPressed: hasPendingOperation
               ? null
               : () => _openConnection(row.connection),
@@ -109,6 +116,8 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               : ConnectionWorkspaceCopy.reconnectActionFor(
                   row.reconnectRequirement!,
                 ),
+          icon: Icons.refresh_rounded,
+          isInProgress: _reconnectingConnectionIds.contains(connectionId),
           onPressed: _isLifecycleActionBlocked(connectionId)
               ? null
               : () => _reconnectConnection(connectionId),
@@ -122,7 +131,7 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
   ) {
     final connectionId = row.connection.id;
     final hasPendingOperation = _hasPendingRowOperation(connectionId);
-    return <ConnectionLifecycleButtonAction>[
+    return <ConnectionLifecycleButtonAction?>[
       for (final actionId in row.secondaryActionIds)
         switch (actionId) {
           ConnectionLifecycleSecondaryActionId.disconnect =>
@@ -131,6 +140,8 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _disconnectingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.disconnectProgress
                   : ConnectionWorkspaceCopy.disconnectAction,
+              icon: Icons.link_off_rounded,
+              isInProgress: _disconnectingConnectionIds.contains(connectionId),
               onPressed: _isLifecycleActionBlocked(connectionId)
                   ? null
                   : () => _disconnectConnection(connectionId),
@@ -141,14 +152,32 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _editingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.saveProgress
                   : ConnectionWorkspaceCopy.editAction,
+              icon: Icons.edit_outlined,
+              isInProgress: _editingConnectionIds.contains(connectionId),
               onPressed: hasPendingOperation
                   ? null
                   : () => _editConnection(row.connection),
             ),
+          _ => null,
+        },
+    ].whereType<ConnectionLifecycleButtonAction>().toList();
+  }
+
+  List<ConnectionLifecycleButtonAction> _overflowActionsForRow(
+    ConnectionLifecyclePresentation row,
+  ) {
+    final connectionId = row.connection.id;
+    final hasPendingOperation = _hasPendingRowOperation(connectionId);
+    final isLifecycleBlocked = _isLifecycleActionBlocked(connectionId);
+
+    return <ConnectionLifecycleButtonAction?>[
+      for (final actionId in row.overflowActionIds)
+        switch (actionId) {
           ConnectionLifecycleSecondaryActionId.closeLane =>
             ConnectionLifecycleButtonAction(
               key: ValueKey<String>('close_lane_$connectionId'),
               label: ConnectionWorkspaceCopy.closeLaneAction,
+              icon: Icons.close_rounded,
               onPressed: _isLifecycleActionBlocked(connectionId)
                   ? null
                   : () => widget.workspaceController.terminateConnection(
@@ -161,35 +190,21 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
               label: _deletingConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.deleteProgress
                   : ConnectionWorkspaceCopy.deleteAction,
+              icon: Icons.delete_outline_rounded,
+              isInProgress: _deletingConnectionIds.contains(connectionId),
               onPressed: hasPendingOperation
                   ? null
                   : () => _deleteConnection(connectionId),
               isDestructive: true,
             ),
-          _ => const ConnectionLifecycleButtonAction(
-            key: ValueKey<String>('unsupported_action'),
-            label: '',
-            onPressed: null,
-          ),
-        },
-    ].where((action) => action.label.isNotEmpty).toList();
-  }
-
-  List<ConnectionLifecycleButtonAction> _detailActionsForRow(
-    ConnectionLifecyclePresentation row,
-  ) {
-    final connectionId = row.connection.id;
-    final hasPendingOperation = _hasPendingRowOperation(connectionId);
-    final isLifecycleBlocked = _isLifecycleActionBlocked(connectionId);
-    return <ConnectionLifecycleButtonAction>[
-      for (final actionId in row.detailActionIds)
-        switch (actionId) {
           ConnectionLifecycleSecondaryActionId.checkHost =>
             ConnectionLifecycleButtonAction(
               key: ValueKey<String>('check_host_$connectionId'),
               label: _checkingHostConnectionIds.contains(connectionId)
                   ? ConnectionWorkspaceCopy.checkHostProgress
                   : ConnectionWorkspaceCopy.checkHostAction,
+              icon: Icons.search_rounded,
+              isInProgress: _checkingHostConnectionIds.contains(connectionId),
               onPressed: hasPendingOperation
                   ? null
                   : () => _checkHost(connectionId),
@@ -208,6 +223,10 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                   : ConnectionWorkspaceCopy.remoteServerActionLabel(
                       ConnectionSettingsRemoteServerActionId.restart,
                     ),
+              icon: Icons.restart_alt_rounded,
+              isInProgress:
+                  _activeRemoteServerActionsByConnectionId[connectionId] ==
+                  ConnectionSettingsRemoteServerActionId.restart,
               onPressed: isLifecycleBlocked
                   ? null
                   : () => _runRemoteServerAction(
@@ -229,6 +248,10 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                   : ConnectionWorkspaceCopy.remoteServerActionLabel(
                       ConnectionSettingsRemoteServerActionId.stop,
                     ),
+              icon: Icons.stop_circle_outlined,
+              isInProgress:
+                  _activeRemoteServerActionsByConnectionId[connectionId] ==
+                  ConnectionSettingsRemoteServerActionId.stop,
               onPressed: isLifecycleBlocked
                   ? null
                   : () => _runRemoteServerAction(
@@ -236,13 +259,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
                       ConnectionSettingsRemoteServerActionId.stop,
                     ),
             ),
-          _ => const ConnectionLifecycleButtonAction(
-            key: ValueKey<String>('unsupported_detail_action'),
-            label: '',
-            onPressed: null,
-          ),
+          _ => null,
         },
-    ].where((action) => action.label.isNotEmpty).toList();
+    ].whereType<ConnectionLifecycleButtonAction>().toList();
   }
 
   bool _isLifecycleActionBlocked(String connectionId) {

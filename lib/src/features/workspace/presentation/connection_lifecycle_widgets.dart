@@ -3,20 +3,25 @@ import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
+import 'package:pocket_relay/src/features/workspace/application/connection_workspace_copy.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/connection_lifecycle_presentation.dart';
 
 class ConnectionLifecycleButtonAction {
   const ConnectionLifecycleButtonAction({
     required this.key,
     required this.label,
+    required this.icon,
     required this.onPressed,
     this.isDestructive = false,
+    this.isInProgress = false,
   });
 
   final Key key;
   final String label;
+  final IconData icon;
   final VoidCallback? onPressed;
   final bool isDestructive;
+  final bool isInProgress;
 }
 
 class ConnectionLifecycleSection extends StatelessWidget {
@@ -75,40 +80,73 @@ class ConnectionLifecycleFacts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (facts.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 14,
+      runSpacing: 10,
       children: [
-        for (final fact in facts)
-          DefaultTextStyle(
-            style: theme.textTheme.labelSmall!.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-            child: PocketTintBadge(
-              label: fact.label,
-              color: _colorForFactTone(theme, fact.tone),
-              backgroundOpacity: 0.12,
-              fontSize: 10.5,
-            ),
-          ),
+        for (final fact in facts) _ConnectionLifecycleFactMarker(fact: fact),
       ],
     );
   }
+}
 
-  Color _colorForFactTone(ThemeData theme, ConnectionLifecycleFactTone tone) {
-    return switch (tone) {
-      ConnectionLifecycleFactTone.accent => theme.colorScheme.primary,
-      ConnectionLifecycleFactTone.positive => theme.colorScheme.secondary,
-      ConnectionLifecycleFactTone.warning => theme.colorScheme.tertiary,
-      ConnectionLifecycleFactTone.neutral => theme.colorScheme.onSurfaceVariant,
-    };
+class _ConnectionLifecycleFactMarker extends StatelessWidget {
+  const _ConnectionLifecycleFactMarker({required this.fact});
+
+  final ConnectionLifecycleFact fact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = _colorForFactTone(theme, fact.tone);
+
+    return Tooltip(
+      message: fact.label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 240),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(fact.icon, size: 14, color: color),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                fact.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
+
+Color _colorForFactTone(ThemeData theme, ConnectionLifecycleFactTone tone) {
+  return switch (tone) {
+    ConnectionLifecycleFactTone.accent => theme.colorScheme.primary,
+    ConnectionLifecycleFactTone.positive => theme.colorScheme.secondary,
+    ConnectionLifecycleFactTone.warning => theme.colorScheme.tertiary,
+    ConnectionLifecycleFactTone.neutral => theme.colorScheme.onSurfaceVariant,
+  };
 }
 
 class ConnectionLifecycleActionBar extends StatelessWidget {
@@ -116,75 +154,162 @@ class ConnectionLifecycleActionBar extends StatelessWidget {
     super.key,
     this.primaryAction,
     this.secondaryActions = const <ConnectionLifecycleButtonAction>[],
+    this.overflowActions = const <ConnectionLifecycleButtonAction>[],
+    this.overflowMenuKey,
   });
 
   final ConnectionLifecycleButtonAction? primaryAction;
   final List<ConnectionLifecycleButtonAction> secondaryActions;
+  final List<ConnectionLifecycleButtonAction> overflowActions;
+  final Key? overflowMenuKey;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final primaryAction = this.primaryAction;
-    if (primaryAction == null && secondaryActions.isEmpty) {
+    if (primaryAction == null &&
+        secondaryActions.isEmpty &&
+        overflowActions.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    final visibleActions = <ConnectionLifecycleButtonAction>[
+      if (primaryAction != null) primaryAction,
+      ...secondaryActions,
+    ];
+
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
       children: [
-        if (primaryAction != null)
-          FilledButton(
-            key: primaryAction.key,
-            onPressed: primaryAction.onPressed,
-            child: Text(primaryAction.label),
+        for (final action in visibleActions)
+          _ConnectionLifecycleActionButton(
+            action: action,
+            isPrimary: identical(action, primaryAction),
           ),
-        for (final action in secondaryActions)
-          action.isDestructive
-              ? TextButton(
-                  key: action.key,
-                  onPressed: action.onPressed,
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
-                  ),
-                  child: Text(action.label),
-                )
-              : OutlinedButton(
-                  key: action.key,
-                  onPressed: action.onPressed,
-                  child: Text(action.label),
-                ),
+        if (overflowActions.isNotEmpty)
+          _ConnectionLifecycleOverflowMenu(
+            actions: overflowActions,
+            menuKey: overflowMenuKey,
+          ),
       ],
     );
   }
 }
 
-class ConnectionLifecycleDetailActions extends StatelessWidget {
-  const ConnectionLifecycleDetailActions({super.key, required this.actions});
+class _ConnectionLifecycleActionButton extends StatelessWidget {
+  const _ConnectionLifecycleActionButton({
+    required this.action,
+    required this.isPrimary,
+  });
 
-  final List<ConnectionLifecycleButtonAction> actions;
+  final ConnectionLifecycleButtonAction action;
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
-    if (actions.isEmpty) {
-      return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final icon = action.isInProgress
+        ? SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isPrimary
+                    ? theme.colorScheme.onPrimary
+                    : action.isDestructive
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+              ),
+            ),
+          )
+        : Icon(action.icon);
+
+    if (isPrimary) {
+      return IconButton.filled(
+        key: action.key,
+        onPressed: action.onPressed,
+        tooltip: action.label,
+        icon: icon,
+      );
     }
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: [
-        for (final action in actions)
-          TextButton(
-            key: action.key,
-            onPressed: action.onPressed,
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    return IconButton.outlined(
+      key: action.key,
+      onPressed: action.onPressed,
+      tooltip: action.label,
+      style: action.isDestructive
+          ? IconButton.styleFrom(foregroundColor: theme.colorScheme.error)
+          : null,
+      icon: icon,
+    );
+  }
+}
+
+class _ConnectionLifecycleOverflowMenu extends StatelessWidget {
+  const _ConnectionLifecycleOverflowMenu({required this.actions, this.menuKey});
+
+  final List<ConnectionLifecycleButtonAction> actions;
+  final Key? menuKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final regularActions = actions
+        .where((action) => !action.isDestructive)
+        .toList(growable: false);
+    final destructiveActions = actions
+        .where((action) => action.isDestructive)
+        .toList(growable: false);
+
+    return PopupMenuButton<ConnectionLifecycleButtonAction>(
+      key: menuKey,
+      tooltip: ConnectionWorkspaceCopy.moreRowActionsAction,
+      onSelected: (action) => action.onPressed?.call(),
+      itemBuilder: (context) =>
+          <PopupMenuEntry<ConnectionLifecycleButtonAction>>[
+            ...regularActions.map((action) => _buildMenuItem(context, action)),
+            if (regularActions.isNotEmpty && destructiveActions.isNotEmpty)
+              const PopupMenuDivider(),
+            ...destructiveActions.map(
+              (action) => _buildMenuItem(context, action),
             ),
-            child: Text(action.label),
+          ],
+      icon: const Icon(Icons.more_horiz_rounded),
+    );
+  }
+
+  PopupMenuItem<ConnectionLifecycleButtonAction> _buildMenuItem(
+    BuildContext context,
+    ConnectionLifecycleButtonAction action,
+  ) {
+    final theme = Theme.of(context);
+    final color = action.isDestructive
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurfaceVariant;
+
+    return PopupMenuItem<ConnectionLifecycleButtonAction>(
+      key: action.key,
+      value: action,
+      enabled: action.onPressed != null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          action.isInProgress
+              ? SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                )
+              : Icon(action.icon, size: 18, color: color),
+          const SizedBox(width: 12),
+          Text(
+            action.label,
+            style: theme.textTheme.bodyMedium?.copyWith(color: color),
           ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -198,7 +323,8 @@ class ConnectionLifecycleRow extends StatelessWidget {
     required this.facts,
     this.primaryAction,
     this.secondaryActions = const <ConnectionLifecycleButtonAction>[],
-    this.detailActions = const <ConnectionLifecycleButtonAction>[],
+    this.overflowActions = const <ConnectionLifecycleButtonAction>[],
+    this.overflowMenuKey,
   });
 
   final Key rowKey;
@@ -207,7 +333,8 @@ class ConnectionLifecycleRow extends StatelessWidget {
   final List<ConnectionLifecycleFact> facts;
   final ConnectionLifecycleButtonAction? primaryAction;
   final List<ConnectionLifecycleButtonAction> secondaryActions;
-  final List<ConnectionLifecycleButtonAction> detailActions;
+  final List<ConnectionLifecycleButtonAction> overflowActions;
+  final Key? overflowMenuKey;
 
   @override
   Widget build(BuildContext context) {
@@ -249,15 +376,15 @@ class ConnectionLifecycleRow extends StatelessWidget {
               const SizedBox(height: 12),
               ConnectionLifecycleFacts(facts: facts),
             ],
-            if (detailActions.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ConnectionLifecycleDetailActions(actions: detailActions),
-            ],
-            if (primaryAction != null || secondaryActions.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            if (primaryAction != null ||
+                secondaryActions.isNotEmpty ||
+                overflowActions.isNotEmpty) ...[
+              const SizedBox(height: 14),
               ConnectionLifecycleActionBar(
                 primaryAction: primaryAction,
                 secondaryActions: secondaryActions,
+                overflowActions: overflowActions,
+                overflowMenuKey: overflowMenuKey,
               ),
             ],
           ],

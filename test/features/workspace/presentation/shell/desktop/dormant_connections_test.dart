@@ -88,7 +88,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.byKey(const ValueKey('delete_conn_secondary'), skipOffstage: false),
+      find.byKey(
+        const ValueKey('saved_connection_more_conn_secondary'),
+        skipOffstage: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey('saved_connection_more_conn_secondary'),
+        skipOffstage: false,
+      ),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('delete_conn_secondary')));

@@ -1,3 +1,5 @@
+import 'package:pocket_relay/src/core/ui/primitives/pocket_badge.dart';
+
 import '../support/workspace_surface_test_support.dart';
 
 void main() {
@@ -169,6 +171,42 @@ void main() {
       expect(openLaneWidth, moreOrLessEquals(expectedWidth, epsilon: 0.1));
       expect(attentionWidth, moreOrLessEquals(expectedWidth, epsilon: 0.1));
       expect(savedWidth, moreOrLessEquals(expectedWidth, epsilon: 0.1));
+    },
+  );
+
+  testWidgets(
+    'saved connection rows use icon status markers and overflow row actions',
+    (tester) async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      final controller = buildWorkspaceController(clientsById: clientsById);
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      await tester.pumpWidget(buildDormantRosterApp(controller));
+      await tester.pumpAndSettle();
+
+      final row = find.byKey(const ValueKey('saved_connection_conn_secondary'));
+
+      expect(
+        find.descendant(of: row, matching: find.byType(PocketTintBadge)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: row, matching: find.byType(IconButton)),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(
+          of: row,
+          matching: find.byKey(
+            const ValueKey('saved_connection_more_conn_secondary'),
+          ),
+        ),
+        findsOneWidget,
+      );
     },
   );
 

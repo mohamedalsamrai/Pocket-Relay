@@ -128,17 +128,23 @@ class _ConnectionWorkspaceSavedSystemsContentState
                     label: _editingSystemIds.contains(system.id)
                         ? ConnectionWorkspaceCopy.saveProgress
                         : ConnectionWorkspaceCopy.editAction,
+                    icon: Icons.edit_outlined,
+                    isInProgress: _editingSystemIds.contains(system.id),
                     onPressed:
                         _editingSystemIds.contains(system.id) ||
                             _deletingSystemIds.contains(system.id)
                         ? null
                         : () => _editSystem(system.id),
                   ),
+                ],
+                overflowActions: <ConnectionLifecycleButtonAction>[
                   ConnectionLifecycleButtonAction(
                     key: ValueKey<String>('delete_system_${system.id}'),
                     label: _deletingSystemIds.contains(system.id)
                         ? ConnectionWorkspaceCopy.deleteProgress
                         : ConnectionWorkspaceCopy.deleteAction,
+                    icon: Icons.delete_outline_rounded,
+                    isInProgress: _deletingSystemIds.contains(system.id),
                     onPressed:
                         _editingSystemIds.contains(system.id) ||
                             _deletingSystemIds.contains(system.id)
@@ -147,6 +153,9 @@ class _ConnectionWorkspaceSavedSystemsContentState
                     isDestructive: true,
                   ),
                 ],
+                overflowMenuKey: ValueKey<String>(
+                  'saved_system_more_${system.id}',
+                ),
               ),
             );
           }),
@@ -165,6 +174,7 @@ class _ConnectionWorkspaceSavedSystemsContentState
         ConnectionLifecycleFact(
           label: capabilityLabel,
           tone: _toneForHostCapabilityStatus(capabilityStatus),
+          icon: _iconForHostCapabilityStatus(capabilityStatus),
         ),
       );
     }
@@ -216,6 +226,22 @@ class _ConnectionWorkspaceSavedSystemsContentState
         ConnectionLifecycleFactTone.warning,
       ConnectionRemoteHostCapabilityStatus.unknown =>
         ConnectionLifecycleFactTone.neutral,
+    };
+  }
+
+  IconData _iconForHostCapabilityStatus(
+    ConnectionRemoteHostCapabilityStatus status,
+  ) {
+    return switch (status) {
+      ConnectionRemoteHostCapabilityStatus.supported => Icons.verified_rounded,
+      ConnectionRemoteHostCapabilityStatus.checking =>
+        Icons.hourglass_top_rounded,
+      ConnectionRemoteHostCapabilityStatus.probeFailed =>
+        Icons.troubleshoot_rounded,
+      ConnectionRemoteHostCapabilityStatus.unsupported =>
+        Icons.error_outline_rounded,
+      ConnectionRemoteHostCapabilityStatus.unknown =>
+        Icons.help_outline_rounded,
     };
   }
 
