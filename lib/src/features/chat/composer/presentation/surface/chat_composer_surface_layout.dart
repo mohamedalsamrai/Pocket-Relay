@@ -16,6 +16,7 @@ class ChatComposerSurfaceLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.pocketPalette;
+    final leadingAction = this.leadingAction;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -37,7 +38,7 @@ class ChatComposerSurfaceLayout extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (leadingAction != null) ...[
-              leadingAction!,
+              leadingAction,
               const SizedBox(width: 8),
             ],
             Expanded(child: input),

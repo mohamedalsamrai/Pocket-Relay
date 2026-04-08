@@ -105,7 +105,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       attachmentSummaries: attachmentSummaries,
       usesDesktopKeyboardSubmit:
           widget.platformBehavior.usesDesktopKeyboardSubmit,
-      canSubmitFromKeyboard: _isSendActionEnabled,
+      canSubmitFromKeyboard: () => _isSendActionEnabled,
       onSubmitFromKeyboard: () {
         unawaited(_handleSendTriggered());
       },

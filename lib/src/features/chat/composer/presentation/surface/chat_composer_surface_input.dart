@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pocket_relay/src/features/chat/composer/presentation/chat_composer_draft.dart';
@@ -25,7 +27,7 @@ class ChatComposerSurfaceInput extends StatelessWidget {
   final VoidCallback onTapOutside;
   final List<String> attachmentSummaries;
   final bool usesDesktopKeyboardSubmit;
-  final bool canSubmitFromKeyboard;
+  final bool Function() canSubmitFromKeyboard;
   final VoidCallback onSubmitFromKeyboard;
   final VoidCallback onInsertNewlineFromKeyboard;
 
@@ -160,7 +162,7 @@ class _DesktopKeyboardSubmit extends StatelessWidget {
   static const _desktopSendIntent = _DesktopSendIntent();
   static const _desktopInsertNewlineIntent = _DesktopInsertNewlineIntent();
 
-  final bool canSubmit;
+  final bool Function() canSubmit;
   final VoidCallback onSubmit;
   final VoidCallback onInsertNewline;
   final Widget child;
@@ -171,7 +173,7 @@ class _DesktopKeyboardSubmit extends StatelessWidget {
       actions: <Type, Action<Intent>>{
         _DesktopSendIntent: CallbackAction<_DesktopSendIntent>(
           onInvoke: (_) {
-            if (!canSubmit) {
+            if (!canSubmit()) {
               return null;
             }
 
@@ -219,9 +221,7 @@ class _TextEditDelta {
 
   factory _TextEditDelta.fromValues(String oldText, String newText) {
     var prefixLength = 0;
-    final minLength = oldText.length < newText.length
-        ? oldText.length
-        : newText.length;
+    final minLength = min(oldText.length, newText.length);
     while (prefixLength < minLength &&
         oldText.codeUnitAt(prefixLength) == newText.codeUnitAt(prefixLength)) {
       prefixLength += 1;
