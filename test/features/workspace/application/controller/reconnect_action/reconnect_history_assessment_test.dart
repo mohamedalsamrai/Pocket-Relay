@@ -6,63 +6,9 @@ void main() {
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');
       clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
-          CodexAppServerThreadHistory(
-            id: 'thread_saved',
-            sourceKind: 'app-server',
-            turns: const <CodexAppServerHistoryTurn>[
-              CodexAppServerHistoryTurn(
-                id: 'turn_unknown',
-                items: <CodexAppServerHistoryItem>[
-                  CodexAppServerHistoryItem(
-                    id: 'item_user',
-                    type: 'user_message',
-                    status: 'completed',
-                    raw: <String, dynamic>{
-                      'id': 'item_user',
-                      'type': 'user_message',
-                      'status': 'completed',
-                      'content': <Object>[
-                        <String, Object?>{'text': 'Restore this'},
-                      ],
-                    },
-                  ),
-                  CodexAppServerHistoryItem(
-                    id: 'item_assistant',
-                    type: 'agent_message',
-                    status: 'completed',
-                    raw: <String, dynamic>{
-                      'id': 'item_assistant',
-                      'type': 'agent_message',
-                      'status': 'completed',
-                      'content': <Object>[
-                        <String, Object?>{'text': 'Restored answer'},
-                      ],
-                    },
-                  ),
-                ],
-                raw: <String, dynamic>{
-                  'id': 'turn_unknown',
-                  'items': <Object>[
-                    <String, Object?>{
-                      'id': 'item_user',
-                      'type': 'user_message',
-                      'status': 'completed',
-                      'content': <Object>[
-                        <String, Object?>{'text': 'Restore this'},
-                      ],
-                    },
-                    <String, Object?>{
-                      'id': 'item_assistant',
-                      'type': 'agent_message',
-                      'status': 'completed',
-                      'content': <Object>[
-                        <String, Object?>{'text': 'Restored answer'},
-                      ],
-                    },
-                  ],
-                },
-              ),
-            ],
+          _conversationThreadWithStatus(
+            threadId: 'thread_saved',
+            turnId: 'turn_unknown',
           );
       final controller = buildWorkspaceController(clientsById: clientsById);
       addTearDown(() async {
@@ -215,7 +161,7 @@ void main() {
 CodexAppServerThreadHistory _conversationThreadWithStatus({
   required String threadId,
   required String turnId,
-  required String status,
+  String? status,
   String? turnThreadId,
 }) {
   return CodexAppServerThreadHistory(
@@ -256,8 +202,8 @@ CodexAppServerThreadHistory _conversationThreadWithStatus({
         ],
         raw: <String, dynamic>{
           'id': turnId,
-          'threadId': turnThreadId,
-          'status': status,
+          if (turnThreadId != null) 'threadId': turnThreadId,
+          if (status != null) 'status': status,
         },
       ),
     ],

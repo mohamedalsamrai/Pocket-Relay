@@ -22,25 +22,9 @@ void main() {
         'conn_primary': <FakeCodexAppServerClient>[],
         'conn_secondary': <FakeCodexAppServerClient>[],
       };
-      final controller = ConnectionWorkspaceController(
-        connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient();
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
+        clientsByConnectionId: clientsByConnectionId,
       );
       addTearDown(() async {
         controller.dispose();
