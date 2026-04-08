@@ -192,19 +192,19 @@ abstract final class PocketErrorCatalog {
       ChatComposerPocketErrorCatalog.imageAttachmentUnexpectedFailure;
 
   static const PocketErrorDefinition chatSessionImageAttachmentEmpty =
-      chatComposerImageAttachmentEmpty;
+      ChatComposerPocketErrorCatalog.imageAttachmentEmpty;
   static const PocketErrorDefinition chatSessionImageAttachmentTooLarge =
-      chatComposerImageAttachmentTooLarge;
+      ChatComposerPocketErrorCatalog.imageAttachmentTooLarge;
   static const PocketErrorDefinition chatSessionImageAttachmentUnsupportedType =
-      chatComposerImageAttachmentUnsupportedType;
+      ChatComposerPocketErrorCatalog.imageAttachmentUnsupportedType;
   static const PocketErrorDefinition chatSessionImageAttachmentDecodeFailed =
-      chatComposerImageAttachmentDecodeFailed;
+      ChatComposerPocketErrorCatalog.imageAttachmentDecodeFailed;
   static const PocketErrorDefinition
   chatSessionImageAttachmentTooLargeForRemote =
-      chatComposerImageAttachmentTooLargeForRemote;
+      ChatComposerPocketErrorCatalog.imageAttachmentTooLargeForRemote;
   static const PocketErrorDefinition
   chatSessionImageAttachmentUnexpectedFailure =
-      chatComposerImageAttachmentUnexpectedFailure;
+      ChatComposerPocketErrorCatalog.imageAttachmentUnexpectedFailure;
 
   static const PocketErrorDefinition connectionSettingsModelCatalogUnavailable =
       ConnectionSettingsPocketErrorCatalog.modelCatalogUnavailable;
