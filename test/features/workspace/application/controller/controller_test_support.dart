@@ -345,6 +345,36 @@ class RecordingConnectionWorkspaceRecoveryStore
   }
 }
 
+class DelayedLoadConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  DelayedLoadConnectionWorkspaceRecoveryStore({
+    this.initialState,
+    Completer<void>? loadCompleter,
+    int immediateLoadCount = 0,
+  }) : loadCompleter = loadCompleter ?? Completer<void>(),
+       _remainingImmediateLoads = immediateLoadCount;
+
+  final ConnectionWorkspaceRecoveryState? initialState;
+  final Completer<void> loadCompleter;
+  ConnectionWorkspaceRecoveryState? _state;
+  int _remainingImmediateLoads;
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async {
+    if (_remainingImmediateLoads > 0) {
+      _remainingImmediateLoads -= 1;
+      return _state ?? initialState;
+    }
+    await loadCompleter.future;
+    return _state ?? initialState;
+  }
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    _state = state;
+  }
+}
+
 class DelayedFirstSaveConnectionWorkspaceRecoveryStore
     implements ConnectionWorkspaceRecoveryStore {
   DelayedFirstSaveConnectionWorkspaceRecoveryStore({

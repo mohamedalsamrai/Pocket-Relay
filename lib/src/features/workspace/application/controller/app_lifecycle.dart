@@ -105,9 +105,11 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
   String connectionId,
   ConnectionLaneBinding binding,
 ) async {
-  if (binding.sessionController.conversationRecoveryState != null ||
-      binding.sessionController.historicalConversationRestoreState != null ||
-      _workspaceLaneHasVisibleLiveConversationState(binding)) {
+  if (!_canRestoreWorkspaceConversationAfterResume(
+    controller,
+    connectionId,
+    binding,
+  )) {
     return;
   }
 
@@ -133,12 +135,22 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
     return;
   }
 
+  if (!_canRestoreWorkspaceConversationAfterResume(
+    controller,
+    connectionId,
+    binding,
+  )) {
+    return;
+  }
+
   try {
     await binding.sessionController.reattachConversation(selectedThreadId);
   } catch (_) {
-    if (controller._isDisposed ||
-        controller._state.selectedConnectionId != connectionId ||
-        !controller._state.isConnectionLive(connectionId)) {
+    if (!_canRestoreWorkspaceConversationAfterResume(
+      controller,
+      connectionId,
+      binding,
+    )) {
       return;
     }
     try {
@@ -165,4 +177,30 @@ void _debugLogWorkspaceResumeRecoveryFailure({
     debugPrintStack(stackTrace: stackTrace);
     return true;
   }());
+}
+
+bool _canRestoreWorkspaceConversationAfterResume(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) {
+  if (controller._isDisposed ||
+      !controller._state.isShowingLiveLane ||
+      controller._state.selectedConnectionId != connectionId ||
+      !controller._state.isConnectionLive(connectionId)) {
+    return false;
+  }
+
+  final currentBinding = controller._liveBindingsByConnectionId[connectionId];
+  if (!identical(currentBinding, binding) ||
+      currentBinding == null ||
+      currentBinding.sessionController.sessionState.isBusy ||
+      currentBinding.sessionController.conversationRecoveryState != null ||
+      currentBinding.sessionController.historicalConversationRestoreState !=
+          null ||
+      _workspaceLaneHasVisibleLiveConversationState(currentBinding)) {
+    return false;
+  }
+
+  return true;
 }

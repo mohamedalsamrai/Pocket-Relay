@@ -72,7 +72,9 @@ void main() {
 
       await controller.initialize();
       final binding = controller.bindingForConnectionId('conn_primary')!;
-      await binding.sessionController.selectConversationForResume('thread_saved');
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
       await Future<void>.delayed(Duration.zero);
 
       binding.sessionController.clearTranscript();
@@ -88,9 +90,14 @@ void main() {
       expect(binding.sessionController.transcriptBlocks, isEmpty);
       expect(binding.sessionController.sessionState.rootThreadId, isNull);
 
-      await controller.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
 
-      expect(binding.sessionController.sessionState.rootThreadId, 'thread_saved');
+      expect(
+        binding.sessionController.sessionState.rootThreadId,
+        'thread_saved',
+      );
       expect(
         binding.sessionController.transcriptBlocks
             .whereType<TranscriptTextBlock>()
@@ -101,6 +108,65 @@ void main() {
       expect(
         clientsById['conn_primary']!.readThreadCalls,
         contains('thread_saved'),
+      );
+    },
+  );
+
+  test(
+    'resumed does not restore a stale conversation after lane selection changes during recovery load',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final recoveryStore = DelayedLoadConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_saved',
+          draftText: '',
+        ),
+        immediateLoadCount: 1,
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        if (!recoveryStore.loadCompleter.isCompleted) {
+          recoveryStore.loadCompleter.complete();
+        }
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      await Future<void>.delayed(Duration.zero);
+      binding.sessionController.clearTranscript();
+      await Future<void>.delayed(Duration.zero);
+      final readThreadCallsBeforeResume = List<String>.of(
+        clientsById['conn_primary']!.readThreadCalls,
+      );
+
+      final resumeFuture = controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      controller.showSavedConnections();
+      recoveryStore.loadCompleter.complete();
+      await resumeFuture;
+
+      expect(controller.state.isShowingSavedConnections, isTrue);
+      expect(binding.sessionController.sessionState.rootThreadId, isNull);
+      expect(binding.sessionController.transcriptBlocks, isEmpty);
+      expect(
+        clientsById['conn_primary']!.readThreadCalls,
+        readThreadCallsBeforeResume,
       );
     },
   );
@@ -280,7 +346,9 @@ void main() {
       final binding = controller.bindingForConnectionId('conn_primary')!;
       recoveryStore.saveError = StateError('secure storage write failed');
 
-      await binding.sessionController.selectConversationForResume('thread_saved');
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
       await Future<void>.delayed(Duration.zero);
 
       expect(
