@@ -345,6 +345,23 @@ class RecordingConnectionWorkspaceRecoveryStore
   }
 }
 
+class FixedLoadConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  FixedLoadConnectionWorkspaceRecoveryStore(this.state);
+
+  final ConnectionWorkspaceRecoveryState? state;
+  final List<ConnectionWorkspaceRecoveryState?> attemptedSaves =
+      <ConnectionWorkspaceRecoveryState?>[];
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async => state;
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    attemptedSaves.add(state);
+  }
+}
+
 class DelayedLoadConnectionWorkspaceRecoveryStore
     implements ConnectionWorkspaceRecoveryStore {
   DelayedLoadConnectionWorkspaceRecoveryStore({

@@ -113,11 +113,23 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
     return;
   }
 
-  ConnectionWorkspaceRecoveryState? recoveryState;
+  String? selectedThreadId;
   try {
-    recoveryState =
-        controller._latestUnsavedRecoveryStateSnapshot() ??
-        await controller._recoveryStore.load();
+    final latestUnsavedRecoveryState = controller
+        ._latestUnsavedRecoveryStateSnapshot();
+    selectedThreadId = _normalizedWorkspaceThreadId(
+      latestUnsavedRecoveryState?.connectionId == connectionId
+          ? latestUnsavedRecoveryState?.selectedThreadId
+          : null,
+    );
+    if (selectedThreadId == null) {
+      final persistedRecoveryState = await controller._recoveryStore.load();
+      selectedThreadId = _normalizedWorkspaceThreadId(
+        persistedRecoveryState?.connectionId == connectionId
+            ? persistedRecoveryState?.selectedThreadId
+            : null,
+      );
+    }
   } catch (error, stackTrace) {
     _debugLogWorkspaceResumeRecoveryFailure(
       operation: 'load recovery state',
@@ -126,11 +138,6 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
     );
     return;
   }
-  final selectedThreadId = _normalizedWorkspaceThreadId(
-    recoveryState?.connectionId == connectionId
-        ? recoveryState?.selectedThreadId
-        : null,
-  );
   if (selectedThreadId == null) {
     return;
   }

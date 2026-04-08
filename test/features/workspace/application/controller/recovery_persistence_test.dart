@@ -76,6 +76,13 @@ void main() {
         'thread_saved',
       );
       await Future<void>.delayed(Duration.zero);
+      await recoveryStore.save(
+        const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_saved',
+          draftText: '',
+        ),
+      );
 
       binding.sessionController.clearTranscript();
       await Future<void>.delayed(Duration.zero);
@@ -108,6 +115,65 @@ void main() {
       expect(
         clientsById['conn_primary']!.readThreadCalls,
         contains('thread_saved'),
+      );
+    },
+  );
+
+  test(
+    'resumed falls back to persisted recovery state when the latest unsaved snapshot has no selected thread',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final recoveryStore = FixedLoadConnectionWorkspaceRecoveryStore(
+        const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_saved',
+          draftText: '',
+        ),
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: const Duration(minutes: 5),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      binding.sessionController.clearTranscript();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.debugLatestUnsavedRecoveryState?.selectedThreadId,
+        null,
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
+      expect(binding.sessionController.transcriptBlocks, isEmpty);
+      expect(binding.sessionController.sessionState.rootThreadId, isNull);
+
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+
+      expect(
+        binding.sessionController.sessionState.rootThreadId,
+        'thread_saved',
+      );
+      expect(
+        binding.sessionController.transcriptBlocks
+            .whereType<TranscriptTextBlock>()
+            .single
+            .body,
+        'Restored answer',
       );
     },
   );
