@@ -113,8 +113,15 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
 
   ConnectionWorkspaceRecoveryState? recoveryState;
   try {
-    recoveryState = await controller._recoveryStore.load();
-  } catch (_) {
+    recoveryState =
+        controller._latestUnsavedRecoveryStateSnapshot() ??
+        await controller._recoveryStore.load();
+  } catch (error, stackTrace) {
+    _debugLogWorkspaceResumeRecoveryFailure(
+      operation: 'load recovery state',
+      error: error,
+      stackTrace: stackTrace,
+    );
     return;
   }
   final selectedThreadId = _normalizedWorkspaceThreadId(
@@ -138,6 +145,24 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
       await binding.sessionController.selectConversationForResume(
         selectedThreadId,
       );
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      _debugLogWorkspaceResumeRecoveryFailure(
+        operation: 'select conversation for resume',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
+}
+
+void _debugLogWorkspaceResumeRecoveryFailure({
+  required String operation,
+  required Object error,
+  required StackTrace stackTrace,
+}) {
+  assert(() {
+    debugPrint('Failed to $operation during workspace resume: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return true;
+  }());
 }

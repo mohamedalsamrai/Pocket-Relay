@@ -13,6 +13,7 @@ Future<void> _initializeWorkspaceController(
         ConnectionWorkspaceRecoveryErrors.recoveryStateLoadFailed(error: error);
   }
   controller._lastPersistedRecoveryState = recoveryState;
+  controller._latestRecoveryPersistenceState = recoveryState;
   if (catalog.isEmpty) {
     controller._applyState(
       const ConnectionWorkspaceState(
