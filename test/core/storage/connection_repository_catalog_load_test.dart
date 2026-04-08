@@ -241,7 +241,7 @@ void main() {
   );
 
   test(
-    'loadSystemCatalog backfills a missing stored system label from legacy ssh identity',
+    'loadSystemCatalog keeps a missing stored system label implicit while still deriving the legacy ssh identity for display',
     () async {
       final preferences = SharedPreferencesAsync();
       await preferences.setString(
@@ -271,15 +271,12 @@ void main() {
       final system = await repository.loadSystem('system_seed');
 
       expect(systemCatalog.orderedSystemIds, <String>['system_seed']);
-      expect(
-        systemCatalog.orderedSystems.single.profile.label,
-        'vince@relay.example.com:2200',
-      );
+      expect(systemCatalog.orderedSystems.single.profile.label, isEmpty);
       expect(
         systemCatalog.orderedSystems.single.profile.hasCustomLabel,
         isFalse,
       );
-      expect(system.profile.label, 'vince@relay.example.com:2200');
+      expect(system.profile.label, isEmpty);
       expect(system.profile.displayLabel, 'vince@relay.example.com:2200');
       expect(system.profile.hasCustomLabel, isFalse);
     },

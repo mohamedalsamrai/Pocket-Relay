@@ -34,7 +34,12 @@ class SystemProfile {
       return false;
     }
 
-    final identityLabel = _derivedIdentityLabel(usePlaceholder: false);
+    final identityLabel = connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: false,
+    );
     return identityLabel.isEmpty || normalizedLabel != identityLabel;
   }
 
@@ -44,14 +49,41 @@ class SystemProfile {
       return normalizedLabel;
     }
 
-    return _derivedIdentityLabel(usePlaceholder: true);
+    return connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: true,
+    );
   }
 
   String get connectionIdentityLabel {
-    return _derivedIdentityLabel(usePlaceholder: true);
+    return connectionIdentityLabelForFields(
+      host: host,
+      port: port,
+      username: username,
+      usePlaceholder: true,
+    );
   }
 
-  String _derivedIdentityLabel({required bool usePlaceholder}) {
+  static String connectionIdentityLabelForProfile(
+    ConnectionProfile profile, {
+    bool usePlaceholder = true,
+  }) {
+    return connectionIdentityLabelForFields(
+      host: profile.host,
+      port: profile.port,
+      username: profile.username,
+      usePlaceholder: usePlaceholder,
+    );
+  }
+
+  static String connectionIdentityLabelForFields({
+    required String host,
+    required int port,
+    required String username,
+    required bool usePlaceholder,
+  }) {
     final normalizedHost = host.trim();
     final normalizedUsername = username.trim();
     if (normalizedHost.isEmpty) {
@@ -98,17 +130,8 @@ class SystemProfile {
     final host = json['host'] as String? ?? defaults.host;
     final port = (json['port'] as num?)?.toInt() ?? defaults.port;
     final username = json['username'] as String? ?? defaults.username;
-    final normalizedLabel = (json['label'] as String?)?.trim();
     return SystemProfile(
-      label: normalizedLabel == null || normalizedLabel.isEmpty
-          ? SystemProfile(
-              host: host,
-              port: port,
-              username: username,
-              authMode: defaults.authMode,
-              hostFingerprint: defaults.hostFingerprint,
-            )._derivedIdentityLabel(usePlaceholder: false)
-          : normalizedLabel,
+      label: _storedLabelFromJson(json),
       host: host,
       port: port,
       username: username,
@@ -146,6 +169,33 @@ class SystemProfile {
   @override
   int get hashCode =>
       Object.hash(label, host, port, username, authMode, hostFingerprint);
+
+  static String _storedLabelFromJson(Map<String, dynamic> json) {
+    final rawLabel = json['label'];
+    if (rawLabel is String) {
+      return rawLabel.trim();
+    }
+
+    return _firstNonBlankTrimmedString(<Object?>[
+          json['name'],
+          json['displayLabel'],
+          json['identityLabel'],
+        ]) ??
+        '';
+  }
+
+  static String? _firstNonBlankTrimmedString(Iterable<Object?> candidates) {
+    for (final candidate in candidates) {
+      if (candidate is! String) {
+        continue;
+      }
+      final trimmed = candidate.trim();
+      if (trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    }
+    return null;
+  }
 }
 
 class SavedSystemSummary {

@@ -102,7 +102,9 @@ ConnectionSettingsSystemOptionContract _systemOptionContract(
   ConnectionSettingsSystemTemplate template,
 ) {
   final profile = template.profile;
-  final identityLabel = _systemIdentityLabel(profile);
+  final identityLabel = SystemProfile.connectionIdentityLabelForProfile(
+    profile,
+  );
   final normalizedLabel = profile.label.trim();
   final hasCustomLabel =
       normalizedLabel.isNotEmpty && normalizedLabel != identityLabel;
@@ -120,19 +122,4 @@ ConnectionSettingsSystemOptionContract _systemOptionContract(
         ? '$identityLabel · $signInLabel · $trustLabel'
         : '$signInLabel · $trustLabel',
   );
-}
-
-String _systemIdentityLabel(ConnectionProfile profile) {
-  final host = profile.host.trim();
-  final username = profile.username.trim();
-  if (host.isEmpty) {
-    return 'System not set';
-  }
-
-  final hostWithPort = profile.port == 22 ? host : '$host:${profile.port}';
-  if (username.isEmpty) {
-    return hostWithPort;
-  }
-
-  return '$username@$hostWithPort';
 }

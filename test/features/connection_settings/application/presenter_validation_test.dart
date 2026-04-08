@@ -193,6 +193,50 @@ void main() {
     expect(payload!.profile.label, 'Build Box');
   });
 
+  test(
+    'system settings keep identity-derived fallback names implicit until the user renames the system',
+    () {
+      final savedSystem = SavedSystem(
+        id: 'system_primary',
+        profile: const SystemProfile(
+          label: '',
+          host: 'devbox.local',
+          port: 2200,
+          username: 'vince',
+          authMode: AuthMode.password,
+          hostFingerprint: 'aa:bb:cc:dd',
+        ),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+      final initialProfile = connectionProfileFromSystem(savedSystem);
+      final initialSecrets = savedSystem.secrets;
+      final formState =
+          ConnectionSettingsFormState.initial(
+            profile: initialProfile,
+            secrets: initialSecrets,
+          ).copyWith(
+            draft: ConnectionSettingsDraft.fromConnection(
+              profile: initialProfile,
+              secrets: initialSecrets,
+            ).copyWith(host: 'devbox-2.local', hostFingerprint: '11:22:33:44'),
+            showValidationErrors: true,
+          );
+
+      final contract = presenter.present(
+        initialProfile: initialProfile,
+        initialSecrets: initialSecrets,
+        formState: formState,
+        isSystemSettings: true,
+      );
+      final payload = contract.saveAction.submitPayload;
+
+      expect(initialProfile.label, isEmpty);
+      expect(payload, isNotNull);
+      expect(payload!.profile.label, isEmpty);
+      expect(payload.profile.host, 'devbox-2.local');
+    },
+  );
+
   test('surfaces reusable systems as a picker when matching systems exist', () {
     final initialProfile = configuredConnectionProfile();
     const initialSecrets = ConnectionSecrets(password: 'secret');

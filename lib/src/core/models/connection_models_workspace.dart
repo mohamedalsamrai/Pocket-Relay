@@ -331,7 +331,7 @@ ConnectionProfile connectionProfileFromSystem(SavedSystem? system) {
   final systemProfile = system?.profile ?? SystemProfile.defaults();
   final defaults = ConnectionProfile.defaults();
   return ConnectionProfile(
-    label: system?.profile.displayLabel ?? '',
+    label: system?.profile.label.trim() ?? '',
     host: systemProfile.host,
     port: systemProfile.port,
     username: systemProfile.username,
