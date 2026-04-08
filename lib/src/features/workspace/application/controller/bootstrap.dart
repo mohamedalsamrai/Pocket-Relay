@@ -164,6 +164,14 @@ Future<void> _initializeWorkspaceController(
         firstConnectionId,
         ConnectionWorkspaceTransportRecoveryPhase.unavailable,
       );
+      controller._setTurnLivenessAssessment(
+        firstConnectionId,
+        ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+          evidence: ConnectionWorkspaceTurnLivenessEvidence.ownerUnavailable,
+          threadId: recoveryState!.selectedThreadId!,
+        ),
+      );
       controller._completeRecoveryAttempt(
         firstConnectionId,
         completedAt: controller._now(),
@@ -182,6 +190,15 @@ Future<void> _initializeWorkspaceController(
       controller._setTransportRecoveryPhase(
         firstConnectionId,
         ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      controller._setTurnLivenessAssessment(
+        firstConnectionId,
+        ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.transportUnavailable,
+          threadId: recoveryState!.selectedThreadId!,
+        ),
       );
       controller._completeRecoveryAttempt(
         firstConnectionId,

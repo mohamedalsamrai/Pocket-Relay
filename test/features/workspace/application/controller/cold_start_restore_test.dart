@@ -78,6 +78,8 @@ void main() {
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
         'thread_saved',
+        'thread_saved',
+        'thread_saved',
       ]);
       expect(clientsById['conn_secondary']!.connectCalls, 1);
       expect(
@@ -90,7 +92,7 @@ void main() {
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_secondary'),
-        ConnectionWorkspaceLiveReattachPhase.liveReattached,
+        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
       );
       final diagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
@@ -107,7 +109,7 @@ void main() {
       );
       expect(
         diagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
       );
     },
   );
@@ -307,7 +309,7 @@ void main() {
       expect(restoredDiagnostics, isNotNull);
       expect(
         restoredDiagnostics!.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
       );
       expect(restoredDiagnostics.lastRecoveryCompletedAt, isNotNull);
     },
@@ -504,6 +506,8 @@ void main() {
         'thread_saved',
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
+        'thread_saved',
+        'thread_saved',
         'thread_saved',
       ]);
       expect(

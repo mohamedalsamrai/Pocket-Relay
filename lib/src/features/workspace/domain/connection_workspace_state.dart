@@ -28,6 +28,8 @@ enum ConnectionWorkspaceRecoveryOutcome {
   transportRestored,
   transportUnavailable,
   liveReattached,
+  livenessUnknown,
+  continuityLost,
   conversationRestored,
   conversationUnavailable,
   conversationRestoreFailed,
@@ -48,6 +50,51 @@ enum ConnectionWorkspaceLiveReattachPhase {
   fallbackRestore,
 }
 
+enum ConnectionWorkspaceTurnLivenessStatus {
+  stillLive,
+  finishedWhileAway,
+  continuityLost,
+  unknown,
+}
+
+enum ConnectionWorkspaceTurnLivenessEvidence {
+  activeTurnReattached,
+  pendingTurnRequestReattached,
+  threadHistoryRunningTurn,
+  threadHistoryTerminalTurn,
+  liveReattachFailed,
+  ownerUnavailable,
+  transportUnavailable,
+  adapterUnverifiable,
+}
+
+@immutable
+class ConnectionWorkspaceTurnLivenessAssessment {
+  const ConnectionWorkspaceTurnLivenessAssessment({
+    required this.status,
+    required this.evidence,
+    this.threadId,
+    this.turnId,
+  });
+
+  final ConnectionWorkspaceTurnLivenessStatus status;
+  final ConnectionWorkspaceTurnLivenessEvidence evidence;
+  final String? threadId;
+  final String? turnId;
+
+  @override
+  bool operator ==(Object other) {
+    return other is ConnectionWorkspaceTurnLivenessAssessment &&
+        other.status == status &&
+        other.evidence == evidence &&
+        other.threadId == threadId &&
+        other.turnId == turnId;
+  }
+
+  @override
+  int get hashCode => Object.hash(status, evidence, threadId, turnId);
+}
+
 @immutable
 class ConnectionWorkspaceRecoveryDiagnostics {
   const ConnectionWorkspaceRecoveryDiagnostics({
@@ -64,6 +111,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     this.lastRecoveryPersistenceFailureAt,
     this.lastRecoveryPersistenceFailureDetail,
     this.lastRecoveryOutcome,
+    this.lastTurnLivenessAssessment,
   });
 
   final DateTime? lastBackgroundedAt;
@@ -80,6 +128,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
   final DateTime? lastRecoveryPersistenceFailureAt;
   final String? lastRecoveryPersistenceFailureDetail;
   final ConnectionWorkspaceRecoveryOutcome? lastRecoveryOutcome;
+  final ConnectionWorkspaceTurnLivenessAssessment? lastTurnLivenessAssessment;
 
   ConnectionWorkspaceRecoveryDiagnostics copyWith({
     DateTime? lastBackgroundedAt,
@@ -95,6 +144,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     DateTime? lastRecoveryPersistenceFailureAt,
     String? lastRecoveryPersistenceFailureDetail,
     ConnectionWorkspaceRecoveryOutcome? lastRecoveryOutcome,
+    ConnectionWorkspaceTurnLivenessAssessment? lastTurnLivenessAssessment,
     bool clearLastBackgroundedAt = false,
     bool clearLastBackgroundedLifecycleState = false,
     bool clearLastResumedAt = false,
@@ -108,6 +158,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     bool clearLastRecoveryPersistenceFailureAt = false,
     bool clearLastRecoveryPersistenceFailureDetail = false,
     bool clearLastRecoveryOutcome = false,
+    bool clearLastTurnLivenessAssessment = false,
   }) {
     return ConnectionWorkspaceRecoveryDiagnostics(
       lastBackgroundedAt: clearLastBackgroundedAt
@@ -154,6 +205,9 @@ class ConnectionWorkspaceRecoveryDiagnostics {
       lastRecoveryOutcome: clearLastRecoveryOutcome
           ? null
           : (lastRecoveryOutcome ?? this.lastRecoveryOutcome),
+      lastTurnLivenessAssessment: clearLastTurnLivenessAssessment
+          ? null
+          : (lastTurnLivenessAssessment ?? this.lastTurnLivenessAssessment),
     );
   }
 
@@ -175,7 +229,8 @@ class ConnectionWorkspaceRecoveryDiagnostics {
             lastRecoveryPersistenceFailureAt &&
         other.lastRecoveryPersistenceFailureDetail ==
             lastRecoveryPersistenceFailureDetail &&
-        other.lastRecoveryOutcome == lastRecoveryOutcome;
+        other.lastRecoveryOutcome == lastRecoveryOutcome &&
+        other.lastTurnLivenessAssessment == lastTurnLivenessAssessment;
   }
 
   @override
@@ -193,6 +248,7 @@ class ConnectionWorkspaceRecoveryDiagnostics {
     lastRecoveryPersistenceFailureAt,
     lastRecoveryPersistenceFailureDetail,
     lastRecoveryOutcome,
+    lastTurnLivenessAssessment,
   );
 }
 
@@ -361,6 +417,12 @@ class ConnectionWorkspaceState {
     String connectionId,
   ) {
     return recoveryDiagnosticsByConnectionId[connectionId];
+  }
+
+  ConnectionWorkspaceTurnLivenessAssessment? turnLivenessAssessmentFor(
+    String connectionId,
+  ) {
+    return recoveryDiagnosticsFor(connectionId)?.lastTurnLivenessAssessment;
   }
 
   ConnectionRemoteRuntimeState? remoteRuntimeFor(String connectionId) {

@@ -25,6 +25,40 @@ void _clearWorkspaceLiveReattachPhase(
   );
 }
 
+void _clearWorkspaceTurnLivenessAssessment(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+) {
+  final currentAssessment = controller._state.turnLivenessAssessmentFor(
+    connectionId,
+  );
+  if (controller._isDisposed || currentAssessment == null) {
+    return;
+  }
+
+  controller._updateRecoveryDiagnostics(
+    connectionId,
+    (current) => current.copyWith(clearLastTurnLivenessAssessment: true),
+  );
+}
+
+void _setWorkspaceTurnLivenessAssessment(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionWorkspaceTurnLivenessAssessment assessment,
+) {
+  if (controller._isDisposed ||
+      !controller._state.isConnectionLive(connectionId) ||
+      controller._state.turnLivenessAssessmentFor(connectionId) == assessment) {
+    return;
+  }
+
+  controller._updateRecoveryDiagnostics(
+    connectionId,
+    (current) => current.copyWith(lastTurnLivenessAssessment: assessment),
+  );
+}
+
 void _setWorkspaceLiveReattachPhase(
   ConnectionWorkspaceController controller,
   String connectionId,
@@ -261,6 +295,7 @@ void _beginWorkspaceRecoveryAttempt(
       clearLastLiveReattachFailureDetail: true,
       clearLastRecoveryCompletedAt: true,
       clearLastRecoveryOutcome: true,
+      clearLastTurnLivenessAssessment: true,
     ),
   );
 }

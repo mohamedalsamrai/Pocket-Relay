@@ -482,6 +482,14 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     required Object? error,
   }) => _recordWorkspaceLiveReattachFailure(this, connectionId, error: error);
 
+  void _clearTurnLivenessAssessment(String connectionId) =>
+      _clearWorkspaceTurnLivenessAssessment(this, connectionId);
+
+  void _setTurnLivenessAssessment(
+    String connectionId,
+    ConnectionWorkspaceTurnLivenessAssessment assessment,
+  ) => _setWorkspaceTurnLivenessAssessment(this, connectionId, assessment);
+
   void _beginRecoveryAttempt(
     String connectionId, {
     required DateTime startedAt,

@@ -63,6 +63,22 @@ abstract final class ConnectionWorkspaceCopy {
       'Restoring conversation';
   static const String restoringConversationNoticeMessage =
       'Pocket Relay is restoring this transcript from Codex after live reattach could not continue directly. Your draft is preserved below.';
+  static const String turnStillLiveNoticeTitle =
+      'Same live turn is still running';
+  static const String turnStillLiveNoticeMessage =
+      'Pocket Relay reattached this lane to the same live turn after reconnecting to the remote owner.';
+  static const String turnFinishedWhileAwayNoticeTitle =
+      'Turn finished while you were away';
+  static const String turnFinishedWhileAwayNoticeMessage =
+      'Pocket Relay restored the finished thread from Codex history after confirming that this turn already completed upstream.';
+  static const String turnContinuityLostNoticeTitle =
+      'Live turn continuity was lost';
+  static const String turnContinuityLostNoticeMessage =
+      'Pocket Relay could not re-enter the same live turn after the app returned. The lane is showing the best truthful state it could recover.';
+  static const String turnLivenessUnknownNoticeTitle =
+      'Live turn status could not be verified';
+  static const String turnLivenessUnknownNoticeMessage =
+      'Pocket Relay reconnected this lane, but the adapter/runtime could not prove whether the same turn is still live or already finished.';
   static const String remoteServerRunningSummary = 'Server running';
   static const String remoteServerStoppedSummary = 'Server stopped';
   static const String remoteServerUnhealthySummary = 'Server unhealthy';
