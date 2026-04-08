@@ -1,4 +1,5 @@
 import '../session_controller_test_support.dart';
+import 'session_controller_work_log_terminal_test_support.dart';
 
 void main() {
   test(
@@ -35,7 +36,7 @@ void main() {
                 ),
               ],
             );
-      final controller = buildSessionController(
+      final controller = buildWorkLogTerminalSessionController(
         appServerClient: appServerClient,
       );
 

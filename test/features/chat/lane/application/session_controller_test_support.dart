@@ -1,9 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
-import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
-import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 
 export 'dart:async';
 export 'package:pocket_relay/src/agent_adapters/agent_adapter_capabilities.dart';
@@ -27,24 +23,6 @@ ConnectionProfile configuredProfile() {
     username: 'vince',
     workspaceDir: '/workspace',
   );
-}
-
-ChatSessionController buildSessionController({
-  required FakeCodexAppServerClient appServerClient,
-}) {
-  final savedProfile = SavedProfile(
-    profile: configuredProfile(),
-    secrets: const ConnectionSecrets(password: 'secret'),
-  );
-  addTearDown(appServerClient.close);
-
-  final controller = ChatSessionController(
-    profileStore: MemoryCodexProfileStore(initialValue: savedProfile),
-    appServerClient: appServerClient,
-    initialSavedProfile: savedProfile,
-  );
-  addTearDown(controller.dispose);
-  return controller;
 }
 
 CodexAppServerThreadHistory savedConversationThread({

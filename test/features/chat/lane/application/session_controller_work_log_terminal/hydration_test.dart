@@ -1,11 +1,12 @@
 import '../session_controller_test_support.dart';
+import 'session_controller_work_log_terminal_test_support.dart';
 
 void main() {
   test(
     'hydrateWorkLogTerminal uses active turn data for running commands',
     () async {
       final appServerClient = FakeCodexAppServerClient();
-      final controller = buildSessionController(
+      final controller = buildWorkLogTerminalSessionController(
         appServerClient: appServerClient,
       );
 
@@ -104,7 +105,7 @@ void main() {
                 ),
               ],
             );
-      final controller = buildSessionController(
+      final controller = buildWorkLogTerminalSessionController(
         appServerClient: appServerClient,
       );
 
@@ -182,7 +183,7 @@ void main() {
                 ),
               ],
             );
-      final controller = buildSessionController(
+      final controller = buildWorkLogTerminalSessionController(
         appServerClient: appServerClient,
       );
 
