@@ -43,11 +43,16 @@ Future<void> _queueWorkspaceRecoveryPersistenceSnapshot(
     return controller._recoveryPersistence;
   }
 
-  if (snapshot == controller._lastPersistedRecoveryState ||
+  final hasUnsavedRecoverySnapshot =
+      controller._latestRecoveryPersistenceState !=
+      controller._lastPersistedRecoveryState;
+  if ((snapshot == controller._lastPersistedRecoveryState &&
+          !hasUnsavedRecoverySnapshot) ||
       snapshot == controller._pendingRecoveryPersistenceState) {
     return controller._recoveryPersistence;
   }
 
+  controller._latestRecoveryPersistenceState = snapshot;
   controller._pendingRecoveryPersistenceState = snapshot;
   if (controller._isPersistingRecoveryState) {
     return controller._recoveryPersistence;
@@ -79,26 +84,22 @@ Future<void> _drainWorkspaceRecoveryPersistenceQueue(
       try {
         await controller._recoveryStore.save(snapshot);
         controller._lastPersistedRecoveryState = snapshot;
-        if (snapshot != null) {
-          controller._updateRecoveryDiagnostics(
-            snapshot.connectionId,
-            (current) => current.copyWith(
-              clearLastRecoveryPersistenceFailureAt: true,
-              clearLastRecoveryPersistenceFailureDetail: true,
-            ),
-          );
-        }
+        controller._updateRecoveryDiagnostics(
+          snapshot.connectionId,
+          (current) => current.copyWith(
+            clearLastRecoveryPersistenceFailureAt: true,
+            clearLastRecoveryPersistenceFailureDetail: true,
+          ),
+        );
       } catch (error, stackTrace) {
-        if (snapshot != null) {
-          controller._updateRecoveryDiagnostics(
-            snapshot.connectionId,
-            (current) => current.copyWith(
-              lastRecoveryPersistenceFailureAt: controller._now().toUtc(),
-              lastRecoveryPersistenceFailureDetail:
-                  PocketErrorDetailFormatter.normalize(error),
-            ),
-          );
-        }
+        controller._updateRecoveryDiagnostics(
+          snapshot.connectionId,
+          (current) => current.copyWith(
+            lastRecoveryPersistenceFailureAt: controller._now().toUtc(),
+            lastRecoveryPersistenceFailureDetail:
+                PocketErrorDetailFormatter.normalize(error),
+          ),
+        );
         assert(() {
           debugPrint('Failed to save workspace recovery state: $error');
           debugPrintStack(stackTrace: stackTrace);
@@ -125,11 +126,32 @@ bool _hasWorkspaceImmediateRecoveryIdentityChange(
   ConnectionWorkspaceController controller,
   ConnectionWorkspaceRecoveryState? snapshot,
 ) {
-  final referenceSnapshot =
-      controller._pendingRecoveryPersistenceState ??
-      controller._lastPersistedRecoveryState;
+  final referenceSnapshot = _latestWorkspaceRecoveryStateSnapshot(controller);
   return referenceSnapshot?.connectionId != snapshot?.connectionId ||
       referenceSnapshot?.selectedThreadId != snapshot?.selectedThreadId;
+}
+
+ConnectionWorkspaceRecoveryState? _latestWorkspaceRecoveryStateSnapshot(
+  ConnectionWorkspaceController controller,
+) {
+  return _latestUnsavedWorkspaceRecoveryStateSnapshot(controller) ??
+      controller._lastPersistedRecoveryState;
+}
+
+ConnectionWorkspaceRecoveryState? _latestUnsavedWorkspaceRecoveryStateSnapshot(
+  ConnectionWorkspaceController controller,
+) {
+  final pendingSnapshot = controller._pendingRecoveryPersistenceState;
+  if (pendingSnapshot != null) {
+    return pendingSnapshot;
+  }
+
+  final latestSnapshot = controller._latestRecoveryPersistenceState;
+  if (latestSnapshot != controller._lastPersistedRecoveryState) {
+    return latestSnapshot;
+  }
+
+  return null;
 }
 
 ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(

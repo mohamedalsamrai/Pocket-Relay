@@ -69,6 +69,16 @@ Future<void> _handleWorkspaceAppLifecycleState(
         occurredAt: resumedAt,
       );
       if (!controller._state.requiresTransportReconnect(selectedConnectionId)) {
+        final binding =
+            controller._liveBindingsByConnectionId[selectedConnectionId];
+        if (binding == null || binding.sessionController.sessionState.isBusy) {
+          return;
+        }
+        await _restoreWorkspaceConversationAfterResumeIfNeeded(
+          controller,
+          selectedConnectionId,
+          binding,
+        );
         return;
       }
 
@@ -88,4 +98,116 @@ Future<void> _handleWorkspaceAppLifecycleState(
     case AppLifecycleState.detached:
       return;
   }
+}
+
+Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) async {
+  if (!_canRestoreWorkspaceConversationAfterResume(
+    controller,
+    connectionId,
+    binding,
+  )) {
+    return;
+  }
+
+  String? selectedThreadId;
+  try {
+    final latestUnsavedRecoveryState = controller
+        ._latestUnsavedRecoveryStateSnapshot();
+    selectedThreadId = _normalizedWorkspaceThreadId(
+      latestUnsavedRecoveryState?.connectionId == connectionId
+          ? latestUnsavedRecoveryState?.selectedThreadId
+          : null,
+    );
+    if (selectedThreadId == null) {
+      final persistedRecoveryState = await controller._recoveryStore.load();
+      selectedThreadId = _normalizedWorkspaceThreadId(
+        persistedRecoveryState?.connectionId == connectionId
+            ? persistedRecoveryState?.selectedThreadId
+            : null,
+      );
+    }
+  } catch (error, stackTrace) {
+    _debugLogWorkspaceResumeRecoveryFailure(
+      operation: 'load recovery state',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return;
+  }
+  if (selectedThreadId == null) {
+    return;
+  }
+
+  if (!_canRestoreWorkspaceConversationAfterResume(
+    controller,
+    connectionId,
+    binding,
+  )) {
+    return;
+  }
+
+  try {
+    await binding.sessionController.reattachConversation(selectedThreadId);
+  } catch (_) {
+    if (!_canRestoreWorkspaceConversationAfterResume(
+      controller,
+      connectionId,
+      binding,
+    )) {
+      return;
+    }
+    try {
+      await binding.sessionController.selectConversationForResume(
+        selectedThreadId,
+      );
+    } catch (error, stackTrace) {
+      _debugLogWorkspaceResumeRecoveryFailure(
+        operation: 'select conversation for resume',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+}
+
+void _debugLogWorkspaceResumeRecoveryFailure({
+  required String operation,
+  required Object error,
+  required StackTrace stackTrace,
+}) {
+  assert(() {
+    debugPrint('Failed to $operation during workspace resume: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    return true;
+  }());
+}
+
+bool _canRestoreWorkspaceConversationAfterResume(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) {
+  if (controller._isDisposed ||
+      !controller._state.isShowingLiveLane ||
+      controller._state.selectedConnectionId != connectionId ||
+      !controller._state.isConnectionLive(connectionId)) {
+    return false;
+  }
+
+  final currentBinding = controller._liveBindingsByConnectionId[connectionId];
+  if (!identical(currentBinding, binding) ||
+      currentBinding == null ||
+      currentBinding.sessionController.sessionState.isBusy ||
+      currentBinding.sessionController.conversationRecoveryState != null ||
+      currentBinding.sessionController.historicalConversationRestoreState !=
+          null ||
+      _workspaceLaneHasVisibleLiveConversationState(currentBinding)) {
+    return false;
+  }
+
+  return true;
 }

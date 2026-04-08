@@ -345,6 +345,83 @@ class RecordingConnectionWorkspaceRecoveryStore
   }
 }
 
+class FixedLoadConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  FixedLoadConnectionWorkspaceRecoveryStore(this.state);
+
+  final ConnectionWorkspaceRecoveryState? state;
+  final List<ConnectionWorkspaceRecoveryState?> attemptedSaves =
+      <ConnectionWorkspaceRecoveryState?>[];
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async => state;
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    attemptedSaves.add(state);
+  }
+}
+
+class DelayedLoadConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  DelayedLoadConnectionWorkspaceRecoveryStore({
+    this.initialState,
+    Completer<void>? loadCompleter,
+    int immediateLoadCount = 0,
+  }) : loadCompleter = loadCompleter ?? Completer<void>(),
+       _remainingImmediateLoads = immediateLoadCount;
+
+  final ConnectionWorkspaceRecoveryState? initialState;
+  final Completer<void> loadCompleter;
+  ConnectionWorkspaceRecoveryState? _state;
+  int _remainingImmediateLoads;
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async {
+    if (_remainingImmediateLoads > 0) {
+      _remainingImmediateLoads -= 1;
+      return _state ?? initialState;
+    }
+    await loadCompleter.future;
+    return _state ?? initialState;
+  }
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    _state = state;
+  }
+}
+
+class DelayedFirstSaveConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  DelayedFirstSaveConnectionWorkspaceRecoveryStore({
+    this.initialState,
+    Completer<void>? firstSaveCompleter,
+  }) : firstSaveCompleter = firstSaveCompleter ?? Completer<void>();
+
+  final ConnectionWorkspaceRecoveryState? initialState;
+  final Completer<void> firstSaveCompleter;
+  final List<ConnectionWorkspaceRecoveryState?> attemptedStates =
+      <ConnectionWorkspaceRecoveryState?>[];
+  ConnectionWorkspaceRecoveryState? _state;
+  var _saveCalls = 0;
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async {
+    return _state ?? initialState;
+  }
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    attemptedStates.add(state);
+    _saveCalls += 1;
+    if (_saveCalls == 1) {
+      await firstSaveCompleter.future;
+    }
+    _state = state;
+  }
+}
+
 class ToggleableFailingConnectionWorkspaceRecoveryStore
     implements ConnectionWorkspaceRecoveryStore {
   ToggleableFailingConnectionWorkspaceRecoveryStore({

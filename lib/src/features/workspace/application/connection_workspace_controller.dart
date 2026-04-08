@@ -121,11 +121,16 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   Timer? _recoveryPersistenceDebounceTimer;
   ConnectionWorkspaceRecoveryState? _pendingRecoveryPersistenceState;
   ConnectionWorkspaceRecoveryState? _lastPersistedRecoveryState;
+  ConnectionWorkspaceRecoveryState? _latestRecoveryPersistenceState;
   bool _isPersistingRecoveryState = false;
   bool _isDisposed = false;
 
   ConnectionWorkspaceState get state => _state;
   Future<void> flushRecoveryPersistence() => _enqueueRecoveryPersistence();
+
+  @visibleForTesting
+  ConnectionWorkspaceRecoveryState? get debugLatestUnsavedRecoveryState =>
+      _latestUnsavedRecoveryStateSnapshot();
 
   void dismissFinishedWhileAwayNotice(String connectionId) {
     final assessment = _state.turnLivenessAssessmentFor(connectionId);
@@ -437,6 +442,9 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     backgroundedAt: backgroundedAt,
     backgroundedLifecycleState: backgroundedLifecycleState,
   );
+
+  ConnectionWorkspaceRecoveryState? _latestUnsavedRecoveryStateSnapshot() =>
+      _latestUnsavedWorkspaceRecoveryStateSnapshot(this);
 
   void _markTransportReconnectRequired(String connectionId) =>
       _markWorkspaceTransportReconnectRequired(this, connectionId);
