@@ -17,6 +17,7 @@ void _registerWorkspaceLiveBinding(
   controller._unregisterLiveBinding(connectionId);
   void listener() {
     _syncWorkspaceTurnLivenessAssessment(controller, connectionId, binding);
+    _syncWorkspaceRecoveredTransportState(controller, connectionId, binding);
     if (controller._state.selectedConnectionId != connectionId) {
       return;
     }

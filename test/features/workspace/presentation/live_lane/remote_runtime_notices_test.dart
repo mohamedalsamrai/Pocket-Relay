@@ -65,6 +65,7 @@ void main() {
       final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
         laneBindingFactory: ({required connectionId, required connection}) {
           return ConnectionLaneBinding(
             connectionId: connectionId,
@@ -163,6 +164,7 @@ void main() {
           ];
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
         laneBindingFactory: ({required connectionId, required connection}) {
           return ConnectionLaneBinding(
             connectionId: connectionId,
@@ -240,6 +242,7 @@ void main() {
           );
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
         laneBindingFactory: ({required connectionId, required connection}) {
           return ConnectionLaneBinding(
             connectionId: connectionId,
@@ -297,7 +300,7 @@ void main() {
   );
 
   testWidgets(
-    'live lane shows a finished-while-away notice when recovery restores a completed turn from history',
+    'live lane auto-dismisses a finished-while-away notice after recovery restores a completed turn from history',
     (tester) async {
       final repository = MemoryCodexConnectionRepository(
         initialConnections: <SavedConnection>[
@@ -374,6 +377,270 @@ void main() {
         ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
       );
       expect(find.text('Restored answer'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsNothing);
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane keeps the finished-while-away notice visible across background time until foreground dwell elapses',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      client.threadHistoriesById['thread_saved'] = _savedConversationThread(
+        threadId: 'thread_saved',
+      );
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.selectedLaneBinding!.sessionController
+          .selectConversationForResume('thread_saved');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.startSessionError = const CodexAppServerException('resume failed');
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 30));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsNothing);
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane keeps the finished-while-away notice visible while the lane is hidden offscreen',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      client.threadHistoriesById['thread_saved'] = _savedConversationThread(
+        threadId: 'thread_saved',
+      );
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await controller.selectedLaneBinding!.sessionController
+          .selectConversationForResume('thread_saved');
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      client.startSessionError = const CodexAppServerException('resume failed');
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      controller.showSavedConnections();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 30));
+
+      controller.selectConnection('conn_primary');
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsNothing);
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane clears stale reconnecting chrome once real lane activity resumes after an out-of-band reconnect',
+    (tester) async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final client = FakeCodexAppServerClient();
+      client.threadHistoriesById['thread_saved'] = _savedConversationThread(
+        threadId: 'thread_saved',
+      );
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      client.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'thread/started',
+          params: <String, Object?>{
+            'thread': <String, Object?>{
+              'id': 'thread_saved',
+              'name': 'Saved conversation',
+              'source': <String, Object?>{'kind': 'app-server'},
+            },
+          },
+        ),
+      );
+      await tester.pump();
+      await client.disconnect();
+
+      await tester.pumpWidget(
+        buildWorkspaceDrivenLiveLaneApp(
+          controller,
+          settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await client.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await tester.pump();
+      await tester.pump();
+      await controller.flushRecoveryPersistence();
+
+      expect(find.text('Reconnecting to remote session'), findsNothing);
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isFalse,
+      );
+      expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
+      await controller.flushRecoveryPersistence();
     },
   );
 
