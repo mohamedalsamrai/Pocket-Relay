@@ -16,69 +16,29 @@ _ParsedGetContentReadCommand? _tryParseGetContentReadCommand(
     final token = tokens[index];
     final normalizedToken = token.toLowerCase();
 
-    if (_isPowerShellNamedParameter(normalizedToken, 'path')) {
-      final result = _resolvePowerShellParameterValue(
-        tokens: tokens,
-        index: index,
-        parameterName: 'path',
-      );
-      if (result == null || path != null) {
+    final pathResult = _tryResolveGetContentPathParameter(
+      tokens: tokens,
+      index: index,
+      normalizedToken: normalizedToken,
+    );
+    if (pathResult != null) {
+      if (path != null) {
         return null;
       }
-      path = result.value;
-      index = result.nextIndex;
+      path = pathResult.value;
+      index = pathResult.nextIndex;
       continue;
     }
 
-    if (_isPowerShellNamedParameter(normalizedToken, 'literalpath')) {
-      final result = _resolvePowerShellParameterValue(
-        tokens: tokens,
-        index: index,
-        parameterName: 'literalpath',
-      );
-      if (result == null || path != null) {
-        return null;
-      }
-      path = result.value;
-      index = result.nextIndex;
-      continue;
-    }
-
-    if (_isPowerShellNamedParameter(normalizedToken, 'totalcount')) {
-      final result = _resolvePowerShellParameterValue(
-        tokens: tokens,
-        index: index,
-        parameterName: 'totalcount',
-      );
-      if (result == null) {
-        return null;
-      }
-      final parsedCount = _parsePositiveInt(result.value);
-      if (parsedCount == null) {
-        return null;
-      }
-      mode = ChatGetContentReadMode.firstLines;
-      lineCount = parsedCount;
-      index = result.nextIndex;
-      continue;
-    }
-
-    if (_isPowerShellNamedParameter(normalizedToken, 'tail')) {
-      final result = _resolvePowerShellParameterValue(
-        tokens: tokens,
-        index: index,
-        parameterName: 'tail',
-      );
-      if (result == null) {
-        return null;
-      }
-      final parsedCount = _parsePositiveInt(result.value);
-      if (parsedCount == null) {
-        return null;
-      }
-      mode = ChatGetContentReadMode.lastLines;
-      lineCount = parsedCount;
-      index = result.nextIndex;
+    final lineModeResult = _tryResolveGetContentLineModeParameter(
+      tokens: tokens,
+      index: index,
+      normalizedToken: normalizedToken,
+    );
+    if (lineModeResult != null) {
+      mode = lineModeResult.mode;
+      lineCount = lineModeResult.lineCount;
+      index = lineModeResult.nextIndex;
       continue;
     }
 
@@ -106,6 +66,67 @@ _ParsedGetContentReadCommand? _tryParseGetContentReadCommand(
     path: path!,
     mode: mode,
     lineCount: lineCount,
+  );
+}
+
+_ResolvedPowerShellParameter? _tryResolveGetContentPathParameter({
+  required List<String> tokens,
+  required int index,
+  required String normalizedToken,
+}) {
+  String? parameterName;
+  if (_isPowerShellNamedParameter(normalizedToken, 'path')) {
+    parameterName = 'path';
+  } else if (_isPowerShellNamedParameter(normalizedToken, 'literalpath')) {
+    parameterName = 'literalpath';
+  }
+  if (parameterName == null) {
+    return null;
+  }
+
+  return _resolvePowerShellParameterValue(
+    tokens: tokens,
+    index: index,
+    parameterName: parameterName,
+  );
+}
+
+_ParsedGetContentLineModeParameter? _tryResolveGetContentLineModeParameter({
+  required List<String> tokens,
+  required int index,
+  required String normalizedToken,
+}) {
+  String? parameterName;
+  ChatGetContentReadMode? mode;
+  if (_isPowerShellNamedParameter(normalizedToken, 'totalcount')) {
+    parameterName = 'totalcount';
+    mode = ChatGetContentReadMode.firstLines;
+  } else if (_isPowerShellNamedParameter(normalizedToken, 'tail')) {
+    parameterName = 'tail';
+    mode = ChatGetContentReadMode.lastLines;
+  }
+  if (parameterName == null || mode == null) {
+    return null;
+  }
+
+  final result = _resolvePowerShellParameterValue(
+    tokens: tokens,
+    index: index,
+    parameterName: parameterName,
+  );
+  if (result == null) {
+    return null;
+  }
+
+  final parsedCount = _parsePositiveInt(result.value);
+  if (parsedCount == null) {
+    return null;
+  }
+
+  return _ParsedGetContentLineModeParameter(
+    mode: mode,
+    lineCount: parsedCount,
+    nextIndex: result.nextIndex,
   );
 }
 
@@ -215,4 +236,16 @@ class _ParsedSelectObjectReadProjection {
   final int? lineCount;
   final int? lineStart;
   final int? lineEnd;
+}
+
+class _ParsedGetContentLineModeParameter {
+  const _ParsedGetContentLineModeParameter({
+    required this.mode,
+    required this.lineCount,
+    required this.nextIndex,
+  });
+
+  final ChatGetContentReadMode mode;
+  final int lineCount;
+  final int nextIndex;
 }

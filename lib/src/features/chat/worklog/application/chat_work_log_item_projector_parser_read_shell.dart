@@ -1,44 +1,30 @@
 part of 'chat_work_log_item_projector.dart';
 
 _ParsedCatReadCommand? _tryParseCatReadCommand(List<String> tokens) {
-  var index = 1;
-  if (index < tokens.length && tokens[index] == '--') {
-    index++;
-  } else if (index < tokens.length && tokens[index].startsWith('-')) {
-    return null;
-  }
-
-  if (index != tokens.length - 1) {
-    return null;
-  }
-
-  final path = tokens[index].trim();
-  if (!_isFileTarget(path)) {
+  final path = _tryParseSimpleFileReadPath(tokens);
+  if (path == null) {
     return null;
   }
   return _ParsedCatReadCommand(path: path);
 }
 
 _ParsedTypeReadCommand? _tryParseTypeReadCommand(List<String> tokens) {
-  var index = 1;
-  if (index < tokens.length && tokens[index] == '--') {
-    index++;
-  } else if (index < tokens.length && tokens[index].startsWith('-')) {
-    return null;
-  }
-
-  if (index != tokens.length - 1) {
-    return null;
-  }
-
-  final path = tokens[index].trim();
-  if (!_isFileTarget(path)) {
+  final path = _tryParseSimpleFileReadPath(tokens);
+  if (path == null) {
     return null;
   }
   return _ParsedTypeReadCommand(path: path);
 }
 
 _ParsedMoreReadCommand? _tryParseMoreReadCommand(List<String> tokens) {
+  final path = _tryParseSimpleFileReadPath(tokens);
+  if (path == null) {
+    return null;
+  }
+  return _ParsedMoreReadCommand(path: path);
+}
+
+String? _tryParseSimpleFileReadPath(List<String> tokens) {
   var index = 1;
   if (index < tokens.length && tokens[index] == '--') {
     index++;
@@ -54,7 +40,7 @@ _ParsedMoreReadCommand? _tryParseMoreReadCommand(List<String> tokens) {
   if (!_isFileTarget(path)) {
     return null;
   }
-  return _ParsedMoreReadCommand(path: path);
+  return path;
 }
 
 _ParsedHeadReadCommand? _tryParseHeadReadCommand(List<String> tokens) {
