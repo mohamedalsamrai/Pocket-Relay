@@ -49,7 +49,7 @@ selected transcript at a time while preserving:
 
 The initial target is:
 
-- default visible tail window: `160` main transcript items
+- default visible tail window: `120` main transcript items
 - no older-window expansion in the first shipped step
 - a plain top-of-window notice when older transcript items are hidden
 
@@ -119,7 +119,7 @@ Extend:
 The projector should:
 
 - keep total transcript block count
-- map only the newest `160` transcript blocks into `mainItems`
+- map only the newest `120` transcript blocks into `mainItems`
 
 That is the key savings for phase 1:
 
@@ -133,7 +133,7 @@ That is the key savings for phase 1:
 
 When the selected transcript is first shown:
 
-- show only the newest `160` main transcript items
+- show only the newest `120` main transcript items
 - keep pinned request items outside this limit
 - preserve the current live-tail follow behavior
 
@@ -164,7 +164,7 @@ Allowed:
 
 - one slim top-of-transcript text notice when older items are hidden
 - simple hidden-count copy such as:
-  - `Showing the most recent 160 of 842 items`
+  - `Showing the most recent 120 of 842 items`
   - `Older activity is not shown in this view`
 
 Not allowed:
@@ -197,7 +197,7 @@ navigation later.
 
 Start with:
 
-- `defaultVisibleMainItemCount = 160`
+- `defaultVisibleMainItemCount = 120`
 
 Rationale:
 

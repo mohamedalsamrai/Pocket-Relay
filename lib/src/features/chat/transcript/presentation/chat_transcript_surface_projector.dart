@@ -17,7 +17,7 @@ class ChatTranscriptSurfaceProjector {
        _itemProjector = itemProjector,
        _pendingRequestPlacementProjector = pendingRequestPlacementProjector;
 
-  static const int defaultMainTranscriptItemLimit = 160;
+  static const int defaultMainTranscriptItemLimit = 120;
 
   final int mainTranscriptItemLimit;
   final ChatTranscriptItemProjector _itemProjector;
