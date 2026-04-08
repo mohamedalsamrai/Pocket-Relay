@@ -1,34 +1,24 @@
 # Remaining PR Split And Review Process
 
-## Goal
+## Status
 
-Work through the 6 currently open PRs in parallel without overlapping branch
-ownership, while clearing the actual outstanding review threads on each PR.
+Historical coordination note from an earlier April 2026 PR-review cleanup.
 
-This document is the coordination source of truth for the split. It is not a
-request to chat with the remote AI agent. Each side works its assigned PRs
-independently and uses the same review process.
+This file is preserved as audit context only. It is not the live source of
+truth for the current PR queue.
 
-## PR Split
+Use these instead for current state:
 
-The split is by surface area so each side stays in one coherent part of the
-codebase and avoids cross-branch churn.
+- the live GitHub open PR list
+- the active child issue or umbrella tracker comment, especially `#102` for the
+  LOC refactor train
+- `.github/pull_request_template.md` for the current per-PR checklist
 
-### This agent
+The specific PR assignments and review worklists below are historical and should
+not be reused as an active execution plan without first validating them against
+GitHub.
 
-- PR #24: restore legacy singleton profile bootstrap to preserve host key
-  pinning
-- PR #26: reject unpinned SSH host keys
-- PR #31: fix capture tool launcher command injection
-
-### Remote agent
-
-- PR #27: bound retained changed-file diffs to global unified-diff budget
-- PR #29: bound live model catalog pagination
-- PR #30: stop persisting workspace drafts in SharedPreferences-backed recovery
-  store
-
-## Shared Process
+## Historical Process
 
 Each assigned PR should be handled in the same sequence:
 
@@ -45,7 +35,7 @@ Each assigned PR should be handled in the same sequence:
 7. Resolve GitHub review threads only after the code change is on the branch
    and the relevant verification has passed.
 
-## Guardrails
+## Historical Guardrails
 
 - Do not work on a PR assigned to the other side.
 - Do not answer the remote AI agent directly. Coordination happens through this
@@ -56,7 +46,7 @@ Each assigned PR should be handled in the same sequence:
 - If a review comment implies a broader product or backend contract change,
   stop and document the blocker before widening scope.
 
-## PR Worklists
+## Historical Worklists
 
 ### This agent
 

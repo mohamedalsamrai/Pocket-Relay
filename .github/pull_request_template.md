@@ -1,3 +1,8 @@
+## Linked Issues
+
+- Primary issue:
+- Related tracker/admin issue:
+
 ## Summary
 
 Describe the intended behavior change and keep the scope literal.
@@ -13,3 +18,4 @@ Describe the intended behavior change and keep the scope literal.
 - [ ] This branch is not `master` or `main`
 - [ ] The PR scope does not include unrelated redesign or speculative churn
 - [ ] Protected-branch rules were not bypassed for routine work
+- [ ] Linked issues and any affected tracker/admin comments were updated or confirmed unnecessary
