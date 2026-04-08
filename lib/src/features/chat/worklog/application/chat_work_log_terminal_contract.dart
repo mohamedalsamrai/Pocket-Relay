@@ -1,5 +1,7 @@
 import 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart';
 
+const _chatWorkLogTerminalKeepValue = Object();
+
 class ChatWorkLogTerminalContract {
   const ChatWorkLogTerminalContract({
     required this.id,
@@ -15,6 +17,7 @@ class ChatWorkLogTerminalContract {
     this.processId,
     this.terminalInput,
     this.terminalOutput,
+    this.activitySummary,
   });
 
   factory ChatWorkLogTerminalContract.fromEntry(
@@ -43,6 +46,13 @@ class ChatWorkLogTerminalContract {
       processId: entry.processId,
       terminalInput: entry.terminalInput,
       terminalOutput: entry.terminalOutput,
+      activitySummary: switch (entry) {
+        ChatCommandExecutionWorkLogEntryContract(:final outputPreview) =>
+          outputPreview,
+        ChatCommandWaitWorkLogEntryContract(:final outputPreview) =>
+          outputPreview,
+        _ => null,
+      },
     );
   }
 
@@ -59,6 +69,7 @@ class ChatWorkLogTerminalContract {
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
+  final String? activitySummary;
 
   ChatWorkLogTerminalContract copyWith({
     String? activityLabel,
@@ -73,6 +84,7 @@ class ChatWorkLogTerminalContract {
     String? processId,
     String? terminalInput,
     String? terminalOutput,
+    Object? activitySummary = _chatWorkLogTerminalKeepValue,
   }) {
     return ChatWorkLogTerminalContract(
       id: id,
@@ -88,11 +100,15 @@ class ChatWorkLogTerminalContract {
       processId: processId ?? this.processId,
       terminalInput: terminalInput ?? this.terminalInput,
       terminalOutput: terminalOutput ?? this.terminalOutput,
+      activitySummary: identical(activitySummary, _chatWorkLogTerminalKeepValue)
+          ? this.activitySummary
+          : activitySummary as String?,
     );
   }
 
   bool get hasTerminalInput => terminalInput != null;
   bool get hasTerminalOutput => terminalOutput != null;
+  bool get hasActivitySummary => activitySummary != null;
 
   String get statusBadgeLabel {
     if (isWaiting) {
