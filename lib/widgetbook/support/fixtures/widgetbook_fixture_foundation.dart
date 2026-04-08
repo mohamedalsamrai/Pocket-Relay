@@ -88,7 +88,7 @@ abstract final class WidgetbookFixtureFoundation {
         username: 'vince',
         workspaceDir: '/workspace/Pocket-Relay',
         model: 'gpt-5.4',
-        reasoningEffort: CodexReasoningEffort.high,
+        reasoningEffort: AgentAdapterReasoningEffort.high,
       );
 
   static final ConnectionProfile localProfile = ConnectionProfile.defaults()
@@ -97,7 +97,7 @@ abstract final class WidgetbookFixtureFoundation {
         workspaceDir: '/Users/vince/Projects/Pocket-Relay',
         connectionMode: ConnectionMode.local,
         model: 'gpt-5.4',
-        reasoningEffort: CodexReasoningEffort.medium,
+        reasoningEffort: AgentAdapterReasoningEffort.medium,
       );
 
   static const ConnectionSecrets passwordSecrets = ConnectionSecrets(

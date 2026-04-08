@@ -17,7 +17,7 @@ WidgetbookCategory buildAppWidgetbookCategory() {
               connectionRepository: MemoryCodexConnectionRepository.single(
                 savedProfile: WidgetbookFixtures.savedProfile,
               ),
-              appServerClient: FakeCodexAppServerClient(),
+              agentAdapterClient: FakeCodexAppServerClient(),
               displayWakeLockController: const NoopDisplayWakeLockController(),
               platformPolicy: WidgetbookFixtures.mobilePolicy,
             ),
@@ -28,7 +28,7 @@ WidgetbookCategory buildAppWidgetbookCategory() {
               connectionRepository: MemoryCodexConnectionRepository.single(
                 savedProfile: WidgetbookFixtures.savedProfile,
               ),
-              appServerClient: FakeCodexAppServerClient(),
+              agentAdapterClient: FakeCodexAppServerClient(),
               displayWakeLockController: const NoopDisplayWakeLockController(),
               platformPolicy: WidgetbookFixtures.desktopPolicy,
             ),
