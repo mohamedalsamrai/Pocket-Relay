@@ -15,6 +15,28 @@ export 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 final BlepDiagnosticsConfig blepDiagnosticsConfig =
     _resolveBlepDiagnosticsConfig();
 
+String _buildPocketRelayRemoteOwnerLogFilePath({required String sessionName}) {
+  final normalized = sessionName.trim();
+  if (normalized.isEmpty) {
+    throw ArgumentError.value(sessionName, 'sessionName', 'must not be empty');
+  }
+
+  final environment = Platform.environment;
+  final runtimeDir = environment['XDG_RUNTIME_DIR']?.trim();
+  if (runtimeDir != null && runtimeDir.isNotEmpty) {
+    return '$runtimeDir/pocket-relay/$normalized.log';
+  }
+
+  final home = environment['HOME']?.trim();
+  if (home != null && home.isNotEmpty) {
+    return '$home/.cache/pocket-relay/$normalized.log';
+  }
+
+  final uid = (environment['UID'] ?? '').replaceAll(RegExp(r'[^0-9]+'), '');
+  final uidSuffix = uid.isEmpty ? 'unknown' : uid;
+  return '/tmp/pocket-relay-$uidSuffix/$normalized.log';
+}
+
 Future<void> verifyOpenSshOwnerInspection() async {
   final config = blepDiagnosticsConfig;
   final profile = config.profile!;
@@ -330,13 +352,15 @@ String _buildImmediateTmuxDebugCommand({
   required String workspaceDir,
   required int port,
 }) {
-  final logFile = buildPocketRelayRemoteOwnerLogFilePath(
+  final logFile = _buildPocketRelayRemoteOwnerLogFilePath(
     sessionName: sessionName,
   );
+  final logDir = File(logFile).parent.path;
   final tmuxCommand =
       '''
 launch_command="codex app-server --listen ws://127.0.0.1:$port"
 log_file="$logFile"
+mkdir -p ${_shellQuote(logDir)}
 rm -f "\$log_file"
 eval "\$launch_command" >>"\$log_file" 2>&1
 app_status=\$?
@@ -351,6 +375,7 @@ printf 'HOME=%s\\nPATH=%s\\nSHELL=%s\\nTMPDIR=%s\\nTMUX_TMPDIR=%s\\nXDG_RUNTIME_
 command -v tmux || true
 command -v codex || true
 tmux kill-session -t ${_shellQuote(sessionName)} 2>/dev/null || true
+mkdir -p ${_shellQuote(logDir)}
 rm -f ${_shellQuote(logFile)}
 pane_id=\$(tmux new-session -d -P -F '#{pane_id}' -s ${_shellQuote(sessionName)} -c ${_shellQuote(workspaceDir)})
 printf 'pane_id=%s\\n' "\$pane_id"
@@ -384,13 +409,15 @@ _ShellResult _startOwnerViaOpenSsh({
   required String workspaceDir,
   required int port,
 }) {
-  final logFile = buildPocketRelayRemoteOwnerLogFilePath(
+  final logFile = _buildPocketRelayRemoteOwnerLogFilePath(
     sessionName: sessionName,
   );
+  final logDir = File(logFile).parent.path;
   final script =
       '''
 set -euo pipefail
 tmux kill-session -t ${_shellQuote(sessionName)} 2>/dev/null || true
+mkdir -p ${_shellQuote(logDir)}
 rm -f ${_shellQuote(logFile)}
 tmux new-session -d -s ${_shellQuote(sessionName)} -c ${_shellQuote(workspaceDir)} "bash -lc 'launch_command=\\\"codex app-server --listen ws://127.0.0.1:$port\\\"; log_file=\\\"$logFile\\\"; rm -f \\\"\\\$log_file\\\"; eval \\\"\\\$launch_command\\\" >>\\\"\\\$log_file\\\" 2>&1; app_status=\\\$?; echo \\\"pocket-relay: codex app-server exited with status \\\$app_status\\\" >>\\\"\\\$log_file\\\"; exit \\\"\\\$app_status\\\"'"
 sleep 1
@@ -410,7 +437,7 @@ cat ${_shellQuote(logFile)} 2>/dev/null || true
 }
 
 String _rawOwnerState({required String alias, required String sessionName}) {
-  final logFile = buildPocketRelayRemoteOwnerLogFilePath(
+  final logFile = _buildPocketRelayRemoteOwnerLogFilePath(
     sessionName: sessionName,
   );
   final script =
