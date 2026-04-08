@@ -78,6 +78,15 @@ abstract final class ChatSessionGuardrailErrors {
     );
   }
 
+  static PocketUserFacingError liveTurnSteeringUnsupported() {
+    return PocketUserFacingError(
+      definition: PocketErrorCatalog.chatSessionLiveTurnSteeringUnsupported,
+      title: 'Active turn input unavailable',
+      message:
+          'This agent adapter does not support sending more input while a turn is already running. Wait for the current turn to finish or stop it first.',
+    );
+  }
+
   static PocketUserFacingError userInputRequestUnavailable() {
     return PocketUserFacingError(
       definition: PocketErrorCatalog.chatSessionUserInputRequestUnavailable,

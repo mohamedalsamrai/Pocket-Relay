@@ -113,6 +113,19 @@ extension on ChatSessionController {
         effectiveState.transcriptBlocks.isNotEmpty;
   }
 
+  String? _activeTurnIdForSteering() {
+    final transportTurnId = _normalizedTurnId(agentAdapterClient.activeTurnId);
+    if (transportTurnId != null) {
+      return transportTurnId;
+    }
+
+    if (agentAdapterClient.isConnected) {
+      return null;
+    }
+
+    return _normalizedTurnId(_sessionState.activeTurn?.turnId);
+  }
+
   void _startBufferingRuntimeEvents() {
     _bufferedRuntimeEvents.clear();
     _isBufferingRuntimeEvents = true;
@@ -160,6 +173,14 @@ extension on ChatSessionController {
         _profile.agentAdapter,
       ),
     };
+  }
+
+  String? _normalizedTurnId(String? value) {
+    final normalizedValue = value?.trim();
+    if (normalizedValue == null || normalizedValue.isEmpty) {
+      return null;
+    }
+    return normalizedValue;
   }
 }
 

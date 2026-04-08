@@ -2,6 +2,7 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 
 export 'dart:async';
+export 'package:pocket_relay/src/agent_adapters/agent_adapter_capabilities.dart';
 export 'package:flutter_test/flutter_test.dart';
 export 'package:pocket_relay/src/core/errors/pocket_error.dart';
 export 'package:pocket_relay/src/core/models/connection_models.dart';

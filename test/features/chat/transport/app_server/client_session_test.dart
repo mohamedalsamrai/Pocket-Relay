@@ -178,6 +178,84 @@ void main() {
     await client.disconnect();
   });
 
+  test('steerActiveTurn sends the expected request', () async {
+    late FakeCodexAppServerProcess process;
+    process = FakeCodexAppServerProcess(
+      onClientMessage: (message) {
+        switch (message['method']) {
+          case 'initialize':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'userAgent': 'codex-app-server-test'},
+            });
+          case 'thread/start':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'thread': <String, Object?>{'id': 'thread_123'},
+                'cwd': '/workspace',
+                'model': 'gpt-5.3-codex',
+                'modelProvider': 'openai',
+                'approvalPolicy': 'on-request',
+                'sandbox': <String, Object?>{'type': 'workspace-write'},
+              },
+            });
+          case 'turn/start':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{
+                'turn': <String, Object?>{'id': 'turn_123'},
+              },
+            });
+          case 'turn/steer':
+            process.sendStdout(<String, Object?>{
+              'id': message['id'],
+              'result': <String, Object?>{'turnId': 'turn_123'},
+            });
+        }
+      },
+    );
+
+    final client = CodexAppServerClient(
+      processLauncher:
+          ({required profile, required secrets, required emitEvent}) async =>
+              process,
+    );
+
+    await client.connect(
+      profile: clientProfile(),
+      secrets: const ConnectionSecrets(password: 'secret'),
+    );
+
+    final session = await client.startSession();
+    await client.sendUserMessage(threadId: session.threadId, text: 'start');
+    final turn = await client.steerActiveTurn(
+      threadId: session.threadId,
+      turnId: 'turn_123',
+      text: 'focus on tests first',
+    );
+
+    expect(turn.turnId, 'turn_123');
+    expect(client.activeTurnId, 'turn_123');
+
+    final steerRequest = process.writtenMessages.firstWhere(
+      (message) => message['method'] == 'turn/steer',
+    );
+    expect(steerRequest['params'], <String, Object?>{
+      'threadId': 'thread_123',
+      'input': <Object>[
+        <String, Object?>{
+          'type': 'text',
+          'text': 'focus on tests first',
+          'text_elements': <Object>[],
+        },
+      ],
+      'expectedTurnId': 'turn_123',
+    });
+
+    await client.disconnect();
+  });
+
   test(
     'startSession uses thread/resume params without ephemeral field',
     () async {

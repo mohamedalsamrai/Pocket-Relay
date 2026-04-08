@@ -204,6 +204,23 @@ class CodexAppServerClient implements AgentAdapterClient {
   }
 
   @override
+  Future<CodexAppServerTurn> steerActiveTurn({
+    required String threadId,
+    required String turnId,
+    String? text,
+    AgentAdapterTurnInput? input,
+  }) async {
+    _ensureNotDisposed();
+    return _requestApi.steerActiveTurn(
+      _connection,
+      threadId: threadId,
+      turnId: turnId,
+      text: text,
+      input: codexTurnInputFromAgentAdapter(input),
+    );
+  }
+
+  @override
   Future<void> answerUserInput({
     required String requestId,
     required Map<String, List<String>> answers,

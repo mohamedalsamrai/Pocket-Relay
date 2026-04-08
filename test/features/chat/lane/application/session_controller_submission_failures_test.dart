@@ -127,6 +127,96 @@ void main() {
   );
 
   test(
+    'sendPrompt blocks active-turn input when the adapter does not support steering',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        injectedAgentAdapterCapabilities: const AgentAdapterCapabilities(),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendPrompt('Blocked while running');
+
+      expect(sent, isFalse);
+      expect(
+        await snackBarMessage,
+        '[${PocketErrorCatalog.chatSessionLiveTurnSteeringUnsupported.code}] Active turn input unavailable. This agent adapter does not support sending more input while a turn is already running. Wait for the current turn to finish or stop it first.',
+      );
+      expect(appServerClient.sentMessages, <String>['First prompt']);
+      expect(appServerClient.steeredMessages, isEmpty);
+      expect(
+        controller.transcriptBlocks.whereType<TranscriptUserMessageBlock>(),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'sendPrompt preserves earlier pending local prompt correlation when steering fails',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..steerActiveTurnError = StateError('steer failed');
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      final firstPendingBlockId =
+          controller.sessionState.pendingLocalUserMessageBlockIds.single;
+
+      final snackBarMessage = controller.snackBarMessages.first.timeout(
+        const Duration(seconds: 1),
+      );
+      final sent = await controller.sendPrompt('Second prompt');
+
+      expect(sent, isFalse);
+      expect(controller.sessionState.pendingLocalUserMessageBlockIds, <String>[
+        firstPendingBlockId,
+      ]);
+      expect(controller.sessionState.localUserMessageProviderBindings, isEmpty);
+      expect(
+        controller.transcriptBlocks.whereType<TranscriptUserMessageBlock>(),
+        hasLength(2),
+      );
+      expect(
+        await snackBarMessage,
+        '[${PocketErrorCatalog.chatSessionSendFailed.code}] Send failed. Could not send the prompt to the remote Codex session.',
+      );
+    },
+  );
+
+  test(
     'sendPrompt reuses the response-owned thread before thread notifications arrive',
     () async {
       final appServerClient = FakeCodexAppServerClient();
@@ -165,6 +255,49 @@ void main() {
         'First prompt',
         'Second prompt',
       ]);
+      expect(appServerClient.steeredMessages, isEmpty);
+    },
+  );
+
+  test(
+    'sendPrompt does not steer a stale completed turn after the transport pointer clears first',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+
+      expect(await controller.sendPrompt('Second prompt'), isTrue);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentMessages, <String>[
+        'First prompt',
+        'Second prompt',
+      ]);
+      expect(appServerClient.steeredMessages, isEmpty);
     },
   );
 

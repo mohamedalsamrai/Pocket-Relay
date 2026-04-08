@@ -41,36 +41,69 @@ void main() {
     expect(messageBlock.deliveryState, TranscriptUserMessageDeliveryState.sent);
   });
 
-  test('sendPrompt allows steering while a turn is already running', () async {
-    final appServerClient = FakeCodexAppServerClient();
-    addTearDown(appServerClient.close);
+  test(
+    'sendPrompt steers the active turn when the adapter supports live turn steering',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
 
-    final controller = ChatSessionController(
-      profileStore: MemoryCodexProfileStore(
-        initialValue: SavedProfile(
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
           profile: configuredProfile(),
           secrets: const ConnectionSecrets(password: 'secret'),
         ),
-      ),
-      appServerClient: appServerClient,
-      initialSavedProfile: SavedProfile(
-        profile: configuredProfile(),
-        secrets: const ConnectionSecrets(password: 'secret'),
-      ),
-    );
-    addTearDown(controller.dispose);
+      );
+      addTearDown(controller.dispose);
 
-    expect(await controller.sendPrompt('First prompt'), isTrue);
+      expect(await controller.sendPrompt('First prompt'), isTrue);
 
-    final sentWhileRunning = await controller.sendPrompt('Steer the agent');
+      final sentWhileRunning = await controller.sendPrompt('Steer the agent');
 
-    expect(sentWhileRunning, isTrue);
-    expect(appServerClient.startSessionCalls, 1);
-    expect(appServerClient.sentMessages, <String>[
-      'First prompt',
-      'Steer the agent',
-    ]);
-  });
+      expect(sentWhileRunning, isTrue);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentMessages, <String>['First prompt']);
+      expect(appServerClient.steeredMessages, <String>['Steer the agent']);
+      expect(appServerClient.sentTurns, <
+        ({
+          String threadId,
+          CodexAppServerTurnInput input,
+          String text,
+          String? model,
+          CodexReasoningEffort? effort,
+        })
+      >[
+        (
+          threadId: 'thread_123',
+          input: const CodexAppServerTurnInput.text('First prompt'),
+          text: 'First prompt',
+          model: null,
+          effort: null,
+        ),
+      ]);
+      expect(appServerClient.steeredTurns, <
+        ({
+          String threadId,
+          String turnId,
+          CodexAppServerTurnInput input,
+          String text,
+        })
+      >[
+        (
+          threadId: 'thread_123',
+          turnId: 'turn_1',
+          input: const CodexAppServerTurnInput.text('Steer the agent'),
+          text: 'Steer the agent',
+        ),
+      ]);
+    },
+  );
 
   test(
     'sendPrompt starts a fresh conversation after controller restart until history is explicitly picked',

@@ -92,6 +92,13 @@ class TranscriptPolicy {
     return _clearLocalUserMessageCorrelationStateImpl(state);
   }
 
+  TranscriptSessionState removeLocalUserMessageCorrelationForBlockId(
+    TranscriptSessionState state,
+    String blockId,
+  ) {
+    return _removeLocalUserMessageCorrelationForBlockIdImpl(state, blockId);
+  }
+
   TranscriptSessionState rolloverTurnIfNeeded(
     TranscriptSessionState state, {
     required String? turnId,

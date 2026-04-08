@@ -414,6 +414,16 @@ Codex gives Pocket Relay a strong upstream contract for:
 
 That is why Codex was able to become the first working integration.
 
+Pocket Relay should still model live-turn steering as an app-owned adapter
+capability rather than as a Codex-specific send shortcut:
+
+- generic adapter semantics: append additional user input to the currently
+  running live turn without starting a new turn
+- unsupported adapters: surface the capability as unavailable and keep the
+  composer/session controller from assuming active-turn input is allowed
+- Codex mapping: `turn/steer` with the active `turnId` passed as
+  `expectedTurnId`
+
 ## Upstream Reality: Claude Code
 
 The Claude Code reference snapshot does not show an equivalent public local

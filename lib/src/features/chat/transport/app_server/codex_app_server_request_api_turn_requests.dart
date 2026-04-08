@@ -41,6 +41,52 @@ Future<CodexAppServerTurn> _sendUserMessage(
   return CodexAppServerTurn(threadId: effectiveThreadId, turnId: turnId);
 }
 
+Future<CodexAppServerTurn> _steerActiveTurn(
+  CodexAppServerConnection connection, {
+  required String threadId,
+  required String turnId,
+  String? text,
+  CodexAppServerTurnInput? input,
+}) async {
+  connection.requireConnected();
+
+  final effectiveThreadId = threadId.trim();
+  final expectedTurnId = turnId.trim();
+  final turnInput = _turnInputFor(text: text, input: input);
+  if (effectiveThreadId.isEmpty) {
+    throw const CodexAppServerException('Thread id cannot be empty.');
+  }
+  if (expectedTurnId.isEmpty) {
+    throw const CodexAppServerException('Turn id cannot be empty.');
+  }
+  if (turnInput.isEmpty) {
+    throw const CodexAppServerException('Turn input cannot be empty.');
+  }
+
+  final response = await connection.sendRequest('turn/steer', <String, Object?>{
+    'threadId': effectiveThreadId,
+    'input': _turnInputPayload(turnInput),
+    'expectedTurnId': expectedTurnId,
+  });
+  final payload = _requireObject(response, 'turn/steer response');
+  final returnedTurnId = _asString(payload['turnId']) ?? '';
+
+  if (returnedTurnId.isEmpty) {
+    throw const CodexAppServerException(
+      'turn/steer response did not include a turn id.',
+    );
+  }
+
+  connection.setTrackedTurn(
+    threadId: effectiveThreadId,
+    turnId: returnedTurnId,
+  );
+  return CodexAppServerTurn(
+    threadId: effectiveThreadId,
+    turnId: returnedTurnId,
+  );
+}
+
 Future<void> _answerUserInput(
   CodexAppServerConnection connection, {
   required String requestId,

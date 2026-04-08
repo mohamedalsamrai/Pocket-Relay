@@ -104,6 +104,27 @@ class TranscriptReducer {
     );
   }
 
+  TranscriptSessionState removeLocalUserMessageCorrelationForBlockId(
+    TranscriptSessionState state,
+    String blockId,
+  ) {
+    final targetThreadId = state.rootThreadId;
+    if (targetThreadId == null) {
+      return _policy.removeLocalUserMessageCorrelationForBlockId(
+        state,
+        blockId,
+      );
+    }
+    return _reduceTimelineStateImpl(
+      this,
+      state,
+      threadId: targetThreadId,
+      event: null,
+      reducerFn: (projectedState) => _policy
+          .removeLocalUserMessageCorrelationForBlockId(projectedState, blockId),
+    );
+  }
+
   TranscriptSessionState markUnpinnedHostKeySaved(
     TranscriptSessionState state, {
     required String blockId,

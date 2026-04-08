@@ -41,6 +41,7 @@ class ChatSessionController extends ChangeNotifier {
   ChatSessionController({
     required this.profileStore,
     AgentAdapterClient? injectedAgentAdapterClient,
+    AgentAdapterCapabilities? injectedAgentAdapterCapabilities,
     @Deprecated('Use agentAdapterClient instead.')
     AgentAdapterClient? appServerClient,
     SavedProfile? initialSavedProfile,
@@ -55,6 +56,7 @@ class ChatSessionController extends ChangeNotifier {
          'An agent adapter client is required.',
        ),
        agentAdapterClient = injectedAgentAdapterClient ?? appServerClient!,
+       _injectedAgentAdapterCapabilities = injectedAgentAdapterCapabilities,
        _sessionReducer = reducer,
        _runtimeEventMapper =
            runtimeEventMapper ??
@@ -89,6 +91,7 @@ class ChatSessionController extends ChangeNotifier {
   final AgentAdapterRuntimeEventMapper _runtimeEventMapper;
   final CodexHistoricalConversationNormalizer _historicalConversationNormalizer;
   final ChatHistoricalConversationRestorer _historicalConversationRestorer;
+  final AgentAdapterCapabilities? _injectedAgentAdapterCapabilities;
   final ChatConversationRecoveryPolicy _conversationRecoveryPolicy =
       const ChatConversationRecoveryPolicy();
   final bool _supportsLocalConnectionMode;
@@ -122,6 +125,7 @@ class ChatSessionController extends ChangeNotifier {
   ConnectionProfile get profile => _profile;
   ConnectionSecrets get secrets => _secrets;
   AgentAdapterCapabilities get agentAdapterCapabilities =>
+      _injectedAgentAdapterCapabilities ??
       agentAdapterCapabilitiesFor(_profile.agentAdapter);
   TranscriptSessionState get sessionState => _sessionState;
   ChatConversationRecoveryState? get conversationRecoveryState =>
