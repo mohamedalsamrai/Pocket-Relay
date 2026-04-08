@@ -127,6 +127,11 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   ConnectionWorkspaceState get state => _state;
   Future<void> flushRecoveryPersistence() => _enqueueRecoveryPersistence();
+
+  @visibleForTesting
+  ConnectionWorkspaceRecoveryState? get debugLatestUnsavedRecoveryState =>
+      _latestUnsavedRecoveryStateSnapshot();
+
   AgentAdapterRemoteRuntimeDelegate createRemoteRuntimeDelegate(
     AgentAdapterKind kind,
   ) {

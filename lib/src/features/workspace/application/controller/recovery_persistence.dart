@@ -43,7 +43,11 @@ Future<void> _queueWorkspaceRecoveryPersistenceSnapshot(
     return controller._recoveryPersistence;
   }
 
-  if (snapshot == controller._lastPersistedRecoveryState ||
+  final hasUnsavedRecoverySnapshot =
+      controller._latestRecoveryPersistenceState !=
+      controller._lastPersistedRecoveryState;
+  if ((snapshot == controller._lastPersistedRecoveryState &&
+          !hasUnsavedRecoverySnapshot) ||
       snapshot == controller._pendingRecoveryPersistenceState) {
     return controller._recoveryPersistence;
   }
@@ -143,8 +147,7 @@ ConnectionWorkspaceRecoveryState? _latestUnsavedWorkspaceRecoveryStateSnapshot(
   }
 
   final latestSnapshot = controller._latestRecoveryPersistenceState;
-  if (controller._isPersistingRecoveryState &&
-      latestSnapshot != controller._lastPersistedRecoveryState) {
+  if (latestSnapshot != controller._lastPersistedRecoveryState) {
     return latestSnapshot;
   }
 

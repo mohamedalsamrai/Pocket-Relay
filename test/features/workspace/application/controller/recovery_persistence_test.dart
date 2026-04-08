@@ -207,6 +207,90 @@ void main() {
     },
   );
 
+  test(
+    'selected lane thread reversion during an in-flight save still persists the reverted snapshot',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_a'] =
+          savedConversationThread(threadId: 'thread_a');
+      clientsById['conn_primary']!.threadHistoriesById['thread_b'] =
+          savedConversationThread(threadId: 'thread_b');
+      final recoveryStore = DelayedFirstSaveConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_a',
+          draftText: '',
+        ),
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: const Duration(minutes: 5),
+      );
+      addTearDown(() async {
+        if (!recoveryStore.firstSaveCompleter.isCompleted) {
+          recoveryStore.firstSaveCompleter.complete();
+        }
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      recoveryStore.attemptedStates.clear();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+
+      await binding.sessionController.selectConversationForResume('thread_b');
+      await Future<void>.delayed(Duration.zero);
+      await binding.sessionController.selectConversationForResume('thread_a');
+      await Future<void>.delayed(Duration.zero);
+
+      recoveryStore.firstSaveCompleter.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+
+      expect(recoveryStore.attemptedStates, isNotEmpty);
+      expect(recoveryStore.attemptedStates.last?.selectedThreadId, 'thread_a');
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_a');
+    },
+  );
+
+  test(
+    'failed recovery persistence keeps the latest selected thread as unsaved state',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final recoveryStore = ToggleableFailingConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_stale',
+          draftText: '',
+        ),
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: const Duration(minutes: 5),
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      recoveryStore.saveError = StateError('secure storage write failed');
+
+      await binding.sessionController.selectConversationForResume('thread_saved');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.debugLatestUnsavedRecoveryState?.selectedThreadId,
+        'thread_saved',
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_stale');
+    },
+  );
+
   test('non-selected lane changes do not persist recovery snapshots', () async {
     final clientsById = buildClientsById('conn_primary', 'conn_secondary');
     final recoveryStore = RecordingConnectionWorkspaceRecoveryStore(

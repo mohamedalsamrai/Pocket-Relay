@@ -345,6 +345,36 @@ class RecordingConnectionWorkspaceRecoveryStore
   }
 }
 
+class DelayedFirstSaveConnectionWorkspaceRecoveryStore
+    implements ConnectionWorkspaceRecoveryStore {
+  DelayedFirstSaveConnectionWorkspaceRecoveryStore({
+    this.initialState,
+    Completer<void>? firstSaveCompleter,
+  }) : firstSaveCompleter = firstSaveCompleter ?? Completer<void>();
+
+  final ConnectionWorkspaceRecoveryState? initialState;
+  final Completer<void> firstSaveCompleter;
+  final List<ConnectionWorkspaceRecoveryState?> attemptedStates =
+      <ConnectionWorkspaceRecoveryState?>[];
+  ConnectionWorkspaceRecoveryState? _state;
+  var _saveCalls = 0;
+
+  @override
+  Future<ConnectionWorkspaceRecoveryState?> load() async {
+    return _state ?? initialState;
+  }
+
+  @override
+  Future<void> save(ConnectionWorkspaceRecoveryState? state) async {
+    attemptedStates.add(state);
+    _saveCalls += 1;
+    if (_saveCalls == 1) {
+      await firstSaveCompleter.future;
+    }
+    _state = state;
+  }
+}
+
 class ToggleableFailingConnectionWorkspaceRecoveryStore
     implements ConnectionWorkspaceRecoveryStore {
   ToggleableFailingConnectionWorkspaceRecoveryStore({
