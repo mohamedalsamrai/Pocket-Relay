@@ -24,8 +24,17 @@ Future<bool> _attemptWorkspaceTransportReconnect(
     binding,
     threadId: threadId,
   );
-  if (!transportConnected || controller._isDisposed || threadId == null) {
+  if (!transportConnected || controller._isDisposed) {
     return transportConnected;
+  }
+  if (threadId == null) {
+    _finalizeWorkspaceRecoveredTransportState(
+      controller,
+      connectionId,
+      completedAt: controller._now(),
+      recordRecoveryOutcome: true,
+    );
+    return true;
   }
 
   await _recoverWorkspaceConversationAfterTransportReconnect(
