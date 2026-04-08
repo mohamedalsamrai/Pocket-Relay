@@ -260,6 +260,48 @@ void main() {
   );
 
   test(
+    'sendPrompt does not steer a stale completed turn after the transport pointer clears first',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('First prompt'), isTrue);
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/completed',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turn': <String, Object?>{'id': 'turn_1', 'status': 'completed'},
+          },
+        ),
+      );
+
+      expect(await controller.sendPrompt('Second prompt'), isTrue);
+      expect(appServerClient.startSessionCalls, 1);
+      expect(appServerClient.sentMessages, <String>[
+        'First prompt',
+        'Second prompt',
+      ]);
+      expect(appServerClient.steeredMessages, isEmpty);
+    },
+  );
+
+  test(
     'sendPrompt resumes the root thread after the transport drops the tracked thread',
     () async {
       final appServerClient = FakeCodexAppServerClient();

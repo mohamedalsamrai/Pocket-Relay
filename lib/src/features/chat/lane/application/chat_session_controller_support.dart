@@ -114,11 +114,16 @@ extension on ChatSessionController {
   }
 
   String? _activeTurnIdForSteering() {
-    final sessionTurnId = _normalizedTurnId(_sessionState.activeTurn?.turnId);
-    if (sessionTurnId != null) {
-      return sessionTurnId;
+    final transportTurnId = _normalizedTurnId(agentAdapterClient.activeTurnId);
+    if (transportTurnId != null) {
+      return transportTurnId;
     }
-    return _normalizedTurnId(agentAdapterClient.activeTurnId);
+
+    if (agentAdapterClient.isConnected) {
+      return null;
+    }
+
+    return _normalizedTurnId(_sessionState.activeTurn?.turnId);
   }
 
   void _startBufferingRuntimeEvents() {
