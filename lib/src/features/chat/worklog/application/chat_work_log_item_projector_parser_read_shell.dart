@@ -1,27 +1,32 @@
 part of 'chat_work_log_item_projector.dart';
 
-_ParsedCatReadCommand? _tryParseCatReadCommand(List<String> tokens) {
-  final path = _tryParseSimpleFileReadPath(tokens);
-  if (path == null) {
-    return null;
-  }
-  return _ParsedCatReadCommand(path: path);
-}
+_ParsedCatReadCommand? _tryParseCatReadCommand(List<String> tokens) =>
+    _tryParseSimpleFileReadCommand(
+      tokens,
+      (path) => _ParsedCatReadCommand(path: path),
+    );
 
-_ParsedTypeReadCommand? _tryParseTypeReadCommand(List<String> tokens) {
-  final path = _tryParseSimpleFileReadPath(tokens);
-  if (path == null) {
-    return null;
-  }
-  return _ParsedTypeReadCommand(path: path);
-}
+_ParsedTypeReadCommand? _tryParseTypeReadCommand(List<String> tokens) =>
+    _tryParseSimpleFileReadCommand(
+      tokens,
+      (path) => _ParsedTypeReadCommand(path: path),
+    );
 
-_ParsedMoreReadCommand? _tryParseMoreReadCommand(List<String> tokens) {
+_ParsedMoreReadCommand? _tryParseMoreReadCommand(List<String> tokens) =>
+    _tryParseSimpleFileReadCommand(
+      tokens,
+      (path) => _ParsedMoreReadCommand(path: path),
+    );
+
+T? _tryParseSimpleFileReadCommand<T>(
+  List<String> tokens,
+  T Function(String path) build,
+) {
   final path = _tryParseSimpleFileReadPath(tokens);
   if (path == null) {
     return null;
   }
-  return _ParsedMoreReadCommand(path: path);
+  return build(path);
 }
 
 String? _tryParseSimpleFileReadPath(List<String> tokens) {
