@@ -127,7 +127,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   ConnectionWorkspaceState get state => _state;
   Future<void> flushRecoveryPersistence() => _enqueueRecoveryPersistence();
 
-  void dismissTurnLivenessNotice(String connectionId) {
+  void dismissFinishedWhileAwayNotice(String connectionId) {
+    final assessment = _state.turnLivenessAssessmentFor(connectionId);
+    if (assessment?.status !=
+        ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway) {
+      return;
+    }
     _clearTurnLivenessAssessment(connectionId);
   }
 
@@ -529,15 +534,6 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     this,
     connectionId,
     binding,
-    completedAt: completedAt,
-  );
-
-  void _completeLiveReattachRecoveryAttempt(
-    String connectionId, {
-    required DateTime completedAt,
-  }) => _completeWorkspaceLiveReattachRecoveryAttempt(
-    this,
-    connectionId,
     completedAt: completedAt,
   );
 

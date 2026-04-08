@@ -47,60 +47,71 @@ void main() {
     },
   );
 
-  test('projector marks finished-while-away as dismissible after visible dwell', () {
-    final contract = projector.project(
-      liveReattachPhase: null,
-      transportRecoveryPhase: null,
-      recoveryDiagnostics: null,
-      remoteRuntime: null,
-      turnLivenessAssessment: const ConnectionWorkspaceTurnLivenessAssessment(
-        status: ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway,
-        evidence:
-            ConnectionWorkspaceTurnLivenessEvidence.threadHistoryTerminalTurn,
-        threadId: 'thread_saved',
-        turnId: 'turn_done',
-      ),
-      recoveryLoadWarning: null,
-      deviceContinuityWarnings:
-          const ConnectionWorkspaceDeviceContinuityWarnings(),
-      historicalConversationRestoreState: null,
-      conversationRecoveryState: null,
-    );
+  test(
+    'projector marks finished-while-away as dismissible after visible dwell',
+    () {
+      final contract = projector.project(
+        liveReattachPhase: null,
+        transportRecoveryPhase: null,
+        recoveryDiagnostics: null,
+        remoteRuntime: null,
+        turnLivenessAssessment: const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.threadHistoryTerminalTurn,
+          threadId: 'thread_saved',
+          turnId: 'turn_done',
+        ),
+        recoveryLoadWarning: null,
+        deviceContinuityWarnings:
+            const ConnectionWorkspaceDeviceContinuityWarnings(),
+        historicalConversationRestoreState: null,
+        conversationRecoveryState: null,
+      );
 
-    expect(contract, isNotNull);
-    expect(contract!.entries, hasLength(1));
-    expect(
-      contract.dismissibleEntry?.key,
-      'turn_finished_while_away|thread_saved|turn_done',
-    );
-    expect(
-      contract.dismissibleEntry?.dismissAfterVisibleDuration,
-      LiveLaneNoticeProjector.finishedWhileAwayVisibilityDuration,
-    );
-  });
+      expect(contract, isNotNull);
+      expect(contract!.entries, hasLength(1));
+      expect(
+        contract.dismissibleEntry?.key,
+        'turn_finished_while_away|thread_saved|turn_done',
+      );
+      expect(
+        contract.dismissibleEntry?.dismissAfterVisibleDuration,
+        LiveLaneNoticeProjector.finishedWhileAwayVisibilityDuration,
+      );
+      expect(
+        contract.dismissibleEntry?.dismissAction,
+        LiveLaneNoticeDismissAction.finishedWhileAway,
+      );
+    },
+  );
 
-  test('projector omits recovery notices while conversation recovery is active', () {
-    final contract = projector.project(
-      liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.reconnecting,
-      transportRecoveryPhase: null,
-      recoveryDiagnostics: null,
-      remoteRuntime: null,
-      turnLivenessAssessment: const ConnectionWorkspaceTurnLivenessAssessment(
-        status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
-        evidence: ConnectionWorkspaceTurnLivenessEvidence.activeTurnReattached,
-        threadId: 'thread_saved',
-        turnId: 'turn_live',
-      ),
-      recoveryLoadWarning: null,
-      deviceContinuityWarnings:
-          const ConnectionWorkspaceDeviceContinuityWarnings(),
-      historicalConversationRestoreState: null,
-      conversationRecoveryState: const ChatConversationRecoveryState(
-        reason: ChatConversationRecoveryReason.detachedTranscript,
-        expectedThreadId: 'thread_saved',
-      ),
-    );
+  test(
+    'projector omits recovery notices while conversation recovery is active',
+    () {
+      final contract = projector.project(
+        liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.reconnecting,
+        transportRecoveryPhase: null,
+        recoveryDiagnostics: null,
+        remoteRuntime: null,
+        turnLivenessAssessment: const ConnectionWorkspaceTurnLivenessAssessment(
+          status: ConnectionWorkspaceTurnLivenessStatus.stillLive,
+          evidence:
+              ConnectionWorkspaceTurnLivenessEvidence.activeTurnReattached,
+          threadId: 'thread_saved',
+          turnId: 'turn_live',
+        ),
+        recoveryLoadWarning: null,
+        deviceContinuityWarnings:
+            const ConnectionWorkspaceDeviceContinuityWarnings(),
+        historicalConversationRestoreState: null,
+        conversationRecoveryState: const ChatConversationRecoveryState(
+          reason: ChatConversationRecoveryReason.detachedTranscript,
+          expectedThreadId: 'thread_saved',
+        ),
+      );
 
-    expect(contract, isNull);
-  });
+      expect(contract, isNull);
+    },
+  );
 }

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 enum LiveLaneNoticeTone { informational, warning }
 
+enum LiveLaneNoticeDismissAction { finishedWhileAway }
+
 @immutable
 class LiveLaneNoticeEntryContract {
   const LiveLaneNoticeEntryContract({
@@ -13,6 +15,7 @@ class LiveLaneNoticeEntryContract {
     required this.tone,
     required this.icon,
     this.dismissAfterVisibleDuration,
+    this.dismissAction,
   });
 
   final String key;
@@ -22,6 +25,7 @@ class LiveLaneNoticeEntryContract {
   final LiveLaneNoticeTone tone;
   final IconData icon;
   final Duration? dismissAfterVisibleDuration;
+  final LiveLaneNoticeDismissAction? dismissAction;
 
   @override
   bool operator ==(Object other) {
@@ -32,7 +36,8 @@ class LiveLaneNoticeEntryContract {
         other.isLoading == isLoading &&
         other.tone == tone &&
         other.icon == icon &&
-        other.dismissAfterVisibleDuration == dismissAfterVisibleDuration;
+        other.dismissAfterVisibleDuration == dismissAfterVisibleDuration &&
+        other.dismissAction == dismissAction;
   }
 
   @override
@@ -44,6 +49,7 @@ class LiveLaneNoticeEntryContract {
     tone,
     icon,
     dismissAfterVisibleDuration,
+    dismissAction,
   );
 }
 
@@ -57,7 +63,8 @@ class LiveLaneNoticeContract {
 
   LiveLaneNoticeEntryContract? get dismissibleEntry {
     for (final entry in entries) {
-      if (entry.dismissAfterVisibleDuration != null) {
+      if (entry.dismissAfterVisibleDuration != null &&
+          entry.dismissAction != null) {
         return entry;
       }
     }
@@ -66,7 +73,8 @@ class LiveLaneNoticeContract {
 
   @override
   bool operator ==(Object other) {
-    return other is LiveLaneNoticeContract && listEquals(other.entries, entries);
+    return other is LiveLaneNoticeContract &&
+        listEquals(other.entries, entries);
   }
 
   @override

@@ -23,7 +23,8 @@ class LiveLaneNoticeProjector {
     required ConnectionRemoteRuntimeState? remoteRuntime,
     required ConnectionWorkspaceTurnLivenessAssessment? turnLivenessAssessment,
     required PocketUserFacingError? recoveryLoadWarning,
-    required ConnectionWorkspaceDeviceContinuityWarnings deviceContinuityWarnings,
+    required ConnectionWorkspaceDeviceContinuityWarnings
+    deviceContinuityWarnings,
     required ChatHistoricalConversationRestoreState?
     historicalConversationRestoreState,
     required ChatConversationRecoveryState? conversationRecoveryState,
@@ -91,9 +92,8 @@ class LiveLaneNoticeProjector {
       return null;
     }
 
-    final isRecoveryStillInFlight = switch (
-      liveReattachPhase ?? transportRecoveryPhase
-    ) {
+    final isRecoveryStillInFlight = switch (liveReattachPhase ??
+        transportRecoveryPhase) {
       ConnectionWorkspaceLiveReattachPhase.transportLost ||
       ConnectionWorkspaceLiveReattachPhase.reconnecting ||
       ConnectionWorkspaceTransportRecoveryPhase.lost ||
@@ -122,9 +122,11 @@ class LiveLaneNoticeProjector {
 
     if (liveReattachPhase ==
         ConnectionWorkspaceLiveReattachPhase.fallbackRestore) {
-      final fallbackError = ConnectionLifecycleErrors.liveReattachFallbackNotice(
-        reattachFailureDetail: recoveryDiagnostics?.lastLiveReattachFailureDetail,
-      );
+      final fallbackError =
+          ConnectionLifecycleErrors.liveReattachFallbackNotice(
+            reattachFailureDetail:
+                recoveryDiagnostics?.lastLiveReattachFailureDetail,
+          );
       return LiveLaneNoticeEntryContract(
         key:
             'fallback_restore|'
@@ -141,41 +143,45 @@ class LiveLaneNoticeProjector {
     final unavailableError =
         ConnectionLifecycleErrors.transportUnavailableNotice(
           remoteRuntime,
-          recoveryFailureDetail: recoveryDiagnostics?.lastTransportFailureDetail,
+          recoveryFailureDetail:
+              recoveryDiagnostics?.lastTransportFailureDetail,
         );
 
     return switch (liveReattachPhase ?? transportRecoveryPhase) {
       ConnectionWorkspaceLiveReattachPhase.transportLost ||
-      ConnectionWorkspaceTransportRecoveryPhase.lost => LiveLaneNoticeEntryContract(
-        key: 'transport_lost',
-        title: transportLostError.title,
-        message: transportLostError.bodyWithCode,
-        isLoading: false,
-        tone: LiveLaneNoticeTone.warning,
-        icon: Icons.portable_wifi_off_rounded,
-      ),
+      ConnectionWorkspaceTransportRecoveryPhase.lost =>
+        LiveLaneNoticeEntryContract(
+          key: 'transport_lost',
+          title: transportLostError.title,
+          message: transportLostError.bodyWithCode,
+          isLoading: false,
+          tone: LiveLaneNoticeTone.warning,
+          icon: Icons.portable_wifi_off_rounded,
+        ),
       ConnectionWorkspaceLiveReattachPhase.reconnecting ||
-      ConnectionWorkspaceTransportRecoveryPhase.reconnecting => LiveLaneNoticeEntryContract(
-        key: 'transport_reconnecting',
-        title: ConnectionWorkspaceCopy.reconnectingNoticeTitle,
-        message: ConnectionWorkspaceCopy.reconnectingNoticeMessage,
-        isLoading: true,
-        tone: LiveLaneNoticeTone.informational,
-        icon: Icons.portable_wifi_off_rounded,
-      ),
+      ConnectionWorkspaceTransportRecoveryPhase.reconnecting =>
+        LiveLaneNoticeEntryContract(
+          key: 'transport_reconnecting',
+          title: ConnectionWorkspaceCopy.reconnectingNoticeTitle,
+          message: ConnectionWorkspaceCopy.reconnectingNoticeMessage,
+          isLoading: true,
+          tone: LiveLaneNoticeTone.informational,
+          icon: Icons.portable_wifi_off_rounded,
+        ),
       ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
       ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy ||
-      ConnectionWorkspaceTransportRecoveryPhase.unavailable => LiveLaneNoticeEntryContract(
-        key:
-            'transport_unavailable|'
-            '${recoveryDiagnostics?.lastTransportFailureDetail ?? ''}|'
-            '${remoteRuntime?.server.status.name ?? ''}',
-        title: unavailableError.title,
-        message: unavailableError.bodyWithCode,
-        isLoading: false,
-        tone: LiveLaneNoticeTone.warning,
-        icon: Icons.portable_wifi_off_rounded,
-      ),
+      ConnectionWorkspaceTransportRecoveryPhase.unavailable =>
+        LiveLaneNoticeEntryContract(
+          key:
+              'transport_unavailable|'
+              '${recoveryDiagnostics?.lastTransportFailureDetail ?? ''}|'
+              '${remoteRuntime?.server.status.name ?? ''}',
+          title: unavailableError.title,
+          message: unavailableError.bodyWithCode,
+          isLoading: false,
+          tone: LiveLaneNoticeTone.warning,
+          icon: Icons.portable_wifi_off_rounded,
+        ),
       _ => null,
     };
   }
@@ -206,6 +212,7 @@ class LiveLaneNoticeProjector {
           tone: LiveLaneNoticeTone.informational,
           icon: Icons.history_rounded,
           dismissAfterVisibleDuration: finishedWhileAwayVisibilityDuration,
+          dismissAction: LiveLaneNoticeDismissAction.finishedWhileAway,
         ),
       ConnectionWorkspaceTurnLivenessStatus.continuityLost =>
         LiveLaneNoticeEntryContract(

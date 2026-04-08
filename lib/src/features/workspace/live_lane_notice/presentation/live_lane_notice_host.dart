@@ -66,7 +66,8 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   }
 
   bool get _isForegroundVisible =>
-      _appLifecycleState == null || _appLifecycleState == AppLifecycleState.resumed;
+      _appLifecycleState == null ||
+      _appLifecycleState == AppLifecycleState.resumed;
 
   void _syncDismissal(LiveLaneNoticeContract contract) {
     final dismissibleEntry = contract.dismissibleEntry;
@@ -104,17 +105,20 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
     final nextRemaining = remaining - elapsed;
     _dismissTimer = null;
     _dismissStartedAt = null;
-    _dismissRemaining =
-        nextRemaining > Duration.zero ? nextRemaining : Duration.zero;
+    _dismissRemaining = nextRemaining > Duration.zero
+        ? nextRemaining
+        : Duration.zero;
     timer.cancel();
   }
 
   void _resumeDismissal() {
     final dismissKey = _dismissKey;
     final remaining = _dismissRemaining;
+    final dismissAction = widget.contract.dismissibleEntry?.dismissAction;
     if (!_isForegroundVisible ||
         dismissKey == null ||
         remaining == null ||
+        dismissAction == null ||
         _dismissTimer != null) {
       return;
     }
@@ -124,7 +128,12 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
         return;
       }
       _cancelDismissal();
-      widget.workspaceController.dismissTurnLivenessNotice(widget.connectionId);
+      switch (dismissAction) {
+        case LiveLaneNoticeDismissAction.finishedWhileAway:
+          widget.workspaceController.dismissFinishedWhileAwayNotice(
+            widget.connectionId,
+          );
+      }
     }
 
     if (remaining <= Duration.zero) {
