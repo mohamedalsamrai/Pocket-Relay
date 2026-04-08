@@ -43,6 +43,9 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
   for (final workspaceId in orderedIds) {
     final rawProfile = profiles[workspaceProfileKeyForWorkspace(workspaceId)];
     if (rawProfile is! String || rawProfile.trim().isEmpty) {
+      await state.preferences.remove(
+        workspaceProfileKeyForWorkspace(workspaceId),
+      );
       continue;
     }
     try {
@@ -54,6 +57,9 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
       );
       normalizedOrderedIds.add(workspaceId);
     } catch (_) {
+      await state.preferences.remove(
+        workspaceProfileKeyForWorkspace(workspaceId),
+      );
       continue;
     }
   }
@@ -95,6 +101,8 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
   for (final systemId in orderedIds) {
     final rawProfile = profiles[systemProfileKeyForSystem(systemId)];
     if (rawProfile is! String || rawProfile.trim().isEmpty) {
+      await state.preferences.remove(systemProfileKeyForSystem(systemId));
+      await deleteSystemSecrets(state, systemId);
       continue;
     }
     try {
@@ -106,6 +114,8 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
       );
       normalizedOrderedIds.add(systemId);
     } catch (_) {
+      await state.preferences.remove(systemProfileKeyForSystem(systemId));
+      await deleteSystemSecrets(state, systemId);
       continue;
     }
   }

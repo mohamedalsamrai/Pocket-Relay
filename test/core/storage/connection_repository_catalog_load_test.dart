@@ -324,6 +324,10 @@ void main() {
       );
       expect(workspaceCatalog.workspaceForId('workspace_bad'), isNull);
       expect(
+        await preferences.getString(workspaceProfileKey('workspace_bad')),
+        isNull,
+      );
+      expect(
         await preferences.getString(workspaceIndexKey()),
         jsonEncode(<String, Object?>{
           'schemaVersion': 1,
@@ -337,6 +341,9 @@ void main() {
     'loadSystemCatalog ignores malformed persisted system profiles and rewrites the ordered index',
     () async {
       final preferences = SharedPreferencesAsync();
+      final secureStorage = FakeFlutterSecureStorage(<String, String>{
+        systemPasswordKey('system_bad'): 'stale-secret',
+      });
       await preferences.setString(
         systemIndexKey(),
         jsonEncode(<String, Object?>{
@@ -358,7 +365,7 @@ void main() {
       );
       await preferences.setString(systemProfileKey('system_bad'), '{not json');
       final repository = buildSecureConnectionRepository(
-        secureStorage: FakeFlutterSecureStorage(<String, String>{}),
+        secureStorage: secureStorage,
         preferences: preferences,
         connectionIdGenerator: () => 'conn_unused',
       );
@@ -371,6 +378,11 @@ void main() {
         'relay.example.com',
       );
       expect(systemCatalog.systemForId('system_bad'), isNull);
+      expect(
+        await preferences.getString(systemProfileKey('system_bad')),
+        isNull,
+      );
+      expect(secureStorage.data[systemPasswordKey('system_bad')], isNull);
       expect(
         await preferences.getString(systemIndexKey()),
         jsonEncode(<String, Object?>{
