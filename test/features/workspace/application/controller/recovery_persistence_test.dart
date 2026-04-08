@@ -54,6 +54,58 @@ void main() {
   );
 
   test(
+    'resumed restores the persisted selected conversation when the live lane lost visible conversation state',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore();
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume('thread_saved');
+      await Future<void>.delayed(Duration.zero);
+
+      binding.sessionController.clearTranscript();
+      await Future<void>.delayed(Duration.zero);
+      await recoveryStore.save(
+        const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_primary',
+          selectedThreadId: 'thread_saved',
+          draftText: '',
+        ),
+      );
+
+      expect(binding.sessionController.transcriptBlocks, isEmpty);
+      expect(binding.sessionController.sessionState.rootThreadId, isNull);
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+      expect(binding.sessionController.sessionState.rootThreadId, 'thread_saved');
+      expect(
+        binding.sessionController.transcriptBlocks
+            .whereType<TranscriptTextBlock>()
+            .single
+            .body,
+        'Restored answer',
+      );
+      expect(
+        clientsById['conn_primary']!.readThreadCalls,
+        contains('thread_saved'),
+      );
+    },
+  );
+
+  test(
     'selected lane draft bursts debounce into one persisted recovery snapshot',
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');

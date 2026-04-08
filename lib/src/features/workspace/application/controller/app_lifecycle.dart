@@ -69,6 +69,16 @@ Future<void> _handleWorkspaceAppLifecycleState(
         occurredAt: resumedAt,
       );
       if (!controller._state.requiresTransportReconnect(selectedConnectionId)) {
+        final binding =
+            controller._liveBindingsByConnectionId[selectedConnectionId];
+        if (binding == null || binding.sessionController.sessionState.isBusy) {
+          return;
+        }
+        await _restoreWorkspaceConversationAfterResumeIfNeeded(
+          controller,
+          selectedConnectionId,
+          binding,
+        );
         return;
       }
 
@@ -87,5 +97,47 @@ Future<void> _handleWorkspaceAppLifecycleState(
       return;
     case AppLifecycleState.detached:
       return;
+  }
+}
+
+Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+  ConnectionLaneBinding binding,
+) async {
+  if (binding.sessionController.conversationRecoveryState != null ||
+      binding.sessionController.historicalConversationRestoreState != null ||
+      _workspaceLaneHasVisibleLiveConversationState(binding)) {
+    return;
+  }
+
+  ConnectionWorkspaceRecoveryState? recoveryState;
+  try {
+    recoveryState = await controller._recoveryStore.load();
+  } catch (_) {
+    return;
+  }
+  final selectedThreadId = _normalizedWorkspaceThreadId(
+    recoveryState?.connectionId == connectionId
+        ? recoveryState?.selectedThreadId
+        : null,
+  );
+  if (selectedThreadId == null) {
+    return;
+  }
+
+  try {
+    await binding.sessionController.reattachConversation(selectedThreadId);
+  } catch (_) {
+    if (controller._isDisposed ||
+        controller._state.selectedConnectionId != connectionId ||
+        !controller._state.isConnectionLive(connectionId)) {
+      return;
+    }
+    try {
+      await binding.sessionController.selectConversationForResume(
+        selectedThreadId,
+      );
+    } catch (_) {}
   }
 }
