@@ -102,17 +102,19 @@ final class StoreBackedConnectionCapabilityAssets
   Future<List<ConnectionSettingsSystemTemplate>>
   loadReusableSystemTemplates() async {
     final catalog = await _connectionRepository.loadSystemCatalog();
-    final systems = <SavedSystem>[];
-    for (final systemId in catalog.orderedSystemIds) {
-      try {
-        systems.add(await _connectionRepository.loadSystem(systemId));
-      } catch (error, stackTrace) {
-        debugPrint(
-          'Failed to load system $systemId for reusable system template: '
-          '$error | $stackTrace',
-        );
-      }
-    }
+    final systems = (await Future.wait<SavedSystem?>(
+      catalog.orderedSystemIds.map((systemId) async {
+        try {
+          return await _connectionRepository.loadSystem(systemId);
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Failed to load system $systemId for reusable system template: '
+            '$error | $stackTrace',
+          );
+          return null;
+        }
+      }),
+    )).whereType<SavedSystem>().toList(growable: false);
 
     return deriveConnectionSettingsSystemTemplatesFromSystems(systems);
   }
