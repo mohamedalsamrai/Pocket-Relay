@@ -63,6 +63,39 @@ void main() {
     );
   });
 
+  testWidgets(
+    'desktop enter submits immediately after typing before the next rebuild',
+    (tester) async {
+      var sendCalls = 0;
+
+      await tester.pumpWidget(
+        buildComposerApp(
+          platform: TargetPlatform.macOS,
+          contract: composerContract(),
+          onSend: () async {
+            sendCalls += 1;
+          },
+        ),
+      );
+
+      final fieldFinder = find.byType(TextField);
+
+      await tester.tap(fieldFinder);
+      await tester.pump();
+
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'Desktop draft',
+          selection: TextSelection.collapsed(offset: 13),
+        ),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(sendCalls, 1);
+    },
+  );
+
   testWidgets('mobile enter does not send and the draft remains multiline', (
     tester,
   ) async {
