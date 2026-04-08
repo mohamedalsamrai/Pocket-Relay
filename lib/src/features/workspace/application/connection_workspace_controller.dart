@@ -13,6 +13,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_capability_assets.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_templates.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
@@ -33,7 +34,6 @@ part 'controller/controller_shell.dart';
 part 'controller/conversation_selection.dart';
 part 'controller/delete_connection.dart';
 part 'controller/device_continuity_warnings.dart';
-part 'controller/model_catalogs.dart';
 part 'controller/recovery_diagnostics.dart';
 part 'controller/recovery_persistence.dart';
 part 'controller/reconnect.dart';
@@ -41,7 +41,6 @@ part 'controller/reconnect_transport.dart';
 part 'controller/reconnect_turn_liveness.dart';
 part 'controller/remote_runtime.dart';
 part 'controller/state_sanitizers.dart';
-part 'controller/system_templates.dart';
 
 typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
@@ -54,6 +53,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   ConnectionWorkspaceController({
     required CodexConnectionRepository connectionRepository,
     required ConnectionLaneBindingFactory laneBindingFactory,
+    ConnectionCapabilityAssets? connectionCapabilityAssets,
+    @Deprecated('Use connectionCapabilityAssets instead.')
     ConnectionModelCatalogStore? modelCatalogStore,
     ConnectionWorkspaceRecoveryStore? recoveryStore,
     AgentAdapterRemoteRuntimeDelegateFactory? remoteRuntimeDelegateFactory,
@@ -72,8 +73,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     WorkspaceNow? now,
   }) : _connectionRepository = connectionRepository,
        _laneBindingFactory = laneBindingFactory,
-       _modelCatalogStore =
-           modelCatalogStore ?? const NoopConnectionModelCatalogStore(),
+       _connectionCapabilityAssets =
+           connectionCapabilityAssets ??
+           StoreBackedConnectionCapabilityAssets(
+             connectionRepository: connectionRepository,
+             modelCatalogStore: modelCatalogStore,
+           ),
        _recoveryStore =
            recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
        _remoteRuntimeDelegateFactory =
@@ -90,7 +95,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
 
   final CodexConnectionRepository _connectionRepository;
   final ConnectionLaneBindingFactory _laneBindingFactory;
-  final ConnectionModelCatalogStore _modelCatalogStore;
+  final ConnectionCapabilityAssets _connectionCapabilityAssets;
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
   final AgentAdapterRemoteRuntimeDelegateFactory _remoteRuntimeDelegateFactory;
   final Duration _recoveryPersistenceDebounceDuration;
@@ -129,6 +134,8 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   bool _isDisposed = false;
 
   ConnectionWorkspaceState get state => _state;
+  ConnectionCapabilityAssets get connectionCapabilityAssets =>
+      _connectionCapabilityAssets;
   Future<void> flushRecoveryPersistence() => _enqueueRecoveryPersistence();
 
   @visibleForTesting
@@ -225,30 +232,6 @@ class ConnectionWorkspaceController extends ChangeNotifier {
       profile: profile,
       secrets: secrets,
     );
-  }
-
-  Future<ConnectionModelCatalog?> loadConnectionModelCatalog(
-    String connectionId,
-  ) {
-    return _loadWorkspaceConnectionModelCatalog(this, connectionId);
-  }
-
-  Future<void> saveConnectionModelCatalog(ConnectionModelCatalog catalog) {
-    return _saveWorkspaceConnectionModelCatalog(this, catalog);
-  }
-
-  Future<ConnectionModelCatalog?> loadLastKnownConnectionModelCatalog() {
-    return _loadWorkspaceLastKnownConnectionModelCatalog(this);
-  }
-
-  Future<List<ConnectionSettingsSystemTemplate>> loadReusableSystemTemplates() {
-    return _loadWorkspaceReusableSystemTemplates(this);
-  }
-
-  Future<void> saveLastKnownConnectionModelCatalog(
-    ConnectionModelCatalog catalog,
-  ) {
-    return _saveWorkspaceLastKnownConnectionModelCatalog(this, catalog);
   }
 
   Future<void> reconnectConnection(String connectionId) {

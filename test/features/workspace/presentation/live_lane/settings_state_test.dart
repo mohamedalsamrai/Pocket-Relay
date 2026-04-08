@@ -108,7 +108,9 @@ void main() {
       });
 
       await controller.initialize();
-      await controller.saveConnectionModelCatalog(cachedCatalog);
+      await controller.connectionCapabilityAssets.saveConnectionModelCatalog(
+        cachedCatalog,
+      );
       await controller.saveLiveConnectionEdits(
         connectionId: 'conn_primary',
         profile: workspaceProfile('Primary Updated', 'changed.local'),

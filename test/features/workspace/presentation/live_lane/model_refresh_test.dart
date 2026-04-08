@@ -79,11 +79,14 @@ void main() {
       expect(client.listModelCalls.single.limit, 100);
       expect(client.listModelCalls.single.includeHidden, isTrue);
       expect(
-        await controller.loadConnectionModelCatalog('conn_primary'),
+        await controller.connectionCapabilityAssets.loadConnectionModelCatalog(
+          'conn_primary',
+        ),
         refreshedCatalog,
       );
       expect(
-        await controller.loadLastKnownConnectionModelCatalog(),
+        await controller.connectionCapabilityAssets
+            .loadLastKnownConnectionModelCatalog(),
         refreshedCatalog,
       );
 
@@ -169,7 +172,9 @@ void main() {
       });
 
       await controller.initialize();
-      await controller.saveConnectionModelCatalog(staleConnectionCatalog);
+      await controller.connectionCapabilityAssets.saveConnectionModelCatalog(
+        staleConnectionCatalog,
+      );
       final laneBinding = controller.selectedLaneBinding!;
 
       await tester.pumpWidget(
@@ -206,11 +211,14 @@ void main() {
       expect(client.listModelCalls.first.cursor, isNull);
       expect(client.listModelCalls.last.cursor, 'repeat-cursor');
       expect(
-        await controller.loadConnectionModelCatalog('conn_primary'),
+        await controller.connectionCapabilityAssets.loadConnectionModelCatalog(
+          'conn_primary',
+        ),
         staleConnectionCatalog,
       );
       expect(
-        await controller.loadLastKnownConnectionModelCatalog(),
+        await controller.connectionCapabilityAssets
+            .loadLastKnownConnectionModelCatalog(),
         staleLastKnownCatalog,
       );
 
@@ -288,11 +296,14 @@ void main() {
       expect(refreshedCatalog.models.first.model, 'gpt-page-1');
       expect(refreshedCatalog.models.last.model, 'gpt-page-101');
       expect(
-        await controller.loadConnectionModelCatalog('conn_primary'),
+        await controller.connectionCapabilityAssets.loadConnectionModelCatalog(
+          'conn_primary',
+        ),
         refreshedCatalog,
       );
       expect(
-        await controller.loadLastKnownConnectionModelCatalog(),
+        await controller.connectionCapabilityAssets
+            .loadLastKnownConnectionModelCatalog(),
         refreshedCatalog,
       );
 
@@ -341,7 +352,9 @@ void main() {
       });
 
       await controller.initialize();
-      await controller.saveConnectionModelCatalog(staleConnectionCatalog);
+      await controller.connectionCapabilityAssets.saveConnectionModelCatalog(
+        staleConnectionCatalog,
+      );
       final laneBinding = controller.selectedLaneBinding!;
 
       await tester.pumpWidget(
@@ -376,11 +389,14 @@ void main() {
 
       expect(client.listModelCalls, isEmpty);
       expect(
-        await controller.loadConnectionModelCatalog('conn_primary'),
+        await controller.connectionCapabilityAssets.loadConnectionModelCatalog(
+          'conn_primary',
+        ),
         staleConnectionCatalog,
       );
       expect(
-        await controller.loadLastKnownConnectionModelCatalog(),
+        await controller.connectionCapabilityAssets
+            .loadLastKnownConnectionModelCatalog(),
         staleLastKnownCatalog,
       );
 

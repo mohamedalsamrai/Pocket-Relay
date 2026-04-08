@@ -11,6 +11,7 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_adapt
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_capability_assets.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_probe.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';

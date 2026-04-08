@@ -42,7 +42,9 @@ void main() {
       });
 
       await controller.initialize();
-      await controller.saveConnectionModelCatalog(cachedCatalog);
+      await controller.connectionCapabilityAssets.saveConnectionModelCatalog(
+        cachedCatalog,
+      );
       await tester.pumpWidget(
         buildDormantRosterApp(
           controller,
