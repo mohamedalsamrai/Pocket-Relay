@@ -548,29 +548,13 @@ void main() {
         secrets: const ConnectionSecrets(),
       );
       await tester.pump();
-
-      expect(find.text('Reconnecting to remote session'), findsOneWidget);
-      expect(controller.state.requiresTransportReconnect('conn_primary'), isTrue);
-
-      client.emit(
-        const CodexAppServerNotificationEvent(
-          method: 'turn/started',
-          params: <String, Object?>{
-            'threadId': 'thread_saved',
-            'turn': <String, Object?>{
-              'id': 'turn_live',
-              'status': 'running',
-              'model': 'gpt-5.4',
-              'effort': 'high',
-            },
-          },
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await controller.flushRecoveryPersistence();
 
       expect(find.text('Reconnecting to remote session'), findsNothing);
       expect(controller.state.requiresTransportReconnect('conn_primary'), isFalse);
       expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
+      await controller.flushRecoveryPersistence();
     },
   );
 

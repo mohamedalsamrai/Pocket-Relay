@@ -574,13 +574,19 @@ void _syncWorkspaceRecoveredTransportState(
   final recoveryAttemptInFlight =
       diagnostics?.lastRecoveryStartedAt != null &&
       diagnostics?.lastRecoveryCompletedAt == null;
-  if (recoveryAttemptInFlight) {
+  final recoveryOrigin = diagnostics?.lastRecoveryOrigin;
+  if (recoveryAttemptInFlight &&
+      (recoveryOrigin == ConnectionWorkspaceRecoveryOrigin.manualReconnect ||
+          recoveryOrigin == ConnectionWorkspaceRecoveryOrigin.coldStart)) {
     return;
   }
 
   final sessionController = binding.sessionController;
+  final historicalRestoreInFlight =
+      sessionController.historicalConversationRestoreState?.phase ==
+      ChatHistoricalConversationRestorePhase.loading;
   if (sessionController.conversationRecoveryState != null ||
-      sessionController.historicalConversationRestoreState != null) {
+      historicalRestoreInFlight) {
     return;
   }
 
@@ -588,16 +594,27 @@ void _syncWorkspaceRecoveredTransportState(
   final hasConversationIdentity =
       sessionState.currentThreadId?.trim().isNotEmpty == true ||
       sessionState.rootThreadId?.trim().isNotEmpty == true;
-  final hasRecoveredActivity =
-      _workspaceLaneHasProvenLiveTurnState(binding) ||
-      (hasConversationIdentity &&
-          _workspaceLaneHasVisibleLiveConversationState(binding));
+  final passiveRecoveryCleanup =
+      recoveryOrigin == null ||
+      recoveryOrigin == ConnectionWorkspaceRecoveryOrigin.foregroundResume;
+  final hasRecoveredActivity = passiveRecoveryCleanup
+      ? _workspaceLaneHasProvenLiveTurnState(binding) || hasConversationIdentity
+      : _workspaceLaneHasProvenLiveTurnState(binding) ||
+            (hasConversationIdentity &&
+                _workspaceLaneHasVisibleLiveConversationState(binding));
   if (!hasRecoveredActivity) {
     return;
   }
 
   controller._clearTransportReconnectRequired(connectionId);
   controller._clearLiveReattachPhase(connectionId);
+  if (recoveryAttemptInFlight) {
+    controller._completeRecoveryAttempt(
+      connectionId,
+      completedAt: controller._now(),
+      outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
+    );
+  }
 }
 
 Future<ConnectionWorkspaceTurnLivenessAssessment>

@@ -27,7 +27,7 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   Timer? _dismissTimer;
   String? _dismissKey;
   Duration? _dismissRemaining;
-  DateTime? _dismissStartedAt;
+  Stopwatch? _dismissStopwatch;
   AppLifecycleState? _appLifecycleState;
 
   @override
@@ -90,21 +90,22 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
     _dismissTimer = null;
     _dismissKey = null;
     _dismissRemaining = null;
-    _dismissStartedAt = null;
+    _dismissStopwatch = null;
   }
 
   void _pauseDismissal() {
     final timer = _dismissTimer;
     final remaining = _dismissRemaining;
-    final startedAt = _dismissStartedAt;
-    if (timer == null || remaining == null || startedAt == null) {
+    final stopwatch = _dismissStopwatch;
+    if (timer == null || remaining == null || stopwatch == null) {
       return;
     }
 
-    final elapsed = DateTime.now().difference(startedAt);
+    stopwatch.stop();
+    final elapsed = stopwatch.elapsed;
     final nextRemaining = remaining - elapsed;
     _dismissTimer = null;
-    _dismissStartedAt = null;
+    _dismissStopwatch = null;
     _dismissRemaining = nextRemaining > Duration.zero
         ? nextRemaining
         : Duration.zero;
@@ -143,7 +144,7 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
       return;
     }
 
-    _dismissStartedAt = DateTime.now();
+    _dismissStopwatch = Stopwatch()..start();
     _dismissTimer = Timer(remaining, dismissNotice);
   }
 
