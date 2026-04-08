@@ -73,6 +73,26 @@ void main() {
             .rootThreadId,
         'thread_saved',
       );
+      expect(
+        controller
+            .selectedLaneBinding
+            ?.sessionController
+            .transcriptBlocks
+            .whereType<TranscriptTextBlock>()
+            .single
+            .body,
+        'Restored answer',
+      );
+      expect(
+        clientsById['conn_secondary']!.startSessionRequests.single.resumeThreadId,
+        'thread_saved',
+      );
+      expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
+        'thread_saved',
+        'thread_saved',
+        'thread_saved',
+      ]);
+      expect(clientsById['conn_secondary']!.connectCalls, 1);
       final restoredDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
       );

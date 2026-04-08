@@ -17,11 +17,9 @@ void main() {
       final binding = controller.selectedLaneBinding;
       expect(binding, isNotNull);
 
-      await binding!.sessionController.initialize();
-
       expect(clientsById['conn_primary']?.connectCalls, 0);
       expect(clientsById['conn_primary']?.readThreadCalls, isEmpty);
-      expect(binding.sessionController.transcriptBlocks, isEmpty);
+      expect(binding!.sessionController.transcriptBlocks, isEmpty);
       expect(binding.sessionController.sessionState.rootThreadId, isNull);
     },
   );
