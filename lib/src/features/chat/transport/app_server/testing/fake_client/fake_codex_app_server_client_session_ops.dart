@@ -2,8 +2,6 @@ part of '../fake_codex_app_server_client.dart';
 
 mixin _FakeCodexAppServerClientSessionOps
     on CodexAppServerClient, _FakeCodexAppServerClientState {
-  void emit(CodexAppServerEvent event);
-
   @override
   Future<void> connect({
     required ConnectionProfile profile,
@@ -140,23 +138,17 @@ mixin _FakeCodexAppServerClientSessionOps
     required String threadId,
   }) async {
     final configuredHistory = threadHistoriesById[threadId];
-    if (configuredHistory != null) {
-      readThreadCalls.add(threadId);
-      await _awaitReadThreadWithTurnsGate(threadId);
-      if (readThreadWithTurnsError != null) {
-        throw readThreadWithTurnsError!;
-      }
-      return configuredHistory;
-    }
-
     final configuredThread = threadsById[threadId];
-    if (configuredThread != null) {
+    if (configuredHistory != null || configuredThread != null) {
       readThreadCalls.add(threadId);
       await _awaitReadThreadWithTurnsGate(threadId);
       if (readThreadWithTurnsError != null) {
         throw readThreadWithTurnsError!;
       }
-      return _codexThreadHistoryFromConfiguredThread(configuredThread);
+      if (configuredHistory != null) {
+        return configuredHistory;
+      }
+      return _codexThreadHistoryFromConfiguredThread(configuredThread!);
     }
 
     final summary = await readThread(threadId: threadId);

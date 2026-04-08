@@ -181,4 +181,70 @@ mixin _FakeCodexAppServerClientState on CodexAppServerClient {
 
   @override
   String? get activeTurnId => _activeTurnId;
+
+  void emit(CodexAppServerEvent event) {
+    switch (event) {
+      case CodexAppServerRequestEvent(:final requestId, :final method):
+        pendingServerRequestMethodsById[requestId] = method;
+      case CodexAppServerNotificationEvent(:final method, :final params):
+        _updateRuntimePointers(method: method, params: params);
+      case CodexAppServerDisconnectedEvent():
+        pendingServerRequestMethodsById.clear();
+      default:
+        break;
+    }
+    if (_eventsController.isClosed) {
+      return;
+    }
+    _eventsController.add(event);
+  }
+
+  Future<void> close() async {
+    await _eventsController.close();
+  }
+
+  void _updateRuntimePointers({
+    required String method,
+    required Object? params,
+  }) {
+    final payload = _asObject(params);
+    switch (method) {
+      case 'session/exited':
+      case 'session/closed':
+        _threadId = null;
+        _activeTurnId = null;
+      case 'thread/started':
+        final thread = _asObject(payload?['thread']);
+        _threadId = _asString(thread?['id']) ?? _asString(payload?['threadId']);
+        _activeTurnId = null;
+      case 'thread/closed':
+        final threadId = _asString(payload?['threadId']);
+        if (threadId == null || threadId == _threadId) {
+          _threadId = null;
+          _activeTurnId = null;
+        }
+      case 'turn/started':
+        _threadId = _asString(payload?['threadId']) ?? _threadId;
+        final turn = _asObject(payload?['turn']);
+        _activeTurnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
+      case 'turn/completed':
+      case 'turn/aborted':
+        final turn = _asObject(payload?['turn']);
+        final turnId = _asString(turn?['id']) ?? _asString(payload?['turnId']);
+        if (turnId == null || turnId == _activeTurnId) {
+          _activeTurnId = null;
+        }
+    }
+  }
+
+  Map<String, Object?>? _asObject(Object? value) {
+    if (value is Map<Object?, Object?>) {
+      return value.map(
+        (key, value) => MapEntry<String, Object?>(key.toString(), value),
+      );
+    }
+    return null;
+  }
+
+  String? _asString(Object? value) => value is String ? value : null;
 }
