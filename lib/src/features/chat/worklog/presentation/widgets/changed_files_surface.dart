@@ -13,6 +13,9 @@ import 'package:pocket_relay/src/features/chat/worklog/application/chat_changed_
 
 part 'changed_files_diff_sheet.dart';
 part 'changed_files_diff_sheet_code_frame.dart';
+part 'changed_files_diff_sheet_code_frame_chrome.dart';
+part 'changed_files_diff_sheet_code_frame_raw.dart';
+part 'changed_files_diff_sheet_code_frame_review.dart';
 part 'changed_files_diff_sheet_header.dart';
 part 'changed_files_row.dart';
 part 'changed_files_support.dart';
