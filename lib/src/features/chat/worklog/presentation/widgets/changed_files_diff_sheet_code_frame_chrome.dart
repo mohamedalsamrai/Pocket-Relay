@@ -20,7 +20,9 @@ class _DiffEditorBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cards.terminalShell,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(PocketRadii.xl),
+        ),
         border: Border(
           bottom: BorderSide(
             color: cards.neutralBorder.withValues(alpha: 0.38),
