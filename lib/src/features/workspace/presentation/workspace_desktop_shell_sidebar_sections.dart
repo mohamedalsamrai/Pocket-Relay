@@ -59,10 +59,8 @@ extension on _MaterialDesktopSidebar {
             : null);
 
     return <ConnectionLifecycleFact>[
-      ...?(laneFact == null ? null : <ConnectionLifecycleFact>[laneFact]),
-      ...?(secondaryFact == null || secondaryFact == laneFact
-          ? null
-          : <ConnectionLifecycleFact>[secondaryFact]),
+      if (laneFact != null) laneFact,
+      if (secondaryFact != null && secondaryFact != laneFact) secondaryFact,
     ];
   }
 }
