@@ -189,3 +189,18 @@ TranscriptSessionState _clearLocalUserMessageCorrelationStateImpl(
     clearLocalUserMessageProviderBindings: true,
   );
 }
+
+TranscriptSessionState _removeLocalUserMessageCorrelationForBlockIdImpl(
+  TranscriptSessionState state,
+  String blockId,
+) {
+  return state.copyWithProjectedTranscript(
+    pendingLocalUserMessageBlockIds: state.pendingLocalUserMessageBlockIds
+        .where((pendingBlockId) => pendingBlockId != blockId)
+        .toList(growable: false),
+    localUserMessageProviderBindings: <String, String>{
+      for (final entry in state.localUserMessageProviderBindings.entries)
+        if (entry.value != blockId) entry.key: entry.value,
+    },
+  );
+}

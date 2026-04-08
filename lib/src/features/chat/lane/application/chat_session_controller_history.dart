@@ -127,6 +127,10 @@ Future<bool> _sendTurnInputWithAppServerForController(
   controller._isTrackingSshBootstrapFailures = true;
   controller._sawTrackedSshBootstrapFailure = false;
   controller._sawTrackedUnpinnedHostKeyFailure = false;
+  final failedLocalUserMessageBlockId =
+      controller._sessionState.pendingLocalUserMessageBlockIds.isEmpty
+      ? null
+      : controller._sessionState.pendingLocalUserMessageBlockIds.last;
   try {
     final threadId = await _ensureChatSessionAppServerThread(controller);
     final activeTurnId = controller._activeTurnIdForSteering();
@@ -174,10 +178,11 @@ Future<bool> _sendTurnInputWithAppServerForController(
     if (recoveryAssessment.recoveryState != null) {
       controller._setConversationRecovery(recoveryAssessment.recoveryState!);
     }
-    if (controller._sessionState.pendingLocalUserMessageBlockIds.isNotEmpty) {
+    if (failedLocalUserMessageBlockId != null) {
       controller._applySessionState(
-        controller._sessionReducer.clearLocalUserMessageCorrelationState(
+        controller._sessionReducer.removeLocalUserMessageCorrelationForBlockId(
           controller._sessionState,
+          failedLocalUserMessageBlockId,
         ),
       );
     }
