@@ -117,6 +117,35 @@ ConnectionWorkspaceController buildWorkspaceController({
   );
 }
 
+ConnectionWorkspaceController buildWorkspaceControllerWithTrackedClients({
+  required MemoryCodexConnectionRepository repository,
+  required Map<String, List<FakeCodexAppServerClient>> clientsByConnectionId,
+  void Function(FakeCodexAppServerClient client, String connectionId)?
+  configureClient,
+}) {
+  return ConnectionWorkspaceController(
+    connectionRepository: repository,
+    laneBindingFactory: ({required connectionId, required connection}) {
+      final appServerClient = FakeCodexAppServerClient();
+      configureClient?.call(appServerClient, connectionId);
+      clientsByConnectionId[connectionId]!.add(appServerClient);
+      return ConnectionLaneBinding(
+        connectionId: connectionId,
+        profileStore: ConnectionScopedProfileStore(
+          connectionId: connectionId,
+          connectionRepository: repository,
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: connection.profile,
+          secrets: connection.secrets,
+        ),
+        ownsAppServerClient: false,
+      );
+    },
+  );
+}
+
 final class FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
   const FakeRemoteHostProbe(this.capabilities);
 
