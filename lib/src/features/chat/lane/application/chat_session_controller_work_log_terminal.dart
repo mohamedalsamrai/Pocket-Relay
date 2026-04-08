@@ -77,6 +77,14 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
       _terminalOutputFromSnapshot(snapshot) ??
       _activeTerminalOutput(item.body, terminalInput) ??
       terminal.terminalOutput;
+  final activitySummary = terminalOutput != null
+      ? null
+      : _terminalActivitySummaryFromActiveItem(
+              item,
+              terminalInput: terminalInput,
+              terminalOutput: terminalOutput,
+            ) ??
+            terminal.activitySummary;
   return terminal.copyWith(
     commandText: _terminalString(item.title) ?? terminal.commandText,
     isRunning: item.isRunning,
@@ -85,13 +93,7 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
     processId: _terminalProcessId(snapshot) ?? terminal.processId,
     terminalInput: terminalInput,
     terminalOutput: terminalOutput,
-    activitySummary:
-        _terminalActivitySummaryFromActiveItem(
-          item,
-          terminalInput: terminalInput,
-          terminalOutput: terminalOutput,
-        ) ??
-        terminal.activitySummary,
+    activitySummary: activitySummary,
   );
 }
 
@@ -123,6 +125,13 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
   final result = _terminalObject(raw['result']);
   final terminalOutput =
       _terminalOutputFromSnapshot(raw) ?? terminal.terminalOutput;
+  final activitySummary = terminalOutput != null
+      ? null
+      : _terminalActivitySummaryFromSnapshot(
+              raw,
+              terminalOutput: terminalOutput,
+            ) ??
+            terminal.activitySummary;
   return terminal.copyWith(
     commandText:
         _terminalString(raw['command'] ?? result?['command']) ??
@@ -138,12 +147,7 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
         _nonBlankTerminalStringPreservingWhitespace(raw['stdin']) ??
         terminal.terminalInput,
     terminalOutput: terminalOutput,
-    activitySummary:
-        _terminalActivitySummaryFromSnapshot(
-          raw,
-          terminalOutput: terminalOutput,
-        ) ??
-        terminal.activitySummary,
+    activitySummary: activitySummary,
   );
 }
 
@@ -235,6 +239,18 @@ String? _terminalActivitySummaryFromSnapshot(
     return null;
   }
 
+  return _terminalActivitySummaryWireValue(value) ??
+      _terminalActivitySummarySupportedSnapshot(value);
+}
+
+String? _terminalActivitySummaryWireValue(Map<String, dynamic> value) {
+  final result = _terminalObject(value['result']);
+  return _nonBlankTerminalStringPreservingWhitespace(
+    value['message'] ?? result?['message'],
+  );
+}
+
+String? _terminalActivitySummarySupportedSnapshot(Map<String, dynamic> value) {
   final extractedSummary = _nonBlankTerminalStringPreservingWhitespace(
     _terminalItemSupport.extractTextFromSnapshot(value),
   );
@@ -245,18 +261,20 @@ String? _terminalActivitySummaryFromSnapshot(
   final result = _terminalObject(value['result']);
   return _nonBlankTerminalStringPreservingWhitespace(
     _terminalItemSupport.extractTextFromSnapshot(
-          result == null
-              ? null
-              : <String, dynamic>{
-                  'summary': result['summary'],
-                  'content': result['content'],
-                  'text': result['text'],
-                  'review': result['message'],
-                },
-        ) ??
-        result?['message'] ??
-        value['message'],
+      result == null ? null : _terminalLegacyActivitySummarySnapshot(result),
+    ),
   );
+}
+
+Map<String, dynamic> _terminalLegacyActivitySummarySnapshot(
+  Map<String, dynamic> result,
+) {
+  return <String, dynamic>{
+    'summary': result['summary'],
+    'content': result['content'],
+    'text': result['text'],
+    'review': result['message'],
+  };
 }
 
 String? _terminalActivitySummaryFromActiveItem(

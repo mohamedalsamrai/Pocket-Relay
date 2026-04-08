@@ -1,5 +1,7 @@
 import 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart';
 
+const _chatWorkLogTerminalKeepValue = Object();
+
 class ChatWorkLogTerminalContract {
   const ChatWorkLogTerminalContract({
     required this.id,
@@ -82,7 +84,7 @@ class ChatWorkLogTerminalContract {
     String? processId,
     String? terminalInput,
     String? terminalOutput,
-    String? activitySummary,
+    Object? activitySummary = _chatWorkLogTerminalKeepValue,
   }) {
     return ChatWorkLogTerminalContract(
       id: id,
@@ -98,7 +100,9 @@ class ChatWorkLogTerminalContract {
       processId: processId ?? this.processId,
       terminalInput: terminalInput ?? this.terminalInput,
       terminalOutput: terminalOutput ?? this.terminalOutput,
-      activitySummary: activitySummary ?? this.activitySummary,
+      activitySummary: identical(activitySummary, _chatWorkLogTerminalKeepValue)
+          ? this.activitySummary
+          : activitySummary as String?,
     );
   }
 
