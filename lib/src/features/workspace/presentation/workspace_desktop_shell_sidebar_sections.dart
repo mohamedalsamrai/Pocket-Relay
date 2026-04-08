@@ -19,36 +19,25 @@ extension on _MaterialDesktopSidebar {
   List<ConnectionLifecycleFact> _sidebarFactsForRow(
     ConnectionLifecyclePresentation row,
   ) {
-    ConnectionLifecycleFact? factMatching(
-      bool Function(ConnectionLifecycleFact) test,
-    ) {
-      for (final fact in row.facts) {
-        if (test(fact)) {
-          return fact;
-        }
-      }
-      return null;
-    }
-
-    final laneFact = factMatching(
+    final laneFact = row.facts.firstWhereOrNull(
       (fact) =>
           fact.label.startsWith('${ConnectionWorkspaceCopy.laneFactLabel}:'),
     );
-    final settingsFact = factMatching(
+    final settingsFact = row.facts.firstWhereOrNull(
       (fact) => fact.label.startsWith(
         '${ConnectionWorkspaceCopy.settingsFactLabel}:',
       ),
     );
-    final transportFact = factMatching(
+    final transportFact = row.facts.firstWhereOrNull(
       (fact) => fact.label.startsWith(
         '${ConnectionWorkspaceCopy.transportFactLabel}:',
       ),
     );
-    final serverFact = factMatching(
+    final serverFact = row.facts.firstWhereOrNull(
       (fact) =>
           fact.label.startsWith('${ConnectionWorkspaceCopy.serverFactLabel}:'),
     );
-    final configurationFact = factMatching(
+    final configurationFact = row.facts.firstWhereOrNull(
       (fact) =>
           fact.label ==
           ConnectionWorkspaceCopy.laneConfigurationIncompleteStatus,

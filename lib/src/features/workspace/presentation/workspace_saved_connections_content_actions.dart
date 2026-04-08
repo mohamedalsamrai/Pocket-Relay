@@ -98,12 +98,18 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     });
 
     try {
-      final availableModelCatalogFuture = widget.workspaceController
-          .loadLastKnownConnectionModelCatalog();
-      final availableSystemTemplatesFuture = widget.workspaceController
-          .loadReusableSystemTemplates();
-      final availableModelCatalog = await availableModelCatalogFuture;
-      final availableSystemTemplates = await availableSystemTemplatesFuture;
+      final [
+        availableModelCatalogObject,
+        availableSystemTemplatesObject,
+      ] = await Future.wait<Object?>(<Future<Object?>>[
+        widget.workspaceController.loadLastKnownConnectionModelCatalog(),
+        widget.workspaceController.loadReusableSystemTemplates(),
+      ]);
+      final availableModelCatalog =
+          availableModelCatalogObject as ConnectionModelCatalog?;
+      final availableSystemTemplates =
+          availableSystemTemplatesObject
+              as List<ConnectionSettingsSystemTemplate>;
       if (!mounted) {
         return;
       }
@@ -144,18 +150,25 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     });
 
     try {
-      final savedConnectionFuture = widget.workspaceController
-          .loadSavedConnection(connectionId);
-      final cachedModelCatalogFuture = widget.workspaceController
-          .loadConnectionModelCatalog(connectionId);
-      final lastKnownModelCatalogFuture = widget.workspaceController
-          .loadLastKnownConnectionModelCatalog();
-      final availableSystemTemplatesFuture = widget.workspaceController
-          .loadReusableSystemTemplates();
-      final savedConnection = await savedConnectionFuture;
-      final cachedModelCatalog = await cachedModelCatalogFuture;
-      final lastKnownModelCatalog = await lastKnownModelCatalogFuture;
-      final availableSystemTemplates = await availableSystemTemplatesFuture;
+      final [
+        savedConnectionObject,
+        cachedModelCatalogObject,
+        lastKnownModelCatalogObject,
+        availableSystemTemplatesObject,
+      ] = await Future.wait<Object?>(<Future<Object?>>[
+        widget.workspaceController.loadSavedConnection(connectionId),
+        widget.workspaceController.loadConnectionModelCatalog(connectionId),
+        widget.workspaceController.loadLastKnownConnectionModelCatalog(),
+        widget.workspaceController.loadReusableSystemTemplates(),
+      ]);
+      final savedConnection = savedConnectionObject as SavedConnection;
+      final cachedModelCatalog =
+          cachedModelCatalogObject as ConnectionModelCatalog?;
+      final lastKnownModelCatalog =
+          lastKnownModelCatalogObject as ConnectionModelCatalog?;
+      final availableSystemTemplates =
+          availableSystemTemplatesObject
+              as List<ConnectionSettingsSystemTemplate>;
       if (!mounted) {
         return;
       }
