@@ -15,6 +15,7 @@ export 'package:pocket_relay/src/features/chat/transcript/domain/chat_conversati
 export 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 export 'package:pocket_relay/src/features/chat/transcript/domain/transcript_ui_block.dart';
 export 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
+export 'package:pocket_relay/src/features/chat/worklog/application/chat_work_log_terminal_contract.dart';
 
 ConnectionProfile configuredProfile() {
   return ConnectionProfile.defaults().copyWith(
