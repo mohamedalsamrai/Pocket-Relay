@@ -66,36 +66,11 @@ ConnectionWorkspaceController buildSingleConnectionWorkspaceController({
       ),
     ],
   );
-
-  ConnectionWorkspaceController buildController() {
-    return ConnectionWorkspaceController(
-      connectionRepository: repository,
-      remoteAppServerHostProbe: remoteAppServerHostProbe,
-      laneBindingFactory: ({required connectionId, required connection}) {
-        return ConnectionLaneBinding(
-          connectionId: connectionId,
-          profileStore: ConnectionScopedProfileStore(
-            connectionId: connectionId,
-            connectionRepository: repository,
-          ),
-          appServerClient: client,
-          initialSavedProfile: SavedProfile(
-            profile: connection.profile,
-            secrets: connection.secrets,
-          ),
-          ownsAppServerClient: false,
-        );
-      },
-    );
-  }
-
-  if (recoveryPersistenceDebounceDuration == null) {
-    return buildController();
-  }
-
   return ConnectionWorkspaceController(
     connectionRepository: repository,
-    recoveryPersistenceDebounceDuration: recoveryPersistenceDebounceDuration,
+    recoveryPersistenceDebounceDuration:
+        recoveryPersistenceDebounceDuration ??
+        const Duration(milliseconds: 250),
     remoteAppServerHostProbe: remoteAppServerHostProbe,
     laneBindingFactory: ({required connectionId, required connection}) {
       return ConnectionLaneBinding(
