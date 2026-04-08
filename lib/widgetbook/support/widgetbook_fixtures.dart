@@ -67,6 +67,8 @@ class WidgetbookFixtures {
     supportsWakeLock: true,
     supportsFiniteBackgroundGrace: false,
     supportsActiveTurnForegroundService: false,
+    supportsForegroundTurnCompletionSignal: true,
+    supportsBackgroundTurnCompletionAlerts: true,
     usesDesktopKeyboardSubmit: false,
     supportsCollapsibleDesktopSidebar: false,
   );
@@ -77,6 +79,8 @@ class WidgetbookFixtures {
     supportsWakeLock: false,
     supportsFiniteBackgroundGrace: false,
     supportsActiveTurnForegroundService: false,
+    supportsForegroundTurnCompletionSignal: false,
+    supportsBackgroundTurnCompletionAlerts: false,
     usesDesktopKeyboardSubmit: true,
     supportsCollapsibleDesktopSidebar: true,
   );

@@ -175,6 +175,8 @@ const mobileSettingsBehavior = PocketPlatformBehavior(
   supportsWakeLock: true,
   supportsFiniteBackgroundGrace: false,
   supportsActiveTurnForegroundService: false,
+  supportsForegroundTurnCompletionSignal: true,
+  supportsBackgroundTurnCompletionAlerts: true,
   usesDesktopKeyboardSubmit: false,
   supportsCollapsibleDesktopSidebar: false,
 );
@@ -185,6 +187,8 @@ const desktopSettingsBehavior = PocketPlatformBehavior(
   supportsWakeLock: false,
   supportsFiniteBackgroundGrace: false,
   supportsActiveTurnForegroundService: false,
+  supportsForegroundTurnCompletionSignal: false,
+  supportsBackgroundTurnCompletionAlerts: false,
   usesDesktopKeyboardSubmit: true,
   supportsCollapsibleDesktopSidebar: false,
 );
