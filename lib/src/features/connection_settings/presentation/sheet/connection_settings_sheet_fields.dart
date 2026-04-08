@@ -95,7 +95,8 @@ extension _ConnectionSettingsSheetFields on ConnectionSettingsSheetSurface {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useSplitLayout = constraints.maxWidth >= 640;
+        final useSplitLayout =
+            constraints.maxWidth >= _modelDefaultsSplitLayoutBreakpoint;
         final pickerContent = useSplitLayout
             ? Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
