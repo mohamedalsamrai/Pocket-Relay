@@ -88,6 +88,110 @@ void main() {
     expect(errorBlock.body, contains('Elapsed 0:09'));
   });
 
+  test('aborting a turn freezes streaming assistant artifacts', () {
+    final reducer = TranscriptReducer();
+    var state = TranscriptSessionState.initial();
+    final startedAt = DateTime(2026, 3, 14, 12);
+    final abortedAt = startedAt.add(const Duration(seconds: 3));
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeTurnStartedEvent(
+        createdAt: startedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeItemStartedEvent(
+        createdAt: startedAt,
+        itemType: TranscriptCanonicalItemType.assistantMessage,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_123',
+        status: TranscriptRuntimeItemStatus.inProgress,
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeContentDeltaEvent(
+        createdAt: startedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_123',
+        streamKind: TranscriptRuntimeContentStreamKind.assistantText,
+        delta: 'Partial answer',
+      ),
+    );
+
+    expect(
+      (state.transcriptBlocks.single as TranscriptTextBlock).isRunning,
+      isTrue,
+    );
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeTurnAbortedEvent(
+        createdAt: abortedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+
+    expect(state.activeTurn, isNull);
+    final assistant = state.blocks.first as TranscriptTextBlock;
+    expect(assistant.body, 'Partial answer');
+    expect(assistant.isRunning, isFalse);
+    expect(state.blocks.last, isA<TranscriptStatusBlock>());
+  });
+
+  test('ignores late abort events after a turn is locally settled', () {
+    final reducer = TranscriptReducer();
+    var state = TranscriptSessionState.initial();
+    final startedAt = DateTime(2026, 3, 14, 12);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeTurnStartedEvent(
+        createdAt: startedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeContentDeltaEvent(
+        createdAt: startedAt,
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+        itemId: 'item_123',
+        streamKind: TranscriptRuntimeContentStreamKind.assistantText,
+        delta: 'Partial answer',
+      ),
+    );
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeTurnAbortedEvent(
+        createdAt: startedAt.add(const Duration(seconds: 1)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+    final settledBlocks = List<TranscriptUiBlock>.from(state.blocks);
+
+    state = reducer.reduceRuntimeEvent(
+      state,
+      TranscriptRuntimeTurnAbortedEvent(
+        createdAt: startedAt.add(const Duration(seconds: 2)),
+        threadId: 'thread_123',
+        turnId: 'turn_123',
+      ),
+    );
+
+    expect(state.blocks, settledBlocks);
+  });
+
   test(
     'uses monotonic elapsed time instead of wall-clock span on completion',
     () {

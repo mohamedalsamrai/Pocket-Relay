@@ -48,6 +48,9 @@ bool _hasMismatchedActiveTurnImpl(
     activeTurn.copyWith(
       timer: completedTimer,
       status: TranscriptActiveTurnStatus.completing,
+      artifacts: activeTurn.artifacts
+          .map(freezeTranscriptTurnArtifact)
+          .toList(growable: false),
     ),
     completedTimer.elapsedAt(createdAt),
   );

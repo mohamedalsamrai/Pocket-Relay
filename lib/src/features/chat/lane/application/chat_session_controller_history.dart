@@ -298,9 +298,19 @@ Future<void> _stopChatSessionAppServerTurn(
     if (targetTimeline == null || turnId == null) {
       return;
     }
+    final threadId = targetTimeline.threadId;
     await controller.agentAdapterClient.abortTurn(
-      threadId: targetTimeline.threadId,
+      threadId: threadId,
       turnId: turnId,
+    );
+    _applyChatSessionRuntimeEvent(
+      controller,
+      TranscriptRuntimeTurnAbortedEvent(
+        createdAt: DateTime.now(),
+        threadId: threadId,
+        turnId: turnId,
+        rawMethod: 'local/turn/abort',
+      ),
     );
   } catch (error) {
     final userFacingError = ChatSessionErrors.stopTurnFailed();
