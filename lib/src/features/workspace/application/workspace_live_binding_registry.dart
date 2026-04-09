@@ -57,13 +57,13 @@ final class WorkspaceLiveBindingRegistry {
     unawaited(registration.agentAdapterEventSubscription.cancel());
   }
 
-  List<MapEntry<String, ConnectionLaneBinding>> detachAll() {
-    final entries = _bindings.entries.toList();
+  List<ConnectionLaneBinding> detachAll() {
+    final bindings = _bindings.values.toList();
     _bindings.clear();
     for (final connectionId in _registrations.keys.toList()) {
       unregister(connectionId);
     }
-    return entries;
+    return bindings;
   }
 }
 
