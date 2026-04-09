@@ -37,6 +37,7 @@ class DisplayWakeLockHost extends StatefulWidget {
     this.displayWakeLockController =
         const WakelockPlusDisplayWakeLockController(),
     this.supportsWakeLock,
+    this.appLifecycleVisibilityListenable,
     this.onWarningChanged,
   });
 
@@ -44,6 +45,8 @@ class DisplayWakeLockHost extends StatefulWidget {
   final bool keepDisplayAwake;
   final DisplayWakeLockController displayWakeLockController;
   final bool? supportsWakeLock;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
   final ValueChanged<PocketUserFacingError?>? onWarningChanged;
 
   @override
@@ -53,6 +56,7 @@ class DisplayWakeLockHost extends StatefulWidget {
 class _DisplayWakeLockHostState extends State<DisplayWakeLockHost>
     with WidgetsBindingObserver {
   AppLifecycleState? _appLifecycleState;
+  bool _isObservingAppLifecycle = false;
   bool _requestedWakeLockEnabled = false;
 
   bool get _supportsWakeLock {
@@ -62,20 +66,34 @@ class _DisplayWakeLockHostState extends State<DisplayWakeLockHost>
   bool get _shouldEnableWakeLock {
     return _supportsWakeLock &&
         widget.keepDisplayAwake &&
-        appLifecycleStateIsForegroundVisible(_appLifecycleState);
+        _appLifecycleVisibility.isForegroundVisible;
+  }
+
+  AppLifecycleVisibility get _appLifecycleVisibility {
+    return widget.appLifecycleVisibilityListenable?.value ??
+        appLifecycleVisibilityForState(_appLifecycleState);
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    if (widget.appLifecycleVisibilityListenable == null) {
+      _startObservingAppLifecycle();
+    } else {
+      widget.appLifecycleVisibilityListenable!.addListener(
+        _handleExternalAppLifecycleVisibilityChanged,
+      );
+    }
     _syncWakeLock();
   }
 
   @override
   void didUpdateWidget(covariant DisplayWakeLockHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncAppLifecycleObserver(
+      oldWidget.appLifecycleVisibilityListenable,
+      widget.appLifecycleVisibilityListenable,
+    );
     if (oldWidget.displayWakeLockController !=
             widget.displayWakeLockController &&
         _requestedWakeLockEnabled) {
@@ -93,7 +111,10 @@ class _DisplayWakeLockHostState extends State<DisplayWakeLockHost>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _stopObservingAppLifecycle();
+    widget.appLifecycleVisibilityListenable?.removeListener(
+      _handleExternalAppLifecycleVisibilityChanged,
+    );
     _setWarning(null);
     if (_requestedWakeLockEnabled) {
       _requestedWakeLockEnabled = false;
@@ -104,6 +125,45 @@ class _DisplayWakeLockHostState extends State<DisplayWakeLockHost>
 
   @override
   Widget build(BuildContext context) => widget.child;
+
+  void _syncAppLifecycleObserver(
+    ValueListenable<AppLifecycleVisibility>? oldVisibility,
+    ValueListenable<AppLifecycleVisibility>? nextVisibility,
+  ) {
+    if (oldVisibility == nextVisibility) {
+      return;
+    }
+
+    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
+    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
+
+    if (nextVisibility == null) {
+      _startObservingAppLifecycle();
+    } else {
+      _stopObservingAppLifecycle();
+    }
+  }
+
+  void _startObservingAppLifecycle() {
+    if (_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    _isObservingAppLifecycle = true;
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+  }
+
+  void _stopObservingAppLifecycle() {
+    if (!_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    _isObservingAppLifecycle = false;
+  }
+
+  void _handleExternalAppLifecycleVisibilityChanged() {
+    _syncWakeLock();
+  }
 
   void _syncWakeLock() {
     final shouldEnableWakeLock = _shouldEnableWakeLock;

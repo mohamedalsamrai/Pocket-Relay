@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
@@ -74,5 +75,33 @@ void main() {
       appLifecycleStateIsNotForegroundVisible(AppLifecycleState.detached),
       isTrue,
     );
+  });
+
+  testWidgets('visibility builder publishes projected lifecycle changes', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    ValueListenable<AppLifecycleVisibility>? visibilityListenable;
+
+    await tester.pumpWidget(
+      AppLifecycleVisibilityBuilder(
+        builder: (context, listenable) {
+          visibilityListenable = listenable;
+          return const SizedBox();
+        },
+      ),
+    );
+
+    expect(visibilityListenable!.value, AppLifecycleVisibility.foreground);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+
+    expect(visibilityListenable!.value, AppLifecycleVisibility.background);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    expect(visibilityListenable!.value, AppLifecycleVisibility.foreground);
   });
 }

@@ -46,6 +46,7 @@ class BackgroundGraceHost extends StatefulWidget {
     this.backgroundGraceController =
         const MethodChannelBackgroundGraceController(),
     this.supportsBackgroundGrace,
+    this.appLifecycleVisibilityListenable,
     this.onWarningChanged,
   });
 
@@ -53,6 +54,8 @@ class BackgroundGraceHost extends StatefulWidget {
   final bool keepBackgroundGraceAlive;
   final BackgroundGraceController backgroundGraceController;
   final bool? supportsBackgroundGrace;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
   final ValueChanged<PocketUserFacingError?>? onWarningChanged;
 
   @override
@@ -62,6 +65,7 @@ class BackgroundGraceHost extends StatefulWidget {
 class _BackgroundGraceHostState extends State<BackgroundGraceHost>
     with WidgetsBindingObserver {
   AppLifecycleState? _appLifecycleState;
+  bool _isObservingAppLifecycle = false;
   bool _requestedBackgroundGraceEnabled = false;
 
   bool get _supportsBackgroundGrace {
@@ -71,20 +75,34 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   bool get _shouldEnableBackgroundGrace {
     return _supportsBackgroundGrace &&
         widget.keepBackgroundGraceAlive &&
-        appLifecycleStateIsNotForegroundVisible(_appLifecycleState);
+        _appLifecycleVisibility.isNotForegroundVisible;
+  }
+
+  AppLifecycleVisibility get _appLifecycleVisibility {
+    return widget.appLifecycleVisibilityListenable?.value ??
+        appLifecycleVisibilityForState(_appLifecycleState);
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    if (widget.appLifecycleVisibilityListenable == null) {
+      _startObservingAppLifecycle();
+    } else {
+      widget.appLifecycleVisibilityListenable!.addListener(
+        _handleExternalAppLifecycleVisibilityChanged,
+      );
+    }
     _syncBackgroundGrace();
   }
 
   @override
   void didUpdateWidget(covariant BackgroundGraceHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncAppLifecycleObserver(
+      oldWidget.appLifecycleVisibilityListenable,
+      widget.appLifecycleVisibilityListenable,
+    );
     if (oldWidget.backgroundGraceController !=
             widget.backgroundGraceController &&
         _requestedBackgroundGraceEnabled) {
@@ -102,7 +120,10 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _stopObservingAppLifecycle();
+    widget.appLifecycleVisibilityListenable?.removeListener(
+      _handleExternalAppLifecycleVisibilityChanged,
+    );
     _setWarning(null);
     if (_requestedBackgroundGraceEnabled) {
       _requestedBackgroundGraceEnabled = false;
@@ -113,6 +134,45 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
 
   @override
   Widget build(BuildContext context) => widget.child;
+
+  void _syncAppLifecycleObserver(
+    ValueListenable<AppLifecycleVisibility>? oldVisibility,
+    ValueListenable<AppLifecycleVisibility>? nextVisibility,
+  ) {
+    if (oldVisibility == nextVisibility) {
+      return;
+    }
+
+    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
+    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
+
+    if (nextVisibility == null) {
+      _startObservingAppLifecycle();
+    } else {
+      _stopObservingAppLifecycle();
+    }
+  }
+
+  void _startObservingAppLifecycle() {
+    if (_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    _isObservingAppLifecycle = true;
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+  }
+
+  void _stopObservingAppLifecycle() {
+    if (!_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    _isObservingAppLifecycle = false;
+  }
+
+  void _handleExternalAppLifecycleVisibilityChanged() {
+    _syncBackgroundGrace();
+  }
 
   void _syncBackgroundGrace() {
     final shouldEnableBackgroundGrace = _shouldEnableBackgroundGrace;
