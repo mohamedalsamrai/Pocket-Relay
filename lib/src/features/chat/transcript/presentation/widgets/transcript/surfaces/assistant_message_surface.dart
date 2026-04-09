@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/markdown_style_factory.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_markdown_body.dart';
 
 class AssistantMessageSurface extends StatelessWidget {
   const AssistantMessageSurface({super.key, required this.block});
@@ -38,11 +38,10 @@ class AssistantMessageSurface extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
               ],
-              MarkdownBody(
+              TranscriptMarkdownBody(
                 data: block.body.trim().isEmpty
                     ? '_Waiting for content…_'
                     : block.body,
-                selectable: true,
                 styleSheet: markdownStyle,
               ),
             ],

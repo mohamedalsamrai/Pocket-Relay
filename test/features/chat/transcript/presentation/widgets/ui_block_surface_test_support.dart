@@ -39,6 +39,7 @@ export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/t
 export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/session_status_surface.dart';
 export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/turn_boundary_marker.dart';
 export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/surfaces/user_input_result_surface.dart';
+export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_markdown_body.dart';
 export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/turn_elapsed_footer.dart';
 export 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/transcript_list.dart';
 export 'package:pocket_relay/src/features/chat/requests/presentation/pending_user_input_form_scope.dart';
