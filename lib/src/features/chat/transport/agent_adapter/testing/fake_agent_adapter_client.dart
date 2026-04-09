@@ -5,135 +5,97 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
 
+typedef FakeAgentAdapterForkThreadRequest = ({
+  String threadId,
+  String? path,
+  String? cwd,
+  String? model,
+  String? modelProvider,
+  bool? ephemeral,
+  bool persistExtendedHistory,
+});
+
+typedef FakeAgentAdapterStartSessionRequest = ({
+  String? cwd,
+  String? model,
+  AgentAdapterReasoningEffort? reasoningEffort,
+  String? resumeThreadId,
+});
+
+typedef FakeAgentAdapterRollbackThreadRequest = ({
+  String threadId,
+  int numTurns,
+});
+typedef FakeAgentAdapterListThreadsRequest = ({String? cursor, int? limit});
+typedef FakeAgentAdapterListModelsRequest = ({
+  String? cursor,
+  int? limit,
+  bool? includeHidden,
+});
+
+typedef FakeAgentAdapterSentTurn = ({
+  String threadId,
+  AgentAdapterTurnInput input,
+  String text,
+  String? model,
+  AgentAdapterReasoningEffort? effort,
+});
+
+typedef FakeAgentAdapterSteeredTurn = ({
+  String threadId,
+  String turnId,
+  AgentAdapterTurnInput input,
+  String text,
+});
+
+typedef FakeAgentAdapterAbortTurnCall = ({String? threadId, String? turnId});
+typedef FakeAgentAdapterApprovalDecision = ({String requestId, bool approved});
+typedef FakeAgentAdapterUserInputResponse = ({
+  String requestId,
+  Map<String, List<String>> answers,
+});
+
+typedef FakeAgentAdapterElicitationResponse = ({
+  String requestId,
+  AgentAdapterElicitationAction action,
+  Object? content,
+  Object? metadata,
+});
+
+typedef FakeAgentAdapterRejectedRequest = ({String requestId, String message});
+
+typedef FakeAgentAdapterDynamicToolResponse = ({
+  String requestId,
+  bool success,
+  List<Map<String, Object?>> contentItems,
+});
+
 /// Adapter-neutral fake for shared `AgentAdapterClient` tests.
 class FakeAgentAdapterClient implements AgentAdapterClient {
   final _eventsController = StreamController<AgentAdapterEvent>.broadcast();
 
   int connectCalls = 0;
   int startSessionCalls = 0;
-  final List<
-    ({
-      String threadId,
-      String? path,
-      String? cwd,
-      String? model,
-      String? modelProvider,
-      bool? ephemeral,
-      bool persistExtendedHistory,
-    })
-  >
-  forkThreadRequests =
-      <
-        ({
-          String threadId,
-          String? path,
-          String? cwd,
-          String? model,
-          String? modelProvider,
-          bool? ephemeral,
-          bool persistExtendedHistory,
-        })
-      >[];
-  final List<
-    ({
-      String? cwd,
-      String? model,
-      AgentAdapterReasoningEffort? reasoningEffort,
-      String? resumeThreadId,
-    })
-  >
-  startSessionRequests =
-      <
-        ({
-          String? cwd,
-          String? model,
-          AgentAdapterReasoningEffort? reasoningEffort,
-          String? resumeThreadId,
-        })
-      >[];
-  final List<String> readThreadCalls = <String>[];
-  final List<({String threadId, int numTurns})> rollbackThreadCalls =
-      <({String threadId, int numTurns})>[];
-  final List<({String? cursor, int? limit})> listThreadCalls =
-      <({String? cursor, int? limit})>[];
-  final List<({String? cursor, int? limit, bool? includeHidden})>
-  listModelCalls = <({String? cursor, int? limit, bool? includeHidden})>[];
-  final List<String> sentMessages = <String>[];
-  final List<
-    ({
-      String threadId,
-      AgentAdapterTurnInput input,
-      String text,
-      String? model,
-      AgentAdapterReasoningEffort? effort,
-    })
-  >
-  sentTurns =
-      <
-        ({
-          String threadId,
-          AgentAdapterTurnInput input,
-          String text,
-          String? model,
-          AgentAdapterReasoningEffort? effort,
-        })
-      >[];
-  final List<String> steeredMessages = <String>[];
-  final List<
-    ({String threadId, String turnId, AgentAdapterTurnInput input, String text})
-  >
-  steeredTurns =
-      <
-        ({
-          String threadId,
-          String turnId,
-          AgentAdapterTurnInput input,
-          String text,
-        })
-      >[];
-  final List<({String? threadId, String? turnId})> abortTurnCalls =
-      <({String? threadId, String? turnId})>[];
-  final List<({String requestId, bool approved})> approvalDecisions =
-      <({String requestId, bool approved})>[];
-  final List<({String requestId, Map<String, List<String>> answers})>
-  userInputResponses =
-      <({String requestId, Map<String, List<String>> answers})>[];
-  final List<
-    ({
-      String requestId,
-      AgentAdapterElicitationAction action,
-      Object? content,
-      Object? metadata,
-    })
-  >
-  elicitationResponses =
-      <
-        ({
-          String requestId,
-          AgentAdapterElicitationAction action,
-          Object? content,
-          Object? metadata,
-        })
-      >[];
-  final List<({String requestId, String message})> rejectedRequests =
-      <({String requestId, String message})>[];
-  final List<
-    ({String requestId, bool success, List<Map<String, Object?>> contentItems})
-  >
-  dynamicToolResponses =
-      <
-        ({
-          String requestId,
-          bool success,
-          List<Map<String, Object?>> contentItems,
-        })
-      >[];
-  final Map<String, String> pendingServerRequestMethodsById =
-      <String, String>{};
+  final List<FakeAgentAdapterForkThreadRequest> forkThreadRequests = [];
+  final List<FakeAgentAdapterStartSessionRequest> startSessionRequests = [];
+  final List<String> readThreadCalls = [];
+  final List<FakeAgentAdapterRollbackThreadRequest> rollbackThreadCalls = [];
+  final List<FakeAgentAdapterListThreadsRequest> listThreadCalls = [];
+  final List<FakeAgentAdapterListModelsRequest> listModelCalls = [];
+  final List<String> sentMessages = [];
+  final List<FakeAgentAdapterSentTurn> sentTurns = [];
+  final List<String> steeredMessages = [];
+  final List<FakeAgentAdapterSteeredTurn> steeredTurns = [];
+  final List<FakeAgentAdapterAbortTurnCall> abortTurnCalls = [];
+  final List<FakeAgentAdapterApprovalDecision> approvalDecisions = [];
+  final List<FakeAgentAdapterUserInputResponse> userInputResponses = [];
+  final List<FakeAgentAdapterElicitationResponse> elicitationResponses = [];
+  final List<FakeAgentAdapterRejectedRequest> rejectedRequests = [];
+  final List<FakeAgentAdapterDynamicToolResponse> dynamicToolResponses = [];
+  final Map<String, String> pendingServerRequestMethodsById = {};
   final Map<String, List<AgentAdapterEvent>>
-  resumeThreadReplayEventsByThreadId = <String, List<AgentAdapterEvent>>{};
-  final List<AgentAdapterEvent> connectEventsBeforeThrow =
-      <AgentAdapterEvent>[];
+  resumeThreadReplayEventsByThreadId = {};
+  final List<AgentAdapterEvent> connectEventsBeforeThrow = [];
   Object? connectError;
   Completer<void>? connectGate;
   Object? startSessionError;
@@ -149,23 +111,18 @@ class FakeAgentAdapterClient implements AgentAdapterClient {
   String? startSessionCwd;
   String? listModelsNextCursor;
   int? listModelsDefaultPageSize;
-  final List<AgentAdapterModelListPage> listedModelPages =
-      <AgentAdapterModelListPage>[];
+  final List<AgentAdapterModelListPage> listedModelPages = [];
   int disconnectCalls = 0;
   String? connectedThreadId;
   Completer<void>? sendUserMessageGate;
   Completer<void>? steerActiveTurnGate;
   Completer<void>? readThreadWithTurnsGate;
   Completer<void>? rollbackThreadGate;
-  final Map<String, Completer<void>> readThreadWithTurnsGatesByThreadId =
-      <String, Completer<void>>{};
-  final Map<String, AgentAdapterThreadSummary> threadsById =
-      <String, AgentAdapterThreadSummary>{};
-  final Map<String, AgentAdapterThreadHistory> threadHistoriesById =
-      <String, AgentAdapterThreadHistory>{};
-  final List<AgentAdapterThreadSummary> listedThreads =
-      <AgentAdapterThreadSummary>[];
-  final List<AgentAdapterModel> listedModels = <AgentAdapterModel>[];
+  final Map<String, Completer<void>> readThreadWithTurnsGatesByThreadId = {};
+  final Map<String, AgentAdapterThreadSummary> threadsById = {};
+  final Map<String, AgentAdapterThreadHistory> threadHistoriesById = {};
+  final List<AgentAdapterThreadSummary> listedThreads = [];
+  final List<AgentAdapterModel> listedModels = [];
 
   bool _isConnected = false;
   bool _isClosed = false;
@@ -332,19 +289,14 @@ class FakeAgentAdapterClient implements AgentAdapterClient {
   }) async {
     final configuredHistory = threadHistoriesById[threadId];
     final configuredThread = threadsById[threadId];
+    late final AgentAdapterThreadSummary summary;
     if (configuredHistory != null || configuredThread != null) {
       readThreadCalls.add(threadId);
-      await _awaitReadThreadWithTurnsGate(threadId);
-      if (readThreadWithTurnsError != null) {
-        throw readThreadWithTurnsError!;
-      }
-      if (configuredHistory != null) {
-        return configuredHistory;
-      }
-      return _threadHistoryFromConfiguredThread(configuredThread!);
+      summary = configuredHistory ?? configuredThread!;
+    } else {
+      summary = await readThread(threadId: threadId);
     }
 
-    final summary = await readThread(threadId: threadId);
     await _awaitReadThreadWithTurnsGate(threadId);
     if (readThreadWithTurnsError != null) {
       throw readThreadWithTurnsError!;
