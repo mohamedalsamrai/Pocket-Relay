@@ -14,7 +14,6 @@ void _registerWorkspaceLiveBinding(
   String connectionId,
   ConnectionLaneBinding binding,
 ) {
-  controller._unregisterLiveBinding(connectionId);
   void listener() {
     _syncWorkspaceTurnLivenessAssessment(controller, connectionId, binding);
     _syncWorkspaceRecoveredTransportState(controller, connectionId, binding);
@@ -31,10 +30,11 @@ void _registerWorkspaceLiveBinding(
     controller._scheduleRecoveryPersistence();
   }
 
-  controller._bindingRecoveryRegistrationsByConnectionId[connectionId] = (
+  controller._laneRoster.registerBinding(
+    connectionId: connectionId,
     binding: binding,
     listener: listener,
-    appServerEventSubscription: binding.agentAdapterClient.events.listen((
+    agentAdapterEventSubscription: binding.agentAdapterClient.events.listen((
       event,
     ) {
       switch (event) {
@@ -118,21 +118,11 @@ void _registerWorkspaceLiveBinding(
       }
     }),
   );
-  binding.sessionController.addListener(listener);
-  binding.composerDraftHost.addListener(listener);
 }
 
 void _unregisterWorkspaceLiveBinding(
   ConnectionWorkspaceController controller,
   String connectionId,
 ) {
-  final registration = controller._bindingRecoveryRegistrationsByConnectionId
-      .remove(connectionId);
-  if (registration == null) {
-    return;
-  }
-
-  registration.binding.sessionController.removeListener(registration.listener);
-  registration.binding.composerDraftHost.removeListener(registration.listener);
-  unawaited(registration.appServerEventSubscription.cancel());
+  controller._laneRoster.unregisterBinding(connectionId);
 }

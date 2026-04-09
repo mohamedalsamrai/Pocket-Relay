@@ -228,8 +228,7 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
   final (nextCatalog, nextSystemCatalog) = await _loadWorkspaceCatalogState(
     controller,
   );
-  final liveBinding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final liveBinding = controller._laneRoster.bindingFor(normalizedConnectionId);
   final shouldRequireReconnect =
       liveBinding == null ||
       liveBinding.sessionController.profile != profile ||

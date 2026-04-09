@@ -4,7 +4,7 @@ Future<void> _reconnectWorkspaceConnection(
   ConnectionWorkspaceController controller,
   String connectionId,
 ) async {
-  final previousBinding = controller._liveBindingsByConnectionId[connectionId];
+  final previousBinding = controller._laneRoster.bindingFor(connectionId);
   if (previousBinding == null) {
     return;
   }
@@ -59,7 +59,7 @@ Future<void> _reconnectWorkspaceConnection(
     return;
   }
 
-  controller._liveBindingsByConnectionId[connectionId] = nextBinding;
+  controller._laneRoster.putBinding(connectionId, nextBinding);
   controller._unregisterLiveBinding(connectionId);
   controller._registerLiveBinding(connectionId, nextBinding);
   previousBinding.dispose();

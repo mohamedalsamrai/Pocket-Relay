@@ -22,6 +22,7 @@ import 'package:pocket_relay/src/features/workspace/application/connection_lifec
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_lane_roster_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_recovery_persistence_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_remote_runtime_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
@@ -129,25 +130,8 @@ class ConnectionWorkspaceController extends ChangeNotifier
   late final WorkspaceRecoveryPersistenceController
   _recoveryPersistenceController;
   final WorkspaceNow _now;
-  final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
-      <String, ConnectionLaneBinding>{};
-  final Map<
-    String,
-    ({
-      ConnectionLaneBinding binding,
-      VoidCallback listener,
-      StreamSubscription<AgentAdapterEvent> appServerEventSubscription,
-    })
-  >
-  _bindingRecoveryRegistrationsByConnectionId =
-      <
-        String,
-        ({
-          ConnectionLaneBinding binding,
-          VoidCallback listener,
-          StreamSubscription<AgentAdapterEvent> appServerEventSubscription,
-        })
-      >{};
+  final WorkspaceLaneRosterController _laneRoster =
+      WorkspaceLaneRosterController();
   final Set<String> _intentionalTransportDisconnectConnectionIds = <String>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
@@ -185,15 +169,11 @@ class ConnectionWorkspaceController extends ChangeNotifier
   }
 
   ConnectionLaneBinding? get selectedLaneBinding {
-    final selectedConnectionId = _state.selectedConnectionId;
-    if (selectedConnectionId == null) {
-      return null;
-    }
-    return _liveBindingsByConnectionId[selectedConnectionId];
+    return _laneRoster.selectedBinding(_state);
   }
 
   ConnectionLaneBinding? bindingForConnectionId(String connectionId) {
-    return _liveBindingsByConnectionId[connectionId];
+    return _laneRoster.bindingFor(connectionId);
   }
 
   Future<void> initialize() {
@@ -360,11 +340,9 @@ class ConnectionWorkspaceController extends ChangeNotifier
     _isDisposed = true;
     unawaited(finalRecoveryPersistence);
 
-    final liveBindingEntries = _liveBindingsByConnectionId.entries.toList();
-    _liveBindingsByConnectionId.clear();
-    for (final entry in liveBindingEntries) {
-      _unregisterLiveBinding(entry.key);
-      entry.value.dispose();
+    final liveBindings = _laneRoster.detachAllBindings();
+    for (final binding in liveBindings) {
+      binding.dispose();
     }
     super.dispose();
   }
