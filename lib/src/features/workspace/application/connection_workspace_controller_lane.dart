@@ -27,8 +27,9 @@ Future<void> _disconnectWorkspaceConnection(
 ) async {
   final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
   await controller.initialize();
-  final binding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final binding = controller._liveBindingRegistry.bindingFor(
+    normalizedConnectionId,
+  );
   if (binding == null ||
       binding.sessionController.sessionState.isBusy ||
       !binding.agentAdapterClient.isConnected) {
@@ -136,21 +137,22 @@ void _terminateWorkspaceConnection(
   String connectionId,
 ) {
   final normalizedConnectionId = connectionId.trim();
-  final binding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final binding = controller._liveBindingRegistry.bindingFor(
+    normalizedConnectionId,
+  );
   if (binding == null) {
     return;
   }
   if (binding.sessionController.sessionState.isBusy) {
     return;
   }
-  controller._liveBindingsByConnectionId.remove(normalizedConnectionId);
+  controller._liveBindingRegistry.removeBinding(normalizedConnectionId);
 
   final currentLiveConnectionIds = controller._state.liveConnectionIds;
   final removalIndex = currentLiveConnectionIds.indexOf(normalizedConnectionId);
   final nextLiveConnectionIds = _orderWorkspaceLiveConnectionIds(
     controller,
-    controller._liveBindingsByConnectionId.keys,
+    controller._liveBindingRegistry.connectionIds,
   );
   final nextSelectedConnectionId =
       _nextSelectedWorkspaceConnectionIdAfterTermination(

@@ -11,7 +11,9 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
     return null;
   }
 
-  final binding = controller._liveBindingsByConnectionId[selectedConnectionId];
+  final binding = controller._liveBindingRegistry.bindingFor(
+    selectedConnectionId,
+  );
   if (binding == null) {
     return null;
   }

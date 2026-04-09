@@ -6,8 +6,9 @@ Future<void> _resumeWorkspaceConversation(
   required String threadId,
 }) async {
   if (controller._state.isConnectionLive(connectionId)) {
-    final previousBinding =
-        controller._liveBindingsByConnectionId[connectionId];
+    final previousBinding = controller._liveBindingRegistry.bindingFor(
+      connectionId,
+    );
     if (previousBinding == null) {
       return;
     }
@@ -25,7 +26,7 @@ Future<void> _resumeWorkspaceConversation(
       nextBinding.dispose();
       return;
     }
-    controller._liveBindingsByConnectionId[connectionId] = nextBinding;
+    controller._liveBindingRegistry.putBinding(connectionId, nextBinding);
     controller._unregisterLiveBinding(connectionId);
     controller._registerLiveBinding(connectionId, nextBinding);
     final didNotifyStateChange = controller._applyState(
@@ -127,7 +128,7 @@ Future<void> _resumeWorkspaceConversation(
     return;
   }
 
-  final binding = controller._liveBindingsByConnectionId[connectionId];
+  final binding = controller._liveBindingRegistry.bindingFor(connectionId);
   if (binding == null) {
     return;
   }

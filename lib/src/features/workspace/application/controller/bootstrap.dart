@@ -59,7 +59,7 @@ Future<void> _initializeWorkspaceController(
     return;
   }
 
-  controller._liveBindingsByConnectionId[firstConnectionId] = firstBinding;
+  controller._liveBindingRegistry.putBinding(firstConnectionId, firstBinding);
   controller._registerLiveBinding(firstConnectionId, firstBinding);
   controller._applyState(
     ConnectionWorkspaceState(
@@ -122,11 +122,11 @@ Future<void> _instantiateWorkspaceConnection(
     binding.dispose();
     return;
   }
-  controller._liveBindingsByConnectionId[connectionId] = binding;
+  controller._liveBindingRegistry.putBinding(connectionId, binding);
   controller._registerLiveBinding(connectionId, binding);
   final nextLiveConnectionIds = _orderWorkspaceLiveConnectionIds(
     controller,
-    controller._liveBindingsByConnectionId.keys,
+    controller._liveBindingRegistry.connectionIds,
   );
   controller._applyState(
     controller._state.copyWith(

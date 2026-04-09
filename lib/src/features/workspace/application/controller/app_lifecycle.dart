@@ -69,8 +69,9 @@ Future<void> _handleWorkspaceAppLifecycleState(
         occurredAt: resumedAt,
       );
       if (!controller._state.requiresTransportReconnect(selectedConnectionId)) {
-        final binding =
-            controller._liveBindingsByConnectionId[selectedConnectionId];
+        final binding = controller._liveBindingRegistry.bindingFor(
+          selectedConnectionId,
+        );
         if (binding == null || binding.sessionController.sessionState.isBusy) {
           return;
         }
@@ -82,8 +83,9 @@ Future<void> _handleWorkspaceAppLifecycleState(
         return;
       }
 
-      final binding =
-          controller._liveBindingsByConnectionId[selectedConnectionId];
+      final binding = controller._liveBindingRegistry.bindingFor(
+        selectedConnectionId,
+      );
       if (binding == null || binding.sessionController.sessionState.isBusy) {
         return;
       }
@@ -200,7 +202,9 @@ bool _canRestoreWorkspaceConversationAfterResume(
     return false;
   }
 
-  final currentBinding = controller._liveBindingsByConnectionId[connectionId];
+  final currentBinding = controller._liveBindingRegistry.bindingFor(
+    connectionId,
+  );
   if (!identical(currentBinding, binding) ||
       currentBinding == null ||
       currentBinding.sessionController.sessionState.isBusy ||
