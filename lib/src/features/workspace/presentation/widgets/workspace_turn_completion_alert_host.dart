@@ -7,12 +7,12 @@ import 'package:pocket_relay/src/features/chat/lane/application/chat_session_con
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_live_session_tracker.dart';
-import 'package:pocket_relay/src/features/workspace/application/workspace_turn_activity.dart';
 
 class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   const WorkspaceTurnCompletionAlertHost({
     super.key,
     required this.workspaceController,
+    required this.hasActiveTurn,
     required this.onWarningChanged,
     required this.child,
     this.turnCompletionAlertController =
@@ -25,6 +25,7 @@ class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   });
 
   final ConnectionWorkspaceController workspaceController;
+  final bool hasActiveTurn;
   final WorkspaceDeviceContinuityWarningChanged onWarningChanged;
   final Widget child;
   final TurnCompletionAlertController turnCompletionAlertController;
@@ -82,7 +83,7 @@ class _WorkspaceTurnCompletionAlertHostState
   Widget build(BuildContext context) {
     return TurnCompletionAlertHost(
       completionAlerts: _completionAlertsController.stream,
-      hasActiveTurn: _hasActiveTurnAcrossLiveLanes(),
+      hasActiveTurn: widget.hasActiveTurn,
       turnCompletionAlertController: widget.turnCompletionAlertController,
       notificationPermissionController: widget.notificationPermissionController,
       supportsForegroundSignal: widget.supportsForegroundSignal,
@@ -176,11 +177,5 @@ class _WorkspaceTurnCompletionAlertHostState
       return 'Return to Pocket Relay to review the latest response.';
     }
     return '$label is ready to review.';
-  }
-
-  bool _hasActiveTurnAcrossLiveLanes() {
-    return workspaceSessionControllersHaveContinuityActiveTurn(
-      _liveSessions.sessionControllers,
-    );
   }
 }

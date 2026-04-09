@@ -10,6 +10,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_completion_alert_host.dart';
 
 void main() {
@@ -32,17 +33,23 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: WorkspaceTurnCompletionAlertHost(
+          home: WorkspaceTurnActivityBuilder(
             workspaceController: controller,
-            onWarningChanged: _warningSink(
-              controller,
-              WorkspaceDeviceContinuityWarningTarget.turnCompletionAlert,
-            ),
-            turnCompletionAlertController: alertController,
-            notificationPermissionController: permissionController,
-            supportsForegroundSignal: true,
-            supportsBackgroundAlerts: true,
-            child: const SizedBox(),
+            builder: (context, hasActiveTurn) {
+              return WorkspaceTurnCompletionAlertHost(
+                workspaceController: controller,
+                hasActiveTurn: hasActiveTurn,
+                onWarningChanged: _warningSink(
+                  controller,
+                  WorkspaceDeviceContinuityWarningTarget.turnCompletionAlert,
+                ),
+                turnCompletionAlertController: alertController,
+                notificationPermissionController: permissionController,
+                supportsForegroundSignal: true,
+                supportsBackgroundAlerts: true,
+                child: const SizedBox(),
+              );
+            },
           ),
         ),
       );

@@ -7,6 +7,7 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_background_grace_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_foreground_service_host.dart';
@@ -43,52 +44,59 @@ class WorkspaceContinuityHost extends StatelessWidget {
       sink: workspaceController,
     );
 
-    return WorkspaceTurnForegroundServiceHost(
+    return WorkspaceTurnActivityBuilder(
       workspaceController: workspaceController,
-      onWarningChanged: warningCallbacks.foregroundService,
-      foregroundServiceController:
-          foregroundServiceController ??
-          const MethodChannelForegroundServiceController(),
-      notificationPermissionController:
-          resolvedNotificationPermissionController,
-      supportsForegroundService:
-          platformPolicy.supportsActiveTurnForegroundService,
-      child: WorkspaceTurnBackgroundGraceHost(
-        workspaceController: workspaceController,
-        onWarningChanged: warningCallbacks.backgroundGrace,
-        backgroundGraceController:
-            backgroundGraceController ??
-            const MethodChannelBackgroundGraceController(),
-        supportsBackgroundGrace: platformPolicy.supportsFiniteBackgroundGrace,
-        child: WorkspaceAppLifecycleHost(
-          workspaceController: workspaceController,
-          child: WorkspaceTurnCompletionAlertHost(
-            workspaceController: workspaceController,
-            onWarningChanged: warningCallbacks.turnCompletionAlert,
-            turnCompletionAlertController:
-                turnCompletionAlertController ??
-                const PlatformTurnCompletionAlertController(),
-            notificationPermissionController:
-                resolvedNotificationPermissionController,
-            supportsForegroundSignal:
-                platformPolicy.supportsForegroundTurnCompletionSignal,
-            supportsBackgroundAlerts:
-                platformPolicy.supportsBackgroundTurnCompletionAlerts,
-            requestNotificationPermissionWhileForegrounded:
-                platformPolicy.supportsBackgroundTurnCompletionAlerts &&
-                !platformPolicy.supportsActiveTurnForegroundService,
-            child: WorkspaceTurnWakeLockHost(
+      builder: (context, hasActiveTurn) {
+        return WorkspaceTurnForegroundServiceHost(
+          hasActiveTurn: hasActiveTurn,
+          onWarningChanged: warningCallbacks.foregroundService,
+          foregroundServiceController:
+              foregroundServiceController ??
+              const MethodChannelForegroundServiceController(),
+          notificationPermissionController:
+              resolvedNotificationPermissionController,
+          supportsForegroundService:
+              platformPolicy.supportsActiveTurnForegroundService,
+          child: WorkspaceTurnBackgroundGraceHost(
+            hasActiveTurn: hasActiveTurn,
+            onWarningChanged: warningCallbacks.backgroundGrace,
+            backgroundGraceController:
+                backgroundGraceController ??
+                const MethodChannelBackgroundGraceController(),
+            supportsBackgroundGrace:
+                platformPolicy.supportsFiniteBackgroundGrace,
+            child: WorkspaceAppLifecycleHost(
               workspaceController: workspaceController,
-              onWarningChanged: warningCallbacks.wakeLock,
-              displayWakeLockController:
-                  displayWakeLockController ??
-                  const WakelockPlusDisplayWakeLockController(),
-              supportsWakeLock: platformPolicy.supportsWakeLock,
-              child: child,
+              child: WorkspaceTurnCompletionAlertHost(
+                workspaceController: workspaceController,
+                hasActiveTurn: hasActiveTurn,
+                onWarningChanged: warningCallbacks.turnCompletionAlert,
+                turnCompletionAlertController:
+                    turnCompletionAlertController ??
+                    const PlatformTurnCompletionAlertController(),
+                notificationPermissionController:
+                    resolvedNotificationPermissionController,
+                supportsForegroundSignal:
+                    platformPolicy.supportsForegroundTurnCompletionSignal,
+                supportsBackgroundAlerts:
+                    platformPolicy.supportsBackgroundTurnCompletionAlerts,
+                requestNotificationPermissionWhileForegrounded:
+                    platformPolicy.supportsBackgroundTurnCompletionAlerts &&
+                    !platformPolicy.supportsActiveTurnForegroundService,
+                child: WorkspaceTurnWakeLockHost(
+                  hasActiveTurn: hasActiveTurn,
+                  onWarningChanged: warningCallbacks.wakeLock,
+                  displayWakeLockController:
+                      displayWakeLockController ??
+                      const WakelockPlusDisplayWakeLockController(),
+                  supportsWakeLock: platformPolicy.supportsWakeLock,
+                  child: child,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
