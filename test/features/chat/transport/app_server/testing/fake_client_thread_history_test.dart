@@ -14,51 +14,85 @@ void main() {
 
     expect(summary, isNotNull);
     expect(summary.id, 'thread_widgetbook');
+    expect(summary.sourceKind, 'app-server');
     expect(history, isNotNull);
     expect(history.id, 'thread_widgetbook');
+    expect(history.sourceKind, 'app-server');
     expect(history.turns, isEmpty);
   });
 
-  test('preserves turns when a configured thread is already a history object', () async {
+  test(
+    'preserves turns when a configured thread is already a history object',
+    () async {
+      final client = FakeCodexAppServerClient();
+      client.threadsById['thread_saved'] = const CodexAppServerThreadHistory(
+        id: 'thread_saved',
+        turns: <CodexAppServerHistoryTurn>[
+          CodexAppServerHistoryTurn(id: 'turn_saved', raw: <String, Object?>{}),
+        ],
+      );
+
+      final history = await client.readThreadWithTurns(
+        threadId: 'thread_saved',
+      );
+
+      expect(history.turns, hasLength(1));
+      expect(history.turns.single.id, 'turn_saved');
+    },
+  );
+
+  test(
+    'converts generic history turns when restoring configured thread history',
+    () async {
+      final client = FakeCodexAppServerClient();
+      client.threadsById['thread_generic'] = const AgentAdapterThreadHistory(
+        id: 'thread_generic',
+        turns: <AgentAdapterHistoryTurn>[
+          AgentAdapterHistoryTurn(
+            id: 'turn_generic',
+            items: <AgentAdapterHistoryItem>[
+              AgentAdapterHistoryItem(
+                id: 'item_generic',
+                type: 'agent_message',
+                status: 'completed',
+                raw: <String, dynamic>{'text': 'Generic restore'},
+              ),
+            ],
+            raw: <String, dynamic>{'id': 'turn_generic'},
+          ),
+        ],
+      );
+
+      final history = await client.readThreadWithTurns(
+        threadId: 'thread_generic',
+      );
+
+      expect(history.turns, hasLength(1));
+      expect(history.turns.single.id, 'turn_generic');
+      expect(history.turns.single.items, hasLength(1));
+      expect(history.turns.single.items.single.id, 'item_generic');
+    },
+  );
+
+  test('keeps Codex request-method validation in the Codex fake', () async {
     final client = FakeCodexAppServerClient();
-    client.threadsById['thread_saved'] = const CodexAppServerThreadHistory(
-      id: 'thread_saved',
-      turns: <CodexAppServerHistoryTurn>[
-        CodexAppServerHistoryTurn(id: 'turn_saved', raw: <String, Object?>{}),
-      ],
+    client.emit(
+      const CodexAppServerRequestEvent(
+        requestId: 'req_input',
+        method: 'item/tool/requestUserInput',
+        params: <String, Object?>{'kind': 'confirm'},
+      ),
     );
 
-    final history = await client.readThreadWithTurns(threadId: 'thread_saved');
-
-    expect(history.turns, hasLength(1));
-    expect(history.turns.single.id, 'turn_saved');
-  });
-
-  test('converts generic history turns when restoring configured thread history', () async {
-    final client = FakeCodexAppServerClient();
-    client.threadsById['thread_generic'] = const AgentAdapterThreadHistory(
-      id: 'thread_generic',
-      turns: <AgentAdapterHistoryTurn>[
-        AgentAdapterHistoryTurn(
-          id: 'turn_generic',
-          items: <AgentAdapterHistoryItem>[
-            AgentAdapterHistoryItem(
-              id: 'item_generic',
-              type: 'agent_message',
-              status: 'completed',
-              raw: <String, dynamic>{'text': 'Generic restore'},
-            ),
-          ],
-          raw: <String, dynamic>{'id': 'turn_generic'},
+    await expectLater(
+      client.resolveApproval(requestId: 'req_input', approved: true),
+      throwsA(
+        isA<CodexAppServerException>().having(
+          (error) => error.message,
+          'message',
+          contains('not a compatible pending server request'),
         ),
-      ],
+      ),
     );
-
-    final history = await client.readThreadWithTurns(threadId: 'thread_generic');
-
-    expect(history.turns, hasLength(1));
-    expect(history.turns.single.id, 'turn_generic');
-    expect(history.turns.single.items, hasLength(1));
-    expect(history.turns.single.items.single.id, 'item_generic');
   });
 }

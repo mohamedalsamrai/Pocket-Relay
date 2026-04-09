@@ -8,8 +8,8 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_profile_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
+import 'package:pocket_relay/src/features/chat/transport/agent_adapter/testing/fake_agent_adapter_client.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_changed_files_contract.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_work_log_terminal_contract.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_root_adapter.dart';
@@ -557,7 +557,7 @@ class CountingChatScreenPresenter extends ChatScreenPresenter {
 }
 
 void completeActiveTurn(
-  FakeCodexAppServerClient appServerClient, {
+  FakeAgentAdapterClient appServerClient, {
   String turnId = 'turn_1',
 }) {
   appServerClient.emit(
