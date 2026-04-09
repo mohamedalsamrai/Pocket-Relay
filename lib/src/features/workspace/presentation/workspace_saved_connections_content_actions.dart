@@ -98,12 +98,14 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     });
 
     try {
+      final capabilityAssets =
+          widget.workspaceController.connectionCapabilityAssets;
       final [
         availableModelCatalogObject,
         availableSystemTemplatesObject,
       ] = await Future.wait<Object?>(<Future<Object?>>[
-        widget.workspaceController.loadLastKnownConnectionModelCatalog(),
-        widget.workspaceController.loadReusableSystemTemplates(),
+        capabilityAssets.loadLastKnownConnectionModelCatalog(),
+        capabilityAssets.loadReusableSystemTemplates(),
       ]);
       final availableModelCatalog =
           availableModelCatalogObject as ConnectionModelCatalog?;
@@ -150,6 +152,8 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
     });
 
     try {
+      final capabilityAssets =
+          widget.workspaceController.connectionCapabilityAssets;
       final [
         savedConnectionObject,
         cachedModelCatalogObject,
@@ -157,9 +161,9 @@ extension on _ConnectionWorkspaceSavedConnectionsContentState {
         availableSystemTemplatesObject,
       ] = await Future.wait<Object?>(<Future<Object?>>[
         widget.workspaceController.loadSavedConnection(connectionId),
-        widget.workspaceController.loadConnectionModelCatalog(connectionId),
-        widget.workspaceController.loadLastKnownConnectionModelCatalog(),
-        widget.workspaceController.loadReusableSystemTemplates(),
+        capabilityAssets.loadConnectionModelCatalog(connectionId),
+        capabilityAssets.loadLastKnownConnectionModelCatalog(),
+        capabilityAssets.loadReusableSystemTemplates(),
       ]);
       final savedConnection = savedConnectionObject as SavedConnection;
       final cachedModelCatalog =

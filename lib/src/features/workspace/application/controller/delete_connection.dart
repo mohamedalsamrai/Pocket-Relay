@@ -5,7 +5,9 @@ Future<void> _deleteWorkspaceSavedConnectionImpl(
   String connectionId,
 ) async {
   await controller._connectionRepository.deleteConnection(connectionId);
-  await controller._modelCatalogStore.delete(connectionId);
+  await controller._connectionCapabilityAssets.deleteConnectionModelCatalog(
+    connectionId,
+  );
   controller._remoteRuntimeRefreshGenerationByConnectionId.remove(connectionId);
   final (nextCatalog, nextSystemCatalog) = await _loadWorkspaceCatalogState(
     controller,

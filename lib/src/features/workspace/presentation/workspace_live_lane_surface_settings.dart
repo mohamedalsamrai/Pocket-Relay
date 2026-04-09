@@ -16,6 +16,7 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
     final settingsOverlayDelegate = widget.settingsOverlayDelegate;
     final platformPolicy = widget.platformPolicy;
     final connectionId = laneBinding.connectionId;
+    final capabilityAssets = workspaceController.connectionCapabilityAssets;
 
     _setOpeningConnectionSettings(true);
 
@@ -28,11 +29,11 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
         connectionId: connectionId,
       );
       final availableModelCatalogFuture = _resolveAvailableModelCatalog(
-        workspaceController: workspaceController,
+        capabilityAssets: capabilityAssets,
         connectionId: connectionId,
         preferConnectionCatalog: shouldPreferCachedModelCatalog,
       );
-      final availableSystemTemplatesFuture = workspaceController
+      final availableSystemTemplatesFuture = capabilityAssets
           .loadReusableSystemTemplates();
       final initialSettings = await initialSettingsFuture;
       final availableModelCatalog = await availableModelCatalogFuture;
@@ -163,12 +164,12 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
 
   Future<(ConnectionModelCatalog?, ConnectionSettingsModelCatalogSource?)>
   _resolveAvailableModelCatalog({
-    required ConnectionWorkspaceController workspaceController,
+    required ConnectionCapabilityAssets capabilityAssets,
     required String connectionId,
     required bool preferConnectionCatalog,
   }) async {
     final connectionCatalog = await _loadCachedModelCatalog(
-      workspaceController: workspaceController,
+      capabilityAssets: capabilityAssets,
       connectionId: connectionId,
     );
     if (connectionCatalog != null || preferConnectionCatalog) {
@@ -181,7 +182,7 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
     }
 
     final lastKnownCatalog = await _loadLastKnownModelCatalog(
-      workspaceController: workspaceController,
+      capabilityAssets: capabilityAssets,
     );
     return (
       lastKnownCatalog,
@@ -192,21 +193,21 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
   }
 
   Future<ConnectionModelCatalog?> _loadCachedModelCatalog({
-    required ConnectionWorkspaceController workspaceController,
+    required ConnectionCapabilityAssets capabilityAssets,
     required String connectionId,
   }) async {
     try {
-      return await workspaceController.loadConnectionModelCatalog(connectionId);
+      return await capabilityAssets.loadConnectionModelCatalog(connectionId);
     } catch (_) {
       return null;
     }
   }
 
   Future<ConnectionModelCatalog?> _loadLastKnownModelCatalog({
-    required ConnectionWorkspaceController workspaceController,
+    required ConnectionCapabilityAssets capabilityAssets,
   }) async {
     try {
-      return await workspaceController.loadLastKnownConnectionModelCatalog();
+      return await capabilityAssets.loadLastKnownConnectionModelCatalog();
     } catch (_) {
       return null;
     }
@@ -263,15 +264,16 @@ extension on _ConnectionWorkspaceLiveLaneSurfaceState {
       fetchedAt: DateTime.now().toUtc(),
       models: models,
     );
+    final capabilityAssets = workspaceController.connectionCapabilityAssets;
     Object? connectionCacheSaveError;
     try {
-      await workspaceController.saveConnectionModelCatalog(catalog);
+      await capabilityAssets.saveConnectionModelCatalog(catalog);
     } catch (error) {
       connectionCacheSaveError = error;
     }
     Object? lastKnownCacheSaveError;
     try {
-      await workspaceController.saveLastKnownConnectionModelCatalog(catalog);
+      await capabilityAssets.saveLastKnownConnectionModelCatalog(catalog);
     } catch (error) {
       lastKnownCacheSaveError = error;
     }
