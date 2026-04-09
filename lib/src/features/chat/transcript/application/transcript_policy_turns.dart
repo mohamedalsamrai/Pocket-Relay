@@ -175,13 +175,15 @@ TranscriptSessionState _applyTurnAbortedImpl(
   TranscriptSessionState state,
   TranscriptRuntimeTurnAbortedEvent event,
 ) {
-  if (_hasMismatchedActiveTurnImpl(state, event.turnId)) {
+  final activeTurn = state.activeTurn;
+  if (activeTurn == null ||
+      (event.turnId != null && activeTurn.turnId != event.turnId)) {
     return state;
   }
 
   final finalizedTurn = _finalizeCommittedTurnImpl(
     policy,
-    state.activeTurn,
+    activeTurn,
     event.createdAt,
   );
   return policy._support.appendBlock(

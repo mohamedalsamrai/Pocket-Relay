@@ -151,4 +151,99 @@ void main() {
       );
     },
   );
+
+  test(
+    'stopActiveTurn clears streaming assistant state without waiting for abort notification',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
+
+      final controller = ChatSessionController(
+        profileStore: MemoryCodexProfileStore(
+          initialValue: SavedProfile(
+            profile: configuredProfile(),
+            secrets: const ConnectionSecrets(password: 'secret'),
+          ),
+        ),
+        appServerClient: appServerClient,
+        initialSavedProfile: SavedProfile(
+          profile: configuredProfile(),
+          secrets: const ConnectionSecrets(password: 'secret'),
+        ),
+      );
+      addTearDown(controller.dispose);
+
+      expect(await controller.sendPrompt('Start streaming'), isTrue);
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/started',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'item': <String, Object?>{
+              'id': 'item_1',
+              'type': 'agentMessage',
+              'status': 'inProgress',
+            },
+          },
+        ),
+      );
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'item/agentMessage/delta',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'itemId': 'item_1',
+            'delta': 'Partial answer',
+          },
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final streamingAssistant = controller.transcriptBlocks
+          .whereType<TranscriptTextBlock>()
+          .singleWhere(
+            (block) => block.kind == TranscriptUiBlockKind.assistantMessage,
+          );
+      expect(streamingAssistant.isRunning, isTrue);
+
+      await controller.stopActiveTurn();
+
+      expect(
+        appServerClient.abortTurnCalls,
+        <({String? threadId, String? turnId})>[
+          (threadId: 'thread_123', turnId: 'turn_1'),
+        ],
+      );
+      final settledAssistant = controller.transcriptBlocks
+          .whereType<TranscriptTextBlock>()
+          .singleWhere(
+            (block) => block.kind == TranscriptUiBlockKind.assistantMessage,
+          );
+      expect(settledAssistant.body, 'Partial answer');
+      expect(settledAssistant.isRunning, isFalse);
+      expect(
+        controller.transcriptBlocks.whereType<TranscriptStatusBlock>(),
+        hasLength(1),
+      );
+
+      appServerClient.emit(
+        const CodexAppServerNotificationEvent(
+          method: 'turn/aborted',
+          params: <String, Object?>{
+            'threadId': 'thread_123',
+            'turnId': 'turn_1',
+            'reason': 'Turn aborted.',
+          },
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.transcriptBlocks.whereType<TranscriptStatusBlock>(),
+        hasLength(1),
+      );
+    },
+  );
 }
