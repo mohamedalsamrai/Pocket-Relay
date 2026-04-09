@@ -16,13 +16,19 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
     return null;
   }
 
+  final diagnostics = controller._state.recoveryDiagnosticsFor(
+    selectedConnectionId,
+  );
+
   var selectedThreadId = _normalizedWorkspaceThreadId(
     binding.sessionController.sessionState.currentThreadId ??
         binding.sessionController.sessionState.rootThreadId ??
         binding.sessionController.historicalConversationRestoreState?.threadId,
   );
   if (selectedThreadId == null &&
-      controller._state.requiresTransportReconnect(selectedConnectionId)) {
+      controller._state.requiresTransportReconnect(selectedConnectionId) &&
+      diagnostics?.lastRecoveryOrigin ==
+          ConnectionWorkspaceRecoveryOrigin.coldStart) {
     final latestRecoverySnapshot =
         controller._recoveryPersistenceController.latestSnapshot;
     selectedThreadId = _normalizedWorkspaceThreadId(
@@ -31,9 +37,6 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
           : null,
     );
   }
-  final diagnostics = controller._state.recoveryDiagnosticsFor(
-    selectedConnectionId,
-  );
 
   return ConnectionWorkspaceRecoveryState(
     connectionId: selectedConnectionId,
