@@ -46,6 +46,7 @@ class BackgroundGraceHost extends StatefulWidget {
     this.backgroundGraceController =
         const MethodChannelBackgroundGraceController(),
     this.supportsBackgroundGrace,
+    this.appLifecycleVisibilityListenable,
     this.onWarningChanged,
   });
 
@@ -53,6 +54,8 @@ class BackgroundGraceHost extends StatefulWidget {
   final bool keepBackgroundGraceAlive;
   final BackgroundGraceController backgroundGraceController;
   final bool? supportsBackgroundGrace;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
   final ValueChanged<PocketUserFacingError?>? onWarningChanged;
 
   @override
@@ -60,8 +63,9 @@ class BackgroundGraceHost extends StatefulWidget {
 }
 
 class _BackgroundGraceHostState extends State<BackgroundGraceHost>
-    with WidgetsBindingObserver {
-  AppLifecycleState? _appLifecycleState;
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<BackgroundGraceHost> {
   bool _requestedBackgroundGraceEnabled = false;
 
   bool get _supportsBackgroundGrace {
@@ -71,20 +75,32 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   bool get _shouldEnableBackgroundGrace {
     return _supportsBackgroundGrace &&
         widget.keepBackgroundGraceAlive &&
-        appLifecycleStateIsNotForegroundVisible(_appLifecycleState);
+        _appLifecycleVisibility.isNotForegroundVisible;
+  }
+
+  AppLifecycleVisibility get _appLifecycleVisibility {
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    initAppLifecycleVisibilityObserver();
     _syncBackgroundGrace();
   }
 
   @override
   void didUpdateWidget(covariant BackgroundGraceHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    syncAppLifecycleVisibilityObserver(
+      oldWidget.appLifecycleVisibilityListenable,
+    );
     if (oldWidget.backgroundGraceController !=
             widget.backgroundGraceController &&
         _requestedBackgroundGraceEnabled) {
@@ -95,14 +111,8 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-    _syncBackgroundGrace();
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    disposeAppLifecycleVisibilityObserver();
     _setWarning(null);
     if (_requestedBackgroundGraceEnabled) {
       _requestedBackgroundGraceEnabled = false;
@@ -113,6 +123,11 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
 
   @override
   Widget build(BuildContext context) => widget.child;
+
+  @override
+  void handleAppLifecycleVisibilityChanged() {
+    _syncBackgroundGrace();
+  }
 
   void _syncBackgroundGrace() {
     final shouldEnableBackgroundGrace = _shouldEnableBackgroundGrace;

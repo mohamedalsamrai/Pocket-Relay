@@ -86,6 +86,7 @@ class TurnCompletionAlertHost extends StatefulWidget {
     this.supportsForegroundSignal,
     this.supportsBackgroundAlerts,
     this.requestNotificationPermissionWhileForegrounded = false,
+    this.appLifecycleVisibilityListenable,
     this.onWarningChanged,
   });
 
@@ -97,6 +98,8 @@ class TurnCompletionAlertHost extends StatefulWidget {
   final bool? supportsForegroundSignal;
   final bool? supportsBackgroundAlerts;
   final bool requestNotificationPermissionWhileForegrounded;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
   final ValueChanged<PocketUserFacingError?>? onWarningChanged;
 
   @override
@@ -105,11 +108,12 @@ class TurnCompletionAlertHost extends StatefulWidget {
 }
 
 class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
-    with WidgetsBindingObserver {
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<TurnCompletionAlertHost> {
   final Set<String> _handledAlertIds = <String>{};
   final Queue<String> _handledAlertIdOrder = Queue<String>();
   StreamSubscription<TurnCompletionAlertRequest>? _completionAlertsSubscription;
-  AppLifecycleState? _appLifecycleState;
   bool _showsBackgroundAlert = false;
   bool _isRequestingNotificationPermission = false;
   bool _notificationPermissionDeniedForCurrentForegroundSession = false;
@@ -128,14 +132,23 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   bool get _isForeground {
-    return appLifecycleStateIsForegroundVisible(_appLifecycleState);
+    return _appLifecycleVisibility.isForegroundVisible;
+  }
+
+  AppLifecycleVisibility get _appLifecycleVisibility {
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    initAppLifecycleVisibilityObserver();
     _subscribeToCompletionAlerts();
     _syncCompletionAlertState();
   }
@@ -143,6 +156,9 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   @override
   void didUpdateWidget(covariant TurnCompletionAlertHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    syncAppLifecycleVisibilityObserver(
+      oldWidget.appLifecycleVisibilityListenable,
+    );
     if (oldWidget.completionAlerts != widget.completionAlerts) {
       unawaited(
         _completionAlertsSubscription?.cancel() ?? Future<void>.value(),
@@ -162,18 +178,8 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-    if (appLifecycleStateIsForegroundVisible(state) &&
-        _notificationPermissionDeniedForCurrentForegroundSession) {
-      _notificationPermissionDeniedForCurrentForegroundSession = false;
-    }
-    _syncCompletionAlertState();
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    disposeAppLifecycleVisibilityObserver();
     unawaited(_completionAlertsSubscription?.cancel() ?? Future<void>.value());
     _setWarning(null);
     super.dispose();
@@ -181,6 +187,22 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
 
   @override
   Widget build(BuildContext context) => widget.child;
+
+  bool _clearNotificationPermissionDenialOnForeground() {
+    if (!_isForeground ||
+        !_notificationPermissionDeniedForCurrentForegroundSession) {
+      return false;
+    }
+
+    _notificationPermissionDeniedForCurrentForegroundSession = false;
+    return true;
+  }
+
+  @override
+  void handleAppLifecycleVisibilityChanged() {
+    _clearNotificationPermissionDenialOnForeground();
+    _syncCompletionAlertState();
+  }
 
   void _subscribeToCompletionAlerts() {
     _completionAlertsSubscription = widget.completionAlerts.listen(

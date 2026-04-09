@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
@@ -85,6 +88,60 @@ void main() {
         'Primary Box is ready to review.',
       );
       await tester.pump(const Duration(milliseconds: 300));
+    },
+  );
+
+  testWidgets(
+    'keeps foreground notification denial latched across foreground rebuilds',
+    (tester) async {
+      final visibility = ValueNotifier<AppLifecycleVisibility>(
+        AppLifecycleVisibility.foreground,
+      );
+      final completionAlerts = StreamController<TurnCompletionAlertRequest>();
+      final alertController = _FakeTurnCompletionAlertController();
+      final permissionController = _FakeNotificationPermissionController(
+        isGrantedResult: false,
+        requestPermissionResult: false,
+      );
+      addTearDown(() async {
+        visibility.dispose();
+        await completionAlerts.close();
+      });
+
+      Future<void> pumpHost({required Key childKey}) {
+        return tester.pumpWidget(
+          MaterialApp(
+            home: TurnCompletionAlertHost(
+              completionAlerts: completionAlerts.stream,
+              hasActiveTurn: true,
+              turnCompletionAlertController: alertController,
+              notificationPermissionController: permissionController,
+              supportsForegroundSignal: true,
+              supportsBackgroundAlerts: true,
+              requestNotificationPermissionWhileForegrounded: true,
+              appLifecycleVisibilityListenable: visibility,
+              child: SizedBox(key: childKey),
+            ),
+          ),
+        );
+      }
+
+      await pumpHost(childKey: const ValueKey<String>('first'));
+      await tester.pump();
+
+      expect(permissionController.requestPermissionCalls, 1);
+
+      await pumpHost(childKey: const ValueKey<String>('rebuilt'));
+      await tester.pump();
+
+      expect(permissionController.requestPermissionCalls, 1);
+
+      visibility.value = AppLifecycleVisibility.background;
+      await tester.pump();
+      visibility.value = AppLifecycleVisibility.foreground;
+      await tester.pump();
+
+      expect(permissionController.requestPermissionCalls, 2);
     },
   );
 }
@@ -179,9 +236,25 @@ class _FakeTurnCompletionAlertController
 
 class _FakeNotificationPermissionController
     implements NotificationPermissionController {
-  @override
-  Future<bool> isGranted() async => true;
+  _FakeNotificationPermissionController({
+    this.isGrantedResult = true,
+    this.requestPermissionResult = true,
+  });
+
+  final bool isGrantedResult;
+  final bool requestPermissionResult;
+  int isGrantedCalls = 0;
+  int requestPermissionCalls = 0;
 
   @override
-  Future<bool> requestPermission() async => true;
+  Future<bool> isGranted() async {
+    isGrantedCalls += 1;
+    return isGrantedResult;
+  }
+
+  @override
+  Future<bool> requestPermission() async {
+    requestPermissionCalls += 1;
+    return requestPermissionResult;
+  }
 }
