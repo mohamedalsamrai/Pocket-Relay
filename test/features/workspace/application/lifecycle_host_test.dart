@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_continuity_host.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -255,30 +256,32 @@ void main() {
     },
   );
 
-  testWidgets('PocketRelayApp mounts one workspace continuity subsystem host', (
-    tester,
-  ) async {
-    final appServerClient = FakeCodexAppServerClient();
-    addTearDown(appServerClient.close);
+  testWidgets(
+    'PocketRelayApp mounts one continuity subsystem with one active-turn signal',
+    (tester) async {
+      final appServerClient = FakeCodexAppServerClient();
+      addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(
-      PocketRelayApp(
-        connectionRepository: MemoryCodexConnectionRepository.single(
-          savedProfile: SavedProfile(
-            profile: _profile('Primary Box', 'primary.local'),
-            secrets: const ConnectionSecrets(password: 'secret-1'),
+      await tester.pumpWidget(
+        PocketRelayApp(
+          connectionRepository: MemoryCodexConnectionRepository.single(
+            savedProfile: SavedProfile(
+              profile: _profile('Primary Box', 'primary.local'),
+              secrets: const ConnectionSecrets(password: 'secret-1'),
+            ),
+            connectionId: 'conn_primary',
           ),
-          connectionId: 'conn_primary',
+          modelCatalogStore: MemoryConnectionModelCatalogStore(),
+          recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
+          agentAdapterClient: appServerClient,
         ),
-        modelCatalogStore: MemoryConnectionModelCatalogStore(),
-        recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-        agentAdapterClient: appServerClient,
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
-  });
+      expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
+      expect(find.byType(WorkspaceTurnActivityBuilder), findsOneWidget);
+    },
+  );
 }
 
 ConnectionWorkspaceController _buildWorkspaceController({

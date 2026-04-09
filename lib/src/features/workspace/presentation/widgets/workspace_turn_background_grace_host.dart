@@ -1,13 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/background_grace_host.dart';
-import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 
 class WorkspaceTurnBackgroundGraceHost extends StatelessWidget {
   const WorkspaceTurnBackgroundGraceHost({
     super.key,
-    required this.workspaceController,
+    required this.hasActiveTurn,
     required this.onWarningChanged,
     required this.child,
     this.backgroundGraceController =
@@ -15,7 +13,7 @@ class WorkspaceTurnBackgroundGraceHost extends StatelessWidget {
     this.supportsBackgroundGrace,
   });
 
-  final ConnectionWorkspaceController workspaceController;
+  final bool hasActiveTurn;
   final WorkspaceDeviceContinuityWarningChanged onWarningChanged;
   final Widget child;
   final BackgroundGraceController backgroundGraceController;
@@ -23,17 +21,12 @@ class WorkspaceTurnBackgroundGraceHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WorkspaceTurnActivityBuilder(
-      workspaceController: workspaceController,
-      builder: (context, hasActiveTurn) {
-        return BackgroundGraceHost(
-          backgroundGraceController: backgroundGraceController,
-          supportsBackgroundGrace: supportsBackgroundGrace,
-          keepBackgroundGraceAlive: hasActiveTurn,
-          onWarningChanged: onWarningChanged,
-          child: child,
-        );
-      },
+    return BackgroundGraceHost(
+      backgroundGraceController: backgroundGraceController,
+      supportsBackgroundGrace: supportsBackgroundGrace,
+      keepBackgroundGraceAlive: hasActiveTurn,
+      onWarningChanged: onWarningChanged,
+      child: child,
     );
   }
 }

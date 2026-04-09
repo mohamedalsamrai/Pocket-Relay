@@ -10,6 +10,7 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_background_grace_host.dart';
 
 void main() {
@@ -33,15 +34,20 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: WorkspaceTurnBackgroundGraceHost(
+          home: WorkspaceTurnActivityBuilder(
             workspaceController: workspaceController,
-            onWarningChanged: _warningSink(
-              workspaceController,
-              WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
-            ),
-            backgroundGraceController: backgroundGraceController,
-            supportsBackgroundGrace: true,
-            child: const SizedBox(),
+            builder: (context, hasActiveTurn) {
+              return WorkspaceTurnBackgroundGraceHost(
+                hasActiveTurn: hasActiveTurn,
+                onWarningChanged: _warningSink(
+                  workspaceController,
+                  WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
+                ),
+                backgroundGraceController: backgroundGraceController,
+                supportsBackgroundGrace: true,
+                child: const SizedBox(),
+              );
+            },
           ),
         ),
       );
@@ -92,15 +98,20 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: WorkspaceTurnBackgroundGraceHost(
+          home: WorkspaceTurnActivityBuilder(
             workspaceController: workspaceController,
-            onWarningChanged: _warningSink(
-              workspaceController,
-              WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
-            ),
-            backgroundGraceController: backgroundGraceController,
-            supportsBackgroundGrace: true,
-            child: const SizedBox(),
+            builder: (context, hasActiveTurn) {
+              return WorkspaceTurnBackgroundGraceHost(
+                hasActiveTurn: hasActiveTurn,
+                onWarningChanged: _warningSink(
+                  workspaceController,
+                  WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
+                ),
+                backgroundGraceController: backgroundGraceController,
+                supportsBackgroundGrace: true,
+                child: const SizedBox(),
+              );
+            },
           ),
         ),
       );
@@ -163,15 +174,20 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: WorkspaceTurnBackgroundGraceHost(
+          home: WorkspaceTurnActivityBuilder(
             workspaceController: workspaceController,
-            onWarningChanged: _warningSink(
-              workspaceController,
-              WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
-            ),
-            backgroundGraceController: backgroundGraceController,
-            supportsBackgroundGrace: true,
-            child: const SizedBox(),
+            builder: (context, hasActiveTurn) {
+              return WorkspaceTurnBackgroundGraceHost(
+                hasActiveTurn: hasActiveTurn,
+                onWarningChanged: _warningSink(
+                  workspaceController,
+                  WorkspaceDeviceContinuityWarningTarget.backgroundGrace,
+                ),
+                backgroundGraceController: backgroundGraceController,
+                supportsBackgroundGrace: true,
+                child: const SizedBox(),
+              );
+            },
           ),
         ),
       );
