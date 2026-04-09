@@ -3,7 +3,7 @@ import 'package:pocket_relay/src/core/theme/pocket_typography.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/core/ui/surfaces/pocket_panel_surface.dart';
-import 'package:pocket_relay/src/core/ui/surfaces/pocket_transcript_frame.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_item_primitives.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
 class SshSurfaceFrame extends StatelessWidget {
