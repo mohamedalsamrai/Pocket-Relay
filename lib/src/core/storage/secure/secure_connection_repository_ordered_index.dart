@@ -44,8 +44,9 @@ Future<List<String>> loadOrderedIds(
     for (final value in rawOrderedIds)
       if (value is String && value.trim().isNotEmpty) value.trim(),
   ];
+  final orderedIdSet = orderedIds.toSet();
   final extraIds =
-      discoveredIds.where((id) => !orderedIds.contains(id)).toList()..sort();
+      discoveredIds.where((id) => !orderedIdSet.contains(id)).toList()..sort();
   return <String>[...orderedIds, ...extraIds];
 }
 
