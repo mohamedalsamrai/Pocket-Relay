@@ -42,6 +42,29 @@ void main() {
     );
   });
 
+  test('equality includes the background lifecycle state', () {
+    final backgroundedAt = DateTime.utc(2026, 3, 22, 10);
+    final inactiveState = ConnectionWorkspaceRecoveryState(
+      connectionId: 'conn_primary',
+      draftText: '',
+      selectedThreadId: 'thread_saved',
+      backgroundedAt: backgroundedAt,
+      backgroundedLifecycleState:
+          ConnectionWorkspaceBackgroundLifecycleState.inactive,
+    );
+    final pausedState = ConnectionWorkspaceRecoveryState(
+      connectionId: 'conn_primary',
+      draftText: '',
+      selectedThreadId: 'thread_saved',
+      backgroundedAt: backgroundedAt,
+      backgroundedLifecycleState:
+          ConnectionWorkspaceBackgroundLifecycleState.paused,
+    );
+
+    expect(inactiveState, isNot(pausedState));
+    expect(inactiveState.hashCode, isNot(pausedState.hashCode));
+  });
+
   test(
     'secure store keeps draft text out of SharedPreferences and restores it from secure storage',
     () async {
@@ -58,6 +81,8 @@ void main() {
           selectedThreadId: 'thread_saved',
           draftText: 'super secret draft',
           backgroundedAt: DateTime.utc(2026, 3, 22, 12),
+          backgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
         ),
       );
 
@@ -79,6 +104,11 @@ void main() {
       expect(loadedState!.connectionId, 'conn_primary');
       expect(loadedState.selectedThreadId, 'thread_saved');
       expect(loadedState.draftText, 'super secret draft');
+      expect(loadedState.backgroundedAt, DateTime.utc(2026, 3, 22, 12));
+      expect(
+        loadedState.backgroundedLifecycleState,
+        ConnectionWorkspaceBackgroundLifecycleState.paused,
+      );
     },
   );
 

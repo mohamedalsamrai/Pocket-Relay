@@ -74,21 +74,20 @@ void main() {
         'thread_saved',
       );
       expect(
-        controller
-            .selectedLaneBinding
-            ?.sessionController
-            .transcriptBlocks
+        controller.selectedLaneBinding?.sessionController.transcriptBlocks
             .whereType<TranscriptTextBlock>()
             .single
             .body,
         'Restored answer',
       );
       expect(
-        clientsById['conn_secondary']!.startSessionRequests.single.resumeThreadId,
+        clientsById['conn_secondary']!
+            .startSessionRequests
+            .single
+            .resumeThreadId,
         'thread_saved',
       );
       expect(clientsById['conn_secondary']!.readThreadCalls, <String>[
-        'thread_saved',
         'thread_saved',
         'thread_saved',
       ]);
@@ -99,7 +98,7 @@ void main() {
       expect(restoredDiagnostics, isNotNull);
       expect(
         restoredDiagnostics!.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceRecoveryOutcome.transportRestored,
       );
       expect(restoredDiagnostics.lastRecoveryCompletedAt, isNotNull);
     },
