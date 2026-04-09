@@ -7,13 +7,15 @@ Future<void> _initializeWorkspaceController(
   ConnectionWorkspaceRecoveryState? recoveryState;
   PocketUserFacingError? recoveryLoadWarning;
   try {
-    recoveryState = await controller._recoveryStore.load();
+    recoveryState = await controller._recoveryPersistenceController
+        .loadPersistedSnapshot();
   } catch (error) {
     recoveryLoadWarning =
         ConnectionWorkspaceRecoveryErrors.recoveryStateLoadFailed(error: error);
   }
-  controller._lastPersistedRecoveryState = recoveryState;
-  controller._latestRecoveryPersistenceState = recoveryState;
+  controller._recoveryPersistenceController.seedPersistedSnapshot(
+    recoveryState,
+  );
   if (catalog.isEmpty) {
     controller._applyState(
       const ConnectionWorkspaceState(

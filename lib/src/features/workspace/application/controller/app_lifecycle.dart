@@ -123,7 +123,9 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
           : null,
     );
     if (selectedThreadId == null) {
-      final persistedRecoveryState = await controller._recoveryStore.load();
+      final persistedRecoveryState = await controller
+          ._recoveryPersistenceController
+          .loadPersistedSnapshot();
       selectedThreadId = _normalizedWorkspaceThreadId(
         persistedRecoveryState?.connectionId == connectionId
             ? persistedRecoveryState?.selectedThreadId

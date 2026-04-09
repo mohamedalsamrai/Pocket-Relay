@@ -23,6 +23,7 @@ import 'package:pocket_relay/src/features/workspace/application/connection_lifec
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_recovery_persistence_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -86,8 +87,6 @@ class ConnectionWorkspaceController extends ChangeNotifier
              connectionRepository: connectionRepository,
              modelCatalogStore: modelCatalogStore,
            ),
-       _recoveryStore =
-           recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
        _remoteRuntimeCoordinator = ConnectionRemoteRuntimeCoordinator(
          remoteRuntimeDelegateFactory:
              _buildWorkspaceRemoteRuntimeDelegateFactory(
@@ -97,16 +96,38 @@ class ConnectionWorkspaceController extends ChangeNotifier
                remoteAppServerOwnerControl: remoteAppServerOwnerControl,
              ),
        ),
-       _recoveryPersistenceDebounceDuration =
-           recoveryPersistenceDebounceDuration,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now {
+    _recoveryPersistenceController = WorkspaceRecoveryPersistenceController(
+      recoveryStore:
+          recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
+      debounceDuration: recoveryPersistenceDebounceDuration,
+      now: _now,
+      buildSnapshot:
+          ({
+            DateTime? backgroundedAt,
+            ConnectionWorkspaceBackgroundLifecycleState?
+            backgroundedLifecycleState,
+          }) => _selectedWorkspaceRecoveryStateSnapshot(
+            this,
+            backgroundedAt: backgroundedAt,
+            backgroundedLifecycleState: backgroundedLifecycleState,
+          ),
+      updateDiagnostics: (connectionId, update) =>
+          _updateWorkspaceRecoveryDiagnostics(
+            this,
+            connectionId,
+            update,
+            enqueueRecoveryPersistence: false,
+          ),
+    );
+  }
 
   final CodexConnectionRepository _connectionRepository;
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionCapabilityAssets _connectionCapabilityAssets;
-  final ConnectionWorkspaceRecoveryStore _recoveryStore;
   final ConnectionRemoteRuntimeCoordinator _remoteRuntimeCoordinator;
-  final Duration _recoveryPersistenceDebounceDuration;
+  late final WorkspaceRecoveryPersistenceController
+  _recoveryPersistenceController;
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
       <String, ConnectionLaneBinding>{};
@@ -133,12 +154,6 @@ class ConnectionWorkspaceController extends ChangeNotifier
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
-  Future<void> _recoveryPersistence = Future<void>.value();
-  Timer? _recoveryPersistenceDebounceTimer;
-  ConnectionWorkspaceRecoveryState? _pendingRecoveryPersistenceState;
-  ConnectionWorkspaceRecoveryState? _lastPersistedRecoveryState;
-  ConnectionWorkspaceRecoveryState? _latestRecoveryPersistenceState;
-  bool _isPersistingRecoveryState = false;
   bool _isDisposed = false;
 
   ConnectionWorkspaceState get state => _state;
@@ -343,9 +358,8 @@ class ConnectionWorkspaceController extends ChangeNotifier
     if (_isDisposed) {
       return;
     }
-    final finalRecoveryPersistence = _enqueueRecoveryPersistence();
+    final finalRecoveryPersistence = _recoveryPersistenceController.dispose();
     _isDisposed = true;
-    _recoveryPersistenceDebounceTimer?.cancel();
     unawaited(finalRecoveryPersistence);
 
     final liveBindingEntries = _liveBindingsByConnectionId.entries.toList();

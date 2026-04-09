@@ -43,13 +43,12 @@ extension on ConnectionWorkspaceController {
       _unregisterWorkspaceLiveBinding(this, connectionId);
 
   void _scheduleRecoveryPersistence() =>
-      _scheduleWorkspaceRecoveryPersistence(this);
+      _recoveryPersistenceController.schedule();
 
   Future<void> _enqueueRecoveryPersistence({
     DateTime? backgroundedAt,
     ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState,
-  }) => _enqueueWorkspaceRecoveryPersistence(
-    this,
+  }) => _recoveryPersistenceController.flush(
     backgroundedAt: backgroundedAt,
     backgroundedLifecycleState: backgroundedLifecycleState,
   );
@@ -64,11 +63,11 @@ extension on ConnectionWorkspaceController {
 
   Future<void> _queueRecoveryPersistenceSnapshot({
     ConnectionWorkspaceRecoveryState? snapshot,
-  }) => _queueWorkspaceRecoveryPersistenceSnapshot(this, snapshot: snapshot);
+  }) => _recoveryPersistenceController.queueSnapshot(snapshot: snapshot);
 
   bool _hasImmediateRecoveryIdentityChange(
     ConnectionWorkspaceRecoveryState? snapshot,
-  ) => _hasWorkspaceImmediateRecoveryIdentityChange(this, snapshot);
+  ) => _recoveryPersistenceController.hasImmediateIdentityChange(snapshot);
 
   ConnectionWorkspaceRecoveryState? _selectedRecoveryStateSnapshot({
     DateTime? backgroundedAt,
@@ -80,7 +79,7 @@ extension on ConnectionWorkspaceController {
   );
 
   ConnectionWorkspaceRecoveryState? _latestUnsavedRecoveryStateSnapshot() =>
-      _latestUnsavedWorkspaceRecoveryStateSnapshot(this);
+      _recoveryPersistenceController.latestUnsavedSnapshot;
 
   void _markTransportReconnectRequired(String connectionId) =>
       _markWorkspaceTransportReconnectRequired(this, connectionId);
