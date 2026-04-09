@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
+
 import 'remote_runtime_notices_test_support.dart';
 
 void main() {
@@ -100,6 +103,62 @@ void main() {
 
       expect(find.text('Turn finished while you were away'), findsOneWidget);
 
+      await tester.pump(const Duration(seconds: 7));
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsNothing);
+      expect(
+        controller.state.turnLivenessAssessmentFor('conn_primary'),
+        isNull,
+      );
+    },
+  );
+
+  testWidgets(
+    'live lane notice dismissal follows shared lifecycle visibility scope',
+    (tester) async {
+      final visibilityListenable = ValueNotifier<AppLifecycleVisibility>(
+        AppLifecycleVisibility.background,
+      );
+      addTearDown(visibilityListenable.dispose);
+      final client = FakeCodexAppServerClient();
+      client.threadHistoriesById['thread_saved'] = savedConversationThread(
+        threadId: 'thread_saved',
+      );
+      final controller = buildSingleConnectionWorkspaceController(
+        client: client,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await client.dispose();
+      });
+
+      await controller.initialize();
+      await selectConversationAndLoseTransport(
+        controller,
+        client,
+        'thread_saved',
+      );
+      await pumpScopedRemoteRuntimeNoticesSurface(
+        tester,
+        controller,
+        visibilityListenable,
+      );
+
+      client.startSessionError = const CodexAppServerException('resume failed');
+      await controller.reconnectConnection('conn_primary');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump();
+
+      expect(find.text('Turn finished while you were away'), findsOneWidget);
+
+      visibilityListenable.value = AppLifecycleVisibility.foreground;
+      await tester.pump();
       await tester.pump(const Duration(seconds: 7));
       await tester.pump();
 

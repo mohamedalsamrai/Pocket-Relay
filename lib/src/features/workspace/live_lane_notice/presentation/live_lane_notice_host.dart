@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
 import 'live_lane_notice_contract.dart';
@@ -30,13 +32,22 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   String? _dismissKey;
   Duration? _dismissRemaining;
   Stopwatch? _dismissStopwatch;
+  ValueListenable<AppLifecycleVisibility>? _appLifecycleVisibilityListenable;
   AppLifecycleState? _appLifecycleState;
+  bool _isObservingAppLifecycle = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAppLifecycleVisibilityListenable(
+      AppLifecycleVisibilityScope.maybeListenableOf(context),
+    );
     _syncDismissal(widget.contract);
   }
 
@@ -54,25 +65,72 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   @override
   void dispose() {
     _cancelDismissal();
-    WidgetsBinding.instance.removeObserver(this);
+    _appLifecycleVisibilityListenable = null;
+    _stopObservingAppLifecycle();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_appLifecycleVisibilityListenable != null) {
+      return;
+    }
     _appLifecycleState = state;
+    _syncVisibilityDismissal();
+  }
+
+  bool get _isForegroundVisible =>
+      (_appLifecycleVisibilityListenable?.value ??
+              appLifecycleVisibilityForState(_appLifecycleState))
+          .isForegroundVisible;
+
+  bool get _isDismissalVisible => _isForegroundVisible && widget.isVisible;
+
+  void _syncAppLifecycleVisibilityListenable(
+    ValueListenable<AppLifecycleVisibility>? nextListenable,
+  ) {
+    final previousListenable = _appLifecycleVisibilityListenable;
+    if (previousListenable == nextListenable) {
+      if (nextListenable == null) {
+        _startObservingAppLifecycle();
+      }
+      return;
+    }
+
+    _appLifecycleVisibilityListenable = nextListenable;
+
+    if (nextListenable == null) {
+      _startObservingAppLifecycle();
+      return;
+    }
+
+    _stopObservingAppLifecycle();
+  }
+
+  void _startObservingAppLifecycle() {
+    if (_isObservingAppLifecycle) {
+      return;
+    }
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+    WidgetsBinding.instance.addObserver(this);
+    _isObservingAppLifecycle = true;
+  }
+
+  void _stopObservingAppLifecycle() {
+    if (!_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    _isObservingAppLifecycle = false;
+  }
+
+  void _syncVisibilityDismissal() {
     if (_isDismissalVisible) {
       _resumeDismissal();
     } else {
       _pauseDismissal();
     }
   }
-
-  bool get _isForegroundVisible =>
-      _appLifecycleState == null ||
-      _appLifecycleState == AppLifecycleState.resumed;
-
-  bool get _isDismissalVisible => _isForegroundVisible && widget.isVisible;
 
   void _syncDismissal(LiveLaneNoticeContract contract) {
     final dismissibleEntry = contract.dismissibleEntry;

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 
 class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
@@ -13,6 +15,7 @@ class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
     this.notificationPermissionController =
         const MethodChannelNotificationPermissionController(),
     this.supportsForegroundService,
+    this.appLifecycleVisibilityListenable,
   });
 
   final bool hasActiveTurn;
@@ -21,6 +24,8 @@ class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
   final ForegroundServiceController foregroundServiceController;
   final NotificationPermissionController notificationPermissionController;
   final bool? supportsForegroundService;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +33,7 @@ class WorkspaceTurnForegroundServiceHost extends StatelessWidget {
       foregroundServiceController: foregroundServiceController,
       notificationPermissionController: notificationPermissionController,
       supportsForegroundService: supportsForegroundService,
+      appLifecycleVisibilityListenable: appLifecycleVisibilityListenable,
       keepForegroundServiceRunning: hasActiveTurn,
       onWarningChanged: onWarningChanged,
       child: child,

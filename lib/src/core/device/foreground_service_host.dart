@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/errors/device_capability_errors.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 
 bool supportsActiveTurnForegroundService([TargetPlatform? platform]) {
@@ -80,6 +81,7 @@ class ForegroundServiceHost extends StatefulWidget {
     this.notificationPermissionController =
         const MethodChannelNotificationPermissionController(),
     this.supportsForegroundService,
+    this.appLifecycleVisibilityListenable,
     this.onWarningChanged,
   });
 
@@ -88,6 +90,8 @@ class ForegroundServiceHost extends StatefulWidget {
   final ForegroundServiceController foregroundServiceController;
   final NotificationPermissionController notificationPermissionController;
   final bool? supportsForegroundService;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
   final ValueChanged<PocketUserFacingError?>? onWarningChanged;
 
   @override
@@ -95,7 +99,9 @@ class ForegroundServiceHost extends StatefulWidget {
 }
 
 class _ForegroundServiceHostState extends State<ForegroundServiceHost>
-    with WidgetsBindingObserver {
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<ForegroundServiceHost> {
   bool _requestedForegroundServiceEnabled = false;
   bool _isRequestingNotificationPermission = false;
   bool _notificationPermissionDeniedForCurrentRequest = false;
@@ -110,16 +116,29 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
     return _supportsForegroundService && widget.keepForegroundServiceRunning;
   }
 
+  AppLifecycleVisibility get _appLifecycleVisibility {
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
+  }
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    initAppLifecycleVisibilityObserver();
     _syncForegroundService();
   }
 
   @override
   void didUpdateWidget(covariant ForegroundServiceHost oldWidget) {
     super.didUpdateWidget(oldWidget);
+    syncAppLifecycleVisibilityObserver(
+      oldWidget.appLifecycleVisibilityListenable,
+    );
     if (oldWidget.foregroundServiceController !=
             widget.foregroundServiceController &&
         _requestedForegroundServiceEnabled) {
@@ -139,7 +158,7 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    disposeAppLifecycleVisibilityObserver();
     _setWarning(null);
     if (_requestedForegroundServiceEnabled) {
       _requestedForegroundServiceEnabled = false;
@@ -149,18 +168,24 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed ||
+  Widget build(BuildContext context) => widget.child;
+
+  bool _clearNotificationPermissionDenialOnForeground() {
+    if (!_appLifecycleVisibility.isForegroundVisible ||
         !_notificationPermissionDeniedForCurrentRequest) {
-      return;
+      return false;
     }
 
     _notificationPermissionDeniedForCurrentRequest = false;
-    _syncForegroundService();
+    return true;
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  void handleAppLifecycleVisibilityChanged() {
+    if (_clearNotificationPermissionDenialOnForeground()) {
+      _syncForegroundService();
+    }
+  }
 
   void _syncForegroundService() {
     final shouldEnableForegroundService = _shouldEnableForegroundService;

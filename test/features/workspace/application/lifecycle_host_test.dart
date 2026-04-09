@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/app/pocket_relay_app.dart';
+import 'package:pocket_relay/src/core/device/background_grace_host.dart';
+import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
+import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
+import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
@@ -302,8 +307,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
+      expect(find.byType(AppLifecycleVisibilityBuilder), findsOneWidget);
+      expect(find.byType(AppLifecycleVisibilityScope), findsOneWidget);
       expect(find.byType(WorkspaceAppLifecycleHost), findsOneWidget);
       expect(find.byType(WorkspaceTurnActivityBuilder), findsOneWidget);
+      expect(
+        tester
+            .widget<ForegroundServiceHost>(find.byType(ForegroundServiceHost))
+            .appLifecycleVisibilityListenable,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<BackgroundGraceHost>(find.byType(BackgroundGraceHost))
+            .appLifecycleVisibilityListenable,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<TurnCompletionAlertHost>(
+              find.byType(TurnCompletionAlertHost),
+            )
+            .appLifecycleVisibilityListenable,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<DisplayWakeLockHost>(find.byType(DisplayWakeLockHost))
+            .appLifecycleVisibilityListenable,
+        isNotNull,
+      );
     },
   );
 }

@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
@@ -22,6 +24,7 @@ class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
     this.supportsForegroundSignal,
     this.supportsBackgroundAlerts,
     this.requestNotificationPermissionWhileForegrounded = false,
+    this.appLifecycleVisibilityListenable,
   });
 
   final ConnectionWorkspaceController workspaceController;
@@ -33,6 +36,8 @@ class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   final bool? supportsForegroundSignal;
   final bool? supportsBackgroundAlerts;
   final bool requestNotificationPermissionWhileForegrounded;
+  final ValueListenable<AppLifecycleVisibility>?
+  appLifecycleVisibilityListenable;
 
   @override
   State<WorkspaceTurnCompletionAlertHost> createState() =>
@@ -90,6 +95,7 @@ class _WorkspaceTurnCompletionAlertHostState
       supportsBackgroundAlerts: widget.supportsBackgroundAlerts,
       requestNotificationPermissionWhileForegrounded:
           widget.requestNotificationPermissionWhileForegrounded,
+      appLifecycleVisibilityListenable: widget.appLifecycleVisibilityListenable,
       onWarningChanged: widget.onWarningChanged,
       child: widget.child,
     );
