@@ -30,7 +30,7 @@ void _registerWorkspaceLiveBinding(
     controller._scheduleRecoveryPersistence();
   }
 
-  controller._liveBindingRegistry.register(
+  controller._laneRoster.registerBinding(
     connectionId: connectionId,
     binding: binding,
     listener: listener,
@@ -124,5 +124,5 @@ void _unregisterWorkspaceLiveBinding(
   ConnectionWorkspaceController controller,
   String connectionId,
 ) {
-  controller._liveBindingRegistry.unregister(connectionId);
+  controller._laneRoster.unregisterBinding(connectionId);
 }
