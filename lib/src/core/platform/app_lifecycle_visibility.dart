@@ -41,6 +41,23 @@ bool appLifecycleStateIsNotForegroundVisible(AppLifecycleState? state) {
   return appLifecycleVisibilityForState(state).isNotForegroundVisible;
 }
 
+class AppLifecycleVisibilityScope
+    extends InheritedNotifier<ValueListenable<AppLifecycleVisibility>> {
+  const AppLifecycleVisibilityScope({
+    super.key,
+    required ValueListenable<AppLifecycleVisibility> visibilityListenable,
+    required super.child,
+  }) : super(notifier: visibilityListenable);
+
+  static ValueListenable<AppLifecycleVisibility>? maybeListenableOf(
+    BuildContext context,
+  ) {
+    return context
+        .dependOnInheritedWidgetOfExactType<AppLifecycleVisibilityScope>()
+        ?.notifier;
+  }
+}
+
 class AppLifecycleVisibilityBuilder extends StatefulWidget {
   const AppLifecycleVisibilityBuilder({super.key, required this.builder});
 

@@ -308,6 +308,7 @@ void main() {
 
       expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
       expect(find.byType(AppLifecycleVisibilityBuilder), findsOneWidget);
+      expect(find.byType(AppLifecycleVisibilityScope), findsOneWidget);
       expect(find.byType(WorkspaceAppLifecycleHost), findsOneWidget);
       expect(find.byType(WorkspaceTurnActivityBuilder), findsOneWidget);
       expect(

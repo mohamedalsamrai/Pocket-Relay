@@ -51,67 +51,71 @@ class WorkspaceContinuityHost extends StatelessWidget {
 
     return AppLifecycleVisibilityBuilder(
       builder: (context, appLifecycleVisibilityListenable) {
-        return WorkspaceTurnActivityBuilder(
-          workspaceController: workspaceController,
-          builder: (context, hasActiveTurn) {
-            return WorkspaceTurnForegroundServiceHost(
-              hasActiveTurn: hasActiveTurn,
-              onWarningChanged: warningCallbacks.foregroundService,
-              foregroundServiceController:
-                  foregroundServiceController ??
-                  const MethodChannelForegroundServiceController(),
-              notificationPermissionController:
-                  resolvedNotificationPermissionController,
-              supportsForegroundService:
-                  platformPolicy.supportsActiveTurnForegroundService,
-              appLifecycleVisibilityListenable:
-                  appLifecycleVisibilityListenable,
-              child: WorkspaceTurnBackgroundGraceHost(
+        return AppLifecycleVisibilityScope(
+          visibilityListenable: appLifecycleVisibilityListenable,
+          child: WorkspaceTurnActivityBuilder(
+            workspaceController: workspaceController,
+            builder: (context, hasActiveTurn) {
+              return WorkspaceTurnForegroundServiceHost(
                 hasActiveTurn: hasActiveTurn,
-                onWarningChanged: warningCallbacks.backgroundGrace,
-                backgroundGraceController:
-                    backgroundGraceController ??
-                    const MethodChannelBackgroundGraceController(),
-                supportsBackgroundGrace:
-                    platformPolicy.supportsFiniteBackgroundGrace,
+                onWarningChanged: warningCallbacks.foregroundService,
+                foregroundServiceController:
+                    foregroundServiceController ??
+                    const MethodChannelForegroundServiceController(),
+                notificationPermissionController:
+                    resolvedNotificationPermissionController,
+                supportsForegroundService:
+                    platformPolicy.supportsActiveTurnForegroundService,
                 appLifecycleVisibilityListenable:
                     appLifecycleVisibilityListenable,
-                child: WorkspaceAppLifecycleHost(
-                  onLifecycleStateChanged: lifecycleCallbacks.appLifecycle,
-                  child: WorkspaceTurnCompletionAlertHost(
-                    workspaceController: workspaceController,
-                    hasActiveTurn: hasActiveTurn,
-                    onWarningChanged: warningCallbacks.turnCompletionAlert,
-                    turnCompletionAlertController:
-                        turnCompletionAlertController ??
-                        const PlatformTurnCompletionAlertController(),
-                    notificationPermissionController:
-                        resolvedNotificationPermissionController,
-                    supportsForegroundSignal:
-                        platformPolicy.supportsForegroundTurnCompletionSignal,
-                    supportsBackgroundAlerts:
-                        platformPolicy.supportsBackgroundTurnCompletionAlerts,
-                    requestNotificationPermissionWhileForegrounded:
-                        platformPolicy.supportsBackgroundTurnCompletionAlerts &&
-                        !platformPolicy.supportsActiveTurnForegroundService,
-                    appLifecycleVisibilityListenable:
-                        appLifecycleVisibilityListenable,
-                    child: WorkspaceTurnWakeLockHost(
+                child: WorkspaceTurnBackgroundGraceHost(
+                  hasActiveTurn: hasActiveTurn,
+                  onWarningChanged: warningCallbacks.backgroundGrace,
+                  backgroundGraceController:
+                      backgroundGraceController ??
+                      const MethodChannelBackgroundGraceController(),
+                  supportsBackgroundGrace:
+                      platformPolicy.supportsFiniteBackgroundGrace,
+                  appLifecycleVisibilityListenable:
+                      appLifecycleVisibilityListenable,
+                  child: WorkspaceAppLifecycleHost(
+                    onLifecycleStateChanged: lifecycleCallbacks.appLifecycle,
+                    child: WorkspaceTurnCompletionAlertHost(
+                      workspaceController: workspaceController,
                       hasActiveTurn: hasActiveTurn,
-                      onWarningChanged: warningCallbacks.wakeLock,
-                      displayWakeLockController:
-                          displayWakeLockController ??
-                          const WakelockPlusDisplayWakeLockController(),
-                      supportsWakeLock: platformPolicy.supportsWakeLock,
+                      onWarningChanged: warningCallbacks.turnCompletionAlert,
+                      turnCompletionAlertController:
+                          turnCompletionAlertController ??
+                          const PlatformTurnCompletionAlertController(),
+                      notificationPermissionController:
+                          resolvedNotificationPermissionController,
+                      supportsForegroundSignal:
+                          platformPolicy.supportsForegroundTurnCompletionSignal,
+                      supportsBackgroundAlerts:
+                          platformPolicy.supportsBackgroundTurnCompletionAlerts,
+                      requestNotificationPermissionWhileForegrounded:
+                          platformPolicy
+                              .supportsBackgroundTurnCompletionAlerts &&
+                          !platformPolicy.supportsActiveTurnForegroundService,
                       appLifecycleVisibilityListenable:
                           appLifecycleVisibilityListenable,
-                      child: child,
+                      child: WorkspaceTurnWakeLockHost(
+                        hasActiveTurn: hasActiveTurn,
+                        onWarningChanged: warningCallbacks.wakeLock,
+                        displayWakeLockController:
+                            displayWakeLockController ??
+                            const WakelockPlusDisplayWakeLockController(),
+                        supportsWakeLock: platformPolicy.supportsWakeLock,
+                        appLifecycleVisibilityListenable:
+                            appLifecycleVisibilityListenable,
+                        child: child,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
