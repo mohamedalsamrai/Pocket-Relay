@@ -21,6 +21,7 @@ import 'package:pocket_relay/src/features/connection_settings/domain/connection_
 import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
@@ -53,7 +54,9 @@ typedef ConnectionLaneBindingFactory =
 typedef WorkspaceNow = DateTime Function();
 
 class ConnectionWorkspaceController extends ChangeNotifier
-    implements WorkspaceDeviceContinuityWarningSink {
+    implements
+        WorkspaceContinuityLifecycleSink,
+        WorkspaceDeviceContinuityWarningSink {
   ConnectionWorkspaceController({
     required CodexConnectionRepository connectionRepository,
     required ConnectionLaneBindingFactory laneBindingFactory,

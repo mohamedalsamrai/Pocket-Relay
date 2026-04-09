@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
@@ -43,6 +44,9 @@ class WorkspaceContinuityHost extends StatelessWidget {
     final warningCallbacks = WorkspaceDeviceContinuityWarningCallbacks(
       sink: workspaceController,
     );
+    final lifecycleCallbacks = WorkspaceContinuityLifecycleCallbacks(
+      sink: workspaceController,
+    );
 
     return WorkspaceTurnActivityBuilder(
       workspaceController: workspaceController,
@@ -66,7 +70,7 @@ class WorkspaceContinuityHost extends StatelessWidget {
             supportsBackgroundGrace:
                 platformPolicy.supportsFiniteBackgroundGrace,
             child: WorkspaceAppLifecycleHost(
-              workspaceController: workspaceController,
+              onLifecycleStateChanged: lifecycleCallbacks.appLifecycle,
               child: WorkspaceTurnCompletionAlertHost(
                 workspaceController: workspaceController,
                 hasActiveTurn: hasActiveTurn,

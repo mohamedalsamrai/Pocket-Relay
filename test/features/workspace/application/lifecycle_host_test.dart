@@ -37,6 +37,29 @@ void main() {
   });
 
   testWidgets(
+    'workspace app lifecycle host routes app lifecycle states through callback',
+    (tester) async {
+      final states = <AppLifecycleState>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: WorkspaceAppLifecycleHost(
+            onLifecycleStateChanged: (state) async {
+              states.add(state);
+            },
+            child: const SizedBox(),
+          ),
+        ),
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+
+      expect(states.last, AppLifecycleState.paused);
+    },
+  );
+
+  testWidgets(
     'workspace app lifecycle host snapshots the selected lane state on pause',
     (tester) async {
       final clientsById = _buildClientsById(firstConnectionId: 'conn_primary');
@@ -66,7 +89,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: WorkspaceAppLifecycleHost(
-            workspaceController: controller,
+            onLifecycleStateChanged: controller.handleAppLifecycleStateChanged,
             child: const SizedBox(),
           ),
         ),
@@ -145,7 +168,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: WorkspaceAppLifecycleHost(
-            workspaceController: controller,
+            onLifecycleStateChanged: controller.handleAppLifecycleStateChanged,
             child: const SizedBox(),
           ),
         ),
@@ -217,7 +240,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: WorkspaceAppLifecycleHost(
-            workspaceController: controller,
+            onLifecycleStateChanged: controller.handleAppLifecycleStateChanged,
             child: const SizedBox(),
           ),
         ),
@@ -279,6 +302,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
+      expect(find.byType(WorkspaceAppLifecycleHost), findsOneWidget);
       expect(find.byType(WorkspaceTurnActivityBuilder), findsOneWidget);
     },
   );
