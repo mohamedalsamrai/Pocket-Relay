@@ -34,14 +34,9 @@ class _PocketRelayBootstrapState extends State<PocketRelayBootstrap> {
   @override
   void didUpdateWidget(covariant PocketRelayBootstrap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final workspaceDependenciesChanged =
-        oldWidget.dependencies.connectionRepository !=
-            widget.dependencies.connectionRepository ||
-        oldWidget.dependencies.agentAdapterClient !=
-            widget.dependencies.agentAdapterClient ||
-        oldWidget.dependencies.platformPolicy !=
-            widget.dependencies.platformPolicy;
-    if (!workspaceDependenciesChanged) {
+    if (!widget.dependencies.requiresWorkspaceControllerRebuild(
+      oldWidget.dependencies,
+    )) {
       return;
     }
 
