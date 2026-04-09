@@ -1,11 +1,17 @@
-# Pull-request Platform Build Verification
+# Pull Request Platform Verification
 
-Pocket Relay now keeps pull-request build verification separate from the
-existing `Repo Guardrails` workflow.
+Pocket Relay now keeps pull-request verification separate from the existing
+`Repo Guardrails` workflow.
 
 This verification layer is intended to answer one narrow question from PR
-evidence: does the app still build on each supported platform surface that the
-repo owns today?
+evidence: does the shared regression suite still pass, and does the app still
+build on each supported platform surface that the repo owns today?
+
+## Shared regression coverage
+
+| Check | Runner | Verification level | Command |
+| --- | --- | --- | --- |
+| Regression tests | `ubuntu-latest` | Full Flutter regression suite for app-owned tests | `flutter test` |
 
 ## Verification levels
 
@@ -18,7 +24,9 @@ repo owns today?
 
 ## Scope boundary
 
-- This workflow verifies buildability, not release signing or store packaging.
+- This workflow verifies shared regression coverage plus buildability.
+- It does not prove end-to-end runtime behavior on every target.
+- It does not prove release signing or store packaging.
 - The iOS simulator check is intentionally not a device-signed build.
 - Platform-specific root-cause issues remain tracked separately.
 - In particular, issue `#118` remains the owner-layer tracker for the iOS
@@ -28,4 +36,4 @@ repo owns today?
 
 The PR checks exposed by `.github/workflows/pr-platform-builds.yml` are the
 checks that branch protection should require when the repo wants explicit
-platform build evidence for pull requests.
+regression and platform-build evidence for pull requests.

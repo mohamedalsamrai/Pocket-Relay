@@ -199,6 +199,7 @@ void main() {
 
       reconnectGate.complete();
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Live transport lost'), findsNothing);
       expect(find.text('Reconnecting to remote session'), findsNothing);
