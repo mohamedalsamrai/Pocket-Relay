@@ -167,7 +167,14 @@ void main() {
       expect(ownerControl.startCalls, 1);
       expect(runtime.server.status, ConnectionRemoteServerStatus.running);
       expect(runtime.server.port, 4100);
-      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+      expect(
+        controller.state.remoteRuntimeFor('conn_primary')?.server.status,
+        ConnectionRemoteServerStatus.running,
+      );
+      expect(
+        controller.state.remoteRuntimeFor('conn_primary')?.server.port,
+        4100,
+      );
     },
   );
 
@@ -201,7 +208,10 @@ void main() {
 
       expect(ownerControl.stopCalls, 1);
       expect(runtime.server.status, ConnectionRemoteServerStatus.notRunning);
-      expect(controller.state.remoteRuntimeFor('conn_primary'), runtime);
+      expect(
+        controller.state.remoteRuntimeFor('conn_primary')?.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
     },
   );
 

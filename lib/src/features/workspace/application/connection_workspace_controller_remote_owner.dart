@@ -6,18 +6,8 @@ Future<ConnectionRemoteRuntimeState> _startWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
-    actionId: ConnectionSettingsRemoteServerActionId.start,
     connectionId: connectionId,
-    actionDetail: 'Starting managed remote runtime…',
-    runAction: ({required profile, required secrets, required ownerId}) =>
-        controller
-            ._remoteRuntimeDelegateFactory(profile.agentAdapter)
-            .startRemoteServer(
-              profile: profile,
-              secrets: secrets,
-              ownerId: ownerId,
-            ),
-  );
+  ).start();
 }
 
 Future<ConnectionRemoteRuntimeState> _stopWorkspaceRemoteServer(
@@ -26,18 +16,8 @@ Future<ConnectionRemoteRuntimeState> _stopWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
-    actionId: ConnectionSettingsRemoteServerActionId.stop,
     connectionId: connectionId,
-    actionDetail: 'Stopping managed remote runtime…',
-    runAction: ({required profile, required secrets, required ownerId}) =>
-        controller
-            ._remoteRuntimeDelegateFactory(profile.agentAdapter)
-            .stopRemoteServer(
-              profile: profile,
-              secrets: secrets,
-              ownerId: ownerId,
-            ),
-  );
+  ).stop();
 }
 
 Future<ConnectionRemoteRuntimeState> _restartWorkspaceRemoteServer(
@@ -46,33 +26,116 @@ Future<ConnectionRemoteRuntimeState> _restartWorkspaceRemoteServer(
 }) {
   return _runWorkspaceRemoteServerAction(
     controller,
-    actionId: ConnectionSettingsRemoteServerActionId.restart,
     connectionId: connectionId,
-    actionDetail: 'Restarting managed remote runtime…',
-    runAction: ({required profile, required secrets, required ownerId}) =>
-        controller
-            ._remoteRuntimeDelegateFactory(profile.agentAdapter)
-            .restartRemoteServer(
-              profile: profile,
-              secrets: secrets,
-              ownerId: ownerId,
-            ),
-  );
+  ).restart();
 }
 
-typedef _WorkspaceRemoteServerActionRunner =
-    Future<void> Function({
-      required ConnectionProfile profile,
-      required ConnectionSecrets secrets,
-      required String ownerId,
-    });
+extension on Future<_WorkspaceRemoteServerActionContext> {
+  Future<ConnectionRemoteRuntimeState> start() async {
+    final context = await this;
+    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+        .startRemoteServer(
+          profile: context.savedConnection.profile,
+          secrets: context.savedConnection.secrets,
+          ownerId: context.connectionId,
+          currentRuntime: context.controller.state.remoteRuntimeFor(
+            context.connectionId,
+          ),
+          probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
+          onChecking: (checkingRuntime) {
+            _applyWorkspaceRemoteServerActionCheckingRuntime(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              checkingRuntime: checkingRuntime,
+            );
+          },
+        );
+    _applyWorkspaceRemoteServerActionResultRuntime(
+      context.controller,
+      connectionId: context.connectionId,
+      refreshGeneration: context.refreshGeneration,
+      nextRuntime: nextRuntime,
+    );
+    return nextRuntime;
+  }
 
-Future<ConnectionRemoteRuntimeState> _runWorkspaceRemoteServerAction(
+  Future<ConnectionRemoteRuntimeState> stop() async {
+    final context = await this;
+    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+        .stopRemoteServer(
+          profile: context.savedConnection.profile,
+          secrets: context.savedConnection.secrets,
+          ownerId: context.connectionId,
+          currentRuntime: context.controller.state.remoteRuntimeFor(
+            context.connectionId,
+          ),
+          probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
+          onChecking: (checkingRuntime) {
+            _applyWorkspaceRemoteServerActionCheckingRuntime(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              checkingRuntime: checkingRuntime,
+            );
+          },
+        );
+    _applyWorkspaceRemoteServerActionResultRuntime(
+      context.controller,
+      connectionId: context.connectionId,
+      refreshGeneration: context.refreshGeneration,
+      nextRuntime: nextRuntime,
+    );
+    return nextRuntime;
+  }
+
+  Future<ConnectionRemoteRuntimeState> restart() async {
+    final context = await this;
+    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+        .restartRemoteServer(
+          profile: context.savedConnection.profile,
+          secrets: context.savedConnection.secrets,
+          ownerId: context.connectionId,
+          currentRuntime: context.controller.state.remoteRuntimeFor(
+            context.connectionId,
+          ),
+          probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
+          onChecking: (checkingRuntime) {
+            _applyWorkspaceRemoteServerActionCheckingRuntime(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              checkingRuntime: checkingRuntime,
+            );
+          },
+        );
+    _applyWorkspaceRemoteServerActionResultRuntime(
+      context.controller,
+      connectionId: context.connectionId,
+      refreshGeneration: context.refreshGeneration,
+      nextRuntime: nextRuntime,
+    );
+    return nextRuntime;
+  }
+}
+
+final class _WorkspaceRemoteServerActionContext {
+  const _WorkspaceRemoteServerActionContext({
+    required this.controller,
+    required this.connectionId,
+    required this.savedConnection,
+    required this.refreshGeneration,
+  });
+
+  final ConnectionWorkspaceController controller;
+  final String connectionId;
+  final SavedConnection savedConnection;
+  final int refreshGeneration;
+}
+
+Future<_WorkspaceRemoteServerActionContext> _runWorkspaceRemoteServerAction(
   ConnectionWorkspaceController controller, {
-  required ConnectionSettingsRemoteServerActionId actionId,
   required String connectionId,
-  required String actionDetail,
-  required _WorkspaceRemoteServerActionRunner runAction,
 }) async {
   final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
   await controller.initialize();
@@ -95,80 +158,58 @@ Future<ConnectionRemoteRuntimeState> _runWorkspaceRemoteServerAction(
   controller
           ._remoteRuntimeRefreshGenerationByConnectionId[normalizedConnectionId] =
       refreshGeneration;
-
-  final sessionName = controller
-      ._remoteRuntimeDelegateFactory(savedConnection.profile.agentAdapter)
-      .buildSessionName(normalizedConnectionId);
-  final existingRuntime = controller.state.remoteRuntimeFor(
-    normalizedConnectionId,
-  );
-  final checkingRuntime = ConnectionRemoteRuntimeState(
-    hostCapability:
-        existingRuntime?.hostCapability ??
-        const ConnectionRemoteHostCapabilityState.unknown(),
-    server: ConnectionRemoteServerState.checking(
-      ownerId: normalizedConnectionId,
-      sessionName: sessionName,
-      detail: actionDetail,
-    ),
-  );
-  if (_canApplyWorkspaceRemoteRuntime(
-    controller,
+  return _WorkspaceRemoteServerActionContext(
+    controller: controller,
     connectionId: normalizedConnectionId,
+    savedConnection: savedConnection,
     refreshGeneration: refreshGeneration,
-  )) {
-    controller._applyState(
-      controller._state.copyWith(
-        remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
-          ...controller._state.remoteRuntimeByConnectionId,
-          normalizedConnectionId: checkingRuntime,
-        },
-      ),
-    );
-  }
-
-  Object? actionError;
-  StackTrace? actionStackTrace;
-  try {
-    await runAction(
-      profile: savedConnection.profile,
-      secrets: savedConnection.secrets,
-      ownerId: normalizedConnectionId,
-    );
-  } catch (error, stackTrace) {
-    // Always re-probe after an explicit lifecycle action so runtime truth comes
-    // from the remote host, even when the action itself fails.
-    actionError = error;
-    actionStackTrace = stackTrace;
-  }
-
-  final nextRuntime = await _refreshWorkspaceRemoteRuntime(
-    controller,
-    normalizedConnectionId,
-    profile: savedConnection.profile,
-    secrets: savedConnection.secrets,
   );
-  if (actionError != null &&
-      !_didWorkspaceRemoteServerActionSucceed(actionId, nextRuntime)) {
-    Error.throwWithStackTrace(actionError, actionStackTrace!);
-  }
-  return nextRuntime;
 }
 
-bool _didWorkspaceRemoteServerActionSucceed(
-  ConnectionSettingsRemoteServerActionId actionId,
-  ConnectionRemoteRuntimeState remoteRuntime,
-) {
-  if (!remoteRuntime.hostCapability.isSupported) {
-    return false;
+void _applyWorkspaceRemoteServerActionCheckingRuntime(
+  ConnectionWorkspaceController controller, {
+  required String connectionId,
+  required int refreshGeneration,
+  required ConnectionRemoteRuntimeState checkingRuntime,
+}) {
+  if (!_canApplyWorkspaceRemoteRuntime(
+    controller,
+    connectionId: connectionId,
+    refreshGeneration: refreshGeneration,
+  )) {
+    return;
   }
 
-  return switch (actionId) {
-    ConnectionSettingsRemoteServerActionId.start =>
-      remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
-    ConnectionSettingsRemoteServerActionId.stop =>
-      remoteRuntime.server.status == ConnectionRemoteServerStatus.notRunning,
-    ConnectionSettingsRemoteServerActionId.restart =>
-      remoteRuntime.server.status == ConnectionRemoteServerStatus.running,
-  };
+  controller._applyState(
+    controller._state.copyWith(
+      remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
+        ...controller._state.remoteRuntimeByConnectionId,
+        connectionId: checkingRuntime,
+      },
+    ),
+  );
+}
+
+void _applyWorkspaceRemoteServerActionResultRuntime(
+  ConnectionWorkspaceController controller, {
+  required String connectionId,
+  required int refreshGeneration,
+  required ConnectionRemoteRuntimeState nextRuntime,
+}) {
+  if (!_canApplyWorkspaceRemoteRuntime(
+    controller,
+    connectionId: connectionId,
+    refreshGeneration: refreshGeneration,
+  )) {
+    return;
+  }
+
+  controller._applyState(
+    controller._state.copyWith(
+      remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
+        ...controller._state.remoteRuntimeByConnectionId,
+        connectionId: nextRuntime,
+      },
+    ),
+  );
 }
