@@ -32,7 +32,6 @@ void main() {
       'lib/src/features/chat/lane/presentation/widgets/chat_empty_state_body_desktop.dart',
       'lib/src/features/chat/lane/presentation/widgets/chat_empty_state_body_mobile.dart',
       'lib/src/features/chat/lane/presentation/widgets/chat_empty_state_body_support.dart',
-      'lib/src/core/ui/primitives/pocket_meta_surface.dart',
       'lib/widgetbook/story_catalog.dart',
       'lib/src/features/workspace/presentation/workspace_saved_connections_content.dart',
       'lib/src/features/workspace/presentation/workspace_saved_connections_content_items.dart',

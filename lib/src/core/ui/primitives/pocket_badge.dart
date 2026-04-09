@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:pocket_relay/src/core/ui/layout/pocket_radii.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
-import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 
 class PocketTintBadge extends StatelessWidget {
   const PocketTintBadge({
@@ -71,41 +70,5 @@ class PocketSolidBadge extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class TranscriptBadge extends StatelessWidget {
-  const TranscriptBadge({super.key, required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return PocketTintBadge(label: label, color: color);
-  }
-}
-
-class InlinePulseChip extends StatelessWidget {
-  const InlinePulseChip({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = tealAccent(Theme.of(context).brightness);
-    return PocketTintBadge(label: label, color: accent);
-  }
-}
-
-class StateChip extends StatelessWidget {
-  const StateChip({super.key, required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return PocketSolidBadge(label: label, color: color);
   }
 }
