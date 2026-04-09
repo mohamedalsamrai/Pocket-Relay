@@ -22,14 +22,9 @@ Future<ConnectionRemoteRuntimeState> _refreshWorkspaceRemoteRuntime(
     resolvedSecrets = secrets ?? savedConnection.secrets;
   }
 
-  final refreshGeneration =
-      (controller
-              ._remoteRuntimeRefreshGenerationByConnectionId[normalizedConnectionId] ??
-          0) +
-      1;
-  controller
-          ._remoteRuntimeRefreshGenerationByConnectionId[normalizedConnectionId] =
-      refreshGeneration;
+  final refreshGeneration = controller._remoteRuntimeController.beginRefresh(
+    normalizedConnectionId,
+  );
 
   if (resolvedProfile.isLocal) {
     final nextRemoteRuntimeByConnectionId =
@@ -62,14 +57,14 @@ Future<ConnectionRemoteRuntimeState> _refreshWorkspaceRemoteRuntime(
       controller._state.copyWith(
         remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
           ...controller._state.remoteRuntimeByConnectionId,
-          normalizedConnectionId: controller._remoteRuntimeCoordinator
+          normalizedConnectionId: controller._remoteRuntimeController
               .buildProbeCheckingRuntime(),
         },
       ),
     );
   }
 
-  final nextRuntime = await controller._remoteRuntimeCoordinator.probe(
+  final nextRuntime = await controller._remoteRuntimeController.probe(
     profile: resolvedProfile,
     secrets: resolvedSecrets,
     ownerId: normalizedConnectionId,
@@ -99,8 +94,10 @@ bool _canApplyWorkspaceRemoteRuntime(
 }) {
   return !controller._isDisposed &&
       controller._state.catalog.connectionForId(connectionId) != null &&
-      controller._remoteRuntimeRefreshGenerationByConnectionId[connectionId] ==
-          refreshGeneration;
+      controller._remoteRuntimeController.isCurrentRefreshGeneration(
+        connectionId: connectionId,
+        refreshGeneration: refreshGeneration,
+      );
 }
 
 void _applyWorkspaceRemoteAttachRuntime(

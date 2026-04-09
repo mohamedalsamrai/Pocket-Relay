@@ -136,7 +136,7 @@ Future<void> _saveWorkspaceInactiveSavedConnection(
       );
   if (profile.isLocal) {
     nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
-    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+    controller._remoteRuntimeController.forgetConnection(
       normalizedConnectionId,
     );
   }
@@ -246,7 +246,7 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
       );
   if (profile.isLocal) {
     nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
-    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+    controller._remoteRuntimeController.forgetConnection(
       normalizedConnectionId,
     );
   }

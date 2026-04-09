@@ -18,12 +18,12 @@ import 'package:pocket_relay/src/features/connection_settings/application/connec
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_errors.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
-import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_recovery_persistence_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_remote_runtime_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -87,7 +87,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
              connectionRepository: connectionRepository,
              modelCatalogStore: modelCatalogStore,
            ),
-       _remoteRuntimeCoordinator = ConnectionRemoteRuntimeCoordinator(
+       _remoteRuntimeController = WorkspaceRemoteRuntimeController(
          remoteRuntimeDelegateFactory:
              _buildWorkspaceRemoteRuntimeDelegateFactory(
                remoteRuntimeDelegateFactory: remoteRuntimeDelegateFactory,
@@ -125,7 +125,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
   final CodexConnectionRepository _connectionRepository;
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionCapabilityAssets _connectionCapabilityAssets;
-  final ConnectionRemoteRuntimeCoordinator _remoteRuntimeCoordinator;
+  final WorkspaceRemoteRuntimeController _remoteRuntimeController;
   late final WorkspaceRecoveryPersistenceController
   _recoveryPersistenceController;
   final WorkspaceNow _now;
@@ -148,8 +148,6 @@ class ConnectionWorkspaceController extends ChangeNotifier
           StreamSubscription<AgentAdapterEvent> appServerEventSubscription,
         })
       >{};
-  final Map<String, int> _remoteRuntimeRefreshGenerationByConnectionId =
-      <String, int>{};
   final Set<String> _intentionalTransportDisconnectConnectionIds = <String>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
@@ -178,7 +176,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
     ConnectionSettingsSubmitPayload payload, {
     String? ownerId,
   }) {
-    return _remoteRuntimeCoordinator.probe(
+    return _remoteRuntimeController.probe(
       profile: payload.profile,
       secrets: payload.secrets,
       ownerId: ownerId,
