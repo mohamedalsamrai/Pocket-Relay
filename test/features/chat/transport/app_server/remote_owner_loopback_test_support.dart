@@ -75,6 +75,7 @@ final class RemoteOwnerLoopbackHarness {
       _buildFakeCodexShim(
         dartExecutable: dartExecutable,
         serverScriptPath: fakeCodexServer.path,
+        logFilePath: logFile.path,
       ),
     );
     await _writeExecutable(
@@ -103,7 +104,6 @@ final class RemoteOwnerLoopbackHarness {
     }
     final environment = <String, String>{
       'PATH': [binDir.path, _controlledSystemPath()].join(':'),
-      'POCKET_RELAY_FAKE_CODEX_LOG': logFile.path,
     };
 
     return RemoteOwnerLoopbackHarness._(
@@ -419,9 +419,11 @@ String _joinPath(String parent, String child) {
 String _buildFakeCodexShim({
   required String dartExecutable,
   required String serverScriptPath,
+  required String logFilePath,
 }) {
   final escapedDartExecutable = _shellEscape(dartExecutable);
   final escapedServerScriptPath = _shellEscape(serverScriptPath);
+  final escapedLogFilePath = _shellEscape(logFilePath);
   return '''
 #!/bin/bash
 set -euo pipefail
@@ -431,16 +433,12 @@ if [ "\${1-}" = "app-server" ] && [ "\${2-}" = "--help" ]; then
   exit 0
 fi
 
-log_file="\${POCKET_RELAY_FAKE_CODEX_LOG-}"
-if [ -n "\${log_file}" ]; then
-  printf 'fake codex invoked: %s\n' "\$*" >> "\${log_file}"
-fi
+log_file=$escapedLogFilePath
+printf 'fake codex invoked: %s\n' "\$*" >> "\${log_file}"
 
 if [ "\${1-}" != "app-server" ] || [ "\${2-}" != "--listen" ] || [ -z "\${3-}" ]; then
   echo "Unsupported fake codex invocation: \$*" >&2
-  if [ -n "\${log_file}" ]; then
-    printf 'fake codex unsupported invocation\n' >> "\${log_file}"
-  fi
+  printf 'fake codex unsupported invocation\n' >> "\${log_file}"
   exit 64
 fi
 
@@ -456,20 +454,14 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-if [ -n "\${log_file}" ]; then
-  $escapedDartExecutable $escapedServerScriptPath "\${listen_uri}" >> "\${log_file}" 2>&1 &
-else
-  $escapedDartExecutable $escapedServerScriptPath "\${listen_uri}" &
-fi
+$escapedDartExecutable $escapedServerScriptPath "\${listen_uri}" "\${log_file}" >> "\${log_file}" 2>&1 &
 child_pid=\$!
 if wait "\${child_pid}"; then
   child_exit=0
 else
   child_exit=\$?
 fi
-if [ -n "\${log_file}" ]; then
-  printf 'fake codex child exit=%s\n' "\${child_exit}" >> "\${log_file}"
-fi
+printf 'fake codex child exit=%s\n' "\${child_exit}" >> "\${log_file}"
 exit "\${child_exit}"
 ''';
 }
@@ -726,7 +718,9 @@ import 'dart:convert';
 import 'dart:io';
 
 Future<void> main(List<String> args) async {
-  final logPath = Platform.environment['POCKET_RELAY_FAKE_CODEX_LOG'];
+  final logPath = args.length > 1
+      ? args[1]
+      : Platform.environment['POCKET_RELAY_FAKE_CODEX_LOG'];
   Future<void> appendLog(String message) async {
     if (logPath == null || logPath.isEmpty) {
       return;
