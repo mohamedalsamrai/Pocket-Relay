@@ -623,18 +623,44 @@ void main() {
       final connection = await repository.loadConnection('conn_seed');
 
       expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(connection.id, 'conn_seed');
+      expect(connection.profile.label, legacyProfile.label);
+      expect(connection.profile.host, legacyProfile.host);
+      expect(connection.profile.port, legacyProfile.port);
+      expect(connection.profile.username, legacyProfile.username);
+      expect(connection.profile.workspaceDir, legacyProfile.workspaceDir);
+      expect(connection.profile.agentAdapter, legacyProfile.agentAdapter);
+      expect(connection.profile.agentCommand, legacyProfile.agentCommand);
+      expect(connection.profile.authMode, legacyProfile.authMode);
       expect(
-        connection,
-        SavedConnection(
-          id: 'conn_seed',
-          profile: legacyProfile,
-          secrets: const ConnectionSecrets(),
-        ),
+        connection.profile.hostFingerprint,
+        legacyProfile.hostFingerprint,
       );
+      expect(
+        connection.profile.dangerouslyBypassSandbox,
+        legacyProfile.dangerouslyBypassSandbox,
+      );
+      expect(
+        connection.profile.ephemeralSession,
+        legacyProfile.ephemeralSession,
+      );
+      expect(connection.profile.model, legacyProfile.model);
+      expect(connection.profile.reasoningEffort, legacyProfile.reasoningEffort);
+      expect(
+        connection.profile.connectionMode,
+        legacyProfile.connectionMode,
+      );
+      expect(connection.secrets, const ConnectionSecrets());
       expect(
         await preferences.getString('pocket_relay.profile'),
         jsonEncode(legacyProfile.toJson()),
       );
+      expect(await preferences.getString(workspaceIndexKey()), isNull);
+      expect(
+        await preferences.getString(workspaceProfileKey('conn_seed')),
+        isNull,
+      );
+      expect(await preferences.getString(systemIndexKey()), isNull);
       expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
     },
   );
