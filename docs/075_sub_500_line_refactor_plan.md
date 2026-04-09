@@ -1,15 +1,32 @@
 # 075 Sub-500-Line Refactor Plan
 
-## Goal
+## Status
 
-Reduce oversized Dart files into coherent ownership slices so that:
+Historical planning snapshot from an earlier stage of the sub-500-line refactor
+program.
+
+This file still captures the original direction of the work, but the live repo
+state has moved on. Some listed files have already been split, some target
+trees have shifted, and execution order is now tracked more accurately in the
+GitHub issue train.
+
+Use this file as background only. For current execution state, use:
+
+- `#102` for the non-test umbrella and progress comments
+- the active child issues such as `#107`, `#108`, `#109`, `#110`, and `#111`
+- the live LOC inventory from `origin/master`
+
+## Still-Useful Principles
+
+The principles below remain valid even though the concrete inventory and order
+have drifted:
 
 - no non-test Dart file exceeds 500 lines
 - public import paths stay stable unless there is a clear product reason to change them
 - private controller and presenter internals keep library privacy where it already exists
 - the split reduces future churn instead of creating a second shadow structure
 
-## Current Large Files
+## Historical Large-File Inventory
 
 - `lib/src/features/workspace/application/connection_workspace_controller_lifecycle.dart`
 - `lib/src/features/workspace/application/connection_workspace_controller.dart`
@@ -25,6 +42,8 @@ Reduce oversized Dart files into coherent ownership slices so that:
 - `lib/widgetbook/support/widgetbook_fixtures.dart`
 - `tool/capture_live_thread_read_fixture.dart`
 
+This inventory is not the live offender list anymore.
+
 ## Structural Rules
 
 - Keep `connection_workspace_controller.dart`, `connection_settings_presenter.dart`, and `connection_settings_host.dart` as the stable entry files.
@@ -33,7 +52,7 @@ Reduce oversized Dart files into coherent ownership slices so that:
 - Keep Widgetbook downstream-only. Story registration stays thin, and fixtures stay separate from real app code.
 - Treat `tool/` scripts as CLI entrypoints plus helpers, not monolith scripts.
 
-## Target Tree
+## Historical Target Tree
 
 ```text
 lib/
@@ -162,7 +181,9 @@ tool/
     json_io.dart
 ```
 
-## Execution Order
+This target tree is illustrative background, not a strict live migration map.
+
+## Historical Execution Order
 
 1. Split `workspace/application/controller/` first.
    This is the biggest concentration of continuity ownership and the most important downstream cost reducer.
@@ -177,7 +198,7 @@ tool/
 9. Split `tool/capture_live_thread_read_fixture.dart`.
 10. Split `testing/fake_client/`.
 
-## First Slice
+## Historical First Slice
 
 The first implementation slice is:
 

@@ -237,8 +237,11 @@ Repo rules for future agents.
 
 - Files under `docs/` must use a three-digit chronological prefix followed by
   `_`.
-- Assign the next available number when adding a new doc unless the user
+- Assign the next unused number when adding a new doc unless the user
   explicitly asks for renumbering.
+- Do not reuse an existing prefix for a new doc.
+- Existing historical duplicates should not be renumbered opportunistically as
+  part of unrelated work. Clean them up only in an explicit docs-admin pass.
 - Preserve prefixed filenames in links and references.
 
 ## 14. Codex history is upstream truth
