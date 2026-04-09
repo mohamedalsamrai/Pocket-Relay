@@ -232,6 +232,46 @@ void main() {
   );
 
   test(
+    'lifecycle persistence after failed cold-start recovery keeps the selected thread for the next launch retry',
+    () async {
+      const initialRecoveryState = ConnectionWorkspaceRecoveryState(
+        connectionId: 'conn_secondary',
+        selectedThreadId: 'thread_saved',
+        draftText: 'Restore my draft',
+        backgroundedLifecycleState:
+            ConnectionWorkspaceBackgroundLifecycleState.paused,
+      );
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore(
+        initialState: initialRecoveryState,
+      );
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_secondary']!.connectError =
+          const CodexAppServerException('connect failed');
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_secondary'),
+        ConnectionWorkspaceTransportRecoveryPhase.unavailable,
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
+    },
+  );
+
+  test(
     'initialization keeps the restored lane visible and marks remote session unavailable when cold-start transport bootstrap fails',
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');
