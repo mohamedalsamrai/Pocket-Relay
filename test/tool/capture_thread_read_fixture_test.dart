@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../tool/capture_live_thread_read_fixture/capture_options.dart';
+import '../../tool/capture_live_thread_read_fixture/capture_output.dart';
 import '../../tool/capture_live_thread_read_fixture.dart';
 
 void main() {
@@ -57,6 +59,50 @@ void main() {
   test('buildCodexLaunchInvocation rejects a blank command', () {
     expect(() => buildCodexLaunchInvocation('   '), throwsFormatException);
   });
+
+  test('CaptureOptions.parse rejects an invalid initialize timeout value', () {
+    final options = CaptureOptions.parse(<String>[
+      '--sanitized-output',
+      'fixture.json',
+      '--initialize-timeout-seconds',
+      'not-an-int',
+    ]);
+
+    expect(options, isNull);
+  });
+
+  test('CaptureOptions.parse rejects an invalid read timeout value', () {
+    final options = CaptureOptions.parse(<String>[
+      '--sanitized-output',
+      'fixture.json',
+      '--read-timeout-seconds',
+      'not-an-int',
+    ]);
+
+    expect(options, isNull);
+  });
+
+  test(
+    'buildThreadCaptureSummary counts raw item lists without deep copying',
+    () {
+      final summary = buildThreadCaptureSummary(<String, dynamic>{
+        'threadId': 'thread_123',
+        'turns': <Map<String, Object?>>[
+          <String, Object?>{
+            'items': <Object?>['a', 'b'],
+          },
+          <String, Object?>{
+            'items': <Object?>[1, 2, 3],
+          },
+          <String, Object?>{'items': 'not-a-list'},
+        ],
+      }, fallbackThreadId: 'fallback_thread');
+
+      expect(summary['threadId'], 'thread_123');
+      expect(summary['turnCount'], 3);
+      expect(summary['itemCountsByTurn'], <int>[2, 3, 0]);
+    },
+  );
 
   test(
     'startCodexLaunchInvocation passes the shell invocation through unchanged',
