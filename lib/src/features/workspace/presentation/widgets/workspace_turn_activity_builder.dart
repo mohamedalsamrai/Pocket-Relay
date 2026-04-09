@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
-import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_session_state.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_turn_activity.dart';
 
 typedef WorkspaceTurnActivityWidgetBuilder =
     Widget Function(BuildContext context, bool hasActiveTurn);
@@ -55,7 +55,10 @@ class _WorkspaceTurnActivityBuilderState
 
   @override
   Widget build(BuildContext context) {
-    return widget.builder(context, _hasActiveTurnAcrossLiveLanes());
+    return widget.builder(
+      context,
+      workspaceHasContinuityActiveTurn(widget.workspaceController),
+    );
   }
 
   void _handleWorkspaceChanged() {
@@ -101,40 +104,10 @@ class _WorkspaceTurnActivityBuilderState
   }
 
   Iterable<ChatSessionController> _liveSessionControllers() sync* {
-    final workspaceController = widget.workspaceController;
-    for (final connectionId in workspaceController.state.liveConnectionIds) {
-      final binding = workspaceController.bindingForConnectionId(connectionId);
-      if (binding != null) {
-        yield binding.sessionController;
-      }
+    for (final entry in workspaceLiveSessionControllers(
+      widget.workspaceController,
+    )) {
+      yield entry.sessionController;
     }
-  }
-
-  bool _hasActiveTurnAcrossLiveLanes() {
-    for (final controller in _liveSessionControllers()) {
-      if (_sessionHasActiveTurn(controller.sessionState)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _sessionHasActiveTurn(TranscriptSessionState sessionState) {
-    if (_turnKeepsWorkspaceActivity(sessionState.sessionActiveTurn)) {
-      return true;
-    }
-
-    for (final timeline in sessionState.timelinesByThreadId.values) {
-      if (_turnKeepsWorkspaceActivity(timeline.activeTurn)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _turnKeepsWorkspaceActivity(TranscriptActiveTurnState? activeTurn) {
-    return activeTurn?.timer.isRunning == true;
   }
 }
