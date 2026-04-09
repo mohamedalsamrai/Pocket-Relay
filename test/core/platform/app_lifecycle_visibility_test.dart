@@ -89,4 +89,35 @@ void main() {
 
     expect(visibilityListenable!.value, AppLifecycleVisibility.foreground);
   });
+
+  testWidgets('visibility scope exposes the shared visibility listenable', (
+    tester,
+  ) async {
+    final visibilityListenable = ValueNotifier<AppLifecycleVisibility>(
+      AppLifecycleVisibility.foreground,
+    );
+    addTearDown(visibilityListenable.dispose);
+    ValueListenable<AppLifecycleVisibility>? scopedListenable;
+
+    await tester.pumpWidget(
+      AppLifecycleVisibilityScope(
+        visibilityListenable: visibilityListenable,
+        child: Builder(
+          builder: (context) {
+            scopedListenable = AppLifecycleVisibilityScope.maybeListenableOf(
+              context,
+            );
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+
+    expect(scopedListenable, same(visibilityListenable));
+
+    visibilityListenable.value = AppLifecycleVisibility.background;
+    await tester.pump();
+
+    expect(scopedListenable!.value, AppLifecycleVisibility.background);
+  });
 }

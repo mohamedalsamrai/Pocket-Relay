@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
+
 import '../../support/workspace_surface_test_support.dart';
 
 export '../../support/workspace_surface_test_support.dart';
@@ -98,6 +101,23 @@ Future<void> pumpRemoteRuntimeNoticesSurface(
     buildWorkspaceDrivenLiveLaneApp(
       controller,
       settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> pumpScopedRemoteRuntimeNoticesSurface(
+  WidgetTester tester,
+  ConnectionWorkspaceController controller,
+  ValueListenable<AppLifecycleVisibility> visibilityListenable,
+) async {
+  await tester.pumpWidget(
+    AppLifecycleVisibilityScope(
+      visibilityListenable: visibilityListenable,
+      child: buildWorkspaceDrivenLiveLaneApp(
+        controller,
+        settingsOverlayDelegate: DeferredConnectionSettingsOverlayDelegate(),
+      ),
     ),
   );
   await tester.pumpAndSettle();
