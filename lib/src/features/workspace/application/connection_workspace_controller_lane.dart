@@ -157,8 +157,7 @@ void _terminateWorkspaceConnection(
       liveConnectionIds: terminationPlan.liveConnectionIds,
       selectedConnectionId: terminationPlan.selectedConnectionId,
       viewport: terminationPlan.viewport,
-      clearSelectedConnectionId:
-          terminationPlan.shouldClearSelectedConnectionId,
+      clearSelectedConnectionId: terminationPlan.selectedConnectionId == null,
       savedSettingsReconnectRequiredConnectionIds:
           _sanitizeWorkspaceReconnectRequiredIds(
             catalog: controller._state.catalog,

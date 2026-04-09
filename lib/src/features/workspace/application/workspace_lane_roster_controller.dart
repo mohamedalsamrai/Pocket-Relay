@@ -101,8 +101,6 @@ final class WorkspaceLaneTerminationPlan {
   final List<String> liveConnectionIds;
   final String? selectedConnectionId;
   final ConnectionWorkspaceViewport viewport;
-
-  bool get shouldClearSelectedConnectionId => selectedConnectionId == null;
 }
 
 String? _nextSelectedConnectionIdAfterRemoval({

@@ -55,7 +55,6 @@ void main() {
     expect(plan.liveConnectionIds, <String>['conn_primary', 'conn_tertiary']);
     expect(plan.selectedConnectionId, 'conn_tertiary');
     expect(plan.viewport, ConnectionWorkspaceViewport.liveLane);
-    expect(plan.shouldClearSelectedConnectionId, isFalse);
   });
 
   test('plans dormant roster fallback after removing the last live lane', () {
@@ -77,7 +76,6 @@ void main() {
     expect(plan.liveConnectionIds, isEmpty);
     expect(plan.selectedConnectionId, isNull);
     expect(plan.viewport, ConnectionWorkspaceViewport.savedConnections);
-    expect(plan.shouldClearSelectedConnectionId, isTrue);
   });
 }
 
