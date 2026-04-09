@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/agent_adapter_conversation_history_repository.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_desktop_shell.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/workspace_live_lane_surface.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/workspace_mobile_shell.dart';
 
 class PocketRelayShell extends StatelessWidget {
@@ -32,36 +32,20 @@ class PocketRelayShell extends StatelessWidget {
           return const PocketRelayBootstrapShell();
         }
 
-        if (platformPolicy.behavior.isMobileExperience) {
-          return ConnectionWorkspaceMobileShell(
+        return switch (platformPolicy.behavior.experience) {
+          PocketPlatformExperience.mobile => ConnectionWorkspaceMobileShell(
             workspaceController: workspaceController,
             platformPolicy: platformPolicy,
             conversationHistoryRepository: conversationHistoryRepository,
             settingsOverlayDelegate: settingsOverlayDelegate,
-          );
-        }
-
-        if (platformPolicy.behavior.isDesktopExperience) {
-          return ConnectionWorkspaceDesktopShell(
+          ),
+          PocketPlatformExperience.desktop => ConnectionWorkspaceDesktopShell(
             workspaceController: workspaceController,
             platformPolicy: platformPolicy,
             conversationHistoryRepository: conversationHistoryRepository,
             settingsOverlayDelegate: settingsOverlayDelegate,
-          );
-        }
-
-        final selectedLaneBinding = workspaceController.selectedLaneBinding;
-        if (selectedLaneBinding != null) {
-          return ConnectionWorkspaceLiveLaneSurface(
-            workspaceController: workspaceController,
-            laneBinding: selectedLaneBinding,
-            platformPolicy: platformPolicy,
-            conversationHistoryRepository: conversationHistoryRepository,
-            settingsOverlayDelegate: settingsOverlayDelegate,
-          );
-        }
-
-        return const PocketRelayBootstrapShell();
+          ),
+        };
       },
     );
   }
