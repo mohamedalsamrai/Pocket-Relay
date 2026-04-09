@@ -5,76 +5,61 @@ import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 
 void main() {
   test('projects Flutter app lifecycle states into visibility states', () {
-    expect(
-      appLifecycleVisibilityForState(null),
-      AppLifecycleVisibility.foreground,
-    );
-    expect(
-      appLifecycleVisibilityForState(AppLifecycleState.resumed),
-      AppLifecycleVisibility.foreground,
-    );
-    expect(
-      appLifecycleVisibilityForState(AppLifecycleState.inactive),
-      AppLifecycleVisibility.background,
-    );
-    expect(
-      appLifecycleVisibilityForState(AppLifecycleState.hidden),
-      AppLifecycleVisibility.background,
-    );
-    expect(
-      appLifecycleVisibilityForState(AppLifecycleState.paused),
-      AppLifecycleVisibility.background,
-    );
-    expect(
-      appLifecycleVisibilityForState(AppLifecycleState.detached),
-      AppLifecycleVisibility.detached,
-    );
+    final cases = <({AppLifecycleState? state, AppLifecycleVisibility result})>[
+      (state: null, result: AppLifecycleVisibility.foreground),
+      (
+        state: AppLifecycleState.resumed,
+        result: AppLifecycleVisibility.foreground,
+      ),
+      (
+        state: AppLifecycleState.inactive,
+        result: AppLifecycleVisibility.background,
+      ),
+      (
+        state: AppLifecycleState.hidden,
+        result: AppLifecycleVisibility.background,
+      ),
+      (
+        state: AppLifecycleState.paused,
+        result: AppLifecycleVisibility.background,
+      ),
+      (
+        state: AppLifecycleState.detached,
+        result: AppLifecycleVisibility.detached,
+      ),
+    ];
+
+    for (final testCase in cases) {
+      expect(
+        appLifecycleVisibilityForState(testCase.state),
+        testCase.result,
+        reason: '${testCase.state} should project to ${testCase.result}',
+      );
+    }
   });
 
   test('foreground visibility helpers match continuity host behavior', () {
-    expect(appLifecycleStateIsForegroundVisible(null), isTrue);
-    expect(
-      appLifecycleStateIsForegroundVisible(AppLifecycleState.resumed),
-      isTrue,
-    );
-    expect(
-      appLifecycleStateIsForegroundVisible(AppLifecycleState.inactive),
-      isFalse,
-    );
-    expect(
-      appLifecycleStateIsForegroundVisible(AppLifecycleState.hidden),
-      isFalse,
-    );
-    expect(
-      appLifecycleStateIsForegroundVisible(AppLifecycleState.paused),
-      isFalse,
-    );
-    expect(
-      appLifecycleStateIsForegroundVisible(AppLifecycleState.detached),
-      isFalse,
-    );
+    final cases = <({AppLifecycleState? state, bool isForeground})>[
+      (state: null, isForeground: true),
+      (state: AppLifecycleState.resumed, isForeground: true),
+      (state: AppLifecycleState.inactive, isForeground: false),
+      (state: AppLifecycleState.hidden, isForeground: false),
+      (state: AppLifecycleState.paused, isForeground: false),
+      (state: AppLifecycleState.detached, isForeground: false),
+    ];
 
-    expect(appLifecycleStateIsNotForegroundVisible(null), isFalse);
-    expect(
-      appLifecycleStateIsNotForegroundVisible(AppLifecycleState.resumed),
-      isFalse,
-    );
-    expect(
-      appLifecycleStateIsNotForegroundVisible(AppLifecycleState.inactive),
-      isTrue,
-    );
-    expect(
-      appLifecycleStateIsNotForegroundVisible(AppLifecycleState.hidden),
-      isTrue,
-    );
-    expect(
-      appLifecycleStateIsNotForegroundVisible(AppLifecycleState.paused),
-      isTrue,
-    );
-    expect(
-      appLifecycleStateIsNotForegroundVisible(AppLifecycleState.detached),
-      isTrue,
-    );
+    for (final testCase in cases) {
+      expect(
+        appLifecycleStateIsForegroundVisible(testCase.state),
+        testCase.isForeground,
+        reason: '${testCase.state} should match foreground visibility',
+      );
+      expect(
+        appLifecycleStateIsNotForegroundVisible(testCase.state),
+        !testCase.isForeground,
+        reason: '${testCase.state} should match non-foreground visibility',
+      );
+    }
   });
 
   testWidgets('visibility builder publishes projected lifecycle changes', (
