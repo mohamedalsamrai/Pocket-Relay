@@ -114,7 +114,7 @@ void main() {
 
     expect(
       find.textContaining(
-        '[${PocketErrorCatalog.chatSessionImageAttachmentUnsupportedType.code}]',
+        '[${PocketErrorCatalog.chatComposerImageAttachmentUnsupportedType.code}]',
       ),
       findsOneWidget,
     );
@@ -135,7 +135,7 @@ void main() {
 
     expect(
       find.textContaining(
-        '[${PocketErrorCatalog.chatSessionImageAttachmentUnexpectedFailure.code}]',
+        '[${PocketErrorCatalog.chatComposerImageAttachmentUnexpectedFailure.code}]',
       ),
       findsOneWidget,
     );
