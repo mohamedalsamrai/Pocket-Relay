@@ -8,7 +8,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);

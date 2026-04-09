@@ -274,7 +274,7 @@ void main() {
           ),
           modelCatalogStore: MemoryConnectionModelCatalogStore(),
           recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-          appServerClient: appServerClient,
+          agentAdapterClient: appServerClient,
         ),
       );
       await tester.pumpAndSettle();

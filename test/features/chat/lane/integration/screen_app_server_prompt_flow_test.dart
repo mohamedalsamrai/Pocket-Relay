@@ -9,7 +9,9 @@ void main() {
       ..startSessionModel = 'gpt-5.4';
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(buildCatalogApp(appServerClient: appServerClient));
+    await tester.pumpWidget(
+      buildCatalogApp(agentAdapterClient: appServerClient),
+    );
 
     await pumpAppReady(tester);
 
@@ -108,7 +110,9 @@ void main() {
       ..sendUserMessageError = StateError('transport broke');
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(buildCatalogApp(appServerClient: appServerClient));
+    await tester.pumpWidget(
+      buildCatalogApp(agentAdapterClient: appServerClient),
+    );
 
     await pumpAppReady(tester);
 
@@ -135,7 +139,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);
@@ -268,7 +272,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);
