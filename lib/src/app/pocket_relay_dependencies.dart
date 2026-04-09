@@ -10,8 +10,6 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner_ssh.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
@@ -25,12 +23,7 @@ class PocketRelayAppDependencies {
     this.conversationHistoryRepository,
     this.recoveryStore,
     this.agentAdapterClient,
-    @Deprecated('Use agentAdapterClient instead.') this.appServerClient,
     this.agentAdapterRemoteRuntimeDelegateFactory,
-    @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-    this.remoteAppServerHostProbe,
-    @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-    this.remoteAppServerOwnerInspector,
     this.backgroundGraceController,
     this.foregroundServiceController,
     this.notificationPermissionController,
@@ -46,14 +39,8 @@ class PocketRelayAppDependencies {
   final WorkspaceConversationHistoryRepository? conversationHistoryRepository;
   final ConnectionWorkspaceRecoveryStore? recoveryStore;
   final AgentAdapterClient? agentAdapterClient;
-  @Deprecated('Use agentAdapterClient instead.')
-  final AgentAdapterClient? appServerClient;
   final AgentAdapterRemoteRuntimeDelegateFactory?
   agentAdapterRemoteRuntimeDelegateFactory;
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  final CodexRemoteAppServerHostProbe? remoteAppServerHostProbe;
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  final CodexRemoteAppServerOwnerInspector? remoteAppServerOwnerInspector;
   final BackgroundGraceController? backgroundGraceController;
   final ForegroundServiceController? foregroundServiceController;
   final NotificationPermissionController? notificationPermissionController;
@@ -73,19 +60,10 @@ class PocketRelayAppDependencies {
         connectionRepository ??
         (ownedConnectionRepository ?? SecureCodexConnectionRepository());
     final resolvedPlatformPolicy = this.resolvedPlatformPolicy;
-    final resolvedRemoteOwnerInspector =
-        remoteAppServerOwnerInspector ??
-        const CodexSshRemoteAppServerOwnerInspector();
-    final resolvedRemoteHostProbe =
-        remoteAppServerHostProbe ?? resolvedRemoteOwnerInspector;
     final resolvedRemoteRuntimeDelegateFactory =
         agentAdapterRemoteRuntimeDelegateFactory ??
-        ((kind) => createDefaultAgentAdapterRemoteRuntimeDelegate(
-          kind,
-          remoteHostProbe: resolvedRemoteHostProbe,
-          remoteOwnerInspector: resolvedRemoteOwnerInspector,
-        ));
-    var usedInjectedAppServerClient = false;
+        ((kind) => createDefaultAgentAdapterRemoteRuntimeDelegate(kind));
+    var usedInjectedAgentAdapterClient = false;
 
     final workspaceController = ConnectionWorkspaceController(
       connectionRepository: resolvedConnectionRepository,
@@ -98,13 +76,12 @@ class PocketRelayAppDependencies {
             required String connectionId,
             required SavedConnection connection,
           }) {
-            final injectedAgentAdapterClient =
-                agentAdapterClient ?? appServerClient;
+            final injectedAgentAdapterClient = agentAdapterClient;
             final usingInjectedClient =
-                !usedInjectedAppServerClient &&
+                !usedInjectedAgentAdapterClient &&
                 injectedAgentAdapterClient != null;
             if (usingInjectedClient) {
-              usedInjectedAppServerClient = true;
+              usedInjectedAgentAdapterClient = true;
             }
 
             return ConnectionLaneBinding(
@@ -118,7 +95,6 @@ class PocketRelayAppDependencies {
                   : createDefaultAgentAdapterClient(
                       profile: connection.profile,
                       ownerId: connectionId,
-                      remoteOwnerInspector: resolvedRemoteOwnerInspector,
                     ),
               runtimeEventMapper: createAgentAdapterRuntimeEventMapper(
                 connection.profile.agentAdapter,

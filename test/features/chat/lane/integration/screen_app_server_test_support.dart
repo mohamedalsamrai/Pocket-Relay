@@ -6,8 +6,9 @@ import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
+
+import '../../../../support/fakes/fake_app_remote_runtime_delegate.dart';
 
 export 'package:flutter/material.dart';
 export 'package:flutter_test/flutter_test.dart';
@@ -43,32 +44,12 @@ SavedProfile savedProfile({
 
 PocketRelayApp buildCatalogApp({
   AgentAdapterClient? agentAdapterClient,
-  @Deprecated('Use agentAdapterClient instead.')
-  AgentAdapterClient? appServerClient,
   SavedProfile? savedProfile,
   CodexConnectionRepository? connectionRepository,
   AgentAdapterRemoteRuntimeDelegateFactory?
   agentAdapterRemoteRuntimeDelegateFactory,
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
-      const FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector =
-      const FakeRemoteOwnerInspector(
-        CodexRemoteAppServerOwnerSnapshot(
-          ownerId: 'conn_primary',
-          workspaceDir: '/workspace',
-          status: CodexRemoteAppServerOwnerStatus.stopped,
-          sessionName: 'pocket-relay-conn_primary',
-          detail: 'Managed remote app-server is not running.',
-        ),
-      ),
 }) {
-  final resolvedAgentAdapterClient = agentAdapterClient ?? appServerClient;
-  assert(
-    resolvedAgentAdapterClient != null,
-    'An agent adapter client is required.',
-  );
+  assert(agentAdapterClient != null, 'An agent adapter client is required.');
   return PocketRelayApp(
     connectionRepository:
         connectionRepository ??
@@ -78,16 +59,10 @@ PocketRelayApp buildCatalogApp({
         ),
     modelCatalogStore: MemoryConnectionModelCatalogStore(),
     recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-    agentAdapterClient: resolvedAgentAdapterClient!,
+    agentAdapterClient: agentAdapterClient!,
     agentAdapterRemoteRuntimeDelegateFactory:
-        agentAdapterRemoteRuntimeDelegateFactory,
-    remoteAppServerHostProbe: agentAdapterRemoteRuntimeDelegateFactory == null
-        ? remoteAppServerHostProbe
-        : null,
-    remoteAppServerOwnerInspector:
-        agentAdapterRemoteRuntimeDelegateFactory == null
-        ? remoteAppServerOwnerInspector
-        : null,
+        agentAdapterRemoteRuntimeDelegateFactory ??
+        fakeAppRemoteRuntimeDelegateFactory,
   );
 }
 
@@ -124,43 +99,4 @@ Future<void> pumpUntil(
     'title=${find.text('Pocket Relay').evaluate().length} '
     'configureRemote=${find.text('Configure remote').evaluate().length}',
   );
-}
-
-final class FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
-  const FakeRemoteHostProbe(this.capabilities);
-
-  final CodexRemoteAppServerHostCapabilities capabilities;
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return capabilities;
-  }
-}
-
-final class FakeRemoteOwnerInspector
-    implements CodexRemoteAppServerOwnerInspector {
-  const FakeRemoteOwnerInspector(this.snapshot);
-
-  final CodexRemoteAppServerOwnerSnapshot snapshot;
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    return snapshot;
-  }
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return const CodexRemoteAppServerHostCapabilities();
-  }
 }

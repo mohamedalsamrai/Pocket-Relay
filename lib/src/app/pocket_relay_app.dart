@@ -9,7 +9,6 @@ import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/core/theme/pocket_theme.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/agent_adapter_conversation_history_repository.dart';
@@ -25,12 +24,7 @@ class PocketRelayApp extends StatelessWidget {
     this.conversationHistoryRepository,
     this.recoveryStore,
     this.agentAdapterClient,
-    @Deprecated('Use agentAdapterClient instead.') this.appServerClient,
     this.agentAdapterRemoteRuntimeDelegateFactory,
-    @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-    this.remoteAppServerHostProbe,
-    @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-    this.remoteAppServerOwnerInspector,
     this.backgroundGraceController,
     this.foregroundServiceController,
     this.notificationPermissionController,
@@ -46,14 +40,8 @@ class PocketRelayApp extends StatelessWidget {
   final WorkspaceConversationHistoryRepository? conversationHistoryRepository;
   final ConnectionWorkspaceRecoveryStore? recoveryStore;
   final AgentAdapterClient? agentAdapterClient;
-  @Deprecated('Use agentAdapterClient instead.')
-  final AgentAdapterClient? appServerClient;
   final AgentAdapterRemoteRuntimeDelegateFactory?
   agentAdapterRemoteRuntimeDelegateFactory;
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  final CodexRemoteAppServerHostProbe? remoteAppServerHostProbe;
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  final CodexRemoteAppServerOwnerInspector? remoteAppServerOwnerInspector;
   final BackgroundGraceController? backgroundGraceController;
   final ForegroundServiceController? foregroundServiceController;
   final NotificationPermissionController? notificationPermissionController;
@@ -76,11 +64,9 @@ class PocketRelayApp extends StatelessWidget {
           modelCatalogStore: modelCatalogStore,
           conversationHistoryRepository: conversationHistoryRepository,
           recoveryStore: recoveryStore,
-          agentAdapterClient: agentAdapterClient ?? appServerClient,
+          agentAdapterClient: agentAdapterClient,
           agentAdapterRemoteRuntimeDelegateFactory:
               agentAdapterRemoteRuntimeDelegateFactory,
-          remoteAppServerHostProbe: remoteAppServerHostProbe,
-          remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
           backgroundGraceController: backgroundGraceController,
           foregroundServiceController: foregroundServiceController,
           notificationPermissionController: notificationPermissionController,

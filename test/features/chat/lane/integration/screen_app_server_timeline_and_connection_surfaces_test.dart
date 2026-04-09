@@ -7,7 +7,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(buildCatalogApp(appServerClient: appServerClient));
+    await tester.pumpWidget(
+      buildCatalogApp(agentAdapterClient: appServerClient),
+    );
 
     await pumpAppReady(tester);
 
@@ -94,7 +96,7 @@ void main() {
       await tester.pumpWidget(
         buildCatalogApp(
           connectionRepository: repository,
-          appServerClient: appServerClient,
+          agentAdapterClient: appServerClient,
         ),
       );
 
@@ -163,7 +165,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);
@@ -203,7 +205,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);
@@ -237,7 +239,7 @@ void main() {
       addTearDown(appServerClient.close);
 
       await tester.pumpWidget(
-        buildCatalogApp(appServerClient: appServerClient),
+        buildCatalogApp(agentAdapterClient: appServerClient),
       );
 
       await pumpAppReady(tester);
@@ -274,7 +276,9 @@ void main() {
     final appServerClient = FakeCodexAppServerClient();
     addTearDown(appServerClient.close);
 
-    await tester.pumpWidget(buildCatalogApp(appServerClient: appServerClient));
+    await tester.pumpWidget(
+      buildCatalogApp(agentAdapterClient: appServerClient),
+    );
 
     await pumpAppReady(tester);
 

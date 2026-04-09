@@ -12,12 +12,13 @@ import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
-import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_overlay_delegate.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+
+import '../fakes/fake_app_remote_runtime_delegate.dart';
 
 void registerAppTestStorageLifecycle() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -69,22 +70,15 @@ PocketRelayApp buildCatalogApp({
   NotificationPermissionController? notificationPermissionController,
   TurnCompletionAlertController? turnCompletionAlertController,
   AgentAdapterClient? agentAdapterClient,
-  @Deprecated('Use agentAdapterClient instead.')
-  AgentAdapterClient? appServerClient,
   AgentAdapterRemoteRuntimeDelegateFactory?
   agentAdapterRemoteRuntimeDelegateFactory,
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  CodexRemoteAppServerHostProbe? remoteAppServerHostProbe,
-  @Deprecated('Use agentAdapterRemoteRuntimeDelegateFactory instead.')
-  CodexRemoteAppServerOwnerInspector? remoteAppServerOwnerInspector,
   ConnectionSettingsOverlayDelegate? settingsOverlayDelegate,
   PocketPlatformPolicy? platformPolicy,
 }) {
   assert(
-    agentAdapterClient != null || appServerClient != null,
+    agentAdapterClient != null,
     'buildCatalogApp requires an AgentAdapterClient.',
   );
-  final resolvedAgentAdapterClient = agentAdapterClient ?? appServerClient;
   return PocketRelayApp(
     connectionRepository:
         connectionRepository ??
@@ -98,68 +92,15 @@ PocketRelayApp buildCatalogApp({
     backgroundGraceController: backgroundGraceController,
     notificationPermissionController: notificationPermissionController,
     turnCompletionAlertController: turnCompletionAlertController,
-    agentAdapterClient: resolvedAgentAdapterClient!,
+    agentAdapterClient: agentAdapterClient!,
     agentAdapterRemoteRuntimeDelegateFactory:
-        agentAdapterRemoteRuntimeDelegateFactory,
-    remoteAppServerHostProbe: agentAdapterRemoteRuntimeDelegateFactory == null
-        ? remoteAppServerHostProbe ??
-              const FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities())
-        : null,
-    remoteAppServerOwnerInspector:
-        agentAdapterRemoteRuntimeDelegateFactory == null
-        ? remoteAppServerOwnerInspector ??
-              FakeRemoteOwnerInspector(
-                const CodexRemoteAppServerOwnerSnapshot(
-                  ownerId: 'conn_primary',
-                  workspaceDir: '/workspace',
-                  status: CodexRemoteAppServerOwnerStatus.missing,
-                ),
-              )
-        : null,
+        agentAdapterRemoteRuntimeDelegateFactory ??
+        fakeAppRemoteRuntimeDelegateFactory,
     settingsOverlayDelegate:
         settingsOverlayDelegate ??
         const ModalConnectionSettingsOverlayDelegate(),
     platformPolicy: platformPolicy,
   );
-}
-
-final class FakeRemoteHostProbe implements CodexRemoteAppServerHostProbe {
-  const FakeRemoteHostProbe(this.capabilities);
-
-  final CodexRemoteAppServerHostCapabilities capabilities;
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return capabilities;
-  }
-}
-
-final class FakeRemoteOwnerInspector
-    implements CodexRemoteAppServerOwnerInspector {
-  const FakeRemoteOwnerInspector(this.snapshot);
-
-  final CodexRemoteAppServerOwnerSnapshot snapshot;
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return const CodexRemoteAppServerHostCapabilities();
-  }
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    return snapshot;
-  }
 }
 
 class DeferredConnectionRepository implements CodexConnectionRepository {
