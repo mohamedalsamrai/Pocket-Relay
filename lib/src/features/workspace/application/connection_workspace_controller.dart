@@ -21,6 +21,7 @@ import 'package:pocket_relay/src/features/connection_settings/domain/connection_
 import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -51,7 +52,8 @@ typedef ConnectionLaneBindingFactory =
     });
 typedef WorkspaceNow = DateTime Function();
 
-class ConnectionWorkspaceController extends ChangeNotifier {
+class ConnectionWorkspaceController extends ChangeNotifier
+    implements WorkspaceDeviceContinuityWarningSink {
   ConnectionWorkspaceController({
     required CodexConnectionRepository connectionRepository,
     required ConnectionLaneBindingFactory laneBindingFactory,
@@ -321,20 +323,12 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _showWorkspaceSavedSystems(this);
   }
 
-  void setForegroundServiceWarning(PocketUserFacingError? warning) {
-    _setWorkspaceForegroundServiceWarning(this, warning);
-  }
-
-  void setBackgroundGraceWarning(PocketUserFacingError? warning) {
-    _setWorkspaceBackgroundGraceWarning(this, warning);
-  }
-
-  void setWakeLockWarning(PocketUserFacingError? warning) {
-    _setWorkspaceWakeLockWarning(this, warning);
-  }
-
-  void setTurnCompletionAlertWarning(PocketUserFacingError? warning) {
-    _setWorkspaceTurnCompletionAlertWarning(this, warning);
+  @override
+  void setDeviceContinuityWarning(
+    WorkspaceDeviceContinuityWarningTarget target,
+    PocketUserFacingError? warning,
+  ) {
+    _setWorkspaceDeviceContinuityWarning(this, target, warning);
   }
 
   void terminateConnection(String connectionId) {

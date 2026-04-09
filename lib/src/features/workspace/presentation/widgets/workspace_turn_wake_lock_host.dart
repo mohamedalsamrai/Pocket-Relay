@@ -1,12 +1,14 @@
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/display_wake_lock_host.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_activity_builder.dart';
 
 class WorkspaceTurnWakeLockHost extends StatelessWidget {
   const WorkspaceTurnWakeLockHost({
     super.key,
     required this.workspaceController,
+    required this.onWarningChanged,
     required this.child,
     this.displayWakeLockController =
         const WakelockPlusDisplayWakeLockController(),
@@ -14,6 +16,7 @@ class WorkspaceTurnWakeLockHost extends StatelessWidget {
   });
 
   final ConnectionWorkspaceController workspaceController;
+  final WorkspaceDeviceContinuityWarningChanged onWarningChanged;
   final Widget child;
   final DisplayWakeLockController displayWakeLockController;
   final bool? supportsWakeLock;
@@ -27,7 +30,7 @@ class WorkspaceTurnWakeLockHost extends StatelessWidget {
           displayWakeLockController: displayWakeLockController,
           supportsWakeLock: supportsWakeLock,
           keepDisplayAwake: hasActiveTurn,
-          onWarningChanged: workspaceController.setWakeLockWarning,
+          onWarningChanged: onWarningChanged,
           child: child,
         );
       },
