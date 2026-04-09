@@ -1,18 +1,111 @@
-part of 'codex_connection_repository.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
 
-MemoryCodexConnectionRepository _memoryRepositorySingle({
-  required SavedProfile savedProfile,
-  required String connectionId,
-}) {
-  return MemoryCodexConnectionRepository(
-    initialConnections: <SavedConnection>[
-      SavedConnection(
-        id: connectionId,
-        profile: savedProfile.profile,
-        secrets: savedProfile.secrets,
-      ),
-    ],
-  );
+import 'connection_repository_contract.dart';
+import 'connection_repository_normalization.dart';
+
+class MemoryCodexConnectionRepository implements CodexConnectionRepository {
+  MemoryCodexConnectionRepository({
+    Iterable<SavedConnection> initialConnections = const <SavedConnection>[],
+    Iterable<SavedWorkspace> initialWorkspaces = const <SavedWorkspace>[],
+    Iterable<SavedSystem> initialSystems = const <SavedSystem>[],
+    ConnectionIdGenerator? connectionIdGenerator,
+    SystemIdGenerator? systemIdGenerator,
+  }) : _workspaceIdGenerator =
+           connectionIdGenerator ?? _defaultMemoryConnectionIdGenerator(),
+       _systemIdGenerator =
+           systemIdGenerator ?? _defaultMemorySystemIdGenerator() {
+    _seedMemoryRepository(
+      this,
+      initialConnections: initialConnections,
+      initialWorkspaces: initialWorkspaces,
+      initialSystems: initialSystems,
+    );
+  }
+
+  factory MemoryCodexConnectionRepository.single({
+    required SavedProfile savedProfile,
+    String connectionId = 'conn_1',
+  }) {
+    return MemoryCodexConnectionRepository(
+      initialConnections: <SavedConnection>[
+        SavedConnection(
+          id: connectionId,
+          profile: savedProfile.profile,
+          secrets: savedProfile.secrets,
+        ),
+      ],
+    );
+  }
+
+  late final Map<String, SavedWorkspace> _workspacesById;
+  late final List<String> _orderedWorkspaceIds;
+  late final Map<String, SavedSystem> _systemsById;
+  late final List<String> _orderedSystemIds;
+  final ConnectionIdGenerator _workspaceIdGenerator;
+  final SystemIdGenerator _systemIdGenerator;
+
+  @override
+  Future<WorkspaceCatalogState> loadWorkspaceCatalog() =>
+      _memoryLoadWorkspaceCatalog(this);
+
+  @override
+  Future<SystemCatalogState> loadSystemCatalog() =>
+      _memoryLoadSystemCatalog(this);
+
+  @override
+  Future<SavedWorkspace> loadWorkspace(String workspaceId) =>
+      _memoryLoadWorkspace(this, workspaceId);
+
+  @override
+  Future<SavedSystem> loadSystem(String systemId) =>
+      _memoryLoadSystem(this, systemId);
+
+  @override
+  Future<SavedWorkspace> createWorkspace({required WorkspaceProfile profile}) =>
+      _memoryCreateWorkspace(this, profile: profile);
+
+  @override
+  Future<SavedSystem> createSystem({
+    required SystemProfile profile,
+    required ConnectionSecrets secrets,
+  }) => _memoryCreateSystem(this, profile: profile, secrets: secrets);
+
+  @override
+  Future<void> saveWorkspace(SavedWorkspace workspace) =>
+      _memorySaveWorkspace(this, workspace);
+
+  @override
+  Future<void> saveSystem(SavedSystem system) =>
+      _memorySaveSystem(this, system);
+
+  @override
+  Future<void> deleteWorkspace(String workspaceId) =>
+      _memoryDeleteWorkspace(this, workspaceId);
+
+  @override
+  Future<void> deleteSystem(String systemId) =>
+      _memoryDeleteSystem(this, systemId);
+
+  @override
+  Future<ConnectionCatalogState> loadCatalog() => _memoryLoadCatalog(this);
+
+  @override
+  Future<SavedConnection> loadConnection(String connectionId) =>
+      _memoryLoadConnection(this, connectionId);
+
+  @override
+  Future<SavedConnection> createConnection({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) => _memoryCreateConnection(this, profile: profile, secrets: secrets);
+
+  @override
+  Future<void> saveConnection(SavedConnection connection) =>
+      _memorySaveConnection(this, connection);
+
+  @override
+  Future<void> deleteConnection(String connectionId) =>
+      _memoryDeleteConnection(this, connectionId);
 }
 
 void _seedMemoryRepository(
@@ -35,14 +128,14 @@ void _seedMemoryRepository(
   ];
 
   for (final connection in initialConnections) {
-    final resolvedSystemProfile = _normalizeSystemFingerprintFromHostIdentity(
+    final resolvedSystemProfile = normalizeSystemFingerprintFromHostIdentity(
       systemProfileFromConnectionProfile(connection.profile),
       repository._systemsById.values,
     );
     final resolvedSystemId =
         connection.profile.isRemote &&
-            _shouldPersistSystem(resolvedSystemProfile, connection.secrets)
-        ? _matchingSystem(
+            shouldPersistSystem(resolvedSystemProfile, connection.secrets)
+        ? matchingSystem(
                 repository._systemsById.values,
                 profile: resolvedSystemProfile,
                 secrets: connection.secrets,
@@ -151,7 +244,7 @@ Future<void> _memorySaveWorkspace(
   MemoryCodexConnectionRepository repository,
   SavedWorkspace workspace,
 ) async {
-  final normalizedWorkspace = _normalizeWorkspace(workspace);
+  final normalizedWorkspace = normalizeWorkspace(workspace);
   final exists = repository._workspacesById.containsKey(normalizedWorkspace.id);
   repository._workspacesById[normalizedWorkspace.id] = normalizedWorkspace;
   if (!exists) {
@@ -163,7 +256,7 @@ Future<void> _memorySaveSystem(
   MemoryCodexConnectionRepository repository,
   SavedSystem system,
 ) async {
-  final normalizedSystem = _normalizeSystem(system);
+  final normalizedSystem = normalizeSystem(system);
   final exists = repository._systemsById.containsKey(normalizedSystem.id);
   repository._systemsById[normalizedSystem.id] = normalizedSystem;
   if (!exists) {
@@ -183,7 +276,7 @@ Future<void> _memoryDeleteSystem(
   MemoryCodexConnectionRepository repository,
   String systemId,
 ) async {
-  if (_workspaceCountForSystem(repository._workspacesById.values, systemId) >
+  if (workspaceCountForSystem(repository._workspacesById.values, systemId) >
       0) {
     throw StateError(
       'Cannot delete a system that is still used by a workspace.',
@@ -255,26 +348,26 @@ Future<void> _memoryPersistResolvedConnection(
   MemoryCodexConnectionRepository repository,
   SavedConnection connection,
 ) async {
-  final normalizedConnection = _normalizeConnection(connection);
+  final normalizedConnection = normalizeConnection(connection);
   final existingWorkspace = repository._workspacesById[normalizedConnection.id];
   String? systemId;
-  final resolvedSystemProfile = _normalizeSystemFingerprintFromHostIdentity(
+  final resolvedSystemProfile = normalizeSystemFingerprintFromHostIdentity(
     systemProfileFromConnectionProfile(normalizedConnection.profile),
     repository._systemsById.values,
   );
   if (normalizedConnection.profile.isRemote &&
-      _shouldPersistSystem(
+      shouldPersistSystem(
         resolvedSystemProfile,
         normalizedConnection.secrets,
       )) {
-    final existingSystem = _matchingSystem(
+    final existingSystem = matchingSystem(
       repository._systemsById.values,
       profile: resolvedSystemProfile,
       secrets: normalizedConnection.secrets,
     );
     systemId = existingSystem?.id;
     if (existingSystem != null) {
-      final mergedProfile = _mergeSystemFingerprint(
+      final mergedProfile = mergeSystemFingerprint(
         existingSystem.profile,
         resolvedSystemProfile,
       );
@@ -309,7 +402,7 @@ Future<void> _memoryPersistResolvedConnection(
     if (fingerprintToShare.isNotEmpty) {
       for (final entry in repository._systemsById.entries.toList()) {
         final savedSystem = entry.value;
-        if (!_sameSystemHostIdentity(
+        if (!sameSystemHostIdentity(
               savedSystem.profile,
               resolvedSystemProfile,
             ) ||
@@ -363,4 +456,14 @@ String _memoryInsertSystem(
   );
   repository._orderedSystemIds.add(systemId);
   return systemId;
+}
+
+ConnectionIdGenerator _defaultMemoryConnectionIdGenerator() {
+  var nextId = 1;
+  return () => 'conn_memory_${nextId++}';
+}
+
+SystemIdGenerator _defaultMemorySystemIdGenerator() {
+  var nextId = 1;
+  return () => 'sys_memory_${nextId++}';
 }
