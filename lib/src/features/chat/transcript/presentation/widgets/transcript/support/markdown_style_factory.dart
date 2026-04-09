@@ -17,6 +17,25 @@ MarkdownStyleSheet buildConversationMarkdownStyle({
     ),
     codeblockPadding: const EdgeInsets.all(12),
     codeblockDecoration: _codeBlockDecoration(cards),
+    tableBody: theme.textTheme.bodyMedium?.copyWith(
+      color: cards.textPrimary,
+      fontSize: isAssistant ? 14 : 13,
+      height: 1.35,
+    ),
+    tableHead: theme.textTheme.bodyMedium?.copyWith(
+      color: cards.textPrimary,
+      fontSize: isAssistant ? 14 : 13,
+      fontWeight: FontWeight.w700,
+      height: 1.35,
+    ),
+    tableBorder: TableBorder.all(color: cards.neutralBorder),
+    tableColumnWidth: const IntrinsicColumnWidth(),
+    tableScrollbarThumbVisibility: true,
+    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    tableHeadCellsPadding: const EdgeInsets.symmetric(
+      horizontal: 10,
+      vertical: 8,
+    ),
     blockquoteDecoration: BoxDecoration(
       color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
       borderRadius: BorderRadius.circular(12),
@@ -54,6 +73,25 @@ MarkdownStyleSheet buildPlanMarkdownStyle({
     ),
     codeblockPadding: const EdgeInsets.all(12),
     codeblockDecoration: _codeBlockDecoration(cards),
+    tableBody: theme.textTheme.bodyMedium?.copyWith(
+      color: cards.textPrimary,
+      fontSize: 13,
+      height: 1.35,
+    ),
+    tableHead: theme.textTheme.bodyMedium?.copyWith(
+      color: cards.textPrimary,
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      height: 1.35,
+    ),
+    tableBorder: TableBorder.all(color: cards.neutralBorder),
+    tableColumnWidth: const IntrinsicColumnWidth(),
+    tableScrollbarThumbVisibility: true,
+    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    tableHeadCellsPadding: const EdgeInsets.symmetric(
+      horizontal: 10,
+      vertical: 8,
+    ),
     blockquoteDecoration: BoxDecoration(
       color: cards.tintedSurface(accent, lightAlpha: 0.08, darkAlpha: 0.18),
       borderRadius: BorderRadius.circular(12),

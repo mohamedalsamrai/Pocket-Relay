@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pocket_relay/src/core/ui/layout/pocket_spacing.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_ui_block.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_palette.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/markdown_style_factory.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_item_primitives.dart';
+import 'package:pocket_relay/src/features/chat/transcript/presentation/widgets/transcript/support/transcript_markdown_body.dart';
 
 class ProposedPlanSurface extends StatefulWidget {
   const ProposedPlanSurface({super.key, required this.block});
@@ -52,11 +52,10 @@ class _ProposedPlanSurfaceState extends State<ProposedPlanSurface> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MarkdownBody(
+          TranscriptMarkdownBody(
             data: displayedText.trim().isEmpty
                 ? '_Waiting for plan…_'
                 : displayedText,
-            selectable: true,
             styleSheet: markdownStyle,
           ),
           if (canCollapse) ...[

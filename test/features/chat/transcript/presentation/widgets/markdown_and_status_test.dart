@@ -1,3 +1,4 @@
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:pocket_relay/src/core/theme/pocket_typography.dart';
 import 'ui_block_surface_test_support.dart';
 
@@ -79,6 +80,162 @@ void main() {
     expect(inlineCodeStyle, isNotNull);
     expect(inlineCodeStyle?.fontFamily, PocketFontFamilies.monospace);
     expect(inlineCodeStyle?.backgroundColor, const Color(0xFFE8E0CF));
+  });
+
+  testWidgets(
+    'opens assistant markdown links through the transcript launcher',
+    (tester) async {
+      final openedLinks = <Uri>[];
+
+      await tester.pumpWidget(
+        buildTestApp(
+          child: TranscriptMarkdownLinkLauncherScope(
+            launcher: (uri) async => openedLinks.add(uri),
+            child: entrySurface(
+              block: TranscriptTextBlock(
+                id: 'assistant_link_1',
+                kind: TranscriptUiBlockKind.assistantMessage,
+                createdAt: DateTime(2026, 3, 14, 12),
+                title: 'Assistant',
+                body:
+                    'Open [the docs](https://example.test/docs?q=relay#setup).',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+      markdown.onTapLink?.call(
+        'the docs',
+        'https://example.test/docs?q=relay#setup',
+        '',
+      );
+      await tester.pump();
+
+      expect(openedLinks, hasLength(1));
+      expect(
+        openedLinks.single.toString(),
+        'https://example.test/docs?q=relay#setup',
+      );
+    },
+  );
+
+  testWidgets('ignores non-web transcript markdown links', (tester) async {
+    final openedLinks = <Uri>[];
+
+    await tester.pumpWidget(
+      buildTestApp(
+        child: TranscriptMarkdownLinkLauncherScope(
+          launcher: (uri) async => openedLinks.add(uri),
+          child: entrySurface(
+            block: TranscriptTextBlock(
+              id: 'assistant_relative_link_1',
+              kind: TranscriptUiBlockKind.assistantMessage,
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Assistant',
+              body: 'Open [local](/internal/path).',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    markdown.onTapLink?.call('local', '/internal/path', '');
+    await tester.pump();
+
+    expect(openedLinks, isEmpty);
+  });
+
+  testWidgets('uses the transcript link launcher for reasoning markdown', (
+    tester,
+  ) async {
+    final openedLinks = <Uri>[];
+
+    await tester.pumpWidget(
+      buildTestApp(
+        child: TranscriptMarkdownLinkLauncherScope(
+          launcher: (uri) async => openedLinks.add(uri),
+          child: entrySurface(
+            block: TranscriptTextBlock(
+              id: 'reasoning_link_1',
+              kind: TranscriptUiBlockKind.reasoning,
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Reasoning',
+              body: 'Check [reference](https://example.test/reference).',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    markdown.onTapLink?.call('reference', 'https://example.test/reference', '');
+    await tester.pump();
+
+    expect(openedLinks.single.toString(), 'https://example.test/reference');
+  });
+
+  testWidgets('uses the transcript link launcher for proposed-plan markdown', (
+    tester,
+  ) async {
+    final openedLinks = <Uri>[];
+
+    await tester.pumpWidget(
+      buildTestApp(
+        child: TranscriptMarkdownLinkLauncherScope(
+          launcher: (uri) async => openedLinks.add(uri),
+          child: entrySurface(
+            block: TranscriptProposedPlanBlock(
+              id: 'plan_link_1',
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Proposed plan',
+              markdown: 'Read [handoff](https://example.test/handoff).',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    markdown.onTapLink?.call('handoff', 'https://example.test/handoff', '');
+    await tester.pump();
+
+    expect(openedLinks.single.toString(), 'https://example.test/handoff');
+  });
+
+  testWidgets('renders wide markdown tables in a horizontal scroll container', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 600));
+    addTearDown(() async => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      buildTestApp(
+        child: SizedBox(
+          width: 220,
+          child: entrySurface(
+            block: TranscriptTextBlock(
+              id: 'assistant_table_1',
+              kind: TranscriptUiBlockKind.assistantMessage,
+              createdAt: DateTime(2026, 3, 14, 12),
+              title: 'Assistant',
+              body:
+                  '| Very long heading A | Very long heading B | Very long heading C |\n'
+                  '| --- | --- | --- |\n'
+                  '| Long cell value A | Long cell value B | Long cell value C |',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final horizontalScrollViews = tester
+        .widgetList<SingleChildScrollView>(find.byType(SingleChildScrollView))
+        .where((widget) => widget.scrollDirection == Axis.horizontal);
+
+    expect(horizontalScrollViews, isNotEmpty);
   });
 
   testWidgets(
