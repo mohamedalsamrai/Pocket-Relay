@@ -6,57 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pocket_relay/src/core/storage/shared_preferences_async_migration.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 
-class ConnectionWorkspaceRecoveryState {
-  const ConnectionWorkspaceRecoveryState({
-    required this.connectionId,
-    required this.draftText,
-    this.selectedThreadId,
-    this.backgroundedAt,
-    this.backgroundedLifecycleState,
-  });
-
-  final String connectionId;
-  final String draftText;
-  final String? selectedThreadId;
-  final DateTime? backgroundedAt;
-  final ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState;
-
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'connectionId': connectionId,
-      'draftText': draftText,
-      'selectedThreadId': selectedThreadId,
-      'backgroundedAt': backgroundedAt?.toIso8601String(),
-      'backgroundedLifecycleState': backgroundedLifecycleState?.name,
-    };
-  }
-
-  factory ConnectionWorkspaceRecoveryState.fromJson(Map<String, dynamic> json) {
-    return ConnectionWorkspaceRecoveryState(
-      connectionId: _normalizedRecoveryString(json['connectionId']) ?? '',
-      draftText: json['draftText'] as String? ?? '',
-      selectedThreadId: _normalizedRecoveryString(json['selectedThreadId']),
-      backgroundedAt: _parseRecoveryDateTime(json['backgroundedAt']),
-      backgroundedLifecycleState: _parseBackgroundLifecycleState(
-        json['backgroundedLifecycleState'],
-      ),
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is ConnectionWorkspaceRecoveryState &&
-        other.connectionId == connectionId &&
-        other.draftText == draftText &&
-        other.selectedThreadId == selectedThreadId &&
-        other.backgroundedAt == backgroundedAt;
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(connectionId, draftText, selectedThreadId, backgroundedAt);
-}
-
 abstract interface class ConnectionWorkspaceRecoveryStore {
   Future<ConnectionWorkspaceRecoveryState?> load();
 
@@ -186,6 +135,7 @@ class SecureConnectionWorkspaceRecoveryStore
       selectedThreadId: state.selectedThreadId,
       draftText: effectiveDraftText,
       backgroundedAt: state.backgroundedAt,
+      backgroundedLifecycleState: state.backgroundedLifecycleState,
     );
   }
 

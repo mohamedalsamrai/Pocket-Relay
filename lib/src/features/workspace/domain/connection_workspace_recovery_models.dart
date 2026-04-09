@@ -4,6 +4,64 @@ enum ConnectionWorkspaceViewport { liveLane, savedConnections, savedSystems }
 
 enum ConnectionWorkspaceBackgroundLifecycleState { inactive, hidden, paused }
 
+@immutable
+class ConnectionWorkspaceRecoveryState {
+  const ConnectionWorkspaceRecoveryState({
+    required this.connectionId,
+    required this.draftText,
+    this.selectedThreadId,
+    this.backgroundedAt,
+    this.backgroundedLifecycleState,
+  });
+
+  final String connectionId;
+  final String draftText;
+  final String? selectedThreadId;
+  final DateTime? backgroundedAt;
+  final ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState;
+
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'connectionId': connectionId,
+      'draftText': draftText,
+      'selectedThreadId': selectedThreadId,
+      'backgroundedAt': backgroundedAt?.toIso8601String(),
+      'backgroundedLifecycleState': backgroundedLifecycleState?.name,
+    };
+  }
+
+  factory ConnectionWorkspaceRecoveryState.fromJson(Map<String, dynamic> json) {
+    return ConnectionWorkspaceRecoveryState(
+      connectionId: _normalizedRecoveryString(json['connectionId']) ?? '',
+      draftText: json['draftText'] as String? ?? '',
+      selectedThreadId: _normalizedRecoveryString(json['selectedThreadId']),
+      backgroundedAt: _parseRecoveryDateTime(json['backgroundedAt']),
+      backgroundedLifecycleState: _parseBackgroundLifecycleState(
+        json['backgroundedLifecycleState'],
+      ),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ConnectionWorkspaceRecoveryState &&
+        other.connectionId == connectionId &&
+        other.draftText == draftText &&
+        other.selectedThreadId == selectedThreadId &&
+        other.backgroundedAt == backgroundedAt &&
+        other.backgroundedLifecycleState == backgroundedLifecycleState;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    connectionId,
+    draftText,
+    selectedThreadId,
+    backgroundedAt,
+    backgroundedLifecycleState,
+  );
+}
+
 enum ConnectionWorkspaceReconnectRequirement {
   savedSettings,
   transport,
@@ -68,6 +126,38 @@ enum ConnectionWorkspaceTurnLivenessEvidence {
   ownerUnavailable,
   transportUnavailable,
   adapterUnverifiable,
+}
+
+DateTime? _parseRecoveryDateTime(Object? value) {
+  if (value is! String || value.trim().isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value);
+}
+
+String? _normalizedRecoveryString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final normalizedValue = value.trim();
+  return normalizedValue.isEmpty ? null : normalizedValue;
+}
+
+ConnectionWorkspaceBackgroundLifecycleState? _parseBackgroundLifecycleState(
+  Object? value,
+) {
+  final normalizedValue = _normalizedRecoveryString(value);
+  if (normalizedValue == null) {
+    return null;
+  }
+
+  for (final lifecycleState
+      in ConnectionWorkspaceBackgroundLifecycleState.values) {
+    if (lifecycleState.name == normalizedValue) {
+      return lifecycleState;
+    }
+  }
+  return null;
 }
 
 @immutable

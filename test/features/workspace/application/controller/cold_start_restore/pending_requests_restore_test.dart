@@ -2,7 +2,7 @@ import '../controller_test_support.dart';
 
 void main() {
   test(
-    'initialization keeps live reattach as the default when cold-start resume replays pending requests',
+    'initialization clears reconnect state when cold-start resume replays pending requests',
     () async {
       const replayedRequest = CodexAppServerRequestEvent(
         requestId: 'input_restore_1',
@@ -68,15 +68,12 @@ void main() {
             .map((block) => block.body),
         contains('Restored answer'),
       );
-      expect(
-        controller.state.liveReattachPhaseFor('conn_secondary'),
-        ConnectionWorkspaceLiveReattachPhase.liveReattached,
-      );
+      expect(controller.state.liveReattachPhaseFor('conn_secondary'), isNull);
       expect(
         controller.state
             .recoveryDiagnosticsFor('conn_secondary')!
             .lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.liveReattached,
+        ConnectionWorkspaceRecoveryOutcome.transportRestored,
       );
     },
   );

@@ -33,10 +33,7 @@ void main() {
         controller: controller,
         client: clientsById['conn_secondary']!,
       );
-      expect(
-        controller.state.liveReattachPhaseFor('conn_secondary'),
-        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
-      );
+      expect(controller.state.liveReattachPhaseFor('conn_secondary'), isNull);
       final diagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
       );
@@ -52,7 +49,7 @@ void main() {
       );
       expect(
         diagnostics.lastRecoveryOutcome,
-        ConnectionWorkspaceRecoveryOutcome.conversationRestored,
+        ConnectionWorkspaceRecoveryOutcome.transportRestored,
       );
     },
   );
@@ -74,15 +71,19 @@ void main() {
           savedConversationThread(threadId: 'thread_saved');
       final secureStorage = FakeFlutterSecureStorage(<String, String>{});
       final preferences = SharedPreferencesAsync();
+      final backgroundedAt = DateTime.utc(2026, 3, 22, 12, 30);
       final recoveryStore = SecureConnectionWorkspaceRecoveryStore(
         secureStorage: secureStorage,
         preferences: preferences,
       );
       await recoveryStore.save(
-        const ConnectionWorkspaceRecoveryState(
+        ConnectionWorkspaceRecoveryState(
           connectionId: 'conn_secondary',
           selectedThreadId: 'thread_saved',
           draftText: 'Restore my draft',
+          backgroundedAt: backgroundedAt,
+          backgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.hidden,
         ),
       );
       final controller = buildWorkspaceController(
@@ -109,6 +110,15 @@ void main() {
             .data['pocket_relay.workspace.recovery_state.draft_text.conn_secondary'],
         'Restore my draft',
       );
+      final diagnostics = controller.state.recoveryDiagnosticsFor(
+        'conn_secondary',
+      );
+      expect(diagnostics, isNotNull);
+      expect(diagnostics!.lastBackgroundedAt, backgroundedAt);
+      expect(
+        diagnostics.lastBackgroundedLifecycleState,
+        ConnectionWorkspaceBackgroundLifecycleState.hidden,
+      );
     },
   );
 }
@@ -130,11 +140,7 @@ void _expectRestoredSelection({
     'Restored answer',
   );
   expect(client.startSessionRequests.single.resumeThreadId, 'thread_saved');
-  expect(client.readThreadCalls, <String>[
-    'thread_saved',
-    'thread_saved',
-    'thread_saved',
-  ]);
+  expect(client.readThreadCalls, <String>['thread_saved', 'thread_saved']);
   expect(client.connectCalls, 1);
   expect(
     controller.state.requiresTransportReconnect('conn_secondary'),

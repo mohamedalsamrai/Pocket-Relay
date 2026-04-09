@@ -99,6 +99,49 @@ void main() {
   );
 
   test(
+    'lifecycle-state-only changes are not skipped as already persisted',
+    () async {
+      final backgroundedAt = DateTime.utc(2026, 4, 9, 11);
+      final persistedState = ConnectionWorkspaceRecoveryState(
+        connectionId: 'conn_primary',
+        selectedThreadId: 'thread_saved',
+        draftText: '',
+        backgroundedAt: backgroundedAt,
+        backgroundedLifecycleState:
+            ConnectionWorkspaceBackgroundLifecycleState.inactive,
+      );
+      final nextState = ConnectionWorkspaceRecoveryState(
+        connectionId: 'conn_primary',
+        selectedThreadId: 'thread_saved',
+        draftText: '',
+        backgroundedAt: backgroundedAt,
+        backgroundedLifecycleState:
+            ConnectionWorkspaceBackgroundLifecycleState.paused,
+      );
+      final recoveryStore = _RecordingRecoveryStore(
+        initialState: persistedState,
+      );
+      final controller = WorkspaceRecoveryPersistenceController(
+        recoveryStore: recoveryStore,
+        debounceDuration: Duration.zero,
+        now: () => DateTime.utc(2026, 4, 9, 12),
+        buildSnapshot: ({backgroundedAt, backgroundedLifecycleState}) =>
+            nextState,
+        updateDiagnostics: (_, _) {},
+      )..seedPersistedSnapshot(persistedState);
+
+      await controller.queueSnapshot(snapshot: nextState);
+
+      expect(recoveryStore.savedStates, <ConnectionWorkspaceRecoveryState?>[
+        nextState,
+      ]);
+      expect(await recoveryStore.load(), nextState);
+
+      await controller.dispose();
+    },
+  );
+
+  test(
     'flush after dispose does not build or queue another snapshot',
     () async {
       final recoveryStore = _RecordingRecoveryStore();
