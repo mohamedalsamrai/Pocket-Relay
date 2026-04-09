@@ -598,7 +598,7 @@ void main() {
   );
 
   test(
-    'loadCatalog ignores legacy singleton secret read failures instead of aborting startup',
+    'loadCatalog migrates the legacy singleton profile even when legacy secret reads fail',
     () async {
       final legacyProfile = ConnectionProfile.defaults().copyWith(
         host: 'relay.example.com',
@@ -627,15 +627,12 @@ void main() {
         connection,
         SavedConnection(
           id: 'conn_seed',
-          profile: ConnectionProfile.defaults(),
+          profile: legacyProfile,
           secrets: const ConnectionSecrets(),
         ),
       );
-      expect(
-        await preferences.getString('pocket_relay.profile'),
-        jsonEncode(legacyProfile.toJson()),
-      );
-      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+      expect(await preferences.getString('pocket_relay.profile'), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
     },
   );
 

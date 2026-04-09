@@ -97,28 +97,24 @@ Future<SavedConnection?> readLegacySingletonConnection(
   if (decodedProfile.issue != null) {
     return null;
   }
-  try {
-    return SavedConnection(
-      id: '',
-      profile: decodedProfile.value!,
-      secrets: ConnectionSecrets(
-        password: await readSecret(
-          state.secureStorage,
-          legacySingletonPasswordKey,
-        ),
-        privateKeyPem: await readSecret(
-          state.secureStorage,
-          legacySingletonPrivateKeyKey,
-        ),
-        privateKeyPassphrase: await readSecret(
-          state.secureStorage,
-          legacySingletonPrivateKeyPassphraseKey,
-        ),
+  return SavedConnection(
+    id: '',
+    profile: decodedProfile.value!,
+    secrets: ConnectionSecrets(
+      password: await _readSecretOrEmptyOnFailure(
+        state.secureStorage,
+        legacySingletonPasswordKey,
       ),
-    );
-  } catch (_) {
-    return null;
-  }
+      privateKeyPem: await _readSecretOrEmptyOnFailure(
+        state.secureStorage,
+        legacySingletonPrivateKeyKey,
+      ),
+      privateKeyPassphrase: await _readSecretOrEmptyOnFailure(
+        state.secureStorage,
+        legacySingletonPrivateKeyPassphraseKey,
+      ),
+    ),
+  );
 }
 
 Future<void> deleteLegacyConnections(
@@ -171,4 +167,15 @@ Future<String> readSecret(
   String key,
 ) async {
   return await secureStorage.read(key: key) ?? '';
+}
+
+Future<String> _readSecretOrEmptyOnFailure(
+  FlutterSecureStorage secureStorage,
+  String key,
+) async {
+  try {
+    return await readSecret(secureStorage, key);
+  } catch (_) {
+    return '';
+  }
 }
