@@ -16,11 +16,21 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
     return null;
   }
 
-  final selectedThreadId = _normalizedWorkspaceThreadId(
+  var selectedThreadId = _normalizedWorkspaceThreadId(
     binding.sessionController.sessionState.currentThreadId ??
         binding.sessionController.sessionState.rootThreadId ??
         binding.sessionController.historicalConversationRestoreState?.threadId,
   );
+  if (selectedThreadId == null &&
+      controller._state.requiresTransportReconnect(selectedConnectionId)) {
+    final latestRecoverySnapshot =
+        controller._recoveryPersistenceController.latestSnapshot;
+    selectedThreadId = _normalizedWorkspaceThreadId(
+      latestRecoverySnapshot?.connectionId == selectedConnectionId
+          ? latestRecoverySnapshot?.selectedThreadId
+          : null,
+    );
+  }
   final diagnostics = controller._state.recoveryDiagnosticsFor(
     selectedConnectionId,
   );

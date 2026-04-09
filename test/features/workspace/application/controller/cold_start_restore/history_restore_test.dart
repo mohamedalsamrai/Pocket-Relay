@@ -42,6 +42,11 @@ void main() {
         controller.selectedLaneBinding?.composerDraftHost.draft.text,
         'Restore my draft',
       );
+      final inFlightRecoveryState = await recoveryStore.load();
+      expect(inFlightRecoveryState, isNotNull);
+      expect(inFlightRecoveryState!.connectionId, 'conn_secondary');
+      expect(inFlightRecoveryState.selectedThreadId, 'thread_saved');
+      expect(inFlightRecoveryState.draftText, 'Restore my draft');
       final reconnectingDiagnostics = controller.state.recoveryDiagnosticsFor(
         'conn_secondary',
       );
@@ -101,6 +106,84 @@ void main() {
         ConnectionWorkspaceRecoveryOutcome.transportRestored,
       );
       expect(restoredDiagnostics.lastRecoveryCompletedAt, isNotNull);
+    },
+  );
+
+  test(
+    'cold-start transport failure preserves the selected thread for a later restore retry',
+    () async {
+      final initialRecoveryState = const ConnectionWorkspaceRecoveryState(
+        connectionId: 'conn_secondary',
+        selectedThreadId: 'thread_saved',
+        draftText: 'Restore my draft',
+        backgroundedLifecycleState:
+            ConnectionWorkspaceBackgroundLifecycleState.paused,
+      );
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore(
+        initialState: initialRecoveryState,
+      );
+
+      final failingClientsById = buildClientsById(
+        'conn_primary',
+        'conn_secondary',
+      );
+      failingClientsById['conn_secondary']!.connectError =
+          const CodexAppServerException('connect failed');
+      final failingController = buildWorkspaceController(
+        clientsById: failingClientsById,
+        recoveryStore: recoveryStore,
+      );
+      addTearDown(() async {
+        failingController.dispose();
+        await closeClients(failingClientsById);
+      });
+
+      await failingController.initialize();
+
+      final failedRecoveryState = await recoveryStore.load();
+      expect(failedRecoveryState, isNotNull);
+      expect(failedRecoveryState, initialRecoveryState);
+
+      final retryClientsById = buildClientsById(
+        'conn_primary',
+        'conn_secondary',
+      );
+      retryClientsById['conn_secondary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final retryController = buildWorkspaceController(
+        clientsById: retryClientsById,
+        recoveryStore: recoveryStore,
+      );
+      addTearDown(() async {
+        retryController.dispose();
+        await closeClients(retryClientsById);
+      });
+
+      await retryController.initialize();
+
+      expect(retryController.state.selectedConnectionId, 'conn_secondary');
+      expect(
+        retryController
+            .selectedLaneBinding
+            ?.sessionController
+            .sessionState
+            .rootThreadId,
+        'thread_saved',
+      );
+      expect(
+        retryController.selectedLaneBinding?.sessionController.transcriptBlocks
+            .whereType<TranscriptTextBlock>()
+            .single
+            .body,
+        'Restored answer',
+      );
+      expect(
+        retryClientsById['conn_secondary']!
+            .startSessionRequests
+            .single
+            .resumeThreadId,
+        'thread_saved',
+      );
     },
   );
 
