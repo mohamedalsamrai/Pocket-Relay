@@ -33,7 +33,7 @@ Future<ConnectionRemoteRuntimeState> _restartWorkspaceRemoteServer(
 extension on Future<_WorkspaceRemoteServerActionContext> {
   Future<ConnectionRemoteRuntimeState> start() async {
     final context = await this;
-    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+    final nextRuntime = await context.controller._remoteRuntimeController
         .startRemoteServer(
           profile: context.savedConnection.profile,
           secrets: context.savedConnection.secrets,
@@ -64,7 +64,7 @@ extension on Future<_WorkspaceRemoteServerActionContext> {
 
   Future<ConnectionRemoteRuntimeState> stop() async {
     final context = await this;
-    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+    final nextRuntime = await context.controller._remoteRuntimeController
         .stopRemoteServer(
           profile: context.savedConnection.profile,
           secrets: context.savedConnection.secrets,
@@ -95,7 +95,7 @@ extension on Future<_WorkspaceRemoteServerActionContext> {
 
   Future<ConnectionRemoteRuntimeState> restart() async {
     final context = await this;
-    final nextRuntime = await context.controller._remoteRuntimeCoordinator
+    final nextRuntime = await context.controller._remoteRuntimeController
         .restartRemoteServer(
           profile: context.savedConnection.profile,
           secrets: context.savedConnection.secrets,
@@ -156,14 +156,9 @@ Future<_WorkspaceRemoteServerActionContext> _runWorkspaceRemoteServerAction(
     );
   }
 
-  final refreshGeneration =
-      (controller
-              ._remoteRuntimeRefreshGenerationByConnectionId[normalizedConnectionId] ??
-          0) +
-      1;
-  controller
-          ._remoteRuntimeRefreshGenerationByConnectionId[normalizedConnectionId] =
-      refreshGeneration;
+  final refreshGeneration = controller._remoteRuntimeController.beginRefresh(
+    normalizedConnectionId,
+  );
   return _WorkspaceRemoteServerActionContext(
     controller: controller,
     connectionId: normalizedConnectionId,
