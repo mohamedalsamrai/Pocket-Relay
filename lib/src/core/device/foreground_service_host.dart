@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/errors/device_capability_errors.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 
 bool supportsActiveTurnForegroundService([TargetPlatform? platform]) {
@@ -150,7 +151,7 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed ||
+    if (!appLifecycleStateIsForegroundVisible(state) ||
         !_notificationPermissionDeniedForCurrentRequest) {
       return;
     }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/errors/device_capability_errors.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -61,8 +62,7 @@ class _DisplayWakeLockHostState extends State<DisplayWakeLockHost>
   bool get _shouldEnableWakeLock {
     return _supportsWakeLock &&
         widget.keepDisplayAwake &&
-        (_appLifecycleState == null ||
-            _appLifecycleState == AppLifecycleState.resumed);
+        appLifecycleStateIsForegroundVisible(_appLifecycleState);
   }
 
   @override

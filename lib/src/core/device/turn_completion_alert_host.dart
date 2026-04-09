@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/errors/device_capability_errors.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_behavior.dart';
 
 bool supportsForegroundTurnCompletionSignal([TargetPlatform? platform]) {
@@ -127,8 +128,7 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   bool get _isForeground {
-    return _appLifecycleState == null ||
-        _appLifecycleState == AppLifecycleState.resumed;
+    return appLifecycleStateIsForegroundVisible(_appLifecycleState);
   }
 
   @override
@@ -164,7 +164,7 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appLifecycleState = state;
-    if (state == AppLifecycleState.resumed &&
+    if (appLifecycleStateIsForegroundVisible(state) &&
         _notificationPermissionDeniedForCurrentForegroundSession) {
       _notificationPermissionDeniedForCurrentForegroundSession = false;
     }

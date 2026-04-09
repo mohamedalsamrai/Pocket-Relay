@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:pocket_relay/src/core/platform/app_lifecycle_visibility.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
 import 'live_lane_notice_contract.dart';
@@ -69,8 +70,7 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   }
 
   bool get _isForegroundVisible =>
-      _appLifecycleState == null ||
-      _appLifecycleState == AppLifecycleState.resumed;
+      appLifecycleStateIsForegroundVisible(_appLifecycleState);
 
   bool get _isDismissalVisible => _isForegroundVisible && widget.isVisible;
 
