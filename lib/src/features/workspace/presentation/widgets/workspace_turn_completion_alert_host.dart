@@ -4,8 +4,9 @@ import 'package:flutter/widgets.dart';
 import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
-import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_session_state.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_live_session_tracker.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_turn_activity.dart';
 
 class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   const WorkspaceTurnCompletionAlertHost({
@@ -38,8 +39,9 @@ class _WorkspaceTurnCompletionAlertHostState
     extends State<WorkspaceTurnCompletionAlertHost> {
   final _completionAlertsController =
       StreamController<TurnCompletionAlertRequest>.broadcast();
-  final Map<String, ChatSessionController> _attachedControllersByConnectionId =
-      <String, ChatSessionController>{};
+  late final WorkspaceLiveSessionTracker _liveSessions;
+  final Map<String, ChatSessionController>
+  _completionControllersByConnectionId = <String, ChatSessionController>{};
   final Map<String, StreamSubscription<ChatSessionTurnCompletedEvent>>
   _completionSubscriptionsByConnectionId =
       <String, StreamSubscription<ChatSessionTurnCompletedEvent>>{};
@@ -47,8 +49,9 @@ class _WorkspaceTurnCompletionAlertHostState
   @override
   void initState() {
     super.initState();
-    widget.workspaceController.addListener(_handleWorkspaceChanged);
-    _syncSessionListeners();
+    _liveSessions = WorkspaceLiveSessionTracker(widget.workspaceController)
+      ..addListener(_handleLiveSessionsChanged);
+    _syncCompletionSubscriptions();
   }
 
   @override
@@ -58,16 +61,16 @@ class _WorkspaceTurnCompletionAlertHostState
       return;
     }
 
-    oldWidget.workspaceController.removeListener(_handleWorkspaceChanged);
-    _detachAllSessionListeners();
-    widget.workspaceController.addListener(_handleWorkspaceChanged);
-    _syncSessionListeners();
+    _liveSessions.updateWorkspaceController(widget.workspaceController);
+    _syncCompletionSubscriptions();
   }
 
   @override
   void dispose() {
-    widget.workspaceController.removeListener(_handleWorkspaceChanged);
-    _detachAllSessionListeners();
+    _liveSessions
+      ..removeListener(_handleLiveSessionsChanged)
+      ..dispose();
+    _detachAllCompletionSubscriptions();
     unawaited(_completionAlertsController.close());
     super.dispose();
   }
@@ -89,76 +92,63 @@ class _WorkspaceTurnCompletionAlertHostState
     );
   }
 
-  void _handleWorkspaceChanged() {
-    _syncSessionListeners();
+  void _handleLiveSessionsChanged() {
+    _syncCompletionSubscriptions();
     if (!mounted) {
       return;
     }
     setState(() {});
   }
 
-  void _handleSessionChanged() {
-    if (!mounted) {
-      return;
-    }
-    setState(() {});
-  }
+  void _syncCompletionSubscriptions() {
+    final nextControllersByConnectionId =
+        _liveSessions.sessionControllersByConnectionId;
 
-  void _syncSessionListeners() {
-    final nextControllersByConnectionId = <String, ChatSessionController>{
-      for (final connectionId
-          in widget.workspaceController.state.liveConnectionIds)
-        if (widget.workspaceController.bindingForConnectionId(connectionId)
-            case final binding?)
-          connectionId: binding.sessionController,
-    };
-
-    final currentConnectionIds = _attachedControllersByConnectionId.keys
+    final currentConnectionIds = _completionControllersByConnectionId.keys
         .toSet();
     final nextConnectionIds = nextControllersByConnectionId.keys.toSet();
 
     for (final connectionId in currentConnectionIds.difference(
       nextConnectionIds,
     )) {
-      _detachController(connectionId);
+      _detachCompletionSubscription(connectionId);
     }
 
     for (final entry in nextControllersByConnectionId.entries) {
-      final existingController = _attachedControllersByConnectionId[entry.key];
+      final existingController =
+          _completionControllersByConnectionId[entry.key];
       if (identical(existingController, entry.value)) {
         continue;
       }
       if (existingController != null) {
-        _detachController(entry.key);
+        _detachCompletionSubscription(entry.key);
       }
-      _attachController(entry.key, entry.value);
+      _attachCompletionSubscription(entry.key, entry.value);
     }
   }
 
-  void _attachController(
+  void _attachCompletionSubscription(
     String connectionId,
     ChatSessionController controller,
   ) {
-    controller.addListener(_handleSessionChanged);
-    _attachedControllersByConnectionId[connectionId] = controller;
+    _completionControllersByConnectionId[connectionId] = controller;
     _completionSubscriptionsByConnectionId[connectionId] = controller
         .turnCompletedEvents
         .listen((event) => _handleTurnCompleted(connectionId, event));
   }
 
-  void _detachController(String connectionId) {
-    final controller = _attachedControllersByConnectionId.remove(connectionId);
-    controller?.removeListener(_handleSessionChanged);
+  void _detachCompletionSubscription(String connectionId) {
+    _completionControllersByConnectionId.remove(connectionId);
     unawaited(
       _completionSubscriptionsByConnectionId.remove(connectionId)?.cancel() ??
           Future<void>.value(),
     );
   }
 
-  void _detachAllSessionListeners() {
+  void _detachAllCompletionSubscriptions() {
     for (final connectionId
-        in _attachedControllersByConnectionId.keys.toList()) {
-      _detachController(connectionId);
+        in _completionControllersByConnectionId.keys.toList()) {
+      _detachCompletionSubscription(connectionId);
     }
   }
 
@@ -187,30 +177,8 @@ class _WorkspaceTurnCompletionAlertHostState
   }
 
   bool _hasActiveTurnAcrossLiveLanes() {
-    for (final controller in _attachedControllersByConnectionId.values) {
-      if (_sessionHasActiveTurn(controller.sessionState)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _sessionHasActiveTurn(TranscriptSessionState sessionState) {
-    if (_turnKeepsWorkspaceActivity(sessionState.sessionActiveTurn)) {
-      return true;
-    }
-
-    for (final timeline in sessionState.timelinesByThreadId.values) {
-      if (_turnKeepsWorkspaceActivity(timeline.activeTurn)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  bool _turnKeepsWorkspaceActivity(TranscriptActiveTurnState? activeTurn) {
-    return activeTurn?.timer.isRunning == true;
+    return workspaceSessionControllersHaveContinuityActiveTurn(
+      _liveSessions.sessionControllers,
+    );
   }
 }
