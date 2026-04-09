@@ -57,14 +57,10 @@ void _scheduleConnectionSettingsRemoteRuntimeRefresh(
     return;
   }
 
-  const checkingRuntime = ConnectionRemoteRuntimeState(
-    hostCapability: ConnectionRemoteHostCapabilityState.checking(),
-    server: ConnectionRemoteServerState.unknown(),
-  );
   if ((!immediate || state._remoteRuntime == null) &&
-      state._remoteRuntime != checkingRuntime) {
+      state._remoteRuntime != connectionRemoteRuntimeProbeCheckingState) {
     state._setStateInternal(() {
-      state._remoteRuntime = checkingRuntime;
+      state._remoteRuntime = connectionRemoteRuntimeProbeCheckingState;
     });
   }
 
@@ -82,15 +78,9 @@ void _scheduleConnectionSettingsRemoteRuntimeRefresh(
       if (!state.mounted || refreshToken != state._remoteRuntimeRefreshToken) {
         return;
       }
-      final userFacingError = ConnectionSettingsErrors.remoteRuntimeProbeFailed(
-        error: error,
-      );
       state._setStateInternal(() {
-        state._remoteRuntime = ConnectionRemoteRuntimeState(
-          hostCapability: ConnectionRemoteHostCapabilityState.probeFailed(
-            detail: userFacingError.bodyWithCode,
-          ),
-          server: const ConnectionRemoteServerState.unknown(),
+        state._remoteRuntime = buildConnectionRemoteRuntimeProbeFailureState(
+          ConnectionSettingsErrors.remoteRuntimeProbeFailed(error: error),
         );
       });
     }

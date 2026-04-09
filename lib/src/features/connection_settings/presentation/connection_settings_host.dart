@@ -12,6 +12,7 @@ import 'package:pocket_relay/src/features/connection_settings/application/connec
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
+import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 
 part 'host/host_models.dart';
 part 'host/model_catalog_refresh.dart';

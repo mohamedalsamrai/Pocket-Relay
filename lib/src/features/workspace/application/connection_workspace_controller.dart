@@ -15,8 +15,10 @@ import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_capability_assets.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_templates.dart';
+import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_errors.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
+import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
@@ -81,14 +83,15 @@ class ConnectionWorkspaceController extends ChangeNotifier {
            ),
        _recoveryStore =
            recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
-       _remoteRuntimeDelegateFactory =
-           remoteRuntimeDelegateFactory ??
-           ((kind) => createDefaultAgentAdapterRemoteRuntimeDelegate(
-             kind,
-             remoteHostProbe: remoteAppServerHostProbe,
-             remoteOwnerInspector: remoteAppServerOwnerInspector,
-             remoteOwnerControl: remoteAppServerOwnerControl,
-           )),
+       _remoteRuntimeCoordinator = ConnectionRemoteRuntimeCoordinator(
+         remoteRuntimeDelegateFactory:
+             _buildWorkspaceRemoteRuntimeDelegateFactory(
+               remoteRuntimeDelegateFactory: remoteRuntimeDelegateFactory,
+               remoteAppServerHostProbe: remoteAppServerHostProbe,
+               remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
+               remoteAppServerOwnerControl: remoteAppServerOwnerControl,
+             ),
+       ),
        _recoveryPersistenceDebounceDuration =
            recoveryPersistenceDebounceDuration,
        _now = now ?? DateTime.now;
@@ -97,7 +100,7 @@ class ConnectionWorkspaceController extends ChangeNotifier {
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionCapabilityAssets _connectionCapabilityAssets;
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
-  final AgentAdapterRemoteRuntimeDelegateFactory _remoteRuntimeDelegateFactory;
+  final ConnectionRemoteRuntimeCoordinator _remoteRuntimeCoordinator;
   final Duration _recoveryPersistenceDebounceDuration;
   final WorkspaceNow _now;
   final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
@@ -151,10 +154,16 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     _clearTurnLivenessAssessment(connectionId);
   }
 
-  AgentAdapterRemoteRuntimeDelegate createRemoteRuntimeDelegate(
-    AgentAdapterKind kind,
-  ) {
-    return _remoteRuntimeDelegateFactory(kind);
+  Future<ConnectionRemoteRuntimeState> probeRemoteRuntimeForSettings(
+    ConnectionSettingsSubmitPayload payload, {
+    String? ownerId,
+  }) {
+    return _remoteRuntimeCoordinator.probe(
+      profile: payload.profile,
+      secrets: payload.secrets,
+      ownerId: ownerId,
+      probeFailure: ConnectionSettingsErrors.remoteRuntimeProbeFailed,
+    );
   }
 
   ConnectionLaneBinding? get selectedLaneBinding {
@@ -350,4 +359,20 @@ class ConnectionWorkspaceController extends ChangeNotifier {
     }
     super.dispose();
   }
+}
+
+AgentAdapterRemoteRuntimeDelegateFactory
+_buildWorkspaceRemoteRuntimeDelegateFactory({
+  AgentAdapterRemoteRuntimeDelegateFactory? remoteRuntimeDelegateFactory,
+  required CodexRemoteAppServerHostProbe remoteAppServerHostProbe,
+  required CodexRemoteAppServerOwnerInspector remoteAppServerOwnerInspector,
+  required CodexRemoteAppServerOwnerControl remoteAppServerOwnerControl,
+}) {
+  return remoteRuntimeDelegateFactory ??
+      ((kind) => createDefaultAgentAdapterRemoteRuntimeDelegate(
+        kind,
+        remoteHostProbe: remoteAppServerHostProbe,
+        remoteOwnerInspector: remoteAppServerOwnerInspector,
+        remoteOwnerControl: remoteAppServerOwnerControl,
+      ));
 }

@@ -53,10 +53,6 @@ Future<ConnectionRemoteRuntimeState> _refreshWorkspaceRemoteRuntime(
     return const ConnectionRemoteRuntimeState.unknown();
   }
 
-  const checkingRuntime = ConnectionRemoteRuntimeState(
-    hostCapability: ConnectionRemoteHostCapabilityState.checking(),
-    server: ConnectionRemoteServerState.unknown(),
-  );
   if (_canApplyWorkspaceRemoteRuntime(
     controller,
     connectionId: normalizedConnectionId,
@@ -66,17 +62,18 @@ Future<ConnectionRemoteRuntimeState> _refreshWorkspaceRemoteRuntime(
       controller._state.copyWith(
         remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
           ...controller._state.remoteRuntimeByConnectionId,
-          normalizedConnectionId: checkingRuntime,
+          normalizedConnectionId: controller._remoteRuntimeCoordinator
+              .buildProbeCheckingRuntime(),
         },
       ),
     );
   }
 
-  final nextRuntime = await _probeWorkspaceRemoteRuntime(
-    controller,
-    connectionId: normalizedConnectionId,
+  final nextRuntime = await controller._remoteRuntimeCoordinator.probe(
     profile: resolvedProfile,
     secrets: resolvedSecrets,
+    ownerId: normalizedConnectionId,
+    probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
   );
   if (_canApplyWorkspaceRemoteRuntime(
     controller,
@@ -104,34 +101,6 @@ bool _canApplyWorkspaceRemoteRuntime(
       controller._state.catalog.connectionForId(connectionId) != null &&
       controller._remoteRuntimeRefreshGenerationByConnectionId[connectionId] ==
           refreshGeneration;
-}
-
-Future<ConnectionRemoteRuntimeState> _probeWorkspaceRemoteRuntime(
-  ConnectionWorkspaceController controller, {
-  required String connectionId,
-  required ConnectionProfile profile,
-  required ConnectionSecrets secrets,
-}) async {
-  try {
-    final remoteRuntimeDelegate = controller._remoteRuntimeDelegateFactory(
-      profile.agentAdapter,
-    );
-    return await remoteRuntimeDelegate.probeRemoteRuntime(
-      profile: profile,
-      secrets: secrets,
-      ownerId: connectionId,
-    );
-  } catch (error) {
-    final userFacingError = ConnectionLifecycleErrors.remoteRuntimeProbeFailure(
-      error: error,
-    );
-    return ConnectionRemoteRuntimeState(
-      hostCapability: ConnectionRemoteHostCapabilityState.probeFailed(
-        detail: userFacingError.bodyWithCode,
-      ),
-      server: const ConnectionRemoteServerState.unknown(),
-    );
-  }
 }
 
 void _applyWorkspaceRemoteAttachRuntime(
