@@ -1,16 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 
 class WorkspaceAppLifecycleHost extends StatefulWidget {
   const WorkspaceAppLifecycleHost({
     super.key,
-    required this.workspaceController,
+    required this.onLifecycleStateChanged,
     required this.child,
   });
 
-  final ConnectionWorkspaceController workspaceController;
+  final WorkspaceContinuityLifecycleStateChanged onLifecycleStateChanged;
   final Widget child;
 
   @override
@@ -27,13 +27,8 @@ class _WorkspaceAppLifecycleHostState extends State<WorkspaceAppLifecycleHost>
   }
 
   @override
-  void didUpdateWidget(covariant WorkspaceAppLifecycleHost oldWidget) {
-    super.didUpdateWidget(oldWidget);
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    unawaited(widget.workspaceController.handleAppLifecycleStateChanged(state));
+    unawaited(widget.onLifecycleStateChanged(state));
   }
 
   @override
