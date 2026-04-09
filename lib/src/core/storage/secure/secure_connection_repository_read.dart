@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/persisted_json.dart';
 import 'package:pocket_relay/src/core/storage/repository/connection_repository_normalization.dart';
 
 import 'secure_connection_repository_keys.dart';
@@ -48,20 +49,22 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
       );
       continue;
     }
-    try {
-      workspacesById[workspaceId] = SavedWorkspaceSummary(
-        id: workspaceId,
-        profile: WorkspaceProfile.fromJson(
-          jsonDecode(rawProfile) as Map<String, dynamic>,
-        ),
-      );
-      normalizedOrderedIds.add(workspaceId);
-    } catch (_) {
+    final decodedProfile = decodePersistedJsonRecord<WorkspaceProfile>(
+      rawProfile,
+      subject: 'saved workspace profile',
+      decode: (json) => WorkspaceProfile.fromJson(json),
+    );
+    if (decodedProfile.issue != null) {
       await state.preferences.remove(
         workspaceProfileKeyForWorkspace(workspaceId),
       );
       continue;
     }
+    workspacesById[workspaceId] = SavedWorkspaceSummary(
+      id: workspaceId,
+      profile: decodedProfile.value!,
+    );
+    normalizedOrderedIds.add(workspaceId);
   }
 
   if (!listEquals(normalizedOrderedIds, orderedIds)) {
@@ -105,19 +108,21 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
       await deleteSystemSecrets(state, systemId);
       continue;
     }
-    try {
-      systemsById[systemId] = SavedSystemSummary(
-        id: systemId,
-        profile: SystemProfile.fromJson(
-          jsonDecode(rawProfile) as Map<String, dynamic>,
-        ),
-      );
-      normalizedOrderedIds.add(systemId);
-    } catch (_) {
+    final decodedProfile = decodePersistedJsonRecord<SystemProfile>(
+      rawProfile,
+      subject: 'saved system profile',
+      decode: (json) => SystemProfile.fromJson(json),
+    );
+    if (decodedProfile.issue != null) {
       await state.preferences.remove(systemProfileKeyForSystem(systemId));
       await deleteSystemSecrets(state, systemId);
       continue;
     }
+    systemsById[systemId] = SavedSystemSummary(
+      id: systemId,
+      profile: decodedProfile.value!,
+    );
+    normalizedOrderedIds.add(systemId);
   }
 
   if (!listEquals(normalizedOrderedIds, orderedIds)) {

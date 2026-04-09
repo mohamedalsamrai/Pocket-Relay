@@ -270,6 +270,82 @@ void main() {
       );
     },
   );
+
+  test(
+    'secure store clears non-object recovery metadata and throws a typed corruption exception',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.workspace.recovery_state.draft_text': 'legacy global',
+      });
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.workspace.recovery_state',
+        '[]',
+      );
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      await expectLater(
+        store.load(),
+        throwsA(
+          isA<ConnectionWorkspaceRecoveryStoreCorruptedException>().having(
+            (error) => error.detail,
+            'detail',
+            contains('not a JSON object'),
+          ),
+        ),
+      );
+
+      expect(
+        await preferences.getString('pocket_relay.workspace.recovery_state'),
+        isNull,
+      );
+      expect(
+        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'secure store clears recovery metadata missing a valid connection id',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{
+        'pocket_relay.workspace.recovery_state.draft_text': 'legacy global',
+      });
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.workspace.recovery_state',
+        '{"connectionId":"   ","selectedThreadId":"thread_saved"}',
+      );
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      await expectLater(
+        store.load(),
+        throwsA(
+          isA<ConnectionWorkspaceRecoveryStoreCorruptedException>().having(
+            (error) => error.detail,
+            'detail',
+            contains('missing a valid connection id'),
+          ),
+        ),
+      );
+
+      expect(
+        await preferences.getString('pocket_relay.workspace.recovery_state'),
+        isNull,
+      );
+      expect(
+        secureStorage.data['pocket_relay.workspace.recovery_state.draft_text'],
+        isNull,
+      );
+    },
+  );
 }
 
 class _FakeFlutterSecureStorage extends FlutterSecureStorage {

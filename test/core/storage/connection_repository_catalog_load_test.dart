@@ -241,6 +241,42 @@ void main() {
   );
 
   test(
+    'loadCatalog migrates the legacy singleton profile even when legacy secrets are missing',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: legacyProfile,
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(await preferences.getString('pocket_relay.profile'), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
+    },
+  );
+
+  test(
     'loadSystemCatalog keeps a missing stored system label implicit while still deriving the legacy ssh identity for display',
     () async {
       final preferences = SharedPreferencesAsync();

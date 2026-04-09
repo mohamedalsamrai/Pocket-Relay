@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/persisted_json.dart';
 
 import 'secure_connection_repository_keys.dart';
 import 'secure_connection_repository_state.dart';
@@ -88,30 +89,32 @@ Future<SavedConnection?> readLegacySingletonConnection(
     return null;
   }
 
-  try {
-    return SavedConnection(
-      id: '',
-      profile: ConnectionProfile.fromJson(
-        jsonDecode(rawProfile) as Map<String, dynamic>,
-      ),
-      secrets: ConnectionSecrets(
-        password: await readSecret(
-          state.secureStorage,
-          legacySingletonPasswordKey,
-        ),
-        privateKeyPem: await readSecret(
-          state.secureStorage,
-          legacySingletonPrivateKeyKey,
-        ),
-        privateKeyPassphrase: await readSecret(
-          state.secureStorage,
-          legacySingletonPrivateKeyPassphraseKey,
-        ),
-      ),
-    );
-  } catch (_) {
+  final decodedProfile = decodePersistedJsonRecord<ConnectionProfile>(
+    rawProfile,
+    subject: 'legacy singleton connection profile',
+    decode: (json) => ConnectionProfile.fromJson(json),
+  );
+  if (decodedProfile.issue != null) {
     return null;
   }
+  return SavedConnection(
+    id: '',
+    profile: decodedProfile.value!,
+    secrets: ConnectionSecrets(
+      password: await readSecret(
+        state.secureStorage,
+        legacySingletonPasswordKey,
+      ),
+      privateKeyPem: await readSecret(
+        state.secureStorage,
+        legacySingletonPrivateKeyKey,
+      ),
+      privateKeyPassphrase: await readSecret(
+        state.secureStorage,
+        legacySingletonPrivateKeyPassphraseKey,
+      ),
+    ),
+  );
 }
 
 Future<void> deleteLegacyConnections(

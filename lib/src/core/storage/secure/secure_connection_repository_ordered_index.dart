@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pocket_relay/src/core/storage/persisted_json.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<List<String>> discoverStoredIds(
@@ -32,11 +33,14 @@ Future<List<String>> loadOrderedIds(
     return discoveredIds;
   }
 
-  final decoded = jsonDecode(rawIndex);
-  if (decoded is! Map<String, dynamic>) {
+  final decoded = decodePersistedJsonObject(
+    rawIndex,
+    subject: 'connection repository ordered index',
+  );
+  if (decoded.issue != null) {
     return discoveredIds;
   }
-  final rawOrderedIds = decoded['orderedIds'];
+  final rawOrderedIds = decoded.value!['orderedIds'];
   if (rawOrderedIds is! List) {
     return discoveredIds;
   }
