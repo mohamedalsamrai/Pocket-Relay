@@ -1,54 +1,33 @@
 part of '../connection_workspace_controller.dart';
 
-void _setWorkspaceForegroundServiceWarning(
+void _setWorkspaceDeviceContinuityWarning(
   ConnectionWorkspaceController controller,
+  WorkspaceDeviceContinuityWarningTarget target,
   PocketUserFacingError? warning,
 ) {
   _updateWorkspaceDeviceContinuityWarnings(
     controller,
-    (current) => current.copyWith(
-      foregroundServiceWarning: warning,
-      clearForegroundServiceWarning: warning == null,
-    ),
-  );
-}
-
-void _setWorkspaceBackgroundGraceWarning(
-  ConnectionWorkspaceController controller,
-  PocketUserFacingError? warning,
-) {
-  _updateWorkspaceDeviceContinuityWarnings(
-    controller,
-    (current) => current.copyWith(
-      backgroundGraceWarning: warning,
-      clearBackgroundGraceWarning: warning == null,
-    ),
-  );
-}
-
-void _setWorkspaceWakeLockWarning(
-  ConnectionWorkspaceController controller,
-  PocketUserFacingError? warning,
-) {
-  _updateWorkspaceDeviceContinuityWarnings(
-    controller,
-    (current) => current.copyWith(
-      wakeLockWarning: warning,
-      clearWakeLockWarning: warning == null,
-    ),
-  );
-}
-
-void _setWorkspaceTurnCompletionAlertWarning(
-  ConnectionWorkspaceController controller,
-  PocketUserFacingError? warning,
-) {
-  _updateWorkspaceDeviceContinuityWarnings(
-    controller,
-    (current) => current.copyWith(
-      turnCompletionAlertWarning: warning,
-      clearTurnCompletionAlertWarning: warning == null,
-    ),
+    (current) => switch (target) {
+      WorkspaceDeviceContinuityWarningTarget.foregroundService =>
+        current.copyWith(
+          foregroundServiceWarning: warning,
+          clearForegroundServiceWarning: warning == null,
+        ),
+      WorkspaceDeviceContinuityWarningTarget.backgroundGrace =>
+        current.copyWith(
+          backgroundGraceWarning: warning,
+          clearBackgroundGraceWarning: warning == null,
+        ),
+      WorkspaceDeviceContinuityWarningTarget.wakeLock => current.copyWith(
+        wakeLockWarning: warning,
+        clearWakeLockWarning: warning == null,
+      ),
+      WorkspaceDeviceContinuityWarningTarget.turnCompletionAlert =>
+        current.copyWith(
+          turnCompletionAlertWarning: warning,
+          clearTurnCompletionAlertWarning: warning == null,
+        ),
+    },
   );
 }
 

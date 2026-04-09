@@ -8,6 +8,7 @@ import 'package:pocket_relay/src/core/storage/connection_scoped_stores.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane_binding.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_wake_lock_host.dart';
 
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
@@ -32,6 +33,10 @@ void main() {
       MaterialApp(
         home: WorkspaceTurnWakeLockHost(
           workspaceController: controller,
+          onWarningChanged: _warningSink(
+            controller,
+            WorkspaceDeviceContinuityWarningTarget.wakeLock,
+          ),
           displayWakeLockController: wakeLockController,
           supportsWakeLock: true,
           child: const SizedBox(),
@@ -115,6 +120,10 @@ void main() {
         MaterialApp(
           home: WorkspaceTurnWakeLockHost(
             workspaceController: controller,
+            onWarningChanged: _warningSink(
+              controller,
+              WorkspaceDeviceContinuityWarningTarget.wakeLock,
+            ),
             displayWakeLockController: wakeLockController,
             supportsWakeLock: true,
             child: const SizedBox(),
@@ -177,6 +186,10 @@ void main() {
         MaterialApp(
           home: WorkspaceTurnWakeLockHost(
             workspaceController: controller,
+            onWarningChanged: _warningSink(
+              controller,
+              WorkspaceDeviceContinuityWarningTarget.wakeLock,
+            ),
             displayWakeLockController: wakeLockController,
             supportsWakeLock: true,
             child: const SizedBox(),
@@ -201,6 +214,13 @@ void main() {
       await controller.flushRecoveryPersistence();
     },
   );
+}
+
+WorkspaceDeviceContinuityWarningChanged _warningSink(
+  ConnectionWorkspaceController controller,
+  WorkspaceDeviceContinuityWarningTarget target,
+) {
+  return (warning) => controller.setDeviceContinuityWarning(target, warning);
 }
 
 ConnectionWorkspaceController _buildWorkspaceController({

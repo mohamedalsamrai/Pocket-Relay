@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_controller.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_live_session_tracker.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_turn_activity.dart';
 
@@ -12,6 +13,7 @@ class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   const WorkspaceTurnCompletionAlertHost({
     super.key,
     required this.workspaceController,
+    required this.onWarningChanged,
     required this.child,
     this.turnCompletionAlertController =
         const PlatformTurnCompletionAlertController(),
@@ -23,6 +25,7 @@ class WorkspaceTurnCompletionAlertHost extends StatefulWidget {
   });
 
   final ConnectionWorkspaceController workspaceController;
+  final WorkspaceDeviceContinuityWarningChanged onWarningChanged;
   final Widget child;
   final TurnCompletionAlertController turnCompletionAlertController;
   final NotificationPermissionController notificationPermissionController;
@@ -86,8 +89,7 @@ class _WorkspaceTurnCompletionAlertHostState
       supportsBackgroundAlerts: widget.supportsBackgroundAlerts,
       requestNotificationPermissionWhileForegrounded:
           widget.requestNotificationPermissionWhileForegrounded,
-      onWarningChanged:
-          widget.workspaceController.setTurnCompletionAlertWarning,
+      onWarningChanged: widget.onWarningChanged,
       child: widget.child,
     );
   }

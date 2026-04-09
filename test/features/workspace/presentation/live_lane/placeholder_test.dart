@@ -1,3 +1,5 @@
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+
 import '../support/workspace_surface_test_support.dart';
 
 void main() {
@@ -105,7 +107,8 @@ void main() {
       });
 
       await controller.initialize();
-      controller.setWakeLockWarning(
+      controller.setDeviceContinuityWarning(
+        WorkspaceDeviceContinuityWarningTarget.wakeLock,
         DeviceCapabilityErrors.wakeLockEnableFailed(
           error: StateError('wakelock plugin unavailable'),
         ),

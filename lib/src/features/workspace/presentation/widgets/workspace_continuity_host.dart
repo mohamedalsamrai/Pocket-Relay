@@ -5,6 +5,7 @@ import 'package:pocket_relay/src/core/device/foreground_service_host.dart';
 import 'package:pocket_relay/src/core/device/turn_completion_alert_host.dart';
 import 'package:pocket_relay/src/core/platform/pocket_platform_policy.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_background_grace_host.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_completion_alert_host.dart';
@@ -38,9 +39,13 @@ class WorkspaceContinuityHost extends StatelessWidget {
     final resolvedNotificationPermissionController =
         notificationPermissionController ??
         const MethodChannelNotificationPermissionController();
+    final warningCallbacks = WorkspaceDeviceContinuityWarningCallbacks(
+      sink: workspaceController,
+    );
 
     return WorkspaceTurnForegroundServiceHost(
       workspaceController: workspaceController,
+      onWarningChanged: warningCallbacks.foregroundService,
       foregroundServiceController:
           foregroundServiceController ??
           const MethodChannelForegroundServiceController(),
@@ -50,6 +55,7 @@ class WorkspaceContinuityHost extends StatelessWidget {
           platformPolicy.supportsActiveTurnForegroundService,
       child: WorkspaceTurnBackgroundGraceHost(
         workspaceController: workspaceController,
+        onWarningChanged: warningCallbacks.backgroundGrace,
         backgroundGraceController:
             backgroundGraceController ??
             const MethodChannelBackgroundGraceController(),
@@ -58,6 +64,7 @@ class WorkspaceContinuityHost extends StatelessWidget {
           workspaceController: workspaceController,
           child: WorkspaceTurnCompletionAlertHost(
             workspaceController: workspaceController,
+            onWarningChanged: warningCallbacks.turnCompletionAlert,
             turnCompletionAlertController:
                 turnCompletionAlertController ??
                 const PlatformTurnCompletionAlertController(),
@@ -72,6 +79,7 @@ class WorkspaceContinuityHost extends StatelessWidget {
                 !platformPolicy.supportsActiveTurnForegroundService,
             child: WorkspaceTurnWakeLockHost(
               workspaceController: workspaceController,
+              onWarningChanged: warningCallbacks.wakeLock,
               displayWakeLockController:
                   displayWakeLockController ??
                   const WakelockPlusDisplayWakeLockController(),
