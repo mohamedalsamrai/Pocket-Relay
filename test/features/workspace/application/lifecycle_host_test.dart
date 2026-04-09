@@ -13,9 +13,7 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_app_lifecycle_host.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_background_grace_host.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_foreground_service_host.dart';
-import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_turn_wake_lock_host.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/widgets/workspace_continuity_host.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -257,34 +255,30 @@ void main() {
     },
   );
 
-  testWidgets(
-    'PocketRelayApp keeps the foreground-service, background-grace, lifecycle, and wake-lock hosts in place',
-    (tester) async {
-      final appServerClient = FakeCodexAppServerClient();
-      addTearDown(appServerClient.close);
+  testWidgets('PocketRelayApp mounts one workspace continuity subsystem host', (
+    tester,
+  ) async {
+    final appServerClient = FakeCodexAppServerClient();
+    addTearDown(appServerClient.close);
 
-      await tester.pumpWidget(
-        PocketRelayApp(
-          connectionRepository: MemoryCodexConnectionRepository.single(
-            savedProfile: SavedProfile(
-              profile: _profile('Primary Box', 'primary.local'),
-              secrets: const ConnectionSecrets(password: 'secret-1'),
-            ),
-            connectionId: 'conn_primary',
+    await tester.pumpWidget(
+      PocketRelayApp(
+        connectionRepository: MemoryCodexConnectionRepository.single(
+          savedProfile: SavedProfile(
+            profile: _profile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
           ),
-          modelCatalogStore: MemoryConnectionModelCatalogStore(),
-          recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-          agentAdapterClient: appServerClient,
+          connectionId: 'conn_primary',
         ),
-      );
-      await tester.pumpAndSettle();
+        modelCatalogStore: MemoryConnectionModelCatalogStore(),
+        recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
+        agentAdapterClient: appServerClient,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byType(WorkspaceTurnForegroundServiceHost), findsOneWidget);
-      expect(find.byType(WorkspaceTurnBackgroundGraceHost), findsOneWidget);
-      expect(find.byType(WorkspaceAppLifecycleHost), findsOneWidget);
-      expect(find.byType(WorkspaceTurnWakeLockHost), findsOneWidget);
-    },
-  );
+    expect(find.byType(WorkspaceContinuityHost), findsOneWidget);
+  });
 }
 
 ConnectionWorkspaceController _buildWorkspaceController({
