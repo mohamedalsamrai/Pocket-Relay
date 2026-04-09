@@ -92,6 +92,40 @@ void main() {
         diagnosticsUpdates.single.lastRecoveryPersistenceFailureDetail,
         'secure storage write failed',
       );
+
+      recoveryStore.saveError = null;
+      await controller.dispose();
+    },
+  );
+
+  test(
+    'flush after dispose does not build or queue another snapshot',
+    () async {
+      final recoveryStore = _RecordingRecoveryStore();
+      const snapshot = ConnectionWorkspaceRecoveryState(
+        connectionId: 'conn_primary',
+        selectedThreadId: 'thread_saved',
+        draftText: '',
+      );
+      var buildCalls = 0;
+      final controller = WorkspaceRecoveryPersistenceController(
+        recoveryStore: recoveryStore,
+        debounceDuration: Duration.zero,
+        now: () => DateTime.utc(2026, 4, 9, 12),
+        buildSnapshot: ({backgroundedAt, backgroundedLifecycleState}) {
+          buildCalls += 1;
+          return snapshot;
+        },
+        updateDiagnostics: (_, _) {},
+      );
+
+      await controller.dispose();
+      await controller.flush();
+
+      expect(buildCalls, 1);
+      expect(recoveryStore.savedStates, <ConnectionWorkspaceRecoveryState?>[
+        snapshot,
+      ]);
     },
   );
 }
