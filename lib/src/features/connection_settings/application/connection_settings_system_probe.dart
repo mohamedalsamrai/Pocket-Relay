@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartssh2/dartssh2.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
