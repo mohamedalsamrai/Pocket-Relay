@@ -65,9 +65,6 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
   @override
   void dispose() {
     _cancelDismissal();
-    _appLifecycleVisibilityListenable?.removeListener(
-      _handleAppLifecycleVisibilityChanged,
-    );
     _appLifecycleVisibilityListenable = null;
     _stopObservingAppLifecycle();
     super.dispose();
@@ -100,7 +97,6 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
       return;
     }
 
-    previousListenable?.removeListener(_handleAppLifecycleVisibilityChanged);
     _appLifecycleVisibilityListenable = nextListenable;
 
     if (nextListenable == null) {
@@ -109,7 +105,6 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
     }
 
     _stopObservingAppLifecycle();
-    nextListenable.addListener(_handleAppLifecycleVisibilityChanged);
   }
 
   void _startObservingAppLifecycle() {
@@ -127,10 +122,6 @@ class _LiveLaneNoticeHostState extends State<LiveLaneNoticeHost>
     }
     WidgetsBinding.instance.removeObserver(this);
     _isObservingAppLifecycle = false;
-  }
-
-  void _handleAppLifecycleVisibilityChanged() {
-    _syncVisibilityDismissal();
   }
 
   void _syncVisibilityDismissal() {
