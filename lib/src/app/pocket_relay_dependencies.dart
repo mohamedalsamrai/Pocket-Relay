@@ -16,6 +16,58 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/agent_adapter_conversation_history_repository.dart';
 
+class PocketRelayWorkspaceControllerDependencies {
+  const PocketRelayWorkspaceControllerDependencies({
+    required this.connectionRepository,
+    required this.modelCatalogStore,
+    required this.recoveryStore,
+    required this.agentAdapterClient,
+    required this.agentAdapterRemoteRuntimeDelegateFactory,
+    required this.platformPolicy,
+  });
+
+  final CodexConnectionRepository? connectionRepository;
+  final ConnectionModelCatalogStore? modelCatalogStore;
+  final ConnectionWorkspaceRecoveryStore? recoveryStore;
+  final AgentAdapterClient? agentAdapterClient;
+  final AgentAdapterRemoteRuntimeDelegateFactory?
+  agentAdapterRemoteRuntimeDelegateFactory;
+  final PocketPlatformPolicy? platformPolicy;
+
+  PocketPlatformPolicy get resolvedPlatformPolicy {
+    return platformPolicy ?? PocketPlatformPolicy.resolve();
+  }
+
+  bool requiresRebuildFrom(
+    PocketRelayWorkspaceControllerDependencies oldDependencies,
+  ) {
+    return this != oldDependencies;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PocketRelayWorkspaceControllerDependencies &&
+            other.connectionRepository == connectionRepository &&
+            other.modelCatalogStore == modelCatalogStore &&
+            other.recoveryStore == recoveryStore &&
+            other.agentAdapterClient == agentAdapterClient &&
+            other.agentAdapterRemoteRuntimeDelegateFactory ==
+                agentAdapterRemoteRuntimeDelegateFactory &&
+            other.platformPolicy == platformPolicy;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    connectionRepository,
+    modelCatalogStore,
+    recoveryStore,
+    agentAdapterClient,
+    agentAdapterRemoteRuntimeDelegateFactory,
+    platformPolicy,
+  );
+}
+
 class PocketRelayAppDependencies {
   const PocketRelayAppDependencies({
     this.connectionRepository,
@@ -53,30 +105,59 @@ class PocketRelayAppDependencies {
     return platformPolicy ?? PocketPlatformPolicy.resolve();
   }
 
+  PocketRelayWorkspaceControllerDependencies
+  get workspaceControllerDependencies {
+    return PocketRelayWorkspaceControllerDependencies(
+      connectionRepository: connectionRepository,
+      modelCatalogStore: modelCatalogStore,
+      recoveryStore: recoveryStore,
+      agentAdapterClient: agentAdapterClient,
+      agentAdapterRemoteRuntimeDelegateFactory:
+          agentAdapterRemoteRuntimeDelegateFactory,
+      platformPolicy: platformPolicy,
+    );
+  }
+
+  bool requiresWorkspaceControllerRebuild(
+    PocketRelayAppDependencies oldDependencies,
+  ) {
+    return workspaceControllerDependencies.requiresRebuildFrom(
+      oldDependencies.workspaceControllerDependencies,
+    );
+  }
+
   PocketRelayWorkspaceBootstrap createWorkspaceBootstrap({
     CodexConnectionRepository? ownedConnectionRepository,
   }) {
+    final workspaceControllerDependencies =
+        this.workspaceControllerDependencies;
     final resolvedConnectionRepository =
-        connectionRepository ??
+        workspaceControllerDependencies.connectionRepository ??
         (ownedConnectionRepository ?? SecureCodexConnectionRepository());
-    final resolvedPlatformPolicy = this.resolvedPlatformPolicy;
+    final resolvedPlatformPolicy =
+        workspaceControllerDependencies.resolvedPlatformPolicy;
     final resolvedRemoteRuntimeDelegateFactory =
-        agentAdapterRemoteRuntimeDelegateFactory ??
+        workspaceControllerDependencies
+            .agentAdapterRemoteRuntimeDelegateFactory ??
         ((kind) => createDefaultAgentAdapterRemoteRuntimeDelegate(kind));
     var usedInjectedAgentAdapterClient = false;
 
     final workspaceController = ConnectionWorkspaceController(
       connectionRepository: resolvedConnectionRepository,
       modelCatalogStore:
-          modelCatalogStore ?? SecureConnectionModelCatalogStore(),
-      recoveryStore: recoveryStore ?? SecureConnectionWorkspaceRecoveryStore(),
+          workspaceControllerDependencies.modelCatalogStore ??
+          SecureConnectionModelCatalogStore(),
+      recoveryStore:
+          workspaceControllerDependencies.recoveryStore ??
+          SecureConnectionWorkspaceRecoveryStore(),
       remoteRuntimeDelegateFactory: resolvedRemoteRuntimeDelegateFactory,
       laneBindingFactory:
           ({
             required String connectionId,
             required SavedConnection connection,
           }) {
-            final injectedAgentAdapterClient = agentAdapterClient;
+            final injectedAgentAdapterClient =
+                workspaceControllerDependencies.agentAdapterClient;
             final usingInjectedClient =
                 !usedInjectedAgentAdapterClient &&
                 injectedAgentAdapterClient != null;
