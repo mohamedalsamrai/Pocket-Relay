@@ -8,6 +8,8 @@ import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dar
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_client.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
+import '../../../../support/fakes/fake_app_remote_runtime_delegate.dart';
+
 export 'package:flutter/material.dart';
 export 'package:flutter_test/flutter_test.dart';
 export 'package:pocket_relay/src/app/pocket_relay_app.dart';
@@ -60,60 +62,8 @@ PocketRelayApp buildCatalogApp({
     agentAdapterClient: agentAdapterClient!,
     agentAdapterRemoteRuntimeDelegateFactory:
         agentAdapterRemoteRuntimeDelegateFactory ??
-        _fakeRemoteRuntimeDelegateFactory,
+        fakeAppRemoteRuntimeDelegateFactory,
   );
-}
-
-AgentAdapterRemoteRuntimeDelegate _fakeRemoteRuntimeDelegateFactory(
-  AgentAdapterKind kind,
-) {
-  return const _FakeAppRemoteRuntimeDelegate();
-}
-
-final class _FakeAppRemoteRuntimeDelegate
-    implements AgentAdapterRemoteRuntimeDelegate {
-  const _FakeAppRemoteRuntimeDelegate();
-
-  @override
-  String buildSessionName(String ownerId) => 'pocket-relay-$ownerId';
-
-  @override
-  Future<ConnectionRemoteRuntimeState> probeRemoteRuntime({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    String? ownerId,
-  }) async {
-    final normalizedOwnerId = ownerId ?? 'conn_primary';
-    return ConnectionRemoteRuntimeState(
-      hostCapability: const ConnectionRemoteHostCapabilityState.supported(),
-      server: ConnectionRemoteServerState.notRunning(
-        ownerId: normalizedOwnerId,
-        sessionName: buildSessionName(normalizedOwnerId),
-        detail: 'Managed remote app-server is not running.',
-      ),
-    );
-  }
-
-  @override
-  Future<void> restartRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
-
-  @override
-  Future<void> startRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
-
-  @override
-  Future<void> stopRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
 }
 
 Future<void> pumpAppReady(WidgetTester tester) {

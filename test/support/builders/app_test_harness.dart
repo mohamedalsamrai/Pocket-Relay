@@ -18,6 +18,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
+import '../fakes/fake_app_remote_runtime_delegate.dart';
+
 void registerAppTestStorageLifecycle() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -93,63 +95,12 @@ PocketRelayApp buildCatalogApp({
     agentAdapterClient: agentAdapterClient!,
     agentAdapterRemoteRuntimeDelegateFactory:
         agentAdapterRemoteRuntimeDelegateFactory ??
-        _fakeRemoteRuntimeDelegateFactory,
+        fakeAppRemoteRuntimeDelegateFactory,
     settingsOverlayDelegate:
         settingsOverlayDelegate ??
         const ModalConnectionSettingsOverlayDelegate(),
     platformPolicy: platformPolicy,
   );
-}
-
-AgentAdapterRemoteRuntimeDelegate _fakeRemoteRuntimeDelegateFactory(
-  AgentAdapterKind kind,
-) {
-  return const _FakeAppRemoteRuntimeDelegate();
-}
-
-final class _FakeAppRemoteRuntimeDelegate
-    implements AgentAdapterRemoteRuntimeDelegate {
-  const _FakeAppRemoteRuntimeDelegate();
-
-  @override
-  String buildSessionName(String ownerId) => 'pocket-relay-$ownerId';
-
-  @override
-  Future<ConnectionRemoteRuntimeState> probeRemoteRuntime({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    String? ownerId,
-  }) async {
-    final normalizedOwnerId = ownerId ?? 'conn_primary';
-    return ConnectionRemoteRuntimeState(
-      hostCapability: const ConnectionRemoteHostCapabilityState.supported(),
-      server: ConnectionRemoteServerState.notRunning(
-        ownerId: normalizedOwnerId,
-        sessionName: buildSessionName(normalizedOwnerId),
-      ),
-    );
-  }
-
-  @override
-  Future<void> restartRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
-
-  @override
-  Future<void> startRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
-
-  @override
-  Future<void> stopRemoteServer({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-  }) async {}
 }
 
 class DeferredConnectionRepository implements CodexConnectionRepository {
