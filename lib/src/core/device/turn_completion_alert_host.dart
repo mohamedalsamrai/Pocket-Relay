@@ -108,12 +108,12 @@ class TurnCompletionAlertHost extends StatefulWidget {
 }
 
 class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
-    with WidgetsBindingObserver {
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<TurnCompletionAlertHost> {
   final Set<String> _handledAlertIds = <String>{};
   final Queue<String> _handledAlertIdOrder = Queue<String>();
   StreamSubscription<TurnCompletionAlertRequest>? _completionAlertsSubscription;
-  AppLifecycleState? _appLifecycleState;
-  bool _isObservingAppLifecycle = false;
   bool _showsBackgroundAlert = false;
   bool _isRequestingNotificationPermission = false;
   bool _notificationPermissionDeniedForCurrentForegroundSession = false;
@@ -136,20 +136,19 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   }
 
   AppLifecycleVisibility get _appLifecycleVisibility {
-    return widget.appLifecycleVisibilityListenable?.value ??
-        appLifecycleVisibilityForState(_appLifecycleState);
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
   }
 
   @override
   void initState() {
     super.initState();
-    if (widget.appLifecycleVisibilityListenable == null) {
-      _startObservingAppLifecycle();
-    } else {
-      widget.appLifecycleVisibilityListenable!.addListener(
-        _handleExternalAppLifecycleVisibilityChanged,
-      );
-    }
+    initAppLifecycleVisibilityObserver();
     _subscribeToCompletionAlerts();
     _syncCompletionAlertState();
   }
@@ -157,9 +156,8 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
   @override
   void didUpdateWidget(covariant TurnCompletionAlertHost oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncAppLifecycleObserver(
+    syncAppLifecycleVisibilityObserver(
       oldWidget.appLifecycleVisibilityListenable,
-      widget.appLifecycleVisibilityListenable,
     );
     if (oldWidget.completionAlerts != widget.completionAlerts) {
       unawaited(
@@ -176,23 +174,12 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
     if (oldWidget.hasActiveTurn && !widget.hasActiveTurn) {
       _notificationPermissionDeniedForCurrentForegroundSession = false;
     }
-    _clearNotificationPermissionDenialOnForeground();
-    _syncCompletionAlertState();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-    _clearNotificationPermissionDenialOnForeground();
     _syncCompletionAlertState();
   }
 
   @override
   void dispose() {
-    _stopObservingAppLifecycle();
-    widget.appLifecycleVisibilityListenable?.removeListener(
-      _handleExternalAppLifecycleVisibilityChanged,
-    );
+    disposeAppLifecycleVisibilityObserver();
     unawaited(_completionAlertsSubscription?.cancel() ?? Future<void>.value());
     _setWarning(null);
     super.dispose();
@@ -200,41 +187,6 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
 
   @override
   Widget build(BuildContext context) => widget.child;
-
-  void _syncAppLifecycleObserver(
-    ValueListenable<AppLifecycleVisibility>? oldVisibility,
-    ValueListenable<AppLifecycleVisibility>? nextVisibility,
-  ) {
-    if (oldVisibility == nextVisibility) {
-      return;
-    }
-
-    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
-    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
-
-    if (nextVisibility == null) {
-      _startObservingAppLifecycle();
-    } else {
-      _stopObservingAppLifecycle();
-    }
-  }
-
-  void _startObservingAppLifecycle() {
-    if (_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.addObserver(this);
-    _isObservingAppLifecycle = true;
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
-  }
-
-  void _stopObservingAppLifecycle() {
-    if (!_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.removeObserver(this);
-    _isObservingAppLifecycle = false;
-  }
 
   bool _clearNotificationPermissionDenialOnForeground() {
     if (!_isForeground ||
@@ -246,7 +198,8 @@ class _TurnCompletionAlertHostState extends State<TurnCompletionAlertHost>
     return true;
   }
 
-  void _handleExternalAppLifecycleVisibilityChanged() {
+  @override
+  void handleAppLifecycleVisibilityChanged() {
     _clearNotificationPermissionDenialOnForeground();
     _syncCompletionAlertState();
   }

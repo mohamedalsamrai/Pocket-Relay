@@ -99,9 +99,9 @@ class ForegroundServiceHost extends StatefulWidget {
 }
 
 class _ForegroundServiceHostState extends State<ForegroundServiceHost>
-    with WidgetsBindingObserver {
-  AppLifecycleState? _appLifecycleState;
-  bool _isObservingAppLifecycle = false;
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<ForegroundServiceHost> {
   bool _requestedForegroundServiceEnabled = false;
   bool _isRequestingNotificationPermission = false;
   bool _notificationPermissionDeniedForCurrentRequest = false;
@@ -117,29 +117,27 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
   }
 
   AppLifecycleVisibility get _appLifecycleVisibility {
-    return widget.appLifecycleVisibilityListenable?.value ??
-        appLifecycleVisibilityForState(_appLifecycleState);
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
   }
 
   @override
   void initState() {
     super.initState();
-    if (widget.appLifecycleVisibilityListenable == null) {
-      _startObservingAppLifecycle();
-    } else {
-      widget.appLifecycleVisibilityListenable!.addListener(
-        _handleExternalAppLifecycleVisibilityChanged,
-      );
-    }
+    initAppLifecycleVisibilityObserver();
     _syncForegroundService();
   }
 
   @override
   void didUpdateWidget(covariant ForegroundServiceHost oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncAppLifecycleObserver(
+    syncAppLifecycleVisibilityObserver(
       oldWidget.appLifecycleVisibilityListenable,
-      widget.appLifecycleVisibilityListenable,
     );
     if (oldWidget.foregroundServiceController !=
             widget.foregroundServiceController &&
@@ -160,10 +158,7 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
 
   @override
   void dispose() {
-    _stopObservingAppLifecycle();
-    widget.appLifecycleVisibilityListenable?.removeListener(
-      _handleExternalAppLifecycleVisibilityChanged,
-    );
+    disposeAppLifecycleVisibilityObserver();
     _setWarning(null);
     if (_requestedForegroundServiceEnabled) {
       _requestedForegroundServiceEnabled = false;
@@ -173,50 +168,7 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-    if (_clearNotificationPermissionDenialOnForeground()) {
-      _syncForegroundService();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) => widget.child;
-
-  void _syncAppLifecycleObserver(
-    ValueListenable<AppLifecycleVisibility>? oldVisibility,
-    ValueListenable<AppLifecycleVisibility>? nextVisibility,
-  ) {
-    if (oldVisibility == nextVisibility) {
-      return;
-    }
-
-    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
-    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
-
-    if (nextVisibility == null) {
-      _startObservingAppLifecycle();
-    } else {
-      _stopObservingAppLifecycle();
-    }
-  }
-
-  void _startObservingAppLifecycle() {
-    if (_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.addObserver(this);
-    _isObservingAppLifecycle = true;
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
-  }
-
-  void _stopObservingAppLifecycle() {
-    if (!_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.removeObserver(this);
-    _isObservingAppLifecycle = false;
-  }
 
   bool _clearNotificationPermissionDenialOnForeground() {
     if (!_appLifecycleVisibility.isForegroundVisible ||
@@ -228,7 +180,8 @@ class _ForegroundServiceHostState extends State<ForegroundServiceHost>
     return true;
   }
 
-  void _handleExternalAppLifecycleVisibilityChanged() {
+  @override
+  void handleAppLifecycleVisibilityChanged() {
     if (_clearNotificationPermissionDenialOnForeground()) {
       _syncForegroundService();
     }
