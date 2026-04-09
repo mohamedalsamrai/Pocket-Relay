@@ -31,6 +31,14 @@ final class WorkspaceRemoteRuntimeController {
     _refreshGenerationByConnectionId.remove(connectionId);
   }
 
+  void invalidateRefreshes(String connectionId) {
+    final currentGeneration = _refreshGenerationByConnectionId[connectionId];
+    if (currentGeneration == null) {
+      return;
+    }
+    _refreshGenerationByConnectionId[connectionId] = currentGeneration + 1;
+  }
+
   ConnectionRemoteRuntimeState buildProbeCheckingRuntime() {
     return _coordinator.buildProbeCheckingRuntime();
   }

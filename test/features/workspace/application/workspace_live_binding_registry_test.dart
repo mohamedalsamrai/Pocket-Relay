@@ -31,7 +31,7 @@ void main() {
 
     final detachedBindings = registry.detachAll();
 
-    expect(detachedBindings.single.value, same(binding));
+    expect(detachedBindings.single, same(binding));
     expect(registry.bindingFor('conn_primary'), isNull);
 
     binding.restoreComposerDraft('Draft after detach');

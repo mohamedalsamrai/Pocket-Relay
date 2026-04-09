@@ -73,6 +73,9 @@ class WorkspaceRecoveryPersistenceController {
     DateTime? backgroundedAt,
     ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState,
   }) {
+    if (_isDisposed) {
+      return _recoveryPersistence;
+    }
     _debounceTimer?.cancel();
     _debounceTimer = null;
     return queueSnapshot(

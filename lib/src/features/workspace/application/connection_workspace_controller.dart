@@ -340,9 +340,9 @@ class ConnectionWorkspaceController extends ChangeNotifier
     _isDisposed = true;
     unawaited(finalRecoveryPersistence);
 
-    final liveBindingEntries = _laneRoster.detachAllBindings();
-    for (final entry in liveBindingEntries) {
-      entry.value.dispose();
+    final liveBindings = _laneRoster.detachAllBindings();
+    for (final binding in liveBindings) {
+      binding.dispose();
     }
     super.dispose();
   }

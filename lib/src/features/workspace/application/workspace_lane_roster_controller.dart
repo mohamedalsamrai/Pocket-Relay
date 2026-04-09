@@ -55,7 +55,7 @@ final class WorkspaceLaneRosterController {
     _liveBindingRegistry.unregister(connectionId);
   }
 
-  List<MapEntry<String, ConnectionLaneBinding>> detachAllBindings() {
+  List<ConnectionLaneBinding> detachAllBindings() {
     return _liveBindingRegistry.detachAll();
   }
 

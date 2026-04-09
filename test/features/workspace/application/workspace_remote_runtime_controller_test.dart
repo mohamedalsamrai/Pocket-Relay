@@ -50,6 +50,25 @@ void main() {
     );
   });
 
+  test('invalidates pending refreshes without reusing generations', () {
+    final controller = WorkspaceRemoteRuntimeController(
+      remoteRuntimeDelegateFactory: (_) => _FakeRemoteRuntimeDelegate(),
+    );
+
+    final staleGeneration = controller.beginRefresh('conn_primary');
+
+    controller.invalidateRefreshes('conn_primary');
+
+    expect(
+      controller.isCurrentRefreshGeneration(
+        connectionId: 'conn_primary',
+        refreshGeneration: staleGeneration,
+      ),
+      isFalse,
+    );
+    expect(controller.beginRefresh('conn_primary'), staleGeneration + 2);
+  });
+
   test(
     'delegates probes through the selected agent adapter runtime owner',
     () async {
