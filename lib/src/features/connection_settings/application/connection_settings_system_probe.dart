@@ -18,7 +18,6 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
 }) async {
-  final _ = secrets;
   final observedHostKey = Completer<ConnectionSettingsSystemTestResult>();
   final socket = await SSHSocket.connect(
     profile.host.trim(),
@@ -37,14 +36,22 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
           ),
         );
       }
-      return false;
+      return true;
     },
+    identities: _connectionSettingsSystemProbeIdentities(profile, secrets),
+    onPasswordRequest: profile.authMode == AuthMode.password
+        ? () => secrets.password.trim().isEmpty ? null : secrets.password
+        : null,
   );
 
   try {
-    final result = await observedHostKey.future.timeout(
-      const Duration(seconds: 10),
-    );
+    final result = await Future.any<ConnectionSettingsSystemTestResult>([
+      observedHostKey.future,
+      client.authenticated.then<ConnectionSettingsSystemTestResult>((_) {
+        throw StateError('Could not read the SSH host fingerprint.');
+      }),
+    ]).timeout(const Duration(seconds: 10));
+    await client.authenticated;
     if (result.fingerprint.isEmpty || result.keyType.isEmpty) {
       throw StateError('Could not read the SSH host fingerprint.');
     }
@@ -52,6 +59,23 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
   } finally {
     client.close();
   }
+}
+
+List<SSHKeyPair>? _connectionSettingsSystemProbeIdentities(
+  ConnectionProfile profile,
+  ConnectionSecrets secrets,
+) {
+  if (profile.authMode != AuthMode.privateKey) {
+    return null;
+  }
+
+  final privateKey = secrets.privateKeyPem.trim();
+  if (privateKey.isEmpty) {
+    throw StateError('A private key is required for key-based SSH auth.');
+  }
+
+  final passphrase = secrets.privateKeyPassphrase.trim();
+  return SSHKeyPair.fromPem(privateKey, passphrase.isEmpty ? null : passphrase);
 }
 
 String connectionSettingsSystemProbeErrorMessage(Object error) {
