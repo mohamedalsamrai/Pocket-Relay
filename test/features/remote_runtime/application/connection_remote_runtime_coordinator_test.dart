@@ -80,6 +80,7 @@ void main() {
   test(
     'restartRemoteServer rethrows the action error when the follow-up probe still does not report a running server',
     () async {
+      final probedRuntimes = <ConnectionRemoteRuntimeState>[];
       final delegate = _FakeRemoteRuntimeDelegate(
         probeRuntime: const ConnectionRemoteRuntimeState(
           hostCapability: ConnectionRemoteHostCapabilityState.supported(),
@@ -101,6 +102,7 @@ void main() {
           ownerId: 'conn_primary',
           currentRuntime: const ConnectionRemoteRuntimeState.unknown(),
           probeFailure: _probeFailure,
+          onProbedRuntime: probedRuntimes.add,
         ),
         throwsA(
           isA<StateError>().having(
@@ -113,6 +115,10 @@ void main() {
 
       expect(delegate.restartCalls, 1);
       expect(delegate.probeCalls, 1);
+      expect(
+        probedRuntimes.single.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
     },
   );
 }

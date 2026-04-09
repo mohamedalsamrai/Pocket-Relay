@@ -43,20 +43,22 @@ extension on Future<_WorkspaceRemoteServerActionContext> {
           ),
           probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
           onChecking: (checkingRuntime) {
-            _applyWorkspaceRemoteServerActionCheckingRuntime(
+            _applyWorkspaceRemoteRuntimeState(
               context.controller,
               connectionId: context.connectionId,
               refreshGeneration: context.refreshGeneration,
-              checkingRuntime: checkingRuntime,
+              runtime: checkingRuntime,
+            );
+          },
+          onProbedRuntime: (nextRuntime) {
+            _applyWorkspaceRemoteRuntimeState(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              runtime: nextRuntime,
             );
           },
         );
-    _applyWorkspaceRemoteServerActionResultRuntime(
-      context.controller,
-      connectionId: context.connectionId,
-      refreshGeneration: context.refreshGeneration,
-      nextRuntime: nextRuntime,
-    );
     return nextRuntime;
   }
 
@@ -72,20 +74,22 @@ extension on Future<_WorkspaceRemoteServerActionContext> {
           ),
           probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
           onChecking: (checkingRuntime) {
-            _applyWorkspaceRemoteServerActionCheckingRuntime(
+            _applyWorkspaceRemoteRuntimeState(
               context.controller,
               connectionId: context.connectionId,
               refreshGeneration: context.refreshGeneration,
-              checkingRuntime: checkingRuntime,
+              runtime: checkingRuntime,
+            );
+          },
+          onProbedRuntime: (nextRuntime) {
+            _applyWorkspaceRemoteRuntimeState(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              runtime: nextRuntime,
             );
           },
         );
-    _applyWorkspaceRemoteServerActionResultRuntime(
-      context.controller,
-      connectionId: context.connectionId,
-      refreshGeneration: context.refreshGeneration,
-      nextRuntime: nextRuntime,
-    );
     return nextRuntime;
   }
 
@@ -101,20 +105,22 @@ extension on Future<_WorkspaceRemoteServerActionContext> {
           ),
           probeFailure: ConnectionLifecycleErrors.remoteRuntimeProbeFailure,
           onChecking: (checkingRuntime) {
-            _applyWorkspaceRemoteServerActionCheckingRuntime(
+            _applyWorkspaceRemoteRuntimeState(
               context.controller,
               connectionId: context.connectionId,
               refreshGeneration: context.refreshGeneration,
-              checkingRuntime: checkingRuntime,
+              runtime: checkingRuntime,
+            );
+          },
+          onProbedRuntime: (nextRuntime) {
+            _applyWorkspaceRemoteRuntimeState(
+              context.controller,
+              connectionId: context.connectionId,
+              refreshGeneration: context.refreshGeneration,
+              runtime: nextRuntime,
             );
           },
         );
-    _applyWorkspaceRemoteServerActionResultRuntime(
-      context.controller,
-      connectionId: context.connectionId,
-      refreshGeneration: context.refreshGeneration,
-      nextRuntime: nextRuntime,
-    );
     return nextRuntime;
   }
 }
@@ -166,11 +172,11 @@ Future<_WorkspaceRemoteServerActionContext> _runWorkspaceRemoteServerAction(
   );
 }
 
-void _applyWorkspaceRemoteServerActionCheckingRuntime(
+void _applyWorkspaceRemoteRuntimeState(
   ConnectionWorkspaceController controller, {
   required String connectionId,
   required int refreshGeneration,
-  required ConnectionRemoteRuntimeState checkingRuntime,
+  required ConnectionRemoteRuntimeState runtime,
 }) {
   if (!_canApplyWorkspaceRemoteRuntime(
     controller,
@@ -184,31 +190,7 @@ void _applyWorkspaceRemoteServerActionCheckingRuntime(
     controller._state.copyWith(
       remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
         ...controller._state.remoteRuntimeByConnectionId,
-        connectionId: checkingRuntime,
-      },
-    ),
-  );
-}
-
-void _applyWorkspaceRemoteServerActionResultRuntime(
-  ConnectionWorkspaceController controller, {
-  required String connectionId,
-  required int refreshGeneration,
-  required ConnectionRemoteRuntimeState nextRuntime,
-}) {
-  if (!_canApplyWorkspaceRemoteRuntime(
-    controller,
-    connectionId: connectionId,
-    refreshGeneration: refreshGeneration,
-  )) {
-    return;
-  }
-
-  controller._applyState(
-    controller._state.copyWith(
-      remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{
-        ...controller._state.remoteRuntimeByConnectionId,
-        connectionId: nextRuntime,
+        connectionId: runtime,
       },
     ),
   );

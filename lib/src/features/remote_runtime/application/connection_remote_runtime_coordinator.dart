@@ -34,12 +34,11 @@ final class ConnectionRemoteRuntimeCoordinator {
   }
 
   ConnectionRemoteRuntimeState buildActionCheckingRuntime({
-    required ConnectionProfile profile,
+    required AgentAdapterRemoteRuntimeDelegate delegate,
     required String ownerId,
     required String detail,
     ConnectionRemoteRuntimeState? currentRuntime,
   }) {
-    final delegate = _remoteRuntimeDelegateFactory(profile.agentAdapter);
     return ConnectionRemoteRuntimeState(
       hostCapability:
           currentRuntime?.hostCapability ??
@@ -75,6 +74,7 @@ final class ConnectionRemoteRuntimeCoordinator {
     ConnectionRemoteRuntimeState? currentRuntime,
     required ConnectionRemoteRuntimeProbeFailureBuilder probeFailure,
     void Function(ConnectionRemoteRuntimeState runtime)? onChecking,
+    void Function(ConnectionRemoteRuntimeState runtime)? onProbedRuntime,
   }) {
     return _runServerAction(
       profile: profile,
@@ -83,6 +83,7 @@ final class ConnectionRemoteRuntimeCoordinator {
       currentRuntime: currentRuntime,
       probeFailure: probeFailure,
       onChecking: onChecking,
+      onProbedRuntime: onProbedRuntime,
       actionDetail: 'Starting managed remote runtime…',
       runAction: (delegate) => delegate.startRemoteServer(
         profile: profile,
@@ -101,6 +102,7 @@ final class ConnectionRemoteRuntimeCoordinator {
     ConnectionRemoteRuntimeState? currentRuntime,
     required ConnectionRemoteRuntimeProbeFailureBuilder probeFailure,
     void Function(ConnectionRemoteRuntimeState runtime)? onChecking,
+    void Function(ConnectionRemoteRuntimeState runtime)? onProbedRuntime,
   }) {
     return _runServerAction(
       profile: profile,
@@ -109,6 +111,7 @@ final class ConnectionRemoteRuntimeCoordinator {
       currentRuntime: currentRuntime,
       probeFailure: probeFailure,
       onChecking: onChecking,
+      onProbedRuntime: onProbedRuntime,
       actionDetail: 'Stopping managed remote runtime…',
       runAction: (delegate) => delegate.stopRemoteServer(
         profile: profile,
@@ -127,6 +130,7 @@ final class ConnectionRemoteRuntimeCoordinator {
     ConnectionRemoteRuntimeState? currentRuntime,
     required ConnectionRemoteRuntimeProbeFailureBuilder probeFailure,
     void Function(ConnectionRemoteRuntimeState runtime)? onChecking,
+    void Function(ConnectionRemoteRuntimeState runtime)? onProbedRuntime,
   }) {
     return _runServerAction(
       profile: profile,
@@ -135,6 +139,7 @@ final class ConnectionRemoteRuntimeCoordinator {
       currentRuntime: currentRuntime,
       probeFailure: probeFailure,
       onChecking: onChecking,
+      onProbedRuntime: onProbedRuntime,
       actionDetail: 'Restarting managed remote runtime…',
       runAction: (delegate) => delegate.restartRemoteServer(
         profile: profile,
@@ -178,6 +183,7 @@ final class ConnectionRemoteRuntimeCoordinator {
     actionSucceeded,
     ConnectionRemoteRuntimeState? currentRuntime,
     void Function(ConnectionRemoteRuntimeState runtime)? onChecking,
+    void Function(ConnectionRemoteRuntimeState runtime)? onProbedRuntime,
   }) async {
     if (profile.isLocal) {
       throw StateError(
@@ -188,7 +194,7 @@ final class ConnectionRemoteRuntimeCoordinator {
     final delegate = _remoteRuntimeDelegateFactory(profile.agentAdapter);
     onChecking?.call(
       buildActionCheckingRuntime(
-        profile: profile,
+        delegate: delegate,
         ownerId: ownerId,
         detail: actionDetail,
         currentRuntime: currentRuntime,
@@ -211,6 +217,7 @@ final class ConnectionRemoteRuntimeCoordinator {
       ownerId: ownerId,
       probeFailure: probeFailure,
     );
+    onProbedRuntime?.call(nextRuntime);
     if (actionError != null && !actionSucceeded(nextRuntime)) {
       Error.throwWithStackTrace(actionError, actionStackTrace!);
     }

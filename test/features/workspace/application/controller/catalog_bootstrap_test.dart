@@ -179,6 +179,49 @@ void main() {
   );
 
   test(
+    'startRemoteServer applies the follow-up probe runtime before rethrowing a failed action',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      final ownerControl = _ThrowingStartRemoteOwnerControl(
+        snapshot: const CodexRemoteAppServerOwnerSnapshot(
+          ownerId: 'conn_primary',
+          workspaceDir: '/workspace',
+          status: CodexRemoteAppServerOwnerStatus.missing,
+          sessionName: 'pocket-relay-conn_primary',
+          detail: 'No managed remote app-server is running.',
+        ),
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        remoteAppServerHostProbe: ownerControl,
+        remoteAppServerOwnerInspector: ownerControl,
+        remoteAppServerOwnerControl: ownerControl,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await expectLater(
+        () => controller.startRemoteServer(connectionId: 'conn_primary'),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'start failed',
+          ),
+        ),
+      );
+
+      expect(ownerControl.startCalls, 1);
+      expect(
+        controller.state.remoteRuntimeFor('conn_primary')?.server.status,
+        ConnectionRemoteServerStatus.notRunning,
+      );
+    },
+  );
+
+  test(
     'stopRemoteServer refreshes controller runtime after an explicit stop action',
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');
@@ -364,4 +407,63 @@ void main() {
       expect(await controller.loadLastKnownConnectionModelCatalog(), catalog);
     },
   );
+}
+
+final class _ThrowingStartRemoteOwnerControl
+    implements CodexRemoteAppServerOwnerControl {
+  _ThrowingStartRemoteOwnerControl({
+    required CodexRemoteAppServerOwnerSnapshot snapshot,
+  }) : _snapshot = snapshot;
+
+  final CodexRemoteAppServerOwnerSnapshot _snapshot;
+  int startCalls = 0;
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    return _snapshot;
+  }
+
+  @override
+  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+  }) async {
+    return const CodexRemoteAppServerHostCapabilities();
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> restartOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('restart should not have been requested');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> startOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    startCalls += 1;
+    throw StateError('start failed');
+  }
+
+  @override
+  Future<CodexRemoteAppServerOwnerSnapshot> stopOwner({
+    required ConnectionProfile profile,
+    required ConnectionSecrets secrets,
+    required String ownerId,
+    required String workspaceDir,
+  }) async {
+    throw StateError('stop should not have been requested');
+  }
 }
