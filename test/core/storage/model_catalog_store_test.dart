@@ -122,6 +122,51 @@ void main() {
       expect(await store.load('conn_primary'), isNull);
     },
   );
+
+  test(
+    'secure store ignores malformed catalog JSON without clearing the cache entry',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.connection.conn_primary.model_catalog',
+        '{not json',
+      );
+      final store = SecureConnectionModelCatalogStore(preferences: preferences);
+
+      expect(await store.load('conn_primary'), isNull);
+      expect(
+        await preferences.getString(
+          'pocket_relay.connection.conn_primary.model_catalog',
+        ),
+        '{not json',
+      );
+    },
+  );
+
+  test('secure store ignores non-map last known cache entries', () async {
+    final preferences = SharedPreferencesAsync();
+    await preferences.setString(
+      'pocket_relay.connection_model_catalog.last_known',
+      '[]',
+    );
+    final store = SecureConnectionModelCatalogStore(preferences: preferences);
+
+    expect(await store.loadLastKnown(), isNull);
+  });
+
+  test(
+    'secure store ignores last known cache entries missing a connection id',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.connection_model_catalog.last_known',
+        '{"connectionId":"","fetchedAt":"2026-03-22T12:00:00.000Z","models":[]}',
+      );
+      final store = SecureConnectionModelCatalogStore(preferences: preferences);
+
+      expect(await store.loadLastKnown(), isNull);
+    },
+  );
 }
 
 ConnectionModelCatalog _catalog({

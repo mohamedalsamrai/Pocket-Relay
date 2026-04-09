@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:pocket_relay/src/core/storage/persisted_json.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,31 +80,26 @@ class SecureConnectionWorkspaceRecoveryStore
       return null;
     }
 
-    final Object decoded;
-    try {
-      decoded = jsonDecode(rawState);
-    } catch (_) {
+    final recoveryStateResult =
+        decodePersistedJsonRecord<ConnectionWorkspaceRecoveryState>(
+          rawState,
+          subject: 'workspace recovery metadata',
+          decode: (json) => ConnectionWorkspaceRecoveryState.fromJson(json),
+          validate: (state) => state.connectionId.isEmpty
+              ? 'is missing a valid connection id.'
+              : null,
+        );
+    if (recoveryStateResult.issue case final issue?) {
       await _clearCorruptedRecoveryMetadata();
-      throw const ConnectionWorkspaceRecoveryStoreCorruptedException(
-        'Persisted workspace recovery metadata is malformed JSON.',
-      );
+      throw ConnectionWorkspaceRecoveryStoreCorruptedException(issue.message);
     }
-    if (decoded is! Map<String, dynamic>) {
-      await _clearCorruptedRecoveryMetadata();
-      throw const ConnectionWorkspaceRecoveryStoreCorruptedException(
-        'Persisted workspace recovery metadata is not a JSON object.',
-      );
-    }
-
-    final sanitizedMap = Map<String, dynamic>.from(decoded)
+    final decoded = decodePersistedJsonObject(
+      rawState,
+      subject: 'workspace recovery metadata',
+    ).value!;
+    final sanitizedMap = Map<String, Object?>.from(decoded)
       ..remove(_legacyDraftTextKey);
-    final state = ConnectionWorkspaceRecoveryState.fromJson(sanitizedMap);
-    if (state.connectionId.isEmpty) {
-      await _clearCorruptedRecoveryMetadata();
-      throw const ConnectionWorkspaceRecoveryStoreCorruptedException(
-        'Persisted workspace recovery metadata is missing a valid connection id.',
-      );
-    }
+    final state = recoveryStateResult.value!;
 
     final hasLegacyDraftText = decoded.containsKey(_legacyDraftTextKey);
     final legacyDraftText = _recoveryDraftText(decoded[_legacyDraftTextKey]);
@@ -171,17 +167,14 @@ class SecureConnectionWorkspaceRecoveryStore
     if (rawState == null || rawState.trim().isEmpty) {
       return null;
     }
-    try {
-      final decoded = jsonDecode(rawState);
-      if (decoded is! Map) {
-        return null;
-      }
-      return _normalizedRecoveryString(
-        Map<String, dynamic>.from(decoded)['connectionId'],
-      );
-    } catch (_) {
+    final decoded = decodePersistedJsonObject(
+      rawState,
+      subject: 'workspace recovery metadata',
+    );
+    if (decoded.issue != null) {
       return null;
     }
+    return _normalizedRecoveryString(decoded.value!['connectionId']);
   }
 
   Future<String> _readDraftText(String connectionId) async {

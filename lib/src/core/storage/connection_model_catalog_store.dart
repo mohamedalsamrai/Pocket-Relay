@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'persisted_json.dart';
 import 'shared_preferences_async_migration.dart';
 
 abstract interface class ConnectionModelCatalogStore {
@@ -102,17 +103,19 @@ class SecureConnectionModelCatalogStore implements ConnectionModelCatalogStore {
       return null;
     }
 
-    final decoded = jsonDecode(rawCatalog);
-    if (decoded is! Map<String, dynamic>) {
-      return null;
-    }
-
-    final catalog = ConnectionModelCatalog.fromJson(decoded);
-    if (catalog.connectionId != normalizedConnectionId ||
-        catalog.connectionId.isEmpty) {
-      return null;
-    }
-    return catalog;
+    // Model-catalog caches are best-effort. Invalid persisted values are
+    // ignored so callers can continue without mutating storage on read.
+    final decodedCatalog = decodePersistedJsonRecord<ConnectionModelCatalog>(
+      rawCatalog,
+      subject: 'connection model catalog cache',
+      decode: (json) => ConnectionModelCatalog.fromJson(json),
+      validate: (catalog) =>
+          catalog.connectionId != normalizedConnectionId ||
+              catalog.connectionId.isEmpty
+          ? 'has a mismatched connection id.'
+          : null,
+    );
+    return decodedCatalog.value;
   }
 
   @override
@@ -141,16 +144,15 @@ class SecureConnectionModelCatalogStore implements ConnectionModelCatalogStore {
       return null;
     }
 
-    final decoded = jsonDecode(rawCatalog);
-    if (decoded is! Map<String, dynamic>) {
-      return null;
-    }
-
-    final catalog = ConnectionModelCatalog.fromJson(decoded);
-    if (catalog.connectionId.isEmpty) {
-      return null;
-    }
-    return catalog;
+    final decodedCatalog = decodePersistedJsonRecord<ConnectionModelCatalog>(
+      rawCatalog,
+      subject: 'last known connection model catalog cache',
+      decode: (json) => ConnectionModelCatalog.fromJson(json),
+      validate: (catalog) => catalog.connectionId.isEmpty
+          ? 'is missing a valid connection id.'
+          : null,
+    );
+    return decodedCatalog.value;
   }
 
   @override
