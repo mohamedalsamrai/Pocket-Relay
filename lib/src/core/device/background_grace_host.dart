@@ -63,9 +63,9 @@ class BackgroundGraceHost extends StatefulWidget {
 }
 
 class _BackgroundGraceHostState extends State<BackgroundGraceHost>
-    with WidgetsBindingObserver {
-  AppLifecycleState? _appLifecycleState;
-  bool _isObservingAppLifecycle = false;
+    with
+        WidgetsBindingObserver,
+        AppLifecycleVisibilityObserver<BackgroundGraceHost> {
   bool _requestedBackgroundGraceEnabled = false;
 
   bool get _supportsBackgroundGrace {
@@ -79,29 +79,27 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   }
 
   AppLifecycleVisibility get _appLifecycleVisibility {
-    return widget.appLifecycleVisibilityListenable?.value ??
-        appLifecycleVisibilityForState(_appLifecycleState);
+    return appLifecycleVisibility;
+  }
+
+  @override
+  ValueListenable<AppLifecycleVisibility>?
+  get appLifecycleVisibilityListenable {
+    return widget.appLifecycleVisibilityListenable;
   }
 
   @override
   void initState() {
     super.initState();
-    if (widget.appLifecycleVisibilityListenable == null) {
-      _startObservingAppLifecycle();
-    } else {
-      widget.appLifecycleVisibilityListenable!.addListener(
-        _handleExternalAppLifecycleVisibilityChanged,
-      );
-    }
+    initAppLifecycleVisibilityObserver();
     _syncBackgroundGrace();
   }
 
   @override
   void didUpdateWidget(covariant BackgroundGraceHost oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncAppLifecycleObserver(
+    syncAppLifecycleVisibilityObserver(
       oldWidget.appLifecycleVisibilityListenable,
-      widget.appLifecycleVisibilityListenable,
     );
     if (oldWidget.backgroundGraceController !=
             widget.backgroundGraceController &&
@@ -113,17 +111,8 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appLifecycleState = state;
-    _syncBackgroundGrace();
-  }
-
-  @override
   void dispose() {
-    _stopObservingAppLifecycle();
-    widget.appLifecycleVisibilityListenable?.removeListener(
-      _handleExternalAppLifecycleVisibilityChanged,
-    );
+    disposeAppLifecycleVisibilityObserver();
     _setWarning(null);
     if (_requestedBackgroundGraceEnabled) {
       _requestedBackgroundGraceEnabled = false;
@@ -135,42 +124,8 @@ class _BackgroundGraceHostState extends State<BackgroundGraceHost>
   @override
   Widget build(BuildContext context) => widget.child;
 
-  void _syncAppLifecycleObserver(
-    ValueListenable<AppLifecycleVisibility>? oldVisibility,
-    ValueListenable<AppLifecycleVisibility>? nextVisibility,
-  ) {
-    if (oldVisibility == nextVisibility) {
-      return;
-    }
-
-    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
-    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
-
-    if (nextVisibility == null) {
-      _startObservingAppLifecycle();
-    } else {
-      _stopObservingAppLifecycle();
-    }
-  }
-
-  void _startObservingAppLifecycle() {
-    if (_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.addObserver(this);
-    _isObservingAppLifecycle = true;
-    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
-  }
-
-  void _stopObservingAppLifecycle() {
-    if (!_isObservingAppLifecycle) {
-      return;
-    }
-    WidgetsBinding.instance.removeObserver(this);
-    _isObservingAppLifecycle = false;
-  }
-
-  void _handleExternalAppLifecycleVisibilityChanged() {
+  @override
+  void handleAppLifecycleVisibilityChanged() {
     _syncBackgroundGrace();
   }
 

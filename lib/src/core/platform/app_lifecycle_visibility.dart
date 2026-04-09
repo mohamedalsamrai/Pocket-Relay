@@ -100,3 +100,91 @@ class _AppLifecycleVisibilityBuilderState
     return widget.builder(context, _visibility);
   }
 }
+
+/// Shared lifecycle visibility observer plumbing for stateful device hosts.
+mixin AppLifecycleVisibilityObserver<T extends StatefulWidget>
+    on State<T>, WidgetsBindingObserver {
+  AppLifecycleState? _appLifecycleState;
+  bool _isObservingAppLifecycle = false;
+
+  /// Optional external visibility source supplied by the host widget.
+  ValueListenable<AppLifecycleVisibility>? get appLifecycleVisibilityListenable;
+
+  /// Current app lifecycle visibility from the external source or Flutter.
+  @protected
+  AppLifecycleVisibility get appLifecycleVisibility {
+    return appLifecycleVisibilityListenable?.value ??
+        appLifecycleVisibilityForState(_appLifecycleState);
+  }
+
+  /// Starts observing the external visibility source or Flutter lifecycle.
+  @protected
+  void initAppLifecycleVisibilityObserver() {
+    final listenable = appLifecycleVisibilityListenable;
+    if (listenable == null) {
+      _startObservingAppLifecycle();
+    } else {
+      listenable.addListener(_handleExternalAppLifecycleVisibilityChanged);
+    }
+  }
+
+  /// Updates observation after the host widget changes its visibility source.
+  @protected
+  void syncAppLifecycleVisibilityObserver(
+    ValueListenable<AppLifecycleVisibility>? oldVisibility,
+  ) {
+    final nextVisibility = appLifecycleVisibilityListenable;
+    if (oldVisibility == nextVisibility) {
+      return;
+    }
+
+    oldVisibility?.removeListener(_handleExternalAppLifecycleVisibilityChanged);
+    nextVisibility?.addListener(_handleExternalAppLifecycleVisibilityChanged);
+
+    if (nextVisibility == null) {
+      _startObservingAppLifecycle();
+    } else {
+      _stopObservingAppLifecycle();
+    }
+  }
+
+  /// Stops observing lifecycle visibility changes.
+  @protected
+  void disposeAppLifecycleVisibilityObserver() {
+    _stopObservingAppLifecycle();
+    appLifecycleVisibilityListenable?.removeListener(
+      _handleExternalAppLifecycleVisibilityChanged,
+    );
+  }
+
+  /// Called when app lifecycle visibility changes.
+  @protected
+  void handleAppLifecycleVisibilityChanged();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appLifecycleState = state;
+    handleAppLifecycleVisibilityChanged();
+  }
+
+  void _startObservingAppLifecycle() {
+    if (_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    _isObservingAppLifecycle = true;
+    _appLifecycleState = WidgetsBinding.instance.lifecycleState;
+  }
+
+  void _stopObservingAppLifecycle() {
+    if (!_isObservingAppLifecycle) {
+      return;
+    }
+    WidgetsBinding.instance.removeObserver(this);
+    _isObservingAppLifecycle = false;
+  }
+
+  void _handleExternalAppLifecycleVisibilityChanged() {
+    handleAppLifecycleVisibilityChanged();
+  }
+}
