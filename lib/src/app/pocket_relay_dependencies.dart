@@ -16,7 +16,7 @@ import 'package:pocket_relay/src/features/workspace/application/connection_works
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/agent_adapter_conversation_history_repository.dart';
 
-class PocketRelayWorkspaceControllerDependencies {
+final class PocketRelayWorkspaceControllerDependencies {
   const PocketRelayWorkspaceControllerDependencies({
     required this.connectionRepository,
     required this.modelCatalogStore,

@@ -80,9 +80,20 @@ class SecureConnectionWorkspaceRecoveryStore
       return null;
     }
 
+    final objectResult = decodePersistedJsonObject(
+      rawState,
+      subject: 'workspace recovery metadata',
+    );
+    if (objectResult.issue case final issue?) {
+      await _clearCorruptedRecoveryMetadata();
+      throw ConnectionWorkspaceRecoveryStoreCorruptedException(issue.message);
+    }
+    final decoded = objectResult.value!;
+    final sanitizedMap = Map<String, Object?>.from(decoded)
+      ..remove(_legacyDraftTextKey);
     final recoveryStateResult =
-        decodePersistedJsonRecord<ConnectionWorkspaceRecoveryState>(
-          rawState,
+        decodePersistedJsonRecordObject<ConnectionWorkspaceRecoveryState>(
+          sanitizedMap,
           subject: 'workspace recovery metadata',
           decode: (json) => ConnectionWorkspaceRecoveryState.fromJson(json),
           validate: (state) => state.connectionId.isEmpty
@@ -93,12 +104,6 @@ class SecureConnectionWorkspaceRecoveryStore
       await _clearCorruptedRecoveryMetadata();
       throw ConnectionWorkspaceRecoveryStoreCorruptedException(issue.message);
     }
-    final decoded = decodePersistedJsonObject(
-      rawState,
-      subject: 'workspace recovery metadata',
-    ).value!;
-    final sanitizedMap = Map<String, Object?>.from(decoded)
-      ..remove(_legacyDraftTextKey);
     final state = recoveryStateResult.value!;
 
     final hasLegacyDraftText = decoded.containsKey(_legacyDraftTextKey);
@@ -220,7 +225,7 @@ String _draftTextStorageKeyForConnection(String connectionId) {
   return '${SecureConnectionWorkspaceRecoveryStore._draftTextStorageKeyPrefix}$normalizedConnectionId';
 }
 
-Map<String, Object?> _persistableStateJson(Map<String, dynamic> json) {
+Map<String, Object?> _persistableStateJson(Map<String, Object?> json) {
   return <String, Object?>{
     'connectionId': _normalizedRecoveryString(json['connectionId']) ?? '',
     'selectedThreadId': _normalizedRecoveryString(json['selectedThreadId']),

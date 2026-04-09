@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -597,6 +598,48 @@ void main() {
   );
 
   test(
+    'loadCatalog ignores legacy singleton secret read failures instead of aborting startup',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: ConnectionProfile.defaults(),
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(
+        await preferences.getString('pocket_relay.profile'),
+        jsonEncode(legacyProfile.toJson()),
+      );
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+    },
+  );
+
+  test(
     'loadCatalog rebuilds the index from namespaced profile keys when the index is missing',
     () async {
       final preferences = SharedPreferencesAsync();
@@ -642,4 +685,38 @@ void main() {
       );
     },
   );
+}
+
+final class _ThrowingReadFakeFlutterSecureStorage
+    extends FakeFlutterSecureStorage {
+  _ThrowingReadFakeFlutterSecureStorage(
+    super.data, {
+    required this.keyToThrowOn,
+  });
+
+  final String keyToThrowOn;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == keyToThrowOn) {
+      throw StateError('secure storage read failed');
+    }
+    return super.read(
+      key: key,
+      iOptions: iOptions,
+      aOptions: aOptions,
+      lOptions: lOptions,
+      webOptions: webOptions,
+      mOptions: mOptions,
+      wOptions: wOptions,
+    );
+  }
 }

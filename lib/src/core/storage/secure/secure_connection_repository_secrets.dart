@@ -97,24 +97,28 @@ Future<SavedConnection?> readLegacySingletonConnection(
   if (decodedProfile.issue != null) {
     return null;
   }
-  return SavedConnection(
-    id: '',
-    profile: decodedProfile.value!,
-    secrets: ConnectionSecrets(
-      password: await readSecret(
-        state.secureStorage,
-        legacySingletonPasswordKey,
+  try {
+    return SavedConnection(
+      id: '',
+      profile: decodedProfile.value!,
+      secrets: ConnectionSecrets(
+        password: await readSecret(
+          state.secureStorage,
+          legacySingletonPasswordKey,
+        ),
+        privateKeyPem: await readSecret(
+          state.secureStorage,
+          legacySingletonPrivateKeyKey,
+        ),
+        privateKeyPassphrase: await readSecret(
+          state.secureStorage,
+          legacySingletonPrivateKeyPassphraseKey,
+        ),
       ),
-      privateKeyPem: await readSecret(
-        state.secureStorage,
-        legacySingletonPrivateKeyKey,
-      ),
-      privateKeyPassphrase: await readSecret(
-        state.secureStorage,
-        legacySingletonPrivateKeyPassphraseKey,
-      ),
-    ),
-  );
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<void> deleteLegacyConnections(
