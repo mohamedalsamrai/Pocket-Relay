@@ -7,13 +7,15 @@ Future<void> _initializeWorkspaceController(
   ConnectionWorkspaceRecoveryState? recoveryState;
   PocketUserFacingError? recoveryLoadWarning;
   try {
-    recoveryState = await controller._recoveryStore.load();
+    recoveryState = await controller._recoveryPersistenceController
+        .loadPersistedSnapshot();
   } catch (error) {
     recoveryLoadWarning =
         ConnectionWorkspaceRecoveryErrors.recoveryStateLoadFailed(error: error);
   }
-  controller._lastPersistedRecoveryState = recoveryState;
-  controller._latestRecoveryPersistenceState = recoveryState;
+  controller._recoveryPersistenceController.seedPersistedSnapshot(
+    recoveryState,
+  );
   if (catalog.isEmpty) {
     controller._applyState(
       const ConnectionWorkspaceState(
@@ -57,7 +59,7 @@ Future<void> _initializeWorkspaceController(
     return;
   }
 
-  controller._liveBindingsByConnectionId[firstConnectionId] = firstBinding;
+  controller._laneRoster.putBinding(firstConnectionId, firstBinding);
   controller._registerLiveBinding(firstConnectionId, firstBinding);
   controller._applyState(
     ConnectionWorkspaceState(
@@ -120,11 +122,10 @@ Future<void> _instantiateWorkspaceConnection(
     binding.dispose();
     return;
   }
-  controller._liveBindingsByConnectionId[connectionId] = binding;
+  controller._laneRoster.putBinding(connectionId, binding);
   controller._registerLiveBinding(connectionId, binding);
-  final nextLiveConnectionIds = _orderWorkspaceLiveConnectionIds(
-    controller,
-    controller._liveBindingsByConnectionId.keys,
+  final nextLiveConnectionIds = controller._laneRoster.orderedLiveConnectionIds(
+    controller._state.catalog,
   );
   controller._applyState(
     controller._state.copyWith(

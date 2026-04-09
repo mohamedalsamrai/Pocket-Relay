@@ -136,7 +136,7 @@ Future<void> _saveWorkspaceInactiveSavedConnection(
       );
   if (profile.isLocal) {
     nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
-    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+    controller._remoteRuntimeController.invalidateRefreshes(
       normalizedConnectionId,
     );
   }
@@ -228,8 +228,7 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
   final (nextCatalog, nextSystemCatalog) = await _loadWorkspaceCatalogState(
     controller,
   );
-  final liveBinding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final liveBinding = controller._laneRoster.bindingFor(normalizedConnectionId);
   final shouldRequireReconnect =
       liveBinding == null ||
       liveBinding.sessionController.profile != profile ||
@@ -246,7 +245,7 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
       );
   if (profile.isLocal) {
     nextRemoteRuntimeByConnectionId.remove(normalizedConnectionId);
-    controller._remoteRuntimeRefreshGenerationByConnectionId.remove(
+    controller._remoteRuntimeController.invalidateRefreshes(
       normalizedConnectionId,
     );
   }

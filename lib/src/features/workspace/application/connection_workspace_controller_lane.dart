@@ -27,8 +27,7 @@ Future<void> _disconnectWorkspaceConnection(
 ) async {
   final normalizedConnectionId = _normalizeWorkspaceConnectionId(connectionId);
   await controller.initialize();
-  final binding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final binding = controller._laneRoster.bindingFor(normalizedConnectionId);
   if (binding == null ||
       binding.sessionController.sessionState.isBusy ||
       !binding.agentAdapterClient.isConnected) {
@@ -136,33 +135,18 @@ void _terminateWorkspaceConnection(
   String connectionId,
 ) {
   final normalizedConnectionId = connectionId.trim();
-  final binding =
-      controller._liveBindingsByConnectionId[normalizedConnectionId];
+  final binding = controller._laneRoster.bindingFor(normalizedConnectionId);
   if (binding == null) {
     return;
   }
   if (binding.sessionController.sessionState.isBusy) {
     return;
   }
-  controller._liveBindingsByConnectionId.remove(normalizedConnectionId);
+  controller._laneRoster.removeBinding(normalizedConnectionId);
 
-  final currentLiveConnectionIds = controller._state.liveConnectionIds;
-  final removalIndex = currentLiveConnectionIds.indexOf(normalizedConnectionId);
-  final nextLiveConnectionIds = _orderWorkspaceLiveConnectionIds(
-    controller,
-    controller._liveBindingsByConnectionId.keys,
-  );
-  final nextSelectedConnectionId =
-      _nextSelectedWorkspaceConnectionIdAfterTermination(
-        controller,
-        removedConnectionId: normalizedConnectionId,
-        removalIndex: removalIndex,
-        nextLiveConnectionIds: nextLiveConnectionIds,
-      );
-  final nextViewport = _nextWorkspaceViewportAfterTermination(
-    controller,
+  final terminationPlan = controller._laneRoster.planTerminationAfterRemoval(
+    state: controller._state,
     removedConnectionId: normalizedConnectionId,
-    nextSelectedConnectionId: nextSelectedConnectionId,
   );
 
   controller._unregisterLiveBinding(normalizedConnectionId);
@@ -170,84 +154,43 @@ void _terminateWorkspaceConnection(
   controller._applyState(
     controller._state.copyWith(
       isLoading: false,
-      liveConnectionIds: nextLiveConnectionIds,
-      selectedConnectionId: nextSelectedConnectionId,
-      viewport: nextViewport,
-      clearSelectedConnectionId: nextSelectedConnectionId == null,
+      liveConnectionIds: terminationPlan.liveConnectionIds,
+      selectedConnectionId: terminationPlan.selectedConnectionId,
+      viewport: terminationPlan.viewport,
+      clearSelectedConnectionId: terminationPlan.selectedConnectionId == null,
       savedSettingsReconnectRequiredConnectionIds:
           _sanitizeWorkspaceReconnectRequiredIds(
             catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
+            liveConnectionIds: terminationPlan.liveConnectionIds,
             reconnectRequiredConnectionIds:
                 controller._state.savedSettingsReconnectRequiredConnectionIds,
           ),
       transportReconnectRequiredConnectionIds:
           _sanitizeWorkspaceReconnectRequiredIds(
             catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
+            liveConnectionIds: terminationPlan.liveConnectionIds,
             reconnectRequiredConnectionIds:
                 controller._state.transportReconnectRequiredConnectionIds,
           ),
       transportRecoveryPhasesByConnectionId:
           _sanitizeWorkspaceTransportRecoveryPhases(
             catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
+            liveConnectionIds: terminationPlan.liveConnectionIds,
             transportRecoveryPhasesByConnectionId:
                 controller._state.transportRecoveryPhasesByConnectionId,
           ),
       liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
         catalog: controller._state.catalog,
-        liveConnectionIds: nextLiveConnectionIds,
+        liveConnectionIds: terminationPlan.liveConnectionIds,
         liveReattachPhasesByConnectionId:
             controller._state.liveReattachPhasesByConnectionId,
       ),
       recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
         catalog: controller._state.catalog,
-        liveConnectionIds: nextLiveConnectionIds,
+        liveConnectionIds: terminationPlan.liveConnectionIds,
         recoveryDiagnosticsByConnectionId:
             controller._state.recoveryDiagnosticsByConnectionId,
       ),
     ),
   );
-}
-
-List<String> _orderWorkspaceLiveConnectionIds(
-  ConnectionWorkspaceController controller,
-  Iterable<String> connectionIds,
-) {
-  final liveConnectionIdSet = connectionIds.toSet();
-  return <String>[
-    for (final connectionId in controller._state.catalog.orderedConnectionIds)
-      if (liveConnectionIdSet.contains(connectionId)) connectionId,
-  ];
-}
-
-String? _nextSelectedWorkspaceConnectionIdAfterTermination(
-  ConnectionWorkspaceController controller, {
-  required String removedConnectionId,
-  required int removalIndex,
-  required List<String> nextLiveConnectionIds,
-}) {
-  if (controller._state.selectedConnectionId != removedConnectionId) {
-    return controller._state.selectedConnectionId;
-  }
-  if (nextLiveConnectionIds.isEmpty) {
-    return null;
-  }
-
-  final nextIndex = removalIndex.clamp(0, nextLiveConnectionIds.length - 1);
-  return nextLiveConnectionIds[nextIndex];
-}
-
-ConnectionWorkspaceViewport _nextWorkspaceViewportAfterTermination(
-  ConnectionWorkspaceController controller, {
-  required String removedConnectionId,
-  required String? nextSelectedConnectionId,
-}) {
-  if (controller._state.selectedConnectionId == removedConnectionId &&
-      nextSelectedConnectionId == null) {
-    return ConnectionWorkspaceViewport.savedConnections;
-  }
-
-  return controller._state.viewport;
 }

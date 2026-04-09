@@ -18,11 +18,13 @@ import 'package:pocket_relay/src/features/connection_settings/application/connec
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_errors.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
-import 'package:pocket_relay/src/features/remote_runtime/application/connection_remote_runtime_coordinator.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_device_continuity_warnings.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_lane_roster_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_recovery_persistence_controller.dart';
+import 'package:pocket_relay/src/features/workspace/application/workspace_remote_runtime_controller.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
 
 import '../domain/connection_workspace_state.dart';
@@ -86,9 +88,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
              connectionRepository: connectionRepository,
              modelCatalogStore: modelCatalogStore,
            ),
-       _recoveryStore =
-           recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
-       _remoteRuntimeCoordinator = ConnectionRemoteRuntimeCoordinator(
+       _remoteRuntimeController = WorkspaceRemoteRuntimeController(
          remoteRuntimeDelegateFactory:
              _buildWorkspaceRemoteRuntimeDelegateFactory(
                remoteRuntimeDelegateFactory: remoteRuntimeDelegateFactory,
@@ -97,48 +97,45 @@ class ConnectionWorkspaceController extends ChangeNotifier
                remoteAppServerOwnerControl: remoteAppServerOwnerControl,
              ),
        ),
-       _recoveryPersistenceDebounceDuration =
-           recoveryPersistenceDebounceDuration,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now {
+    _recoveryPersistenceController = WorkspaceRecoveryPersistenceController(
+      recoveryStore:
+          recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
+      debounceDuration: recoveryPersistenceDebounceDuration,
+      now: _now,
+      buildSnapshot:
+          ({
+            DateTime? backgroundedAt,
+            ConnectionWorkspaceBackgroundLifecycleState?
+            backgroundedLifecycleState,
+          }) => _selectedWorkspaceRecoveryStateSnapshot(
+            this,
+            backgroundedAt: backgroundedAt,
+            backgroundedLifecycleState: backgroundedLifecycleState,
+          ),
+      updateDiagnostics: (connectionId, update) =>
+          _updateWorkspaceRecoveryDiagnostics(
+            this,
+            connectionId,
+            update,
+            enqueueRecoveryPersistence: false,
+          ),
+    );
+  }
 
   final CodexConnectionRepository _connectionRepository;
   final ConnectionLaneBindingFactory _laneBindingFactory;
   final ConnectionCapabilityAssets _connectionCapabilityAssets;
-  final ConnectionWorkspaceRecoveryStore _recoveryStore;
-  final ConnectionRemoteRuntimeCoordinator _remoteRuntimeCoordinator;
-  final Duration _recoveryPersistenceDebounceDuration;
+  final WorkspaceRemoteRuntimeController _remoteRuntimeController;
+  late final WorkspaceRecoveryPersistenceController
+  _recoveryPersistenceController;
   final WorkspaceNow _now;
-  final Map<String, ConnectionLaneBinding> _liveBindingsByConnectionId =
-      <String, ConnectionLaneBinding>{};
-  final Map<
-    String,
-    ({
-      ConnectionLaneBinding binding,
-      VoidCallback listener,
-      StreamSubscription<AgentAdapterEvent> appServerEventSubscription,
-    })
-  >
-  _bindingRecoveryRegistrationsByConnectionId =
-      <
-        String,
-        ({
-          ConnectionLaneBinding binding,
-          VoidCallback listener,
-          StreamSubscription<AgentAdapterEvent> appServerEventSubscription,
-        })
-      >{};
-  final Map<String, int> _remoteRuntimeRefreshGenerationByConnectionId =
-      <String, int>{};
+  final WorkspaceLaneRosterController _laneRoster =
+      WorkspaceLaneRosterController();
   final Set<String> _intentionalTransportDisconnectConnectionIds = <String>{};
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
-  Future<void> _recoveryPersistence = Future<void>.value();
-  Timer? _recoveryPersistenceDebounceTimer;
-  ConnectionWorkspaceRecoveryState? _pendingRecoveryPersistenceState;
-  ConnectionWorkspaceRecoveryState? _lastPersistedRecoveryState;
-  ConnectionWorkspaceRecoveryState? _latestRecoveryPersistenceState;
-  bool _isPersistingRecoveryState = false;
   bool _isDisposed = false;
 
   ConnectionWorkspaceState get state => _state;
@@ -163,7 +160,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
     ConnectionSettingsSubmitPayload payload, {
     String? ownerId,
   }) {
-    return _remoteRuntimeCoordinator.probe(
+    return _remoteRuntimeController.probe(
       profile: payload.profile,
       secrets: payload.secrets,
       ownerId: ownerId,
@@ -172,15 +169,11 @@ class ConnectionWorkspaceController extends ChangeNotifier
   }
 
   ConnectionLaneBinding? get selectedLaneBinding {
-    final selectedConnectionId = _state.selectedConnectionId;
-    if (selectedConnectionId == null) {
-      return null;
-    }
-    return _liveBindingsByConnectionId[selectedConnectionId];
+    return _laneRoster.selectedBinding(_state);
   }
 
   ConnectionLaneBinding? bindingForConnectionId(String connectionId) {
-    return _liveBindingsByConnectionId[connectionId];
+    return _laneRoster.bindingFor(connectionId);
   }
 
   Future<void> initialize() {
@@ -343,16 +336,13 @@ class ConnectionWorkspaceController extends ChangeNotifier
     if (_isDisposed) {
       return;
     }
-    final finalRecoveryPersistence = _enqueueRecoveryPersistence();
+    final finalRecoveryPersistence = _recoveryPersistenceController.dispose();
     _isDisposed = true;
-    _recoveryPersistenceDebounceTimer?.cancel();
     unawaited(finalRecoveryPersistence);
 
-    final liveBindingEntries = _liveBindingsByConnectionId.entries.toList();
-    _liveBindingsByConnectionId.clear();
-    for (final entry in liveBindingEntries) {
-      _unregisterLiveBinding(entry.key);
-      entry.value.dispose();
+    final liveBindings = _laneRoster.detachAllBindings();
+    for (final binding in liveBindings) {
+      binding.dispose();
     }
     super.dispose();
   }
