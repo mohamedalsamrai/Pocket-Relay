@@ -631,8 +631,11 @@ void main() {
           secrets: const ConnectionSecrets(),
         ),
       );
-      expect(await preferences.getString('pocket_relay.profile'), isNull);
-      expect(secureStorage.data['pocket_relay.secret.password'], isNull);
+      expect(
+        await preferences.getString('pocket_relay.profile'),
+        jsonEncode(legacyProfile.toJson()),
+      );
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
     },
   );
 

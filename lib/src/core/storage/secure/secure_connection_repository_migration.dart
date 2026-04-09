@@ -15,7 +15,10 @@ Future<void> secureMigrateCatalogsIfNeeded(
   SecureConnectionRepositoryState state,
 ) async {
   await state.catalogRecovery.ensurePreferencesReady();
-  final legacySingletonConnection = await readLegacySingletonConnection(state);
+  final legacySingletonResult = await readLegacySingletonConnectionWithStatus(
+    state,
+  );
+  final legacySingletonConnection = legacySingletonResult.connection;
 
   final existingWorkspaceIds = await discoverStoredIds(
     state.preferences,
@@ -77,7 +80,8 @@ Future<void> secureMigrateCatalogsIfNeeded(
         seededConnection.copyWith(id: seededConnectionId),
       ],
     );
-    if (legacySingletonConnection != null) {
+    if (legacySingletonConnection != null &&
+        legacySingletonResult.allowCleanup) {
       await deleteLegacySingletonStorage(state);
     }
     return;
@@ -117,7 +121,9 @@ Future<void> secureMigrateCatalogsIfNeeded(
     legacyConnections: legacyConnections,
   );
   await deleteLegacyConnections(state, legacyCatalog.orderedConnectionIds);
-  await deleteLegacySingletonStorage(state);
+  if (legacySingletonResult.allowCleanup) {
+    await deleteLegacySingletonStorage(state);
+  }
 }
 
 Future<void> migrateLegacyConnectionsIntoSplitStorage(
