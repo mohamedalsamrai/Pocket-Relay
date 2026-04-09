@@ -177,16 +177,20 @@ Future<SavedSystem> secureLoadSystem(
 ) async {
   final normalizedSystemId = requireSystemId(systemId);
   final catalog = await secureLoadSystemCatalog(state);
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  final deferredSystem = deferredLegacyCatalog?.systemsById[normalizedSystemId];
   final summary = catalog.systemForId(normalizedSystemId);
   if (summary != null) {
+    if (deferredSystem != null &&
+        identical(catalog, deferredLegacyCatalog?.systemCatalog)) {
+      return deferredSystem;
+    }
     return SavedSystem(
       id: summary.id,
       profile: summary.profile,
       secrets: await readSystemSecrets(state, normalizedSystemId),
     );
   }
-  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
-  final deferredSystem = deferredLegacyCatalog?.systemsById[normalizedSystemId];
   if (deferredSystem != null) {
     return deferredSystem;
   }

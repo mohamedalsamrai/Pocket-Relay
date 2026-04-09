@@ -266,7 +266,7 @@ Future<List<SavedConnection>> _loadLegacyConnectionsForMigration(
 
     final migratedConnection =
         pendingSingletonUpgrade != null &&
-            pendingSingletonUpgrade.profile == ConnectionProfile.defaults()
+            summary.profile == ConnectionProfile.defaults()
         ? pendingSingletonUpgrade.copyWith(id: connectionId)
         : SavedConnection(
             id: connectionId,
