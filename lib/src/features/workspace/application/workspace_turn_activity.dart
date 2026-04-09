@@ -16,29 +16,19 @@ bool workspaceHasContinuityActiveTurn(
 bool workspaceSessionControllersHaveContinuityActiveTurn(
   Iterable<ChatSessionController> sessionControllers,
 ) {
-  for (final controller in sessionControllers) {
-    if (workspaceSessionHasContinuityActiveTurn(controller.sessionState)) {
-      return true;
-    }
-  }
-
-  return false;
+  return sessionControllers.any(
+    (controller) =>
+        workspaceSessionHasContinuityActiveTurn(controller.sessionState),
+  );
 }
 
 bool workspaceSessionHasContinuityActiveTurn(
   TranscriptSessionState sessionState,
 ) {
-  if (workspaceTurnKeepsContinuity(sessionState.sessionActiveTurn)) {
-    return true;
-  }
-
-  for (final timeline in sessionState.timelinesByThreadId.values) {
-    if (workspaceTurnKeepsContinuity(timeline.activeTurn)) {
-      return true;
-    }
-  }
-
-  return false;
+  return workspaceTurnKeepsContinuity(sessionState.sessionActiveTurn) ||
+      sessionState.timelinesByThreadId.values.any(
+        (timeline) => workspaceTurnKeepsContinuity(timeline.activeTurn),
+      );
 }
 
 bool workspaceTurnKeepsContinuity(TranscriptActiveTurnState? activeTurn) {
