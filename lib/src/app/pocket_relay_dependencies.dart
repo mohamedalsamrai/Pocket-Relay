@@ -153,6 +153,7 @@ class PocketRelayAppDependencies {
       remoteRuntimeDelegateFactory: resolvedRemoteRuntimeDelegateFactory,
       laneBindingFactory:
           ({
+            required String laneId,
             required String connectionId,
             required SavedConnection connection,
           }) {
@@ -166,6 +167,7 @@ class PocketRelayAppDependencies {
             }
 
             return ConnectionLaneBinding(
+              laneId: laneId,
               connectionId: connectionId,
               profileStore: ConnectionScopedProfileStore(
                 connectionId: connectionId,

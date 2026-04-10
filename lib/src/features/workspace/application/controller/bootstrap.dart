@@ -22,18 +22,18 @@ Future<void> _initializeWorkspaceController(
         isLoading: false,
         catalog: ConnectionCatalogState.empty(),
         systemCatalog: SystemCatalogState.empty(),
-        liveConnectionIds: <String>[],
-        selectedConnectionId: null,
+        liveLanes: <ConnectionWorkspaceLiveLane>[],
+        selectedLaneId: null,
         viewport: ConnectionWorkspaceViewport.savedConnections,
         recoveryLoadWarning: null,
         deviceContinuityWarnings: ConnectionWorkspaceDeviceContinuityWarnings(),
         savedSettingsReconnectRequiredConnectionIds: <String>{},
-        transportReconnectRequiredConnectionIds: <String>{},
-        transportRecoveryPhasesByConnectionId:
+        transportReconnectRequiredLaneIds: <String>{},
+        transportRecoveryPhasesByLaneId:
             <String, ConnectionWorkspaceTransportRecoveryPhase>{},
-        liveReattachPhasesByConnectionId:
+        liveReattachPhasesByLaneId:
             <String, ConnectionWorkspaceLiveReattachPhase>{},
-        recoveryDiagnosticsByConnectionId:
+        recoveryDiagnosticsByLaneId:
             <String, ConnectionWorkspaceRecoveryDiagnostics>{},
         remoteRuntimeByConnectionId: <String, ConnectionRemoteRuntimeState>{},
       ).copyWith(recoveryLoadWarning: recoveryLoadWarning),
@@ -47,9 +47,11 @@ Future<void> _initializeWorkspaceController(
           catalog.connectionForId(restoredConnectionId) != null
       ? restoredConnectionId
       : catalog.orderedConnectionIds.first;
+  final firstLaneId = _nextWorkspaceLiveLaneId(controller, firstConnectionId);
   final firstBinding = await _loadWorkspaceLaneBinding(
     controller,
-    firstConnectionId,
+    connectionId: firstConnectionId,
+    laneId: firstLaneId,
     initialDraftText: recoveryState?.connectionId == firstConnectionId
         ? recoveryState?.draftText
         : null,
@@ -59,27 +61,32 @@ Future<void> _initializeWorkspaceController(
     return;
   }
 
-  controller._laneRoster.putBinding(firstConnectionId, firstBinding);
-  controller._registerLiveBinding(firstConnectionId, firstBinding);
+  controller._laneRoster.putBinding(firstLaneId, firstBinding);
+  controller._registerLiveBinding(firstLaneId, firstBinding);
   controller._applyStateWithoutRecoveryPersistence(
     ConnectionWorkspaceState(
       isLoading: false,
       catalog: catalog,
       systemCatalog: systemCatalog,
-      liveConnectionIds: <String>[firstConnectionId],
-      selectedConnectionId: firstConnectionId,
+      liveLanes: <ConnectionWorkspaceLiveLane>[
+        ConnectionWorkspaceLiveLane(
+          laneId: firstLaneId,
+          connectionId: firstConnectionId,
+        ),
+      ],
+      selectedLaneId: firstLaneId,
       viewport: ConnectionWorkspaceViewport.liveLane,
       recoveryLoadWarning: recoveryLoadWarning,
       deviceContinuityWarnings:
           const ConnectionWorkspaceDeviceContinuityWarnings(),
       savedSettingsReconnectRequiredConnectionIds: const <String>{},
-      transportReconnectRequiredConnectionIds: const <String>{},
-      transportRecoveryPhasesByConnectionId:
+      transportReconnectRequiredLaneIds: const <String>{},
+      transportRecoveryPhasesByLaneId:
           const <String, ConnectionWorkspaceTransportRecoveryPhase>{},
-      liveReattachPhasesByConnectionId:
+      liveReattachPhasesByLaneId:
           const <String, ConnectionWorkspaceLiveReattachPhase>{},
-      recoveryDiagnosticsByConnectionId: _initialWorkspaceRecoveryDiagnostics(
-        connectionId: firstConnectionId,
+      recoveryDiagnosticsByLaneId: _initialWorkspaceRecoveryDiagnostics(
+        laneId: firstLaneId,
         recoveryState: recoveryState,
       ),
       remoteRuntimeByConnectionId:
@@ -94,19 +101,16 @@ Future<void> _initializeWorkspaceController(
   }
 
   controller._beginRecoveryAttempt(
-    firstConnectionId,
+    firstLaneId,
     startedAt: controller._now(),
     origin: ConnectionWorkspaceRecoveryOrigin.coldStart,
   );
   controller._applyState(
-    _withWorkspaceTransportReconnectStaged(
-      controller._state,
-      firstConnectionId,
-    ),
+    _withWorkspaceTransportReconnectStaged(controller._state, firstLaneId),
   );
   await _attemptWorkspaceTransportReconnect(
     controller,
-    firstConnectionId,
+    firstLaneId,
     firstBinding,
     threadId: recoveryState!.selectedThreadId!,
     hadVisibleConversationState: false,
@@ -117,63 +121,94 @@ Future<void> _instantiateWorkspaceConnection(
   ConnectionWorkspaceController controller,
   String connectionId,
 ) async {
-  final binding = await _loadWorkspaceLaneBinding(controller, connectionId);
+  await _instantiateWorkspaceAdditionalLiveLane(controller, connectionId);
+}
+
+Future<String> _instantiateWorkspaceAdditionalLiveLane(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+) async {
+  final laneId = _nextWorkspaceLiveLaneId(controller, connectionId);
+  final binding = await _loadWorkspaceLaneBinding(
+    controller,
+    connectionId: connectionId,
+    laneId: laneId,
+  );
   if (controller._isDisposed) {
     binding.dispose();
-    return;
+    return laneId;
   }
-  controller._laneRoster.putBinding(connectionId, binding);
-  controller._registerLiveBinding(connectionId, binding);
-  final nextLiveConnectionIds = controller._laneRoster.orderedLiveConnectionIds(
+  controller._laneRoster.putBinding(laneId, binding);
+  controller._registerLiveBinding(laneId, binding);
+  final nextLiveLanes = controller._laneRoster.orderedLiveLanes(
     controller._state.catalog,
+    <ConnectionWorkspaceLiveLane>[
+      ...controller._state.liveLanes,
+      ConnectionWorkspaceLiveLane(laneId: laneId, connectionId: connectionId),
+    ],
   );
   controller._applyState(
     controller._state.copyWith(
       isLoading: false,
-      liveConnectionIds: nextLiveConnectionIds,
-      selectedConnectionId: connectionId,
+      liveLanes: nextLiveLanes,
+      selectedLaneId: laneId,
       viewport: ConnectionWorkspaceViewport.liveLane,
       savedSettingsReconnectRequiredConnectionIds:
           _sanitizeWorkspaceReconnectRequiredIds(
             catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
+            liveConnectionIds: nextLiveLanes
+                .map((lane) => lane.connectionId)
+                .toList(growable: false),
             reconnectRequiredConnectionIds:
                 controller._state.savedSettingsReconnectRequiredConnectionIds,
           ),
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
-            reconnectRequiredConnectionIds:
-                controller._state.transportReconnectRequiredConnectionIds,
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: nextLiveLanes
+                .map((lane) => lane.laneId)
+                .toList(growable: false),
+            transportReconnectRequiredLaneIds:
+                controller._state.transportReconnectRequiredLaneIds,
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: controller._state.catalog,
-            liveConnectionIds: nextLiveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
-                controller._state.transportRecoveryPhasesByConnectionId,
+            liveLaneIds: nextLiveLanes
+                .map((lane) => lane.laneId)
+                .toList(growable: false),
+            transportRecoveryPhasesByLaneId:
+                controller._state.transportRecoveryPhasesByLaneId,
           ),
-      recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-        catalog: controller._state.catalog,
-        liveConnectionIds: nextLiveConnectionIds,
-        recoveryDiagnosticsByConnectionId:
-            controller._state.recoveryDiagnosticsByConnectionId,
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: nextLiveLanes
+            .map((lane) => lane.laneId)
+            .toList(growable: false),
+        liveReattachPhasesByLaneId:
+            controller._state.liveReattachPhasesByLaneId,
+      ),
+      recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+        liveLaneIds: nextLiveLanes
+            .map((lane) => lane.laneId)
+            .toList(growable: false),
+        recoveryDiagnosticsByLaneId:
+            controller._state.recoveryDiagnosticsByLaneId,
       ),
     ),
   );
   await binding.sessionController.initialize();
   if (controller._isDisposed) {
-    return;
+    return laneId;
   }
+  return laneId;
 }
 
 Future<ConnectionLaneBinding> _loadWorkspaceLaneBinding(
-  ConnectionWorkspaceController controller,
-  String connectionId, {
+  ConnectionWorkspaceController controller, {
+  required String connectionId,
+  required String laneId,
   String? initialDraftText,
 }) async {
   final binding = controller._laneBindingFactory(
+    laneId: laneId,
     connectionId: connectionId,
     connection: await controller._connectionRepository.loadConnection(
       connectionId,
@@ -187,10 +222,10 @@ Future<ConnectionLaneBinding> _loadWorkspaceLaneBinding(
 
 Map<String, ConnectionWorkspaceRecoveryDiagnostics>
 _initialWorkspaceRecoveryDiagnostics({
-  required String connectionId,
+  required String laneId,
   required ConnectionWorkspaceRecoveryState? recoveryState,
 }) {
-  if (recoveryState?.connectionId != connectionId) {
+  if (recoveryState == null) {
     return const <String, ConnectionWorkspaceRecoveryDiagnostics>{};
   }
 
@@ -202,7 +237,5 @@ _initialWorkspaceRecoveryDiagnostics({
     return const <String, ConnectionWorkspaceRecoveryDiagnostics>{};
   }
 
-  return <String, ConnectionWorkspaceRecoveryDiagnostics>{
-    connectionId: diagnostics,
-  };
+  return <String, ConnectionWorkspaceRecoveryDiagnostics>{laneId: diagnostics};
 }

@@ -46,6 +46,67 @@ void main() {
     },
   );
 
+  test(
+    'instantiateAdditionalLane opens a sibling live lane without overwriting the existing binding',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
+        clientsByConnectionId: clientsByConnectionId,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        for (final client in clientsByConnectionId['conn_primary']!) {
+          await client.dispose();
+        }
+      });
+
+      await controller.initialize();
+      final firstLaneId = controller.state.selectedLaneId!;
+      final firstBinding = controller.bindingForLaneId(firstLaneId)!;
+
+      final siblingLaneId = await controller.instantiateAdditionalLane(
+        'conn_primary',
+      );
+
+      expect(siblingLaneId, isNot(firstLaneId));
+      expect(controller.state.liveConnectionIds, const <String>[
+        'conn_primary',
+      ]);
+      expect(controller.state.liveLanes, <ConnectionWorkspaceLiveLane>[
+        ConnectionWorkspaceLiveLane(
+          laneId: firstLaneId,
+          connectionId: 'conn_primary',
+        ),
+        ConnectionWorkspaceLiveLane(
+          laneId: siblingLaneId,
+          connectionId: 'conn_primary',
+        ),
+      ]);
+      expect(controller.state.openLaneCountForConnection('conn_primary'), 2);
+      expect(controller.state.selectedLaneId, siblingLaneId);
+
+      final siblingBinding = controller.bindingForLaneId(siblingLaneId)!;
+      expect(siblingBinding, isNot(same(firstBinding)));
+      expect(
+        controller.bindingForConnectionId('conn_primary'),
+        same(siblingBinding),
+      );
+      expect(clientsByConnectionId['conn_primary'], hasLength(2));
+    },
+  );
+
   test('terminating one live lane leaves the others intact', () async {
     final clientsById = buildClientsById('conn_primary', 'conn_secondary');
     final controller = buildWorkspaceController(clientsById: clientsById);

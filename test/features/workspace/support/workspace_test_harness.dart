@@ -40,22 +40,24 @@ ConnectionWorkspaceController buildWorkspaceController({
         recoveryPersistenceDebounceDuration ??
         const Duration(milliseconds: 250),
     now: now,
-    laneBindingFactory: ({required connectionId, required connection}) {
-      final appServerClient = clientsById[connectionId]!;
-      return ConnectionLaneBinding(
-        connectionId: connectionId,
-        profileStore: ConnectionScopedProfileStore(
-          connectionId: connectionId,
-          connectionRepository: resolvedRepository,
-        ),
-        appServerClient: appServerClient,
-        initialSavedProfile: SavedProfile(
-          profile: connection.profile,
-          secrets: connection.secrets,
-        ),
-        ownsAppServerClient: false,
-      );
-    },
+    laneBindingFactory:
+        ({required laneId, required connectionId, required connection}) {
+          final appServerClient = clientsById[connectionId]!;
+          return ConnectionLaneBinding(
+            laneId: laneId,
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: resolvedRepository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
   );
 }
 
@@ -84,24 +86,26 @@ ConnectionWorkspaceController buildWorkspaceControllerWithTrackedClients({
         recoveryPersistenceDebounceDuration ??
         const Duration(milliseconds: 250),
     now: now,
-    laneBindingFactory: ({required connectionId, required connection}) {
-      final appServerClient = FakeCodexAppServerClient();
-      configureClient?.call(appServerClient, connectionId);
-      clientsByConnectionId[connectionId]!.add(appServerClient);
-      return ConnectionLaneBinding(
-        connectionId: connectionId,
-        profileStore: ConnectionScopedProfileStore(
-          connectionId: connectionId,
-          connectionRepository: repository,
-        ),
-        appServerClient: appServerClient,
-        initialSavedProfile: SavedProfile(
-          profile: connection.profile,
-          secrets: connection.secrets,
-        ),
-        ownsAppServerClient: false,
-      );
-    },
+    laneBindingFactory:
+        ({required laneId, required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient();
+          configureClient?.call(appServerClient, connectionId);
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            laneId: laneId,
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
   );
 }
 
@@ -136,21 +140,23 @@ ConnectionWorkspaceController buildSingleConnectionWorkspaceController({
     remoteAppServerOwnerInspector: remoteAppServerOwnerInspector,
     remoteAppServerOwnerControl: remoteAppServerOwnerControl,
     now: now,
-    laneBindingFactory: ({required connectionId, required connection}) {
-      return ConnectionLaneBinding(
-        connectionId: connectionId,
-        profileStore: ConnectionScopedProfileStore(
-          connectionId: connectionId,
-          connectionRepository: repository,
-        ),
-        appServerClient: client,
-        initialSavedProfile: SavedProfile(
-          profile: connection.profile,
-          secrets: connection.secrets,
-        ),
-        ownsAppServerClient: false,
-      );
-    },
+    laneBindingFactory:
+        ({required laneId, required connectionId, required connection}) {
+          return ConnectionLaneBinding(
+            laneId: laneId,
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: client,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
   );
 }
 

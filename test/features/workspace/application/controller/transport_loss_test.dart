@@ -59,6 +59,93 @@ void main() {
   );
 
   test(
+    'transport reconnect state stays scoped to the affected sibling lane',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
+        clientsByConnectionId: clientsByConnectionId,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        for (final client in clientsByConnectionId['conn_primary']!) {
+          await client.dispose();
+        }
+      });
+
+      await controller.initialize();
+      final firstLaneId = controller.state.selectedLaneId!;
+      final siblingLaneId = await controller.instantiateAdditionalLane(
+        'conn_primary',
+      );
+      final firstClient = clientsByConnectionId['conn_primary']!.first;
+      final siblingClient = clientsByConnectionId['conn_primary']!.last;
+
+      await firstClient.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await siblingClient.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      firstClient.emit(const CodexAppServerDisconnectedEvent(exitCode: 1));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnectForLane(firstLaneId),
+        isTrue,
+      );
+      expect(
+        controller.state.transportRecoveryPhaseForLane(firstLaneId),
+        ConnectionWorkspaceTransportRecoveryPhase.lost,
+      );
+      expect(
+        controller.state.liveReattachPhaseForLane(firstLaneId),
+        ConnectionWorkspaceLiveReattachPhase.transportLost,
+      );
+      expect(
+        controller.state
+            .recoveryDiagnosticsForLane(firstLaneId)
+            ?.lastTransportLossReason,
+        ConnectionWorkspaceTransportLossReason.appServerExitError,
+      );
+
+      expect(
+        controller.state.requiresTransportReconnectForLane(siblingLaneId),
+        isFalse,
+      );
+      expect(
+        controller.state.transportRecoveryPhaseForLane(siblingLaneId),
+        isNull,
+      );
+      expect(controller.state.liveReattachPhaseForLane(siblingLaneId), isNull);
+      expect(
+        controller.state
+            .recoveryDiagnosticsForLane(siblingLaneId)
+            ?.lastTransportLossReason,
+        isNull,
+      );
+      expect(controller.state.reconnectRequiredConnectionIds, const <String>{
+        'conn_primary',
+      });
+    },
+  );
+
+  test(
     'intentional transport disconnect keeps the live lane but does not stage reconnect recovery',
     () async {
       final clientsById = buildClientsById('conn_primary', 'conn_secondary');

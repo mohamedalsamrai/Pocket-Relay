@@ -43,25 +43,27 @@ void main() {
     );
     final controller = ConnectionWorkspaceController(
       connectionRepository: repository,
-      laneBindingFactory: ({required connectionId, required connection}) {
-        final appServerClient = FakeCodexAppServerClient();
-        appServerClient.threadHistoriesById['thread_saved'] =
-            savedConversationThread(threadId: 'thread_saved');
-        clientsByConnectionId[connectionId]!.add(appServerClient);
-        return ConnectionLaneBinding(
-          connectionId: connectionId,
-          profileStore: ConnectionScopedProfileStore(
-            connectionId: connectionId,
-            connectionRepository: repository,
-          ),
-          appServerClient: appServerClient,
-          initialSavedProfile: SavedProfile(
-            profile: connection.profile,
-            secrets: connection.secrets,
-          ),
-          ownsAppServerClient: false,
-        );
-      },
+      laneBindingFactory:
+          ({required laneId, required connectionId, required connection}) {
+            final appServerClient = FakeCodexAppServerClient();
+            appServerClient.threadHistoriesById['thread_saved'] =
+                savedConversationThread(threadId: 'thread_saved');
+            clientsByConnectionId[connectionId]!.add(appServerClient);
+            return ConnectionLaneBinding(
+              laneId: laneId,
+              connectionId: connectionId,
+              profileStore: ConnectionScopedProfileStore(
+                connectionId: connectionId,
+                connectionRepository: repository,
+              ),
+              appServerClient: appServerClient,
+              initialSavedProfile: SavedProfile(
+                profile: connection.profile,
+                secrets: connection.secrets,
+              ),
+              ownsAppServerClient: false,
+            );
+          },
     );
     addTearDown(() async {
       controller.dispose();

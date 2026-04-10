@@ -45,9 +45,10 @@ void main() {
         notificationCount += 1;
       });
 
-      expect(tracker.sessionControllersByConnectionId.keys, <String>[
-        'conn_primary',
-      ]);
+      expect(
+        tracker.sessionControllersByLaneId.keys,
+        controller.state.liveLaneIds,
+      );
 
       final notificationsBeforePrompt = notificationCount;
       final primaryBinding = controller.bindingForConnectionId('conn_primary')!;
@@ -70,16 +71,17 @@ void main() {
 
       await controller.instantiateConnection('conn_secondary');
 
-      expect(tracker.sessionControllersByConnectionId.keys, <String>[
-        'conn_primary',
-        'conn_secondary',
-      ]);
+      expect(
+        tracker.sessionControllersByLaneId.keys,
+        controller.state.liveLaneIds,
+      );
 
       controller.terminateConnection('conn_secondary');
 
-      expect(tracker.sessionControllersByConnectionId.keys, <String>[
-        'conn_primary',
-      ]);
+      expect(
+        tracker.sessionControllersByLaneId.keys,
+        controller.state.liveLaneIds,
+      );
     },
   );
 }

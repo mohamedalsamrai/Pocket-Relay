@@ -13,6 +13,7 @@ import 'chat_screen_effect_mapper.dart';
 
 class ConnectionLaneBinding {
   ConnectionLaneBinding({
+    String? laneId,
     required this.connectionId,
     required CodexProfileStore profileStore,
     AgentAdapterClient? agentAdapterClient,
@@ -28,6 +29,7 @@ class ConnectionLaneBinding {
          'An agent adapter client is required.',
        ),
        _ownsAppServerClient = ownsAppServerClient,
+       laneId = laneId ?? connectionId,
        agentAdapterClient = agentAdapterClient ?? appServerClient!,
        sessionController = ChatSessionController(
          profileStore: profileStore,
@@ -41,6 +43,7 @@ class ConnectionLaneBinding {
         .listen(_screenEffectsController.add);
   }
 
+  final String laneId;
   final String connectionId;
   final AgentAdapterClient agentAdapterClient;
   @Deprecated('Use agentAdapterClient instead.')

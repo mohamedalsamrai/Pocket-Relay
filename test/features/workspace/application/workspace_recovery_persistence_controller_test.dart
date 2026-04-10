@@ -13,6 +13,7 @@ void main() {
         recoveryStore: recoveryStore,
         debounceDuration: Duration.zero,
         now: () => DateTime(2026, 4, 9, 12),
+        currentLaneId: () => 'lane_primary',
         buildSnapshot:
             ({
               DateTime? backgroundedAt,
@@ -67,6 +68,7 @@ void main() {
         recoveryStore: recoveryStore,
         debounceDuration: Duration.zero,
         now: () => DateTime.utc(2026, 4, 9, 12),
+        currentLaneId: () => 'lane_primary',
         buildSnapshot: ({backgroundedAt, backgroundedLifecycleState}) =>
             nextState,
         updateDiagnostics: (_, update) {
@@ -125,6 +127,7 @@ void main() {
         recoveryStore: recoveryStore,
         debounceDuration: Duration.zero,
         now: () => DateTime.utc(2026, 4, 9, 12),
+        currentLaneId: () => 'lane_primary',
         buildSnapshot: ({backgroundedAt, backgroundedLifecycleState}) =>
             nextState,
         updateDiagnostics: (_, _) {},
@@ -155,6 +158,7 @@ void main() {
         recoveryStore: recoveryStore,
         debounceDuration: Duration.zero,
         now: () => DateTime.utc(2026, 4, 9, 12),
+        currentLaneId: () => 'lane_primary',
         buildSnapshot: ({backgroundedAt, backgroundedLifecycleState}) {
           buildCalls += 1;
           return snapshot;

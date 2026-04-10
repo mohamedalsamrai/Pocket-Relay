@@ -2,10 +2,10 @@ part of '../connection_workspace_controller.dart';
 
 void _syncWorkspaceTurnLivenessAssessment(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) {
-  final assessment = controller._state.turnLivenessAssessmentFor(connectionId);
+  final assessment = controller._state.turnLivenessAssessmentForLane(laneId);
   if (assessment == null) {
     return;
   }
@@ -18,20 +18,20 @@ void _syncWorkspaceTurnLivenessAssessment(
   if (assessment.threadId != null &&
       currentThreadId != null &&
       assessment.threadId != currentThreadId) {
-    controller._clearTurnLivenessAssessment(connectionId);
+    controller._clearTurnLivenessAssessment(laneId);
     return;
   }
 
   switch (assessment.status) {
     case ConnectionWorkspaceTurnLivenessStatus.stillLive:
       if (!_workspaceLaneHasProvenLiveTurnState(binding)) {
-        controller._clearTurnLivenessAssessment(connectionId);
+        controller._clearTurnLivenessAssessment(laneId);
       }
     case ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway ||
         ConnectionWorkspaceTurnLivenessStatus.continuityLost ||
         ConnectionWorkspaceTurnLivenessStatus.unknown:
       if (binding.agentAdapterClient.activeTurnId?.trim().isNotEmpty == true) {
-        controller._clearTurnLivenessAssessment(connectionId);
+        controller._clearTurnLivenessAssessment(laneId);
       }
   }
 }
@@ -149,15 +149,15 @@ AgentAdapterHistoryTurn? _latestWorkspaceHistoryTurn(
 
 bool _canFinalizeWorkspaceTurnRecoveryAssessment(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) {
   if (controller._isDisposed || !binding.agentAdapterClient.isConnected) {
     return false;
   }
 
-  return controller._state.requiresTransportReconnect(connectionId) &&
-      controller._state.transportRecoveryPhaseFor(connectionId) ==
+  return controller._state.requiresTransportReconnectForLane(laneId) &&
+      controller._state.transportRecoveryPhaseForLane(laneId) ==
           ConnectionWorkspaceTransportRecoveryPhase.reconnecting;
 }
 

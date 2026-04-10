@@ -11,19 +11,22 @@ void _notifyWorkspaceBindingChange(ConnectionWorkspaceController controller) {
 
 void _registerWorkspaceLiveBinding(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) {
   void listener() {
-    _syncWorkspaceTurnLivenessAssessment(controller, connectionId, binding);
-    _syncWorkspaceRecoveredTransportState(controller, connectionId, binding);
-    if (controller._state.selectedConnectionId != connectionId) {
+    _syncWorkspaceTurnLivenessAssessment(controller, laneId, binding);
+    _syncWorkspaceRecoveredTransportState(controller, laneId, binding);
+    if (controller._state.selectedLaneId != laneId) {
       return;
     }
     final snapshot = controller._selectedRecoveryStateSnapshot();
     if (controller._hasImmediateRecoveryIdentityChange(snapshot)) {
       unawaited(
-        controller._queueRecoveryPersistenceSnapshot(snapshot: snapshot),
+        controller._queueRecoveryPersistenceSnapshot(
+          snapshot: snapshot,
+          laneId: laneId,
+        ),
       );
       return;
     }
@@ -31,7 +34,7 @@ void _registerWorkspaceLiveBinding(
   }
 
   controller._laneRoster.registerBinding(
-    connectionId: connectionId,
+    laneId: laneId,
     binding: binding,
     listener: listener,
     agentAdapterEventSubscription: binding.agentAdapterClient.events.listen((
@@ -40,14 +43,14 @@ void _registerWorkspaceLiveBinding(
       switch (event) {
         case AgentAdapterDisconnectedEvent(:final exitCode):
           if (controller._intentionalTransportDisconnectConnectionIds.remove(
-            connectionId,
+            laneId,
           )) {
-            _clearWorkspaceTransportReconnectState(controller, connectionId);
-            controller._clearTurnLivenessAssessment(connectionId);
+            _clearWorkspaceTransportReconnectState(controller, laneId);
+            controller._clearTurnLivenessAssessment(laneId);
             break;
           }
           controller._recordTransportLoss(
-            connectionId,
+            laneId,
             occurredAt: controller._now(),
             reason: switch (exitCode) {
               null => ConnectionWorkspaceTransportLossReason.disconnected,
@@ -55,17 +58,16 @@ void _registerWorkspaceLiveBinding(
               _ => ConnectionWorkspaceTransportLossReason.appServerExitError,
             },
           );
-          controller._markTransportReconnectRequired(connectionId);
+          controller._markTransportReconnectRequired(laneId);
           controller._setLiveReattachPhase(
-            connectionId,
+            laneId,
             ConnectionWorkspaceLiveReattachPhase.transportLost,
           );
-          controller._clearTurnLivenessAssessment(connectionId);
+          controller._clearTurnLivenessAssessment(laneId);
           break;
         case AgentAdapterConnectedEvent():
-          final wasRecovering = controller._state.requiresTransportReconnect(
-            connectionId,
-          );
+          final wasRecovering = controller._state
+              .requiresTransportReconnectForLane(laneId);
           if (wasRecovering) {
             final hasConversationIdentity =
                 binding.sessionController.sessionState.currentThreadId
@@ -78,13 +80,13 @@ void _registerWorkspaceLiveBinding(
                     true;
             if (hasConversationIdentity) {
               controller._setLiveReattachPhase(
-                connectionId,
+                laneId,
                 ConnectionWorkspaceLiveReattachPhase.reconnecting,
               );
             } else {
               _finalizeWorkspaceRecoveredTransportState(
                 controller,
-                connectionId,
+                laneId,
                 completedAt: controller._now(),
                 recordRecoveryOutcome: true,
               );
@@ -93,21 +95,21 @@ void _registerWorkspaceLiveBinding(
           break;
         case AgentAdapterSshConnectFailedEvent():
           controller._recordTransportLoss(
-            connectionId,
+            laneId,
             occurredAt: controller._now(),
             reason: ConnectionWorkspaceTransportLossReason.sshConnectFailed,
           );
           break;
         case AgentAdapterSshHostKeyMismatchEvent():
           controller._recordTransportLoss(
-            connectionId,
+            laneId,
             occurredAt: controller._now(),
             reason: ConnectionWorkspaceTransportLossReason.sshHostKeyMismatch,
           );
           break;
         case AgentAdapterSshAuthenticationFailedEvent():
           controller._recordTransportLoss(
-            connectionId,
+            laneId,
             occurredAt: controller._now(),
             reason:
                 ConnectionWorkspaceTransportLossReason.sshAuthenticationFailed,
@@ -122,7 +124,7 @@ void _registerWorkspaceLiveBinding(
 
 void _unregisterWorkspaceLiveBinding(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
-  controller._laneRoster.unregisterBinding(connectionId);
+  controller._laneRoster.unregisterBinding(laneId);
 }

@@ -28,26 +28,28 @@ void main() {
       };
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..threadHistoriesById['thread_123'] = savedConversationThread(
-              threadId: 'thread_123',
-            );
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        laneBindingFactory:
+            ({required laneId, required connectionId, required connection}) {
+              final appServerClient = FakeCodexAppServerClient()
+                ..threadHistoriesById['thread_123'] = savedConversationThread(
+                  threadId: 'thread_123',
+                );
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                laneId: laneId,
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                ownsAppServerClient: false,
+              );
+            },
       );
       addTearDown(() async {
         controller.dispose();
@@ -125,28 +127,30 @@ void main() {
       };
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..connectError =
-                clientsByConnectionId[connectionId]!.isEmpty &&
-                    connectionId == 'conn_primary'
-                ? null
-                : const CodexAppServerException('connect failed');
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        laneBindingFactory:
+            ({required laneId, required connectionId, required connection}) {
+              final appServerClient = FakeCodexAppServerClient()
+                ..connectError =
+                    clientsByConnectionId[connectionId]!.isEmpty &&
+                        connectionId == 'conn_primary'
+                    ? null
+                    : const CodexAppServerException('connect failed');
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                laneId: laneId,
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                ownsAppServerClient: false,
+              );
+            },
       );
       addTearDown(() async {
         controller.dispose();
@@ -237,37 +241,39 @@ void main() {
       };
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..connectError =
-                clientsByConnectionId[connectionId]!.isEmpty &&
-                    connectionId == 'conn_primary'
-                ? null
-                : const CodexRemoteAppServerAttachException(
-                    snapshot: CodexRemoteAppServerOwnerSnapshot(
-                      ownerId: 'conn_primary',
-                      workspaceDir: '/workspace',
-                      status: CodexRemoteAppServerOwnerStatus.stopped,
-                      sessionName: 'pocket-relay-conn_primary',
-                      detail: 'Managed remote app-server is not running.',
-                    ),
-                    message: 'Managed remote app-server is not running.',
-                  );
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        laneBindingFactory:
+            ({required laneId, required connectionId, required connection}) {
+              final appServerClient = FakeCodexAppServerClient()
+                ..connectError =
+                    clientsByConnectionId[connectionId]!.isEmpty &&
+                        connectionId == 'conn_primary'
+                    ? null
+                    : const CodexRemoteAppServerAttachException(
+                        snapshot: CodexRemoteAppServerOwnerSnapshot(
+                          ownerId: 'conn_primary',
+                          workspaceDir: '/workspace',
+                          status: CodexRemoteAppServerOwnerStatus.stopped,
+                          sessionName: 'pocket-relay-conn_primary',
+                          detail: 'Managed remote app-server is not running.',
+                        ),
+                        message: 'Managed remote app-server is not running.',
+                      );
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                laneId: laneId,
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                ownsAppServerClient: false,
+              );
+            },
       );
       addTearDown(() async {
         controller.dispose();
@@ -357,41 +363,43 @@ void main() {
       };
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..connectError =
-                clientsByConnectionId[connectionId]!.isEmpty &&
-                    connectionId == 'conn_primary'
-                ? null
-                : const CodexRemoteAppServerAttachException(
-                    snapshot: CodexRemoteAppServerOwnerSnapshot(
-                      ownerId: 'conn_primary',
-                      workspaceDir: '/workspace',
-                      status: CodexRemoteAppServerOwnerStatus.unhealthy,
-                      sessionName: 'pocket-relay-conn_primary',
-                      endpoint: CodexRemoteAppServerEndpoint(
-                        host: '127.0.0.1',
-                        port: 4100,
-                      ),
-                      detail: 'readyz failed',
-                    ),
-                    message: 'readyz failed',
-                  );
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        laneBindingFactory:
+            ({required laneId, required connectionId, required connection}) {
+              final appServerClient = FakeCodexAppServerClient()
+                ..connectError =
+                    clientsByConnectionId[connectionId]!.isEmpty &&
+                        connectionId == 'conn_primary'
+                    ? null
+                    : const CodexRemoteAppServerAttachException(
+                        snapshot: CodexRemoteAppServerOwnerSnapshot(
+                          ownerId: 'conn_primary',
+                          workspaceDir: '/workspace',
+                          status: CodexRemoteAppServerOwnerStatus.unhealthy,
+                          sessionName: 'pocket-relay-conn_primary',
+                          endpoint: CodexRemoteAppServerEndpoint(
+                            host: '127.0.0.1',
+                            port: 4100,
+                          ),
+                          detail: 'readyz failed',
+                        ),
+                        message: 'readyz failed',
+                      );
+              clientsByConnectionId[connectionId]!.add(appServerClient);
+              return ConnectionLaneBinding(
+                laneId: laneId,
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                appServerClient: appServerClient,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                ownsAppServerClient: false,
+              );
+            },
       );
       addTearDown(() async {
         controller.dispose();

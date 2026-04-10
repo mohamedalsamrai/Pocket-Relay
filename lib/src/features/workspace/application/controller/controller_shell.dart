@@ -34,13 +34,11 @@ extension on ConnectionWorkspaceController {
 
   void _notifyBindingChange() => _notifyWorkspaceBindingChange(this);
 
-  void _registerLiveBinding(
-    String connectionId,
-    ConnectionLaneBinding binding,
-  ) => _registerWorkspaceLiveBinding(this, connectionId, binding);
+  void _registerLiveBinding(String laneId, ConnectionLaneBinding binding) =>
+      _registerWorkspaceLiveBinding(this, laneId, binding);
 
-  void _unregisterLiveBinding(String connectionId) =>
-      _unregisterWorkspaceLiveBinding(this, connectionId);
+  void _unregisterLiveBinding(String laneId) =>
+      _unregisterWorkspaceLiveBinding(this, laneId);
 
   void _scheduleRecoveryPersistence() =>
       _recoveryPersistenceController.schedule();
@@ -53,17 +51,21 @@ extension on ConnectionWorkspaceController {
     backgroundedLifecycleState: backgroundedLifecycleState,
   );
 
-  void _clearLiveReattachPhase(String connectionId) =>
-      _clearWorkspaceLiveReattachPhase(this, connectionId);
+  void _clearLiveReattachPhase(String laneId) =>
+      _clearWorkspaceLiveReattachPhase(this, laneId);
 
   void _setLiveReattachPhase(
-    String connectionId,
+    String laneId,
     ConnectionWorkspaceLiveReattachPhase phase,
-  ) => _setWorkspaceLiveReattachPhase(this, connectionId, phase);
+  ) => _setWorkspaceLiveReattachPhase(this, laneId, phase);
 
   Future<void> _queueRecoveryPersistenceSnapshot({
     ConnectionWorkspaceRecoveryState? snapshot,
-  }) => _recoveryPersistenceController.queueSnapshot(snapshot: snapshot);
+    String? laneId,
+  }) => _recoveryPersistenceController.queueSnapshot(
+    snapshot: snapshot,
+    laneId: laneId,
+  );
 
   bool _hasImmediateRecoveryIdentityChange(
     ConnectionWorkspaceRecoveryState? snapshot,
@@ -81,107 +83,99 @@ extension on ConnectionWorkspaceController {
   ConnectionWorkspaceRecoveryState? _latestUnsavedRecoveryStateSnapshot() =>
       _recoveryPersistenceController.latestUnsavedSnapshot;
 
-  void _markTransportReconnectRequired(String connectionId) =>
-      _markWorkspaceTransportReconnectRequired(this, connectionId);
+  void _markTransportReconnectRequired(String laneId) =>
+      _markWorkspaceTransportReconnectRequired(this, laneId);
 
-  void _clearTransportReconnectRequired(String connectionId) =>
-      _clearWorkspaceTransportReconnectRequired(this, connectionId);
+  void _clearTransportReconnectRequired(String laneId) =>
+      _clearWorkspaceTransportReconnectRequired(this, laneId);
 
   void _setTransportRecoveryPhase(
-    String connectionId,
+    String laneId,
     ConnectionWorkspaceTransportRecoveryPhase phase,
-  ) => _setWorkspaceTransportRecoveryPhase(this, connectionId, phase);
+  ) => _setWorkspaceTransportRecoveryPhase(this, laneId, phase);
 
   void _recordLifecycleBackgroundSnapshot(
-    String connectionId, {
+    String laneId, {
     required DateTime occurredAt,
     required ConnectionWorkspaceBackgroundLifecycleState lifecycleState,
   }) => _recordWorkspaceLifecycleBackgroundSnapshot(
     this,
-    connectionId,
+    laneId,
     occurredAt: occurredAt,
     lifecycleState: lifecycleState,
   );
 
-  void _recordLifecycleResume(
-    String connectionId, {
-    required DateTime occurredAt,
-  }) => _recordWorkspaceLifecycleResume(
-    this,
-    connectionId,
-    occurredAt: occurredAt,
-  );
+  void _recordLifecycleResume(String laneId, {required DateTime occurredAt}) =>
+      _recordWorkspaceLifecycleResume(this, laneId, occurredAt: occurredAt);
 
   void _recordTransportLoss(
-    String connectionId, {
+    String laneId, {
     required DateTime occurredAt,
     required ConnectionWorkspaceTransportLossReason reason,
   }) => _recordWorkspaceTransportLoss(
     this,
-    connectionId,
+    laneId,
     occurredAt: occurredAt,
     reason: reason,
   );
 
   void _recordFallbackTransportConnectFailure(
-    String connectionId, {
+    String laneId, {
     required DateTime occurredAt,
     required Object? error,
   }) => _recordWorkspaceFallbackTransportConnectFailure(
     this,
-    connectionId,
+    laneId,
     occurredAt: occurredAt,
     error: error,
   );
 
-  void _recordLiveReattachFailure(
-    String connectionId, {
-    required Object? error,
-  }) => _recordWorkspaceLiveReattachFailure(this, connectionId, error: error);
+  void _recordLiveReattachFailure(String laneId, {required Object? error}) =>
+      _recordWorkspaceLiveReattachFailure(this, laneId, error: error);
 
-  void _clearTurnLivenessAssessment(String connectionId) =>
-      _clearWorkspaceTurnLivenessAssessment(this, connectionId);
+  void _clearTurnLivenessAssessment(String laneId) =>
+      _clearWorkspaceTurnLivenessAssessment(this, laneId);
 
   void _setTurnLivenessAssessment(
-    String connectionId,
+    String laneId,
     ConnectionWorkspaceTurnLivenessAssessment assessment,
-  ) => _setWorkspaceTurnLivenessAssessment(this, connectionId, assessment);
+  ) => _setWorkspaceTurnLivenessAssessment(this, laneId, assessment);
 
   void _beginRecoveryAttempt(
-    String connectionId, {
+    String laneId, {
     required DateTime startedAt,
     required ConnectionWorkspaceRecoveryOrigin origin,
   }) => _beginWorkspaceRecoveryAttempt(
     this,
-    connectionId,
+    laneId,
     startedAt: startedAt,
     origin: origin,
   );
 
   void _completeRecoveryAttempt(
-    String connectionId, {
+    String laneId, {
     required DateTime completedAt,
     required ConnectionWorkspaceRecoveryOutcome outcome,
   }) => _completeWorkspaceRecoveryAttempt(
     this,
-    connectionId,
+    laneId,
     completedAt: completedAt,
     outcome: outcome,
   );
 
   void _completeConversationRecoveryAttempt(
-    String connectionId,
+    String laneId,
     ConnectionLaneBinding binding, {
     required DateTime completedAt,
   }) => _completeWorkspaceConversationRecoveryAttempt(
     this,
-    connectionId,
+    laneId,
     binding,
     completedAt: completedAt,
   );
 
   void _updateRecoveryDiagnostics(
-    String connectionId,
+    String laneId,
     ConnectionWorkspaceRecoveryDiagnostics Function(
       ConnectionWorkspaceRecoveryDiagnostics current,
     )
@@ -189,7 +183,7 @@ extension on ConnectionWorkspaceController {
     bool enqueueRecoveryPersistence = false,
   }) => _updateWorkspaceRecoveryDiagnostics(
     this,
-    connectionId,
+    laneId,
     update,
     enqueueRecoveryPersistence: enqueueRecoveryPersistence,
   );

@@ -8,6 +8,7 @@ void main() {
     'successful live reattach stays in open lanes instead of needs attention',
     () {
       const connectionId = 'conn_primary';
+      const laneId = 'lane_primary';
       final profile = ConnectionProfile.defaults().copyWith(
         label: 'Primary Box',
         host: 'primary.local',
@@ -30,18 +31,23 @@ void main() {
             ),
           },
         ),
-        liveConnectionIds: const <String>[connectionId],
-        selectedConnectionId: null,
+        liveLanes: const <ConnectionWorkspaceLiveLane>[
+          ConnectionWorkspaceLiveLane(
+            laneId: laneId,
+            connectionId: connectionId,
+          ),
+        ],
+        selectedLaneId: null,
         viewport: ConnectionWorkspaceViewport.savedConnections,
         savedSettingsReconnectRequiredConnectionIds: const <String>{},
-        transportReconnectRequiredConnectionIds: const <String>{},
-        transportRecoveryPhasesByConnectionId:
+        transportReconnectRequiredLaneIds: const <String>{},
+        transportRecoveryPhasesByLaneId:
             const <String, ConnectionWorkspaceTransportRecoveryPhase>{},
-        liveReattachPhasesByConnectionId:
+        liveReattachPhasesByLaneId:
             const <String, ConnectionWorkspaceLiveReattachPhase>{
-              connectionId: ConnectionWorkspaceLiveReattachPhase.liveReattached,
+              laneId: ConnectionWorkspaceLiveReattachPhase.liveReattached,
             },
-        recoveryDiagnosticsByConnectionId:
+        recoveryDiagnosticsByLaneId:
             const <String, ConnectionWorkspaceRecoveryDiagnostics>{},
         remoteRuntimeByConnectionId:
             const <String, ConnectionRemoteRuntimeState>{
@@ -68,6 +74,7 @@ void main() {
 
   test('fallback restore stays in open lanes instead of needs attention', () {
     const connectionId = 'conn_primary';
+    const laneId = 'lane_primary';
     final profile = ConnectionProfile.defaults().copyWith(
       label: 'Primary Box',
       host: 'primary.local',
@@ -90,18 +97,20 @@ void main() {
           ),
         },
       ),
-      liveConnectionIds: const <String>[connectionId],
-      selectedConnectionId: null,
+      liveLanes: const <ConnectionWorkspaceLiveLane>[
+        ConnectionWorkspaceLiveLane(laneId: laneId, connectionId: connectionId),
+      ],
+      selectedLaneId: null,
       viewport: ConnectionWorkspaceViewport.savedConnections,
       savedSettingsReconnectRequiredConnectionIds: const <String>{},
-      transportReconnectRequiredConnectionIds: const <String>{},
-      transportRecoveryPhasesByConnectionId:
+      transportReconnectRequiredLaneIds: const <String>{},
+      transportRecoveryPhasesByLaneId:
           const <String, ConnectionWorkspaceTransportRecoveryPhase>{},
-      liveReattachPhasesByConnectionId:
+      liveReattachPhasesByLaneId:
           const <String, ConnectionWorkspaceLiveReattachPhase>{
-            connectionId: ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+            laneId: ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
           },
-      recoveryDiagnosticsByConnectionId:
+      recoveryDiagnosticsByLaneId:
           const <String, ConnectionWorkspaceRecoveryDiagnostics>{},
       remoteRuntimeByConnectionId: const <String, ConnectionRemoteRuntimeState>{
         connectionId: remoteRuntime,
@@ -153,16 +162,16 @@ void main() {
             ),
           },
         ),
-        liveConnectionIds: const <String>[],
-        selectedConnectionId: null,
+        liveLanes: const <ConnectionWorkspaceLiveLane>[],
+        selectedLaneId: null,
         viewport: ConnectionWorkspaceViewport.savedConnections,
         savedSettingsReconnectRequiredConnectionIds: const <String>{},
-        transportReconnectRequiredConnectionIds: const <String>{},
-        transportRecoveryPhasesByConnectionId:
+        transportReconnectRequiredLaneIds: const <String>{},
+        transportRecoveryPhasesByLaneId:
             const <String, ConnectionWorkspaceTransportRecoveryPhase>{},
-        liveReattachPhasesByConnectionId:
+        liveReattachPhasesByLaneId:
             const <String, ConnectionWorkspaceLiveReattachPhase>{},
-        recoveryDiagnosticsByConnectionId:
+        recoveryDiagnosticsByLaneId:
             const <String, ConnectionWorkspaceRecoveryDiagnostics>{},
         remoteRuntimeByConnectionId:
             const <String, ConnectionRemoteRuntimeState>{

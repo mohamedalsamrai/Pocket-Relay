@@ -170,22 +170,24 @@ ConnectionWorkspaceController _buildWorkspaceController({
       );
   return ConnectionWorkspaceController(
     connectionRepository: resolvedRepository,
-    laneBindingFactory: ({required connectionId, required connection}) {
-      final appServerClient = clientsById[connectionId]!;
-      return ConnectionLaneBinding(
-        connectionId: connectionId,
-        profileStore: ConnectionScopedProfileStore(
-          connectionId: connectionId,
-          connectionRepository: resolvedRepository,
-        ),
-        appServerClient: appServerClient,
-        initialSavedProfile: SavedProfile(
-          profile: connection.profile,
-          secrets: connection.secrets,
-        ),
-        ownsAppServerClient: false,
-      );
-    },
+    laneBindingFactory:
+        ({required laneId, required connectionId, required connection}) {
+          final appServerClient = clientsById[connectionId]!;
+          return ConnectionLaneBinding(
+            laneId: laneId,
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: resolvedRepository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
   );
 }
 

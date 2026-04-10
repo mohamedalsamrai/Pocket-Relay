@@ -3,6 +3,7 @@ import 'package:pocket_relay/src/features/chat/lane/application/chat_session_con
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 
 typedef WorkspaceLiveSessionControllerEntry = ({
+  String laneId,
   String connectionId,
   ChatSessionController sessionController,
 });
@@ -10,11 +11,12 @@ typedef WorkspaceLiveSessionControllerEntry = ({
 Iterable<WorkspaceLiveSessionControllerEntry> workspaceLiveSessionControllers(
   ConnectionWorkspaceController workspaceController,
 ) sync* {
-  for (final connectionId in workspaceController.state.liveConnectionIds) {
-    final binding = workspaceController.bindingForConnectionId(connectionId);
+  for (final lane in workspaceController.state.liveLanes) {
+    final binding = workspaceController.bindingForLaneId(lane.laneId);
     if (binding != null) {
       yield (
-        connectionId: connectionId,
+        laneId: lane.laneId,
+        connectionId: lane.connectionId,
         sessionController: binding.sessionController,
       );
     }
@@ -28,19 +30,23 @@ final class WorkspaceLiveSessionTracker extends ChangeNotifier {
   }
 
   ConnectionWorkspaceController _workspaceController;
-  final Map<String, ChatSessionController> _sessionControllersByConnectionId =
+  final Map<String, ChatSessionController> _sessionControllersByLaneId =
       <String, ChatSessionController>{};
   bool _isDisposed = false;
 
   ConnectionWorkspaceController get workspaceController => _workspaceController;
 
-  Map<String, ChatSessionController> get sessionControllersByConnectionId =>
+  Map<String, ChatSessionController> get sessionControllersByLaneId =>
       Map<String, ChatSessionController>.unmodifiable(
-        _sessionControllersByConnectionId,
+        _sessionControllersByLaneId,
       );
 
+  @Deprecated('Use sessionControllersByLaneId instead.')
+  Map<String, ChatSessionController> get sessionControllersByConnectionId =>
+      sessionControllersByLaneId;
+
   Iterable<ChatSessionController> get sessionControllers =>
-      _sessionControllersByConnectionId.values;
+      _sessionControllersByLaneId.values;
 
   void updateWorkspaceController(
     ConnectionWorkspaceController workspaceController,
@@ -77,22 +83,20 @@ final class WorkspaceLiveSessionTracker extends ChangeNotifier {
   }
 
   void _syncSessionControllers() {
-    final nextControllersByConnectionId = <String, ChatSessionController>{
+    final nextControllersByLaneId = <String, ChatSessionController>{
       for (final entry in workspaceLiveSessionControllers(_workspaceController))
-        entry.connectionId: entry.sessionController,
+        entry.laneId: entry.sessionController,
     };
 
-    final currentConnectionIds = _sessionControllersByConnectionId.keys.toSet();
-    final nextConnectionIds = nextControllersByConnectionId.keys.toSet();
+    final currentLaneIds = _sessionControllersByLaneId.keys.toSet();
+    final nextLaneIds = nextControllersByLaneId.keys.toSet();
 
-    for (final connectionId in currentConnectionIds.difference(
-      nextConnectionIds,
-    )) {
-      _detachSessionController(connectionId);
+    for (final laneId in currentLaneIds.difference(nextLaneIds)) {
+      _detachSessionController(laneId);
     }
 
-    for (final entry in nextControllersByConnectionId.entries) {
-      final existingController = _sessionControllersByConnectionId[entry.key];
+    for (final entry in nextControllersByLaneId.entries) {
+      final existingController = _sessionControllersByLaneId[entry.key];
       if (identical(existingController, entry.value)) {
         continue;
       }
@@ -104,22 +108,21 @@ final class WorkspaceLiveSessionTracker extends ChangeNotifier {
   }
 
   void _attachSessionController(
-    String connectionId,
+    String laneId,
     ChatSessionController controller,
   ) {
     controller.addListener(_handleSessionChanged);
-    _sessionControllersByConnectionId[connectionId] = controller;
+    _sessionControllersByLaneId[laneId] = controller;
   }
 
-  void _detachSessionController(String connectionId) {
-    final controller = _sessionControllersByConnectionId.remove(connectionId);
+  void _detachSessionController(String laneId) {
+    final controller = _sessionControllersByLaneId.remove(laneId);
     controller?.removeListener(_handleSessionChanged);
   }
 
   void _detachAllSessionControllers() {
-    for (final connectionId
-        in _sessionControllersByConnectionId.keys.toList()) {
-      _detachSessionController(connectionId);
+    for (final laneId in _sessionControllersByLaneId.keys.toList()) {
+      _detachSessionController(laneId);
     }
   }
 

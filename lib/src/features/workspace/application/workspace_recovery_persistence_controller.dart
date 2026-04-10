@@ -13,7 +13,7 @@ typedef WorkspaceRecoveryPersistenceSnapshotBuilder =
 
 typedef WorkspaceRecoveryPersistenceDiagnosticsUpdater =
     void Function(
-      String connectionId,
+      String laneId,
       ConnectionWorkspaceRecoveryDiagnostics Function(
         ConnectionWorkspaceRecoveryDiagnostics current,
       )
@@ -21,29 +21,34 @@ typedef WorkspaceRecoveryPersistenceDiagnosticsUpdater =
     );
 
 typedef WorkspaceRecoveryPersistenceNow = DateTime Function();
+typedef WorkspaceRecoveryPersistenceCurrentLaneId = String? Function();
 
 class WorkspaceRecoveryPersistenceController {
   WorkspaceRecoveryPersistenceController({
     required ConnectionWorkspaceRecoveryStore recoveryStore,
     required Duration debounceDuration,
     required WorkspaceRecoveryPersistenceNow now,
+    required WorkspaceRecoveryPersistenceCurrentLaneId currentLaneId,
     required WorkspaceRecoveryPersistenceSnapshotBuilder buildSnapshot,
     required WorkspaceRecoveryPersistenceDiagnosticsUpdater updateDiagnostics,
   }) : _recoveryStore = recoveryStore,
        _debounceDuration = debounceDuration,
        _now = now,
+       _currentLaneId = currentLaneId,
        _buildSnapshot = buildSnapshot,
        _updateDiagnostics = updateDiagnostics;
 
   final ConnectionWorkspaceRecoveryStore _recoveryStore;
   final Duration _debounceDuration;
   final WorkspaceRecoveryPersistenceNow _now;
+  final WorkspaceRecoveryPersistenceCurrentLaneId _currentLaneId;
   final WorkspaceRecoveryPersistenceSnapshotBuilder _buildSnapshot;
   final WorkspaceRecoveryPersistenceDiagnosticsUpdater _updateDiagnostics;
 
   Future<void> _recoveryPersistence = Future<void>.value();
   Timer? _debounceTimer;
   ConnectionWorkspaceRecoveryState? _pendingPersistenceState;
+  String? _pendingPersistenceLaneId;
   ConnectionWorkspaceRecoveryState? _lastPersistedState;
   ConnectionWorkspaceRecoveryState? _latestPersistenceState;
   bool _isPersisting = false;
@@ -65,7 +70,9 @@ class WorkspaceRecoveryPersistenceController {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(_debounceDuration, () {
       _debounceTimer = null;
-      unawaited(queueSnapshot(snapshot: _buildSnapshot()));
+      unawaited(
+        queueSnapshot(snapshot: _buildSnapshot(), laneId: _currentLaneId()),
+      );
     });
   }
 
@@ -83,23 +90,30 @@ class WorkspaceRecoveryPersistenceController {
         backgroundedAt: backgroundedAt,
         backgroundedLifecycleState: backgroundedLifecycleState,
       ),
+      laneId: _currentLaneId(),
     );
   }
 
-  Future<void> queueSnapshot({ConnectionWorkspaceRecoveryState? snapshot}) {
+  Future<void> queueSnapshot({
+    ConnectionWorkspaceRecoveryState? snapshot,
+    String? laneId,
+  }) {
     if (_isDisposed) {
       return _recoveryPersistence;
     }
 
+    final resolvedLaneId = laneId ?? _currentLaneId();
     final hasUnsavedRecoverySnapshot =
         _latestPersistenceState != _lastPersistedState;
     if ((snapshot == _lastPersistedState && !hasUnsavedRecoverySnapshot) ||
         snapshot == _pendingPersistenceState) {
+      _pendingPersistenceLaneId = resolvedLaneId;
       return _recoveryPersistence;
     }
 
     _latestPersistenceState = snapshot;
     _pendingPersistenceState = snapshot;
+    _pendingPersistenceLaneId = resolvedLaneId;
     if (_isPersisting) {
       return _recoveryPersistence;
     }
@@ -138,7 +152,10 @@ class WorkspaceRecoveryPersistenceController {
     }
     _debounceTimer?.cancel();
     _debounceTimer = null;
-    final finalRecoveryPersistence = queueSnapshot(snapshot: _buildSnapshot());
+    final finalRecoveryPersistence = queueSnapshot(
+      snapshot: _buildSnapshot(),
+      laneId: _currentLaneId(),
+    );
     _isDisposed = true;
     return finalRecoveryPersistence;
   }
@@ -147,7 +164,9 @@ class WorkspaceRecoveryPersistenceController {
     try {
       while (true) {
         final snapshot = _pendingPersistenceState;
+        final laneId = _pendingPersistenceLaneId;
         _pendingPersistenceState = null;
+        _pendingPersistenceLaneId = null;
         if (snapshot == null) {
           break;
         }
@@ -160,22 +179,26 @@ class WorkspaceRecoveryPersistenceController {
         try {
           await _recoveryStore.save(snapshot);
           _lastPersistedState = snapshot;
-          _updateDiagnostics(
-            snapshot.connectionId,
-            (current) => current.copyWith(
-              clearLastRecoveryPersistenceFailureAt: true,
-              clearLastRecoveryPersistenceFailureDetail: true,
-            ),
-          );
+          if (laneId != null) {
+            _updateDiagnostics(
+              laneId,
+              (current) => current.copyWith(
+                clearLastRecoveryPersistenceFailureAt: true,
+                clearLastRecoveryPersistenceFailureDetail: true,
+              ),
+            );
+          }
         } catch (error, stackTrace) {
-          _updateDiagnostics(
-            snapshot.connectionId,
-            (current) => current.copyWith(
-              lastRecoveryPersistenceFailureAt: _now().toUtc(),
-              lastRecoveryPersistenceFailureDetail:
-                  PocketErrorDetailFormatter.normalize(error),
-            ),
-          );
+          if (laneId != null) {
+            _updateDiagnostics(
+              laneId,
+              (current) => current.copyWith(
+                lastRecoveryPersistenceFailureAt: _now().toUtc(),
+                lastRecoveryPersistenceFailureDetail:
+                    PocketErrorDetailFormatter.normalize(error),
+              ),
+            );
+          }
           assert(() {
             debugPrint('Failed to save workspace recovery state: $error');
             debugPrintStack(stackTrace: stackTrace);

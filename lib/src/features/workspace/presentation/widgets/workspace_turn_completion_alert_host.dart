@@ -49,10 +49,11 @@ class _WorkspaceTurnCompletionAlertHostState
   final _completionAlertsController =
       StreamController<TurnCompletionAlertRequest>.broadcast();
   late final WorkspaceLiveSessionTracker _liveSessions;
-  final Map<String, ChatSessionController>
-  _completionControllersByConnectionId = <String, ChatSessionController>{};
+  final Map<String, ChatSessionController> _completionControllersByLaneId =
+      <String, ChatSessionController>{};
+  final Map<String, String> _connectionIdsByLaneId = <String, String>{};
   final Map<String, StreamSubscription<ChatSessionTurnCompletedEvent>>
-  _completionSubscriptionsByConnectionId =
+  _completionSubscriptionsByLaneId =
       <String, StreamSubscription<ChatSessionTurnCompletedEvent>>{};
 
   @override
@@ -110,64 +111,74 @@ class _WorkspaceTurnCompletionAlertHostState
   }
 
   void _syncCompletionSubscriptions() {
-    final nextControllersByConnectionId =
-        _liveSessions.sessionControllersByConnectionId;
+    final nextEntriesByLaneId = <String, WorkspaceLiveSessionControllerEntry>{
+      for (final entry in workspaceLiveSessionControllers(
+        widget.workspaceController,
+      ))
+        entry.laneId: entry,
+    };
 
-    final currentConnectionIds = _completionControllersByConnectionId.keys
-        .toSet();
-    final nextConnectionIds = nextControllersByConnectionId.keys.toSet();
+    final currentLaneIds = _completionControllersByLaneId.keys.toSet();
+    final nextLaneIds = nextEntriesByLaneId.keys.toSet();
 
-    for (final connectionId in currentConnectionIds.difference(
-      nextConnectionIds,
-    )) {
-      _detachCompletionSubscription(connectionId);
+    for (final laneId in currentLaneIds.difference(nextLaneIds)) {
+      _detachCompletionSubscription(laneId);
     }
 
-    for (final entry in nextControllersByConnectionId.entries) {
-      final existingController =
-          _completionControllersByConnectionId[entry.key];
-      if (identical(existingController, entry.value)) {
+    for (final entry in nextEntriesByLaneId.entries) {
+      final existingController = _completionControllersByLaneId[entry.key];
+      if (identical(existingController, entry.value.sessionController) &&
+          _connectionIdsByLaneId[entry.key] == entry.value.connectionId) {
         continue;
       }
       if (existingController != null) {
         _detachCompletionSubscription(entry.key);
       }
-      _attachCompletionSubscription(entry.key, entry.value);
+      _attachCompletionSubscription(
+        entry.key,
+        connectionId: entry.value.connectionId,
+        controller: entry.value.sessionController,
+      );
     }
   }
 
   void _attachCompletionSubscription(
-    String connectionId,
-    ChatSessionController controller,
-  ) {
-    _completionControllersByConnectionId[connectionId] = controller;
-    _completionSubscriptionsByConnectionId[connectionId] = controller
-        .turnCompletedEvents
-        .listen((event) => _handleTurnCompleted(connectionId, event));
+    String laneId, {
+    required String connectionId,
+    required ChatSessionController controller,
+  }) {
+    _completionControllersByLaneId[laneId] = controller;
+    _connectionIdsByLaneId[laneId] = connectionId;
+    _completionSubscriptionsByLaneId[laneId] = controller.turnCompletedEvents
+        .listen((event) => _handleTurnCompleted(laneId, event));
   }
 
-  void _detachCompletionSubscription(String connectionId) {
-    _completionControllersByConnectionId.remove(connectionId);
+  void _detachCompletionSubscription(String laneId) {
+    _completionControllersByLaneId.remove(laneId);
+    _connectionIdsByLaneId.remove(laneId);
     unawaited(
-      _completionSubscriptionsByConnectionId.remove(connectionId)?.cancel() ??
+      _completionSubscriptionsByLaneId.remove(laneId)?.cancel() ??
           Future<void>.value(),
     );
   }
 
   void _detachAllCompletionSubscriptions() {
-    for (final connectionId
-        in _completionControllersByConnectionId.keys.toList()) {
-      _detachCompletionSubscription(connectionId);
+    for (final laneId in _completionControllersByLaneId.keys.toList()) {
+      _detachCompletionSubscription(laneId);
     }
   }
 
   void _handleTurnCompleted(
-    String connectionId,
+    String laneId,
     ChatSessionTurnCompletedEvent event,
   ) {
+    final connectionId = _connectionIdsByLaneId[laneId];
+    if (connectionId == null) {
+      return;
+    }
     _completionAlertsController.add(
       TurnCompletionAlertRequest(
-        id: '$connectionId:${event.turnId}',
+        id: '$laneId:${event.turnId}',
         title: 'Turn completed',
         body: _completionAlertBodyFor(connectionId),
       ),

@@ -41,31 +41,27 @@ Future<String> _createWorkspaceConnection(
             reconnectRequiredConnectionIds:
                 controller._state.savedSettingsReconnectRequiredConnectionIds,
           ),
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds:
-                controller._state.transportReconnectRequiredConnectionIds,
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: controller._state.liveLaneIds,
+            transportReconnectRequiredLaneIds:
+                controller._state.transportReconnectRequiredLaneIds,
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
-                controller._state.transportRecoveryPhasesByConnectionId,
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
+                controller._state.transportRecoveryPhasesByLaneId,
           ),
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
-            controller._state.liveReattachPhasesByConnectionId,
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: controller._state.liveLaneIds,
+        liveReattachPhasesByLaneId:
+            controller._state.liveReattachPhasesByLaneId,
       ),
-      recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        recoveryDiagnosticsByConnectionId:
-            controller._state.recoveryDiagnosticsByConnectionId,
+      recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+        liveLaneIds: controller._state.liveLaneIds,
+        recoveryDiagnosticsByLaneId:
+            controller._state.recoveryDiagnosticsByLaneId,
       ),
       remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
         catalog: nextCatalog,
@@ -156,31 +152,27 @@ Future<void> _saveWorkspaceInactiveSavedConnection(
             reconnectRequiredConnectionIds:
                 controller._state.savedSettingsReconnectRequiredConnectionIds,
           ),
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds:
-                controller._state.transportReconnectRequiredConnectionIds,
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: controller._state.liveLaneIds,
+            transportReconnectRequiredLaneIds:
+                controller._state.transportReconnectRequiredLaneIds,
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
-                controller._state.transportRecoveryPhasesByConnectionId,
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
+                controller._state.transportRecoveryPhasesByLaneId,
           ),
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
-            controller._state.liveReattachPhasesByConnectionId,
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: controller._state.liveLaneIds,
+        liveReattachPhasesByLaneId:
+            controller._state.liveReattachPhasesByLaneId,
       ),
-      recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        recoveryDiagnosticsByConnectionId:
-            controller._state.recoveryDiagnosticsByConnectionId,
+      recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+        liveLaneIds: controller._state.liveLaneIds,
+        recoveryDiagnosticsByLaneId:
+            controller._state.recoveryDiagnosticsByLaneId,
       ),
       remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
         catalog: nextCatalog,
@@ -228,7 +220,10 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
   final (nextCatalog, nextSystemCatalog) = await _loadWorkspaceCatalogState(
     controller,
   );
-  final liveBinding = controller._laneRoster.bindingFor(normalizedConnectionId);
+  final liveBinding = controller._laneRoster.bindingForConnection(
+    controller._state,
+    normalizedConnectionId,
+  );
   final shouldRequireReconnect =
       liveBinding == null ||
       liveBinding.sessionController.profile != profile ||
@@ -264,31 +259,27 @@ Future<void> _saveWorkspaceLiveConnectionEdits(
             liveConnectionIds: controller._state.liveConnectionIds,
             reconnectRequiredConnectionIds: nextReconnectRequiredConnectionIds,
           ),
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds:
-                controller._state.transportReconnectRequiredConnectionIds,
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: controller._state.liveLaneIds,
+            transportReconnectRequiredLaneIds:
+                controller._state.transportReconnectRequiredLaneIds,
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: nextCatalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
-                controller._state.transportRecoveryPhasesByConnectionId,
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
+                controller._state.transportRecoveryPhasesByLaneId,
           ),
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
-            controller._state.liveReattachPhasesByConnectionId,
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: controller._state.liveLaneIds,
+        liveReattachPhasesByLaneId:
+            controller._state.liveReattachPhasesByLaneId,
       ),
-      recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-        catalog: nextCatalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        recoveryDiagnosticsByConnectionId:
-            controller._state.recoveryDiagnosticsByConnectionId,
+      recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+        liveLaneIds: controller._state.liveLaneIds,
+        recoveryDiagnosticsByLaneId:
+            controller._state.recoveryDiagnosticsByLaneId,
       ),
       remoteRuntimeByConnectionId: _sanitizeWorkspaceRemoteRuntimes(
         catalog: nextCatalog,

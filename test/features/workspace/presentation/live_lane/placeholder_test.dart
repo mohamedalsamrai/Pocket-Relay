@@ -243,21 +243,23 @@ void main() {
       final client = FakeCodexAppServerClient();
       final controller = ConnectionWorkspaceController(
         connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: client,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        laneBindingFactory:
+            ({required laneId, required connectionId, required connection}) {
+              return ConnectionLaneBinding(
+                laneId: laneId,
+                connectionId: connectionId,
+                profileStore: ConnectionScopedProfileStore(
+                  connectionId: connectionId,
+                  connectionRepository: repository,
+                ),
+                appServerClient: client,
+                initialSavedProfile: SavedProfile(
+                  profile: connection.profile,
+                  secrets: connection.secrets,
+                ),
+                ownsAppServerClient: false,
+              );
+            },
       );
       addTearDown(() async {
         controller.dispose();

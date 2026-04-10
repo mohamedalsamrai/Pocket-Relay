@@ -6,12 +6,12 @@ Future<void> _handleWorkspaceAppLifecycleState(
 ) async {
   switch (state) {
     case AppLifecycleState.inactive:
-      final selectedConnectionId = controller._state.selectedConnectionId;
+      final selectedLaneId = controller._state.selectedLaneId;
       final backgroundedAt = controller._now();
-      if (selectedConnectionId != null &&
-          controller._state.isConnectionLive(selectedConnectionId)) {
+      if (selectedLaneId != null &&
+          controller._state.isLaneLive(selectedLaneId)) {
         controller._recordLifecycleBackgroundSnapshot(
-          selectedConnectionId,
+          selectedLaneId,
           occurredAt: backgroundedAt,
           lifecycleState: ConnectionWorkspaceBackgroundLifecycleState.inactive,
         );
@@ -23,12 +23,11 @@ Future<void> _handleWorkspaceAppLifecycleState(
       );
       return;
     case AppLifecycleState.hidden:
-      final hiddenConnectionId = controller._state.selectedConnectionId;
+      final hiddenLaneId = controller._state.selectedLaneId;
       final hiddenAt = controller._now();
-      if (hiddenConnectionId != null &&
-          controller._state.isConnectionLive(hiddenConnectionId)) {
+      if (hiddenLaneId != null && controller._state.isLaneLive(hiddenLaneId)) {
         controller._recordLifecycleBackgroundSnapshot(
-          hiddenConnectionId,
+          hiddenLaneId,
           occurredAt: hiddenAt,
           lifecycleState: ConnectionWorkspaceBackgroundLifecycleState.hidden,
         );
@@ -40,12 +39,11 @@ Future<void> _handleWorkspaceAppLifecycleState(
       );
       return;
     case AppLifecycleState.paused:
-      final pausedConnectionId = controller._state.selectedConnectionId;
+      final pausedLaneId = controller._state.selectedLaneId;
       final pausedAt = controller._now();
-      if (pausedConnectionId != null &&
-          controller._state.isConnectionLive(pausedConnectionId)) {
+      if (pausedLaneId != null && controller._state.isLaneLive(pausedLaneId)) {
         controller._recordLifecycleBackgroundSnapshot(
-          pausedConnectionId,
+          pausedLaneId,
           occurredAt: pausedAt,
           lifecycleState: ConnectionWorkspaceBackgroundLifecycleState.paused,
         );
@@ -57,41 +55,44 @@ Future<void> _handleWorkspaceAppLifecycleState(
       );
       return;
     case AppLifecycleState.resumed:
-      final selectedConnectionId = controller._state.selectedConnectionId;
+      final selectedLaneId = controller._state.selectedLaneId;
       final resumedAt = controller._now();
-      if (selectedConnectionId == null ||
-          !controller._state.isConnectionLive(selectedConnectionId)) {
+      if (selectedLaneId == null ||
+          !controller._state.isLaneLive(selectedLaneId)) {
+        return;
+      }
+      final selectedLane = controller._state.liveLaneForId(selectedLaneId);
+      if (selectedLane == null) {
         return;
       }
 
-      controller._recordLifecycleResume(
-        selectedConnectionId,
-        occurredAt: resumedAt,
-      );
-      if (!controller._state.requiresTransportReconnect(selectedConnectionId)) {
-        final binding = controller._laneRoster.bindingFor(selectedConnectionId);
+      controller._recordLifecycleResume(selectedLaneId, occurredAt: resumedAt);
+      if (!controller._state.requiresTransportReconnectForLane(
+        selectedLaneId,
+      )) {
+        final binding = controller._laneRoster.bindingForLaneId(selectedLaneId);
         if (binding == null || binding.sessionController.sessionState.isBusy) {
           return;
         }
         await _restoreWorkspaceConversationAfterResumeIfNeeded(
           controller,
-          selectedConnectionId,
+          selectedLaneId,
           binding,
         );
         return;
       }
 
-      final binding = controller._laneRoster.bindingFor(selectedConnectionId);
+      final binding = controller._laneRoster.bindingForLaneId(selectedLaneId);
       if (binding == null || binding.sessionController.sessionState.isBusy) {
         return;
       }
 
       controller._beginRecoveryAttempt(
-        selectedConnectionId,
+        selectedLaneId,
         startedAt: resumedAt,
         origin: ConnectionWorkspaceRecoveryOrigin.foregroundResume,
       );
-      await _reconnectWorkspaceConnection(controller, selectedConnectionId);
+      await _reconnectWorkspaceConnection(controller, selectedLaneId);
       return;
     case AppLifecycleState.detached:
       return;
@@ -100,14 +101,16 @@ Future<void> _handleWorkspaceAppLifecycleState(
 
 Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) async {
-  if (!_canRestoreWorkspaceConversationAfterResume(
-    controller,
-    connectionId,
-    binding,
-  )) {
+  final lane = controller._state.liveLaneForId(laneId);
+  if (lane == null ||
+      !_canRestoreWorkspaceConversationAfterResume(
+        controller,
+        laneId,
+        binding,
+      )) {
     return;
   }
 
@@ -116,7 +119,7 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
     final latestUnsavedRecoveryState = controller
         ._latestUnsavedRecoveryStateSnapshot();
     selectedThreadId = _normalizedWorkspaceThreadId(
-      latestUnsavedRecoveryState?.connectionId == connectionId
+      latestUnsavedRecoveryState?.connectionId == lane.connectionId
           ? latestUnsavedRecoveryState?.selectedThreadId
           : null,
     );
@@ -125,7 +128,7 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
           ._recoveryPersistenceController
           .loadPersistedSnapshot();
       selectedThreadId = _normalizedWorkspaceThreadId(
-        persistedRecoveryState?.connectionId == connectionId
+        persistedRecoveryState?.connectionId == lane.connectionId
             ? persistedRecoveryState?.selectedThreadId
             : null,
       );
@@ -144,7 +147,7 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
 
   if (!_canRestoreWorkspaceConversationAfterResume(
     controller,
-    connectionId,
+    laneId,
     binding,
   )) {
     return;
@@ -155,7 +158,7 @@ Future<void> _restoreWorkspaceConversationAfterResumeIfNeeded(
   } catch (_) {
     if (!_canRestoreWorkspaceConversationAfterResume(
       controller,
-      connectionId,
+      laneId,
       binding,
     )) {
       return;
@@ -188,17 +191,19 @@ void _debugLogWorkspaceResumeRecoveryFailure({
 
 bool _canRestoreWorkspaceConversationAfterResume(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) {
+  final lane = controller._state.liveLaneForId(laneId);
   if (controller._isDisposed ||
+      lane == null ||
       !controller._state.isShowingLiveLane ||
-      controller._state.selectedConnectionId != connectionId ||
-      !controller._state.isConnectionLive(connectionId)) {
+      controller._state.selectedLaneId != laneId ||
+      !controller._state.isLaneLive(laneId)) {
     return false;
   }
 
-  final currentBinding = controller._laneRoster.bindingFor(connectionId);
+  final currentBinding = controller._laneRoster.bindingForLaneId(laneId);
   if (!identical(currentBinding, binding) ||
       currentBinding == null ||
       currentBinding.sessionController.sessionState.isBusy ||

@@ -5,19 +5,18 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
   DateTime? backgroundedAt,
   ConnectionWorkspaceBackgroundLifecycleState? backgroundedLifecycleState,
 }) {
-  final selectedConnectionId = controller._state.selectedConnectionId;
-  if (selectedConnectionId == null ||
-      !controller._state.isConnectionLive(selectedConnectionId)) {
+  final selectedLaneId = controller._state.selectedLaneId;
+  if (selectedLaneId == null || !controller._state.isLaneLive(selectedLaneId)) {
     return null;
   }
 
-  final binding = controller._laneRoster.bindingFor(selectedConnectionId);
+  final binding = controller._laneRoster.bindingForLaneId(selectedLaneId);
   if (binding == null) {
     return null;
   }
 
-  final diagnostics = controller._state.recoveryDiagnosticsFor(
-    selectedConnectionId,
+  final diagnostics = controller._state.recoveryDiagnosticsForLane(
+    selectedLaneId,
   );
   final backgroundedLifecycleStateFromDiagnostics =
       diagnostics?.lastBackgroundedLifecycleState;
@@ -32,7 +31,7 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
         binding.sessionController.historicalConversationRestoreState?.threadId,
   );
   final shouldRetainColdStartRecoveryThread =
-      controller._state.requiresTransportReconnect(selectedConnectionId) &&
+      controller._state.requiresTransportReconnectForLane(selectedLaneId) &&
       diagnostics?.lastRecoveryOrigin ==
           ConnectionWorkspaceRecoveryOrigin.coldStart &&
       !binding.sessionController.suppressesTrackedThreadReuse &&
@@ -41,14 +40,14 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
     final latestRecoverySnapshot =
         controller._recoveryPersistenceController.latestSnapshot;
     selectedThreadId = _normalizedWorkspaceThreadId(
-      latestRecoverySnapshot?.connectionId == selectedConnectionId
+      latestRecoverySnapshot?.connectionId == binding.connectionId
           ? latestRecoverySnapshot?.selectedThreadId
           : null,
     );
   }
 
   return ConnectionWorkspaceRecoveryState(
-    connectionId: selectedConnectionId,
+    connectionId: binding.connectionId,
     selectedThreadId: selectedThreadId,
     draftText: binding.composerDraftHost.draft.text,
     backgroundedAt: backgroundedAt ?? backgroundedAtFromDiagnostics,

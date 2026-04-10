@@ -14,51 +14,53 @@ Set<String> _sanitizeWorkspaceReconnectRequiredIds({
   };
 }
 
+Set<String> _sanitizeWorkspaceTransportReconnectRequiredLaneIds({
+  required List<String> liveLaneIds,
+  required Set<String> transportReconnectRequiredLaneIds,
+}) {
+  final liveLaneIdSet = liveLaneIds.toSet();
+  return <String>{
+    for (final laneId in transportReconnectRequiredLaneIds)
+      if (liveLaneIdSet.contains(laneId)) laneId,
+  };
+}
+
 Map<String, ConnectionWorkspaceTransportRecoveryPhase>
 _sanitizeWorkspaceTransportRecoveryPhases({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
+  required List<String> liveLaneIds,
   required Map<String, ConnectionWorkspaceTransportRecoveryPhase>
-  transportRecoveryPhasesByConnectionId,
+  transportRecoveryPhasesByLaneId,
 }) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
+  final liveLaneIdSet = liveLaneIds.toSet();
   return <String, ConnectionWorkspaceTransportRecoveryPhase>{
-    for (final entry in transportRecoveryPhasesByConnectionId.entries)
-      if (catalog.connectionForId(entry.key) != null &&
-          liveConnectionIdSet.contains(entry.key))
-        entry.key: entry.value,
+    for (final entry in transportRecoveryPhasesByLaneId.entries)
+      if (liveLaneIdSet.contains(entry.key)) entry.key: entry.value,
   };
 }
 
 Map<String, ConnectionWorkspaceLiveReattachPhase>
 _sanitizeWorkspaceLiveReattachPhases({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
+  required List<String> liveLaneIds,
   required Map<String, ConnectionWorkspaceLiveReattachPhase>
-  liveReattachPhasesByConnectionId,
+  liveReattachPhasesByLaneId,
 }) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
+  final liveLaneIdSet = liveLaneIds.toSet();
   return <String, ConnectionWorkspaceLiveReattachPhase>{
-    for (final entry in liveReattachPhasesByConnectionId.entries)
-      if (catalog.connectionForId(entry.key) != null &&
-          liveConnectionIdSet.contains(entry.key))
-        entry.key: entry.value,
+    for (final entry in liveReattachPhasesByLaneId.entries)
+      if (liveLaneIdSet.contains(entry.key)) entry.key: entry.value,
   };
 }
 
 Map<String, ConnectionWorkspaceRecoveryDiagnostics>
 _sanitizeWorkspaceRecoveryDiagnostics({
-  required ConnectionCatalogState catalog,
-  required List<String> liveConnectionIds,
+  required List<String> liveLaneIds,
   required Map<String, ConnectionWorkspaceRecoveryDiagnostics>
-  recoveryDiagnosticsByConnectionId,
+  recoveryDiagnosticsByLaneId,
 }) {
-  final liveConnectionIdSet = liveConnectionIds.toSet();
+  final liveLaneIdSet = liveLaneIds.toSet();
   return <String, ConnectionWorkspaceRecoveryDiagnostics>{
-    for (final entry in recoveryDiagnosticsByConnectionId.entries)
-      if (catalog.connectionForId(entry.key) != null &&
-          liveConnectionIdSet.contains(entry.key))
-        entry.key: entry.value,
+    for (final entry in recoveryDiagnosticsByLaneId.entries)
+      if (liveLaneIdSet.contains(entry.key)) entry.key: entry.value,
   };
 }
 

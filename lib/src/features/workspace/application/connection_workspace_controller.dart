@@ -14,10 +14,8 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane
 import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_capability_assets.dart';
-import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_templates.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_errors.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
-import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_system_template.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_lifecycle_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_recovery_errors.dart';
 import 'package:pocket_relay/src/features/workspace/application/workspace_continuity_lifecycle.dart';
@@ -50,6 +48,7 @@ part 'controller/state_sanitizers.dart';
 
 typedef ConnectionLaneBindingFactory =
     ConnectionLaneBinding Function({
+      required String laneId,
       required String connectionId,
       required SavedConnection connection,
     });
@@ -103,6 +102,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
           recoveryStore ?? const NoopConnectionWorkspaceRecoveryStore(),
       debounceDuration: recoveryPersistenceDebounceDuration,
       now: _now,
+      currentLaneId: () => _state.selectedLaneId,
       buildSnapshot:
           ({
             DateTime? backgroundedAt,
@@ -113,10 +113,10 @@ class ConnectionWorkspaceController extends ChangeNotifier
             backgroundedAt: backgroundedAt,
             backgroundedLifecycleState: backgroundedLifecycleState,
           ),
-      updateDiagnostics: (connectionId, update) =>
+      updateDiagnostics: (laneId, update) =>
           _updateWorkspaceRecoveryDiagnostics(
             this,
-            connectionId,
+            laneId,
             update,
             enqueueRecoveryPersistence: false,
           ),
@@ -133,6 +133,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
   final WorkspaceLaneRosterController _laneRoster =
       WorkspaceLaneRosterController();
   final Set<String> _intentionalTransportDisconnectConnectionIds = <String>{};
+  int _nextLiveLaneOrdinal = 0;
 
   ConnectionWorkspaceState _state = const ConnectionWorkspaceState.initial();
   Future<void>? _initializationFuture;
@@ -148,12 +149,16 @@ class ConnectionWorkspaceController extends ChangeNotifier
       _latestUnsavedRecoveryStateSnapshot();
 
   void dismissFinishedWhileAwayNotice(String connectionId) {
-    final assessment = _state.turnLivenessAssessmentFor(connectionId);
+    final laneId = _state.primaryLiveLaneIdForConnection(connectionId);
+    if (laneId == null) {
+      return;
+    }
+    final assessment = _state.turnLivenessAssessmentForLane(laneId);
     if (assessment?.status !=
         ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway) {
       return;
     }
-    _clearTurnLivenessAssessment(connectionId);
+    _clearTurnLivenessAssessment(laneId);
   }
 
   Future<ConnectionRemoteRuntimeState> probeRemoteRuntimeForSettings(
@@ -172,8 +177,12 @@ class ConnectionWorkspaceController extends ChangeNotifier
     return _laneRoster.selectedBinding(_state);
   }
 
+  ConnectionLaneBinding? bindingForLaneId(String laneId) {
+    return _laneRoster.bindingForLaneId(laneId);
+  }
+
   ConnectionLaneBinding? bindingForConnectionId(String connectionId) {
-    return _laneRoster.bindingFor(connectionId);
+    return _laneRoster.bindingForConnection(_state, connectionId);
   }
 
   Future<void> initialize() {
@@ -280,6 +289,7 @@ class ConnectionWorkspaceController extends ChangeNotifier
     return _restartWorkspaceRemoteServer(this, connectionId: connectionId);
   }
 
+  @override
   Future<void> handleAppLifecycleStateChanged(AppLifecycleState state) {
     return _handleWorkspaceAppLifecycleState(this, state);
   }
@@ -307,8 +317,16 @@ class ConnectionWorkspaceController extends ChangeNotifier
     return _instantiateWorkspaceLiveConnection(this, connectionId);
   }
 
+  Future<String> instantiateAdditionalLane(String connectionId) {
+    return _instantiateWorkspaceAdditionalLiveLane(this, connectionId);
+  }
+
   void selectConnection(String connectionId) {
     _selectWorkspaceConnection(this, connectionId);
+  }
+
+  void selectLane(String laneId) {
+    _selectWorkspaceLane(this, laneId);
   }
 
   void showSavedConnections() {
@@ -331,6 +349,10 @@ class ConnectionWorkspaceController extends ChangeNotifier
     _terminateWorkspaceConnection(this, connectionId);
   }
 
+  void terminateLane(String laneId) {
+    _terminateWorkspaceLane(this, laneId);
+  }
+
   @override
   void dispose() {
     if (_isDisposed) {
@@ -346,6 +368,14 @@ class ConnectionWorkspaceController extends ChangeNotifier
     }
     super.dispose();
   }
+}
+
+String _nextWorkspaceLiveLaneId(
+  ConnectionWorkspaceController controller,
+  String connectionId,
+) {
+  controller._nextLiveLaneOrdinal += 1;
+  return '$connectionId::lane_${controller._nextLiveLaneOrdinal}';
 }
 
 AgentAdapterRemoteRuntimeDelegateFactory

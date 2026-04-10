@@ -315,7 +315,9 @@ void main() {
       );
       expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
 
-      await controller.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.inactive,
+      );
 
       expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
     },

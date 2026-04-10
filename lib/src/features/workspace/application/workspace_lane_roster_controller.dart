@@ -14,78 +14,109 @@ final class WorkspaceLaneRosterController {
 
   final WorkspaceLiveBindingRegistry _liveBindingRegistry;
 
-  Iterable<String> get connectionIds => _liveBindingRegistry.connectionIds;
+  Iterable<String> get laneIds => _liveBindingRegistry.laneIds;
 
-  ConnectionLaneBinding? bindingFor(String connectionId) {
-    return _liveBindingRegistry.bindingFor(connectionId);
+  ConnectionLaneBinding? bindingForLaneId(String laneId) {
+    return _liveBindingRegistry.bindingFor(laneId);
+  }
+
+  ConnectionLaneBinding? bindingForConnection(
+    ConnectionWorkspaceState state,
+    String connectionId,
+  ) {
+    final laneId = state.primaryLiveLaneIdForConnection(connectionId);
+    if (laneId == null) {
+      return null;
+    }
+    return bindingForLaneId(laneId);
   }
 
   ConnectionLaneBinding? selectedBinding(ConnectionWorkspaceState state) {
-    final selectedConnectionId = state.selectedConnectionId;
-    if (selectedConnectionId == null) {
+    final selectedLaneId = state.selectedLaneId;
+    if (selectedLaneId == null) {
       return null;
     }
-    return bindingFor(selectedConnectionId);
+    return bindingForLaneId(selectedLaneId);
   }
 
-  void putBinding(String connectionId, ConnectionLaneBinding binding) {
-    _liveBindingRegistry.putBinding(connectionId, binding);
+  void putBinding(String laneId, ConnectionLaneBinding binding) {
+    _liveBindingRegistry.putBinding(laneId, binding);
   }
 
-  ConnectionLaneBinding? removeBinding(String connectionId) {
-    return _liveBindingRegistry.removeBinding(connectionId);
+  ConnectionLaneBinding? removeBinding(String laneId) {
+    return _liveBindingRegistry.removeBinding(laneId);
   }
 
   void registerBinding({
-    required String connectionId,
+    required String laneId,
     required ConnectionLaneBinding binding,
     required WorkspaceLiveBindingListener listener,
     required StreamSubscription<AgentAdapterEvent>
     agentAdapterEventSubscription,
   }) {
     _liveBindingRegistry.register(
-      connectionId: connectionId,
+      laneId: laneId,
       binding: binding,
       listener: listener,
       agentAdapterEventSubscription: agentAdapterEventSubscription,
     );
   }
 
-  void unregisterBinding(String connectionId) {
-    _liveBindingRegistry.unregister(connectionId);
+  void unregisterBinding(String laneId) {
+    _liveBindingRegistry.unregister(laneId);
   }
 
   List<ConnectionLaneBinding> detachAllBindings() {
     return _liveBindingRegistry.detachAll();
   }
 
-  List<String> orderedLiveConnectionIds(ConnectionCatalogState catalog) {
-    final liveConnectionIdSet = connectionIds.toSet();
-    return <String>[
+  List<ConnectionWorkspaceLiveLane> orderedLiveLanes(
+    ConnectionCatalogState catalog,
+    List<ConnectionWorkspaceLiveLane> liveLanes,
+  ) {
+    final liveLanesByConnectionId = <String, List<ConnectionWorkspaceLiveLane>>{
       for (final connectionId in catalog.orderedConnectionIds)
-        if (liveConnectionIdSet.contains(connectionId)) connectionId,
+        connectionId: <ConnectionWorkspaceLiveLane>[],
+    };
+    for (final lane in liveLanes) {
+      final connectionLanes =
+          liveLanesByConnectionId[lane.connectionId] ??
+          <ConnectionWorkspaceLiveLane>[];
+      connectionLanes.add(lane);
+      liveLanesByConnectionId[lane.connectionId] = connectionLanes;
+    }
+
+    return <ConnectionWorkspaceLiveLane>[
+      for (final connectionId in catalog.orderedConnectionIds)
+        ...?liveLanesByConnectionId[connectionId],
     ];
   }
 
   WorkspaceLaneTerminationPlan planTerminationAfterRemoval({
     required ConnectionWorkspaceState state,
-    required String removedConnectionId,
+    required String removedLaneId,
   }) {
-    final removalIndex = state.liveConnectionIds.indexOf(removedConnectionId);
-    final nextLiveConnectionIds = orderedLiveConnectionIds(state.catalog);
-    final nextSelectedConnectionId = _nextSelectedConnectionIdAfterRemoval(
+    final removalIndex = state.liveLaneIds.indexOf(removedLaneId);
+    final nextLiveLanes = orderedLiveLanes(
+      state.catalog,
+      <ConnectionWorkspaceLiveLane>[
+        for (final lane in state.liveLanes)
+          if (lane.laneId != removedLaneId) lane,
+      ],
+    );
+    final nextSelectedLaneId = _nextSelectedLaneIdAfterRemoval(
       state: state,
-      removedConnectionId: removedConnectionId,
+      removedLaneId: removedLaneId,
       removalIndex: removalIndex,
-      nextLiveConnectionIds: nextLiveConnectionIds,
+      nextLiveLanes: nextLiveLanes,
     );
     return WorkspaceLaneTerminationPlan(
-      liveConnectionIds: nextLiveConnectionIds,
-      selectedConnectionId: nextSelectedConnectionId,
+      liveLanes: nextLiveLanes,
+      selectedLaneId: nextSelectedLaneId,
       viewport: _nextViewportAfterRemoval(
         state: state,
-        removedConnectionId: removedConnectionId,
-        nextSelectedConnectionId: nextSelectedConnectionId,
+        removedLaneId: removedLaneId,
+        nextSelectedLaneId: nextSelectedLaneId,
       ),
     );
   }
@@ -93,40 +124,39 @@ final class WorkspaceLaneRosterController {
 
 final class WorkspaceLaneTerminationPlan {
   const WorkspaceLaneTerminationPlan({
-    required this.liveConnectionIds,
-    required this.selectedConnectionId,
+    required this.liveLanes,
+    required this.selectedLaneId,
     required this.viewport,
   });
 
-  final List<String> liveConnectionIds;
-  final String? selectedConnectionId;
+  final List<ConnectionWorkspaceLiveLane> liveLanes;
+  final String? selectedLaneId;
   final ConnectionWorkspaceViewport viewport;
 }
 
-String? _nextSelectedConnectionIdAfterRemoval({
+String? _nextSelectedLaneIdAfterRemoval({
   required ConnectionWorkspaceState state,
-  required String removedConnectionId,
+  required String removedLaneId,
   required int removalIndex,
-  required List<String> nextLiveConnectionIds,
+  required List<ConnectionWorkspaceLiveLane> nextLiveLanes,
 }) {
-  if (state.selectedConnectionId != removedConnectionId) {
-    return state.selectedConnectionId;
+  if (state.selectedLaneId != removedLaneId) {
+    return state.selectedLaneId;
   }
-  if (nextLiveConnectionIds.isEmpty) {
+  if (nextLiveLanes.isEmpty) {
     return null;
   }
 
-  final nextIndex = removalIndex.clamp(0, nextLiveConnectionIds.length - 1);
-  return nextLiveConnectionIds[nextIndex];
+  final nextIndex = removalIndex.clamp(0, nextLiveLanes.length - 1);
+  return nextLiveLanes[nextIndex].laneId;
 }
 
 ConnectionWorkspaceViewport _nextViewportAfterRemoval({
   required ConnectionWorkspaceState state,
-  required String removedConnectionId,
-  required String? nextSelectedConnectionId,
+  required String removedLaneId,
+  required String? nextSelectedLaneId,
 }) {
-  if (state.selectedConnectionId == removedConnectionId &&
-      nextSelectedConnectionId == null) {
+  if (state.selectedLaneId == removedLaneId && nextSelectedLaneId == null) {
     return ConnectionWorkspaceViewport.savedConnections;
   }
 

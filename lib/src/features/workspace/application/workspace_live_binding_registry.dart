@@ -11,29 +11,29 @@ final class WorkspaceLiveBindingRegistry {
   final Map<String, _WorkspaceLiveBindingRegistration> _registrations =
       <String, _WorkspaceLiveBindingRegistration>{};
 
-  Iterable<String> get connectionIds => _bindings.keys;
+  Iterable<String> get laneIds => _bindings.keys;
 
-  ConnectionLaneBinding? bindingFor(String connectionId) {
-    return _bindings[connectionId];
+  ConnectionLaneBinding? bindingFor(String laneId) {
+    return _bindings[laneId];
   }
 
-  void putBinding(String connectionId, ConnectionLaneBinding binding) {
-    _bindings[connectionId] = binding;
+  void putBinding(String laneId, ConnectionLaneBinding binding) {
+    _bindings[laneId] = binding;
   }
 
-  ConnectionLaneBinding? removeBinding(String connectionId) {
-    return _bindings.remove(connectionId);
+  ConnectionLaneBinding? removeBinding(String laneId) {
+    return _bindings.remove(laneId);
   }
 
   void register({
-    required String connectionId,
+    required String laneId,
     required ConnectionLaneBinding binding,
     required WorkspaceLiveBindingListener listener,
     required StreamSubscription<AgentAdapterEvent>
     agentAdapterEventSubscription,
   }) {
-    unregister(connectionId);
-    _registrations[connectionId] = _WorkspaceLiveBindingRegistration(
+    unregister(laneId);
+    _registrations[laneId] = _WorkspaceLiveBindingRegistration(
       binding: binding,
       listener: listener,
       agentAdapterEventSubscription: agentAdapterEventSubscription,
@@ -42,8 +42,8 @@ final class WorkspaceLiveBindingRegistry {
     binding.composerDraftHost.addListener(listener);
   }
 
-  void unregister(String connectionId) {
-    final registration = _registrations.remove(connectionId);
+  void unregister(String laneId) {
+    final registration = _registrations.remove(laneId);
     if (registration == null) {
       return;
     }
@@ -60,8 +60,8 @@ final class WorkspaceLiveBindingRegistry {
   List<ConnectionLaneBinding> detachAll() {
     final bindings = _bindings.values.toList();
     _bindings.clear();
-    for (final connectionId in _registrations.keys.toList()) {
-      unregister(connectionId);
+    for (final laneId in _registrations.keys.toList()) {
+      unregister(laneId);
     }
     return bindings;
   }

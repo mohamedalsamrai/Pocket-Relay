@@ -13,14 +13,14 @@ Future<void> _connectWorkspaceBindingTransport(ConnectionLaneBinding binding) {
 
 Future<bool> _attemptWorkspaceTransportReconnect(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding, {
   required String? threadId,
   required bool hadVisibleConversationState,
 }) async {
   final transportConnected = await _connectWorkspaceBindingTransportForRecovery(
     controller,
-    connectionId,
+    laneId,
     binding,
     threadId: threadId,
   );
@@ -30,7 +30,7 @@ Future<bool> _attemptWorkspaceTransportReconnect(
   if (threadId == null) {
     _finalizeWorkspaceRecoveredTransportState(
       controller,
-      connectionId,
+      laneId,
       completedAt: controller._now(),
       recordRecoveryOutcome: true,
     );
@@ -39,7 +39,7 @@ Future<bool> _attemptWorkspaceTransportReconnect(
 
   await _recoverWorkspaceConversationAfterTransportReconnect(
     controller,
-    connectionId,
+    laneId,
     binding,
     threadId: threadId,
     hadVisibleConversationState: hadVisibleConversationState,
@@ -49,7 +49,7 @@ Future<bool> _attemptWorkspaceTransportReconnect(
 
 Future<bool> _connectWorkspaceBindingTransportForRecovery(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding, {
   required String? threadId,
 }) async {
@@ -60,7 +60,8 @@ Future<bool> _connectWorkspaceBindingTransportForRecovery(
     if (!controller._isDisposed) {
       _handleWorkspaceUnavailableTransportDuringRecovery(
         controller,
-        connectionId: connectionId,
+        laneId: laneId,
+        connectionId: binding.connectionId,
         threadId: threadId,
         occurredAt: controller._now(),
         error: error,
@@ -82,7 +83,8 @@ Future<bool> _connectWorkspaceBindingTransportForRecovery(
     if (!controller._isDisposed) {
       _handleWorkspaceUnavailableTransportDuringRecovery(
         controller,
-        connectionId: connectionId,
+        laneId: laneId,
+        connectionId: binding.connectionId,
         threadId: threadId,
         occurredAt: controller._now(),
         error: error,
@@ -96,6 +98,7 @@ Future<bool> _connectWorkspaceBindingTransportForRecovery(
 
 void _handleWorkspaceUnavailableTransportDuringRecovery(
   ConnectionWorkspaceController controller, {
+  required String laneId,
   required String connectionId,
   required String? threadId,
   required DateTime occurredAt,
@@ -113,22 +116,22 @@ void _handleWorkspaceUnavailableTransportDuringRecovery(
   }
 
   controller._recordFallbackTransportConnectFailure(
-    connectionId,
+    laneId,
     occurredAt: occurredAt,
     error: error,
   );
   if (liveReattachPhase == null) {
-    controller._clearLiveReattachPhase(connectionId);
+    controller._clearLiveReattachPhase(laneId);
   } else {
-    controller._setLiveReattachPhase(connectionId, liveReattachPhase);
+    controller._setLiveReattachPhase(laneId, liveReattachPhase);
   }
   controller._setTransportRecoveryPhase(
-    connectionId,
+    laneId,
     ConnectionWorkspaceTransportRecoveryPhase.unavailable,
   );
   if (threadId != null) {
     controller._setTurnLivenessAssessment(
-      connectionId,
+      laneId,
       ConnectionWorkspaceTurnLivenessAssessment(
         status: ConnectionWorkspaceTurnLivenessStatus.continuityLost,
         evidence: turnLivenessEvidence,
@@ -137,7 +140,7 @@ void _handleWorkspaceUnavailableTransportDuringRecovery(
     );
   }
   controller._completeRecoveryAttempt(
-    connectionId,
+    laneId,
     completedAt: occurredAt,
     outcome: ConnectionWorkspaceRecoveryOutcome.transportUnavailable,
   );
@@ -145,7 +148,7 @@ void _handleWorkspaceUnavailableTransportDuringRecovery(
 
 Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding, {
   required String threadId,
   required bool hadVisibleConversationState,
@@ -170,17 +173,17 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
         );
     if (!_canFinalizeWorkspaceTurnRecoveryAssessment(
       controller,
-      connectionId,
+      laneId,
       binding,
     )) {
       return;
     }
-    controller._clearTransportReconnectRequired(connectionId);
+    controller._clearTransportReconnectRequired(laneId);
 
     if (shouldRestoreFromHistory) {
       await _restoreWorkspaceConversationFromHistoryAfterReconnect(
         controller,
-        connectionId,
+        laneId,
         binding,
         threadId: threadId,
         assessment: assessment,
@@ -189,12 +192,12 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
     }
 
     controller._setLiveReattachPhase(
-      connectionId,
+      laneId,
       ConnectionWorkspaceLiveReattachPhase.liveReattached,
     );
-    controller._setTurnLivenessAssessment(connectionId, assessment);
+    controller._setTurnLivenessAssessment(laneId, assessment);
     controller._completeRecoveryAttempt(
-      connectionId,
+      laneId,
       completedAt: controller._now(),
       outcome: switch (assessment.status) {
         ConnectionWorkspaceTurnLivenessStatus.stillLive =>
@@ -208,7 +211,7 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
       },
     );
   } catch (error) {
-    controller._recordLiveReattachFailure(connectionId, error: error);
+    controller._recordLiveReattachFailure(laneId, error: error);
     if (controller._isDisposed) {
       return;
     }
@@ -220,21 +223,21 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
     );
     if (!_canFinalizeWorkspaceTurnRecoveryAssessment(
       controller,
-      connectionId,
+      laneId,
       binding,
     )) {
       return;
     }
-    controller._clearTransportReconnectRequired(connectionId);
+    controller._clearTransportReconnectRequired(laneId);
     final shouldRestoreFromHistory =
         assessment.status ==
             ConnectionWorkspaceTurnLivenessStatus.finishedWhileAway ||
         !hadVisibleConversationState;
     if (!shouldRestoreFromHistory) {
-      controller._clearLiveReattachPhase(connectionId);
-      controller._setTurnLivenessAssessment(connectionId, assessment);
+      controller._clearLiveReattachPhase(laneId);
+      controller._setTurnLivenessAssessment(laneId, assessment);
       controller._completeRecoveryAttempt(
-        connectionId,
+        laneId,
         completedAt: controller._now(),
         outcome: ConnectionWorkspaceRecoveryOutcome.continuityLost,
       );
@@ -242,7 +245,7 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
     }
     await _restoreWorkspaceConversationFromHistoryAfterReconnect(
       controller,
-      connectionId,
+      laneId,
       binding,
       threadId: threadId,
       assessment: assessment,
@@ -252,13 +255,13 @@ Future<void> _recoverWorkspaceConversationAfterTransportReconnect(
 
 Future<void> _restoreWorkspaceConversationFromHistoryAfterReconnect(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding, {
   required String threadId,
   required ConnectionWorkspaceTurnLivenessAssessment assessment,
 }) async {
   controller._setLiveReattachPhase(
-    connectionId,
+    laneId,
     ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
   );
   await binding.sessionController.selectConversationForResume(threadId);
@@ -266,9 +269,9 @@ Future<void> _restoreWorkspaceConversationFromHistoryAfterReconnect(
     return;
   }
 
-  controller._setTurnLivenessAssessment(connectionId, assessment);
+  controller._setTurnLivenessAssessment(laneId, assessment);
   controller._completeConversationRecoveryAttempt(
-    connectionId,
+    laneId,
     binding,
     completedAt: controller._now(),
   );
@@ -305,24 +308,22 @@ bool _workspaceLaneHasProvenLiveTurnState(ConnectionLaneBinding binding) {
 
 void _syncWorkspaceRecoveredTransportState(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding,
 ) {
-  if (!controller._state.requiresTransportReconnect(connectionId) ||
+  if (!controller._state.requiresTransportReconnectForLane(laneId) ||
       !binding.agentAdapterClient.isConnected) {
     return;
   }
 
-  final liveReattachPhase = controller._state.liveReattachPhaseFor(
-    connectionId,
-  );
+  final liveReattachPhase = controller._state.liveReattachPhaseForLane(laneId);
   if (liveReattachPhase == ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
       liveReattachPhase ==
           ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy) {
     return;
   }
 
-  final diagnostics = controller._state.recoveryDiagnosticsFor(connectionId);
+  final diagnostics = controller._state.recoveryDiagnosticsForLane(laneId);
   final recoveryAttemptInFlight =
       diagnostics?.lastRecoveryStartedAt != null &&
       diagnostics?.lastRecoveryCompletedAt == null;
@@ -360,7 +361,7 @@ void _syncWorkspaceRecoveredTransportState(
 
   _finalizeWorkspaceRecoveredTransportState(
     controller,
-    connectionId,
+    laneId,
     completedAt: controller._now(),
     recordRecoveryOutcome: recoveryAttemptInFlight,
   );

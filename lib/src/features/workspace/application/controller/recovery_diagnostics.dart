@@ -2,115 +2,103 @@ part of '../connection_workspace_controller.dart';
 
 ConnectionWorkspaceState _withWorkspaceTransportReconnectStaged(
   ConnectionWorkspaceState state,
-  String connectionId,
+  String laneId,
 ) {
+  final liveLaneIds = state.liveLaneIds;
   return state.copyWith(
-    transportReconnectRequiredConnectionIds:
-        _sanitizeWorkspaceReconnectRequiredIds(
-          catalog: state.catalog,
-          liveConnectionIds: state.liveConnectionIds,
-          reconnectRequiredConnectionIds: <String>{
-            ...state.transportReconnectRequiredConnectionIds,
-            connectionId,
+    transportReconnectRequiredLaneIds:
+        _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+          liveLaneIds: liveLaneIds,
+          transportReconnectRequiredLaneIds: <String>{
+            ...state.transportReconnectRequiredLaneIds,
+            laneId,
           },
         ),
-    transportRecoveryPhasesByConnectionId:
-        _sanitizeWorkspaceTransportRecoveryPhases(
-          catalog: state.catalog,
-          liveConnectionIds: state.liveConnectionIds,
-          transportRecoveryPhasesByConnectionId:
-              <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                ...state.transportRecoveryPhasesByConnectionId,
-                connectionId:
-                    ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
-              },
-        ),
-    liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-      catalog: state.catalog,
-      liveConnectionIds: state.liveConnectionIds,
-      liveReattachPhasesByConnectionId:
-          <String, ConnectionWorkspaceLiveReattachPhase>{
-            ...state.liveReattachPhasesByConnectionId,
-            connectionId: ConnectionWorkspaceLiveReattachPhase.reconnecting,
+    transportRecoveryPhasesByLaneId: _sanitizeWorkspaceTransportRecoveryPhases(
+      liveLaneIds: liveLaneIds,
+      transportRecoveryPhasesByLaneId:
+          <String, ConnectionWorkspaceTransportRecoveryPhase>{
+            ...state.transportRecoveryPhasesByLaneId,
+            laneId: ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
           },
     ),
-    recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-      catalog: state.catalog,
-      liveConnectionIds: state.liveConnectionIds,
-      recoveryDiagnosticsByConnectionId:
-          state.recoveryDiagnosticsByConnectionId,
+    liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+      liveLaneIds: liveLaneIds,
+      liveReattachPhasesByLaneId:
+          <String, ConnectionWorkspaceLiveReattachPhase>{
+            ...state.liveReattachPhasesByLaneId,
+            laneId: ConnectionWorkspaceLiveReattachPhase.reconnecting,
+          },
+    ),
+    recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+      liveLaneIds: liveLaneIds,
+      recoveryDiagnosticsByLaneId: state.recoveryDiagnosticsByLaneId,
     ),
   );
 }
 
 ConnectionWorkspaceState _withWorkspaceTransportReconnectCleared(
   ConnectionWorkspaceState state,
-  String connectionId,
+  String laneId,
 ) {
+  final liveLaneIds = state.liveLaneIds;
   return state.copyWith(
-    transportReconnectRequiredConnectionIds:
-        _sanitizeWorkspaceReconnectRequiredIds(
-          catalog: state.catalog,
-          liveConnectionIds: state.liveConnectionIds,
-          reconnectRequiredConnectionIds: <String>{
-            ...state.transportReconnectRequiredConnectionIds,
-          }..remove(connectionId),
+    transportReconnectRequiredLaneIds:
+        _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+          liveLaneIds: liveLaneIds,
+          transportReconnectRequiredLaneIds: <String>{
+            ...state.transportReconnectRequiredLaneIds,
+          }..remove(laneId),
         ),
-    transportRecoveryPhasesByConnectionId:
-        _sanitizeWorkspaceTransportRecoveryPhases(
-          catalog: state.catalog,
-          liveConnectionIds: state.liveConnectionIds,
-          transportRecoveryPhasesByConnectionId:
-              <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                for (final entry
-                    in state.transportRecoveryPhasesByConnectionId.entries)
-                  if (entry.key != connectionId) entry.key: entry.value,
-              },
-        ),
-    liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-      catalog: state.catalog,
-      liveConnectionIds: state.liveConnectionIds,
-      liveReattachPhasesByConnectionId:
-          <String, ConnectionWorkspaceLiveReattachPhase>{
-            for (final entry in state.liveReattachPhasesByConnectionId.entries)
-              if (entry.key != connectionId) entry.key: entry.value,
+    transportRecoveryPhasesByLaneId: _sanitizeWorkspaceTransportRecoveryPhases(
+      liveLaneIds: liveLaneIds,
+      transportRecoveryPhasesByLaneId:
+          <String, ConnectionWorkspaceTransportRecoveryPhase>{
+            for (final entry in state.transportRecoveryPhasesByLaneId.entries)
+              if (entry.key != laneId) entry.key: entry.value,
           },
     ),
-    recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-      catalog: state.catalog,
-      liveConnectionIds: state.liveConnectionIds,
-      recoveryDiagnosticsByConnectionId:
-          state.recoveryDiagnosticsByConnectionId,
+    liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+      liveLaneIds: liveLaneIds,
+      liveReattachPhasesByLaneId:
+          <String, ConnectionWorkspaceLiveReattachPhase>{
+            for (final entry in state.liveReattachPhasesByLaneId.entries)
+              if (entry.key != laneId) entry.key: entry.value,
+          },
+    ),
+    recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+      liveLaneIds: liveLaneIds,
+      recoveryDiagnosticsByLaneId: state.recoveryDiagnosticsByLaneId,
     ),
   );
 }
 
 void _clearWorkspaceTransportReconnectState(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
   if (controller._isDisposed) {
     return;
   }
 
   controller._applyState(
-    _withWorkspaceTransportReconnectCleared(controller._state, connectionId),
+    _withWorkspaceTransportReconnectCleared(controller._state, laneId),
   );
 }
 
 void _finalizeWorkspaceRecoveredTransportState(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime completedAt,
   required bool recordRecoveryOutcome,
 }) {
-  _clearWorkspaceTransportReconnectState(controller, connectionId);
+  _clearWorkspaceTransportReconnectState(controller, laneId);
   if (!recordRecoveryOutcome || controller._isDisposed) {
     return;
   }
 
   controller._completeRecoveryAttempt(
-    connectionId,
+    laneId,
     completedAt: completedAt,
     outcome: ConnectionWorkspaceRecoveryOutcome.transportRestored,
   );
@@ -118,23 +106,22 @@ void _finalizeWorkspaceRecoveredTransportState(
 
 void _clearWorkspaceLiveReattachPhase(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
   if (controller._isDisposed ||
-      controller._state.liveReattachPhaseFor(connectionId) == null) {
+      controller._state.liveReattachPhaseForLane(laneId) == null) {
     return;
   }
 
   controller._applyState(
     controller._state.copyWith(
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: controller._state.catalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: controller._state.liveLaneIds,
+        liveReattachPhasesByLaneId:
             <String, ConnectionWorkspaceLiveReattachPhase>{
               for (final entry
-                  in controller._state.liveReattachPhasesByConnectionId.entries)
-                if (entry.key != connectionId) entry.key: entry.value,
+                  in controller._state.liveReattachPhasesByLaneId.entries)
+                if (entry.key != laneId) entry.key: entry.value,
             },
       ),
     ),
@@ -143,61 +130,59 @@ void _clearWorkspaceLiveReattachPhase(
 
 void _clearWorkspaceTurnLivenessAssessment(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
-  final currentAssessment = controller._state.turnLivenessAssessmentFor(
-    connectionId,
+  final currentAssessment = controller._state.turnLivenessAssessmentForLane(
+    laneId,
   );
   if (controller._isDisposed || currentAssessment == null) {
     return;
   }
 
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(clearLastTurnLivenessAssessment: true),
   );
 }
 
 void _setWorkspaceTurnLivenessAssessment(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionWorkspaceTurnLivenessAssessment assessment,
 ) {
   if (controller._isDisposed ||
-      !controller._state.isConnectionLive(connectionId) ||
-      controller._state.turnLivenessAssessmentFor(connectionId) == assessment) {
+      !controller._state.isLaneLive(laneId) ||
+      controller._state.turnLivenessAssessmentForLane(laneId) == assessment) {
     return;
   }
 
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(lastTurnLivenessAssessment: assessment),
   );
 }
 
 void _setWorkspaceLiveReattachPhase(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionWorkspaceLiveReattachPhase phase,
 ) {
-  if (controller._isDisposed ||
-      !controller._state.isConnectionLive(connectionId)) {
+  if (controller._isDisposed || !controller._state.isLaneLive(laneId)) {
     return;
   }
 
-  if (controller._state.liveReattachPhaseFor(connectionId) == phase) {
+  if (controller._state.liveReattachPhaseForLane(laneId) == phase) {
     return;
   }
 
   controller._applyState(
     controller._state.copyWith(
-      liveReattachPhasesByConnectionId: _sanitizeWorkspaceLiveReattachPhases(
-        catalog: controller._state.catalog,
-        liveConnectionIds: controller._state.liveConnectionIds,
-        liveReattachPhasesByConnectionId:
+      liveReattachPhasesByLaneId: _sanitizeWorkspaceLiveReattachPhases(
+        liveLaneIds: controller._state.liveLaneIds,
+        liveReattachPhasesByLaneId:
             <String, ConnectionWorkspaceLiveReattachPhase>{
-              ...controller._state.liveReattachPhasesByConnectionId,
-              connectionId: phase,
+              ...controller._state.liveReattachPhasesByLaneId,
+              laneId: phase,
             },
       ),
     ),
@@ -206,33 +191,31 @@ void _setWorkspaceLiveReattachPhase(
 
 void _markWorkspaceTransportReconnectRequired(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
   if (controller._isDisposed ||
-      !controller._state.isConnectionLive(connectionId) ||
-      controller._state.requiresTransportReconnect(connectionId)) {
+      !controller._state.isLaneLive(laneId) ||
+      controller._state.requiresTransportReconnectForLane(laneId)) {
     return;
   }
 
   controller._applyState(
     controller._state.copyWith(
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds: <String>{
-              ...controller._state.transportReconnectRequiredConnectionIds,
-              connectionId,
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: controller._state.liveLaneIds,
+            transportReconnectRequiredLaneIds: <String>{
+              ...controller._state.transportReconnectRequiredLaneIds,
+              laneId,
             },
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
                 <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                  ...controller._state.transportRecoveryPhasesByConnectionId,
-                  connectionId: ConnectionWorkspaceTransportRecoveryPhase.lost,
+                  ...controller._state.transportRecoveryPhasesByLaneId,
+                  laneId: ConnectionWorkspaceTransportRecoveryPhase.lost,
                 },
           ),
     ),
@@ -241,35 +224,33 @@ void _markWorkspaceTransportReconnectRequired(
 
 void _clearWorkspaceTransportReconnectRequired(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
 ) {
   if (controller._isDisposed ||
-      !controller._state.requiresTransportReconnect(connectionId)) {
+      !controller._state.requiresTransportReconnectForLane(laneId)) {
     return;
   }
 
   controller._applyState(
     controller._state.copyWith(
-      transportReconnectRequiredConnectionIds:
-          _sanitizeWorkspaceReconnectRequiredIds(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            reconnectRequiredConnectionIds: <String>{
-              ...controller._state.transportReconnectRequiredConnectionIds,
-            }..remove(connectionId),
+      transportReconnectRequiredLaneIds:
+          _sanitizeWorkspaceTransportReconnectRequiredLaneIds(
+            liveLaneIds: controller._state.liveLaneIds,
+            transportReconnectRequiredLaneIds: <String>{
+              ...controller._state.transportReconnectRequiredLaneIds,
+            }..remove(laneId),
           ),
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
                 <String, ConnectionWorkspaceTransportRecoveryPhase>{
                   for (final entry
                       in controller
                           ._state
-                          .transportRecoveryPhasesByConnectionId
+                          .transportRecoveryPhasesByLaneId
                           .entries)
-                    if (entry.key != connectionId) entry.key: entry.value,
+                    if (entry.key != laneId) entry.key: entry.value,
                 },
           ),
     ),
@@ -278,28 +259,26 @@ void _clearWorkspaceTransportReconnectRequired(
 
 void _setWorkspaceTransportRecoveryPhase(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionWorkspaceTransportRecoveryPhase phase,
 ) {
-  if (controller._isDisposed ||
-      !controller._state.isConnectionLive(connectionId)) {
+  if (controller._isDisposed || !controller._state.isLaneLive(laneId)) {
     return;
   }
 
-  if (controller._state.transportRecoveryPhaseFor(connectionId) == phase) {
+  if (controller._state.transportRecoveryPhaseForLane(laneId) == phase) {
     return;
   }
 
   controller._applyState(
     controller._state.copyWith(
-      transportRecoveryPhasesByConnectionId:
+      transportRecoveryPhasesByLaneId:
           _sanitizeWorkspaceTransportRecoveryPhases(
-            catalog: controller._state.catalog,
-            liveConnectionIds: controller._state.liveConnectionIds,
-            transportRecoveryPhasesByConnectionId:
+            liveLaneIds: controller._state.liveLaneIds,
+            transportRecoveryPhasesByLaneId:
                 <String, ConnectionWorkspaceTransportRecoveryPhase>{
-                  ...controller._state.transportRecoveryPhasesByConnectionId,
-                  connectionId: phase,
+                  ...controller._state.transportRecoveryPhasesByLaneId,
+                  laneId: phase,
                 },
           ),
     ),
@@ -308,12 +287,12 @@ void _setWorkspaceTransportRecoveryPhase(
 
 void _recordWorkspaceLifecycleBackgroundSnapshot(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime occurredAt,
   required ConnectionWorkspaceBackgroundLifecycleState lifecycleState,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastBackgroundedAt: occurredAt,
       lastBackgroundedLifecycleState: lifecycleState,
@@ -324,11 +303,11 @@ void _recordWorkspaceLifecycleBackgroundSnapshot(
 
 void _recordWorkspaceLifecycleResume(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime occurredAt,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastResumedAt: occurredAt,
       clearLastBackgroundedLifecycleState: true,
@@ -339,12 +318,12 @@ void _recordWorkspaceLifecycleResume(
 
 void _recordWorkspaceTransportLoss(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime occurredAt,
   required ConnectionWorkspaceTransportLossReason reason,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastTransportLossAt: occurredAt,
       lastTransportLossReason: reason,
@@ -354,11 +333,11 @@ void _recordWorkspaceTransportLoss(
 
 void _recordWorkspaceFallbackTransportConnectFailure(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime occurredAt,
   required Object? error,
 }) {
-  final diagnostics = controller._state.recoveryDiagnosticsFor(connectionId);
+  final diagnostics = controller._state.recoveryDiagnosticsForLane(laneId);
   final lastRecoveryStartedAt = diagnostics?.lastRecoveryStartedAt;
   final lastTransportLossAt = diagnostics?.lastTransportLossAt;
   if (lastRecoveryStartedAt != null &&
@@ -368,12 +347,12 @@ void _recordWorkspaceFallbackTransportConnectFailure(
   }
 
   controller._recordTransportLoss(
-    connectionId,
+    laneId,
     occurredAt: occurredAt,
     reason: ConnectionWorkspaceTransportLossReason.connectFailed,
   );
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastTransportFailureDetail: PocketErrorDetailFormatter.normalize(error),
     ),
@@ -382,11 +361,11 @@ void _recordWorkspaceFallbackTransportConnectFailure(
 
 void _recordWorkspaceLiveReattachFailure(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required Object? error,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastLiveReattachFailureDetail: PocketErrorDetailFormatter.normalize(
         error,
@@ -397,12 +376,12 @@ void _recordWorkspaceLiveReattachFailure(
 
 void _beginWorkspaceRecoveryAttempt(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime startedAt,
   required ConnectionWorkspaceRecoveryOrigin origin,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastRecoveryOrigin: origin,
       lastRecoveryStartedAt: startedAt,
@@ -417,12 +396,12 @@ void _beginWorkspaceRecoveryAttempt(
 
 void _completeWorkspaceRecoveryAttempt(
   ConnectionWorkspaceController controller,
-  String connectionId, {
+  String laneId, {
   required DateTime completedAt,
   required ConnectionWorkspaceRecoveryOutcome outcome,
 }) {
   controller._updateRecoveryDiagnostics(
-    connectionId,
+    laneId,
     (current) => current.copyWith(
       lastRecoveryCompletedAt: completedAt,
       lastRecoveryOutcome: outcome,
@@ -432,7 +411,7 @@ void _completeWorkspaceRecoveryAttempt(
 
 void _completeWorkspaceConversationRecoveryAttempt(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionLaneBinding binding, {
   required DateTime completedAt,
 }) {
@@ -446,7 +425,7 @@ void _completeWorkspaceConversationRecoveryAttempt(
     _ => ConnectionWorkspaceRecoveryOutcome.conversationRestored,
   };
   controller._completeRecoveryAttempt(
-    connectionId,
+    laneId,
     completedAt: completedAt,
     outcome: outcome,
   );
@@ -454,20 +433,19 @@ void _completeWorkspaceConversationRecoveryAttempt(
 
 void _updateWorkspaceRecoveryDiagnostics(
   ConnectionWorkspaceController controller,
-  String connectionId,
+  String laneId,
   ConnectionWorkspaceRecoveryDiagnostics Function(
     ConnectionWorkspaceRecoveryDiagnostics current,
   )
   update, {
   required bool enqueueRecoveryPersistence,
 }) {
-  if (controller._isDisposed ||
-      !controller._state.isConnectionLive(connectionId)) {
+  if (controller._isDisposed || !controller._state.isLaneLive(laneId)) {
     return;
   }
 
   final currentDiagnostics =
-      controller._state.recoveryDiagnosticsFor(connectionId) ??
+      controller._state.recoveryDiagnosticsForLane(laneId) ??
       const ConnectionWorkspaceRecoveryDiagnostics();
   final nextDiagnostics = update(currentDiagnostics);
   if (nextDiagnostics == currentDiagnostics) {
@@ -475,13 +453,12 @@ void _updateWorkspaceRecoveryDiagnostics(
   }
 
   final nextState = controller._state.copyWith(
-    recoveryDiagnosticsByConnectionId: _sanitizeWorkspaceRecoveryDiagnostics(
-      catalog: controller._state.catalog,
-      liveConnectionIds: controller._state.liveConnectionIds,
-      recoveryDiagnosticsByConnectionId:
+    recoveryDiagnosticsByLaneId: _sanitizeWorkspaceRecoveryDiagnostics(
+      liveLaneIds: controller._state.liveLaneIds,
+      recoveryDiagnosticsByLaneId:
           <String, ConnectionWorkspaceRecoveryDiagnostics>{
-            ...controller._state.recoveryDiagnosticsByConnectionId,
-            connectionId: nextDiagnostics,
+            ...controller._state.recoveryDiagnosticsByLaneId,
+            laneId: nextDiagnostics,
           },
     ),
   );

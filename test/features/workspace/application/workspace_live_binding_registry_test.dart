@@ -12,9 +12,9 @@ void main() {
     final registry = WorkspaceLiveBindingRegistry();
     var listenerCalls = 0;
 
-    registry.putBinding('conn_primary', binding);
+    registry.putBinding('lane_primary', binding);
     registry.register(
-      connectionId: 'conn_primary',
+      laneId: 'lane_primary',
       binding: binding,
       listener: () {
         listenerCalls += 1;
@@ -22,8 +22,8 @@ void main() {
       agentAdapterEventSubscription: client.events.listen((_) {}),
     );
 
-    expect(registry.bindingFor('conn_primary'), same(binding));
-    expect(registry.connectionIds, contains('conn_primary'));
+    expect(registry.bindingFor('lane_primary'), same(binding));
+    expect(registry.laneIds, contains('lane_primary'));
 
     binding.restoreComposerDraft('Draft');
 
@@ -32,7 +32,7 @@ void main() {
     final detachedBindings = registry.detachAll();
 
     expect(detachedBindings.single, same(binding));
-    expect(registry.bindingFor('conn_primary'), isNull);
+    expect(registry.bindingFor('lane_primary'), isNull);
 
     binding.restoreComposerDraft('Draft after detach');
 
@@ -44,9 +44,9 @@ void main() {
     final registry = WorkspaceLiveBindingRegistry();
     var listenerCalls = 0;
 
-    registry.putBinding('conn_primary', binding);
+    registry.putBinding('lane_primary', binding);
     registry.register(
-      connectionId: 'conn_primary',
+      laneId: 'lane_primary',
       binding: binding,
       listener: () {
         listenerCalls += 1;
@@ -54,13 +54,13 @@ void main() {
       agentAdapterEventSubscription: client.events.listen((_) {}),
     );
 
-    registry.unregister('conn_primary');
+    registry.unregister('lane_primary');
     binding.restoreComposerDraft('Detached draft');
 
     expect(listenerCalls, 0);
-    expect(registry.bindingFor('conn_primary'), same(binding));
-    expect(registry.removeBinding('conn_primary'), same(binding));
-    expect(registry.bindingFor('conn_primary'), isNull);
+    expect(registry.bindingFor('lane_primary'), same(binding));
+    expect(registry.removeBinding('lane_primary'), same(binding));
+    expect(registry.bindingFor('lane_primary'), isNull);
   });
 }
 
@@ -81,6 +81,7 @@ _buildBinding() {
     savedProfile: savedProfile,
   );
   final binding = ConnectionLaneBinding(
+    laneId: 'lane_primary',
     connectionId: 'conn_primary',
     profileStore: ConnectionScopedProfileStore(
       connectionId: 'conn_primary',
