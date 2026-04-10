@@ -15,7 +15,7 @@ Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   if (!terminal.isRunning &&
       !terminal.isWaiting &&
       (terminal.hasTerminalOutput ||
-          terminal.outputState != ChatWorkLogTerminalOutputState.unknown)) {
+          terminal.outputState == ChatWorkLogTerminalOutputState.empty)) {
     return terminal;
   }
 

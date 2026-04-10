@@ -25,9 +25,7 @@ abstract final class TranscriptCommandAuditSnapshot {
     _carryForward(next, existingSnapshot, key: 'command');
     _carryForward(next, existingSnapshot, key: 'processId');
     _carryForward(next, existingSnapshot, key: 'process_id');
-    if (status != TranscriptRuntimeItemStatus.inProgress) {
-      _carryForwardTerminalInput(next, existingSnapshot);
-    }
+    _carryForwardTerminalInput(next, existingSnapshot);
 
     final exitCode =
         exitCodeValue(eventSnapshot) ?? exitCodeValue(existingSnapshot);
@@ -170,7 +168,7 @@ abstract final class TranscriptCommandAuditSnapshot {
     }
 
     final stdin = existingSnapshot['stdin'];
-    if (stdin is String && stdin.isNotEmpty) {
+    if (stdin is String) {
       next['stdin'] = stdin;
     }
   }
@@ -197,6 +195,9 @@ abstract final class TranscriptCommandAuditSnapshot {
     required bool hasStderr,
   }) {
     if (!hasStdout && !hasStderr) {
+      return null;
+    }
+    if ((hasStdout && stdout == null) || (hasStderr && stderr == null)) {
       return null;
     }
 

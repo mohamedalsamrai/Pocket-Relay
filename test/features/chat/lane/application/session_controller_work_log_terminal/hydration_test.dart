@@ -157,6 +157,62 @@ void main() {
   );
 
   test(
+    'hydrateWorkLogTerminal rereads history when terminal output is marked uncaptured',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_uncaptured'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_uncaptured',
+              turns: <CodexAppServerHistoryTurn>[
+                CodexAppServerHistoryTurn(
+                  id: 'turn_uncaptured',
+                  status: 'completed',
+                  items: <CodexAppServerHistoryItem>[
+                    CodexAppServerHistoryItem(
+                      id: 'command_uncaptured',
+                      type: 'commandExecution',
+                      status: 'completed',
+                      raw: <String, dynamic>{
+                        'id': 'command_uncaptured',
+                        'type': 'commandExecution',
+                        'status': 'completed',
+                        'command': 'pwd',
+                        'aggregatedOutput': '/repo\n',
+                        'exitCode': 0,
+                      },
+                    ),
+                  ],
+                  raw: <String, dynamic>{
+                    'id': 'turn_uncaptured',
+                    'status': 'completed',
+                  },
+                ),
+              ],
+            );
+      final controller = buildWorkLogTerminalSessionController(
+        appServerClient: appServerClient,
+      );
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_uncaptured',
+          activityLabel: 'Ran command',
+          commandText: 'pwd',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_uncaptured',
+          threadId: 'thread_uncaptured',
+          turnId: 'turn_uncaptured',
+          outputState: ChatWorkLogTerminalOutputState.uncaptured,
+        ),
+      );
+
+      expect(appServerClient.readThreadCalls, <String>['thread_uncaptured']);
+      expect(hydrated.terminalOutput, '/repo\n');
+    },
+  );
+
+  test(
     'hydrateWorkLogTerminal ignores active items from a different turn id',
     () async {
       final appServerClient = FakeCodexAppServerClient()
