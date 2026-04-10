@@ -1,3 +1,5 @@
+import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
+
 import 'root_adapter_test_support.dart';
 
 void main() {
@@ -117,6 +119,217 @@ void main() {
         'Hello Codex',
       );
       expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'clears the submitted draft immediately and prevents duplicate resend while the send is in flight',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.sentMessages, <String>['Hello Codex']);
+      expect(overlayDelegate.transientFeedbackMessages, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'keeps newly typed text when an earlier in-flight send later fails',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      await tester.enterText(composerField, 'Follow-up text');
+      await tester.pump();
+
+      appServerClient.sendUserMessageError = StateError('transport broke');
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.sentMessages, isEmpty);
+      expect(
+        tester.widget<TextField>(composerField).controller?.text,
+        'Follow-up text',
+      );
+      expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'restores the latest failed draft without letting an earlier failed send repopulate stale text',
+    (tester) async {
+      final sendGateA = Completer<void>();
+      final sendGateB = Completer<void>();
+      final agentAdapterClient = _SequencedSendFakeAgentAdapterClient(
+        sendGates: <Completer<void>>[sendGateA, sendGateB],
+        sendOutcomes: <Object?>[
+          StateError('first send failed'),
+          StateError('second send failed'),
+        ],
+      );
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      addTearDown(agentAdapterClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          agentAdapterClient: agentAdapterClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+
+      await tester.enterText(composerField, 'First prompt');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      await tester.enterText(composerField, 'Second prompt');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      sendGateA.complete();
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      sendGateB.complete();
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<TextField>(composerField).controller?.text,
+        'Second prompt',
+      );
+      expect(overlayDelegate.transientFeedbackMessages, hasLength(2));
+    },
+  );
+
+  testWidgets(
+    'restores the failed draft even if the widget unmounts while the send is in flight',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      final laneBinding = buildLaneBinding(
+        appServerClient: appServerClient,
+        savedProfile: testSavedProfile(),
+      );
+      addTearDown(() async {
+        laneBinding.dispose();
+        await appServerClient.close();
+      });
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          laneBinding: laneBinding,
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox());
+
+      appServerClient.sendUserMessageError = StateError('transport broke');
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(laneBinding.composerDraftHost.draft.text, 'Hello Codex');
+    },
+  );
+
+  testWidgets(
+    'does not restore into a disposed lane binding when an in-flight send later fails',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      final laneBinding = buildLaneBinding(
+        appServerClient: appServerClient,
+        savedProfile: testSavedProfile(),
+      );
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          laneBinding: laneBinding,
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox());
+      laneBinding.dispose();
+
+      appServerClient.sendUserMessageError = StateError('transport broke');
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(laneBinding.composerDraftHost.isDisposed, isTrue);
     },
   );
 
@@ -388,4 +601,45 @@ void main() {
       expect(find.byType(FlutterChatComposerRegion), findsOneWidget);
     },
   );
+}
+
+final class _SequencedSendFakeAgentAdapterClient extends FakeAgentAdapterClient {
+  _SequencedSendFakeAgentAdapterClient({
+    required this.sendGates,
+    required this.sendOutcomes,
+  });
+
+  final List<Completer<void>> sendGates;
+  final List<Object?> sendOutcomes;
+
+  @override
+  Future<AgentAdapterTurn> sendUserMessage({
+    required String threadId,
+    String? text,
+    AgentAdapterTurnInput? input,
+    String? model,
+    AgentAdapterReasoningEffort? effort,
+  }) async {
+    if (sendGates.isNotEmpty) {
+      final gate = sendGates.removeAt(0);
+      if (!gate.isCompleted) {
+        await gate.future;
+      }
+    }
+
+    if (sendOutcomes.isNotEmpty) {
+      final outcome = sendOutcomes.removeAt(0);
+      if (outcome != null) {
+        throw outcome;
+      }
+    }
+
+    return super.sendUserMessage(
+      threadId: threadId,
+      text: text,
+      input: input,
+      model: model,
+      effort: effort,
+    );
+  }
 }
