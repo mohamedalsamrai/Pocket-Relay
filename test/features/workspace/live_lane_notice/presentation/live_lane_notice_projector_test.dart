@@ -186,4 +186,34 @@ void main() {
       expect(contract.entries.single.tone, LiveLaneNoticeTone.warning);
     },
   );
+
+  test(
+    'projector keeps transport-loss warning when the loss happened before backgrounding',
+    () {
+      final contract = projector.project(
+        supportsFiniteBackgroundGrace: true,
+        liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.transportLost,
+        transportRecoveryPhase: ConnectionWorkspaceTransportRecoveryPhase.lost,
+        recoveryDiagnostics: ConnectionWorkspaceRecoveryDiagnostics(
+          lastBackgroundedAt: DateTime.utc(2026, 4, 10, 3, 0, 2),
+          lastBackgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+          lastResumedAt: DateTime.utc(2026, 4, 10, 3, 0, 4),
+          lastTransportLossAt: DateTime.utc(2026, 4, 10, 3, 0, 1),
+        ),
+        remoteRuntime: null,
+        turnLivenessAssessment: null,
+        recoveryLoadWarning: null,
+        deviceContinuityWarnings:
+            const ConnectionWorkspaceDeviceContinuityWarnings(),
+        historicalConversationRestoreState: null,
+        conversationRecoveryState: null,
+      );
+
+      expect(contract, isNotNull);
+      expect(contract!.entries, hasLength(1));
+      expect(contract.entries.single.key, 'transport_lost');
+      expect(contract.entries.single.tone, LiveLaneNoticeTone.warning);
+    },
+  );
 }

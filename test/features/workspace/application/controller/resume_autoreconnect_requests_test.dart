@@ -22,26 +22,10 @@ void main() {
         'conn_primary': <FakeCodexAppServerClient>[],
         'conn_secondary': <FakeCodexAppServerClient>[],
       };
-      final controller = ConnectionWorkspaceController(
-        connectionRepository: repository,
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
         recoveryStore: MemoryConnectionWorkspaceRecoveryStore(),
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient();
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
-          );
-        },
+        clientsByConnectionId: clientsByConnectionId,
       );
       addTearDown(() async {
         controller.dispose();
@@ -90,26 +74,12 @@ void main() {
         'conn_primary': <FakeCodexAppServerClient>[],
         'conn_secondary': <FakeCodexAppServerClient>[],
       };
-      final controller = ConnectionWorkspaceController(
-        connectionRepository: repository,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..threadHistoriesById['thread_123'] = savedConversationThread(
-              threadId: 'thread_123',
-            );
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
+        clientsByConnectionId: clientsByConnectionId,
+        configureClient: (client, _) {
+          client.threadHistoriesById['thread_123'] = savedConversationThread(
+            threadId: 'thread_123',
           );
         },
       );
@@ -213,27 +183,13 @@ void main() {
       final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
         'conn_primary': <FakeCodexAppServerClient>[],
       };
-      final controller = ConnectionWorkspaceController(
-        connectionRepository: repository,
+      final controller = buildWorkspaceControllerWithTrackedClients(
+        repository: repository,
+        clientsByConnectionId: clientsByConnectionId,
         recoveryPersistenceDebounceDuration: Duration.zero,
-        laneBindingFactory: ({required connectionId, required connection}) {
-          final appServerClient = FakeCodexAppServerClient()
-            ..threadHistoriesById['thread_123'] = savedConversationThread(
-              threadId: 'thread_123',
-            );
-          clientsByConnectionId[connectionId]!.add(appServerClient);
-          return ConnectionLaneBinding(
-            connectionId: connectionId,
-            profileStore: ConnectionScopedProfileStore(
-              connectionId: connectionId,
-              connectionRepository: repository,
-            ),
-            appServerClient: appServerClient,
-            initialSavedProfile: SavedProfile(
-              profile: connection.profile,
-              secrets: connection.secrets,
-            ),
-            ownsAppServerClient: false,
+        configureClient: (client, _) {
+          client.threadHistoriesById['thread_123'] = savedConversationThread(
+            threadId: 'thread_123',
           );
         },
       );
@@ -253,7 +209,9 @@ void main() {
       final reconnectGate = Completer<void>();
       clientsByConnectionId['conn_primary']!.first.connectGate = reconnectGate;
 
-      await controller.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.inactive,
+      );
       await controller.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       final backgroundedDiagnostics = controller.state.recoveryDiagnosticsFor(
@@ -280,7 +238,8 @@ void main() {
         'conn_primary',
       );
       expect(reconnectingDiagnostics, isNotNull);
-      expect(reconnectingDiagnostics!.lastBackgroundedLifecycleState, isNull);
+      expect(reconnectingDiagnostics!.lastBackgroundedAt, isNotNull);
+      expect(reconnectingDiagnostics.lastBackgroundedLifecycleState, isNull);
       expect(reconnectingDiagnostics.lastResumedAt, isNotNull);
       expect(
         reconnectingDiagnostics.lastRecoveryOrigin,

@@ -202,9 +202,8 @@ class LiveLaneNoticeProjector {
     required ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhase,
     required ConnectionWorkspaceRecoveryDiagnostics? recoveryDiagnostics,
   }) {
-    final isTransportRecoveryNotice = switch (
-      liveReattachPhase ?? transportRecoveryPhase
-    ) {
+    final isTransportRecoveryNotice = switch (liveReattachPhase ??
+        transportRecoveryPhase) {
       ConnectionWorkspaceLiveReattachPhase.transportLost ||
       ConnectionWorkspaceLiveReattachPhase.reconnecting ||
       ConnectionWorkspaceTransportRecoveryPhase.lost ||
@@ -220,11 +219,14 @@ class LiveLaneNoticeProjector {
     final backgroundedAt = recoveryDiagnostics.lastBackgroundedAt;
     final resumedAt = recoveryDiagnostics.lastResumedAt;
     final transportLossAt = recoveryDiagnostics.lastTransportLossAt;
-    if (backgroundedAt == null || resumedAt == null || transportLossAt == null) {
+    if (backgroundedAt == null ||
+        resumedAt == null ||
+        transportLossAt == null) {
       return false;
     }
 
-    return !transportLossAt.isAfter(resumedAt) &&
+    return !transportLossAt.isBefore(backgroundedAt) &&
+        !transportLossAt.isAfter(resumedAt) &&
         !resumedAt.isBefore(backgroundedAt) &&
         resumedAt.difference(backgroundedAt) <=
             briefBackgroundInterruptionThreshold;

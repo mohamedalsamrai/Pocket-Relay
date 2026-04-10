@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/codex_connection_repository.dart';
 import 'package:pocket_relay/src/core/storage/connection_model_catalog_store.dart';
@@ -12,14 +10,9 @@ import 'package:pocket_relay/src/features/chat/lane/presentation/connection_lane
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_client.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_remote_owner.dart';
 import 'package:pocket_relay/src/features/chat/transport/app_server/testing/fake_codex_app_server_client.dart';
-import 'package:pocket_relay/src/features/chat/transcript/domain/chat_historical_conversation_restore_state.dart';
-import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_ui_block.dart';
 import 'package:pocket_relay/src/features/workspace/application/connection_workspace_controller.dart';
 import 'package:pocket_relay/src/features/workspace/domain/connection_workspace_state.dart';
 import 'package:pocket_relay/src/features/workspace/infrastructure/connection_workspace_recovery_store.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 export 'dart:async';
 export 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -120,11 +113,17 @@ ConnectionWorkspaceController buildWorkspaceController({
 ConnectionWorkspaceController buildWorkspaceControllerWithTrackedClients({
   required MemoryCodexConnectionRepository repository,
   required Map<String, List<FakeCodexAppServerClient>> clientsByConnectionId,
+  ConnectionWorkspaceRecoveryStore? recoveryStore,
+  Duration? recoveryPersistenceDebounceDuration,
   void Function(FakeCodexAppServerClient client, String connectionId)?
   configureClient,
 }) {
   return ConnectionWorkspaceController(
     connectionRepository: repository,
+    recoveryStore: recoveryStore,
+    recoveryPersistenceDebounceDuration:
+        recoveryPersistenceDebounceDuration ??
+        const Duration(milliseconds: 250),
     laneBindingFactory: ({required connectionId, required connection}) {
       final appServerClient = FakeCodexAppServerClient();
       configureClient?.call(appServerClient, connectionId);
