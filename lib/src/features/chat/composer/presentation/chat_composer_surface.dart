@@ -40,18 +40,14 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   static const _imageAttachmentPicker = ChatComposerImageAttachmentPicker();
 
   /// Image formats to probe when reading from the clipboard, ordered by
-  /// preference. PNG is first because it is universally supported and is
-  /// synthesised automatically on macOS (from TIFF) and Windows (from DIB).
-  /// TIFF is listed early because it is the native macOS pasteboard format.
-  /// Web only supports PNG via the Async Clipboard API.
+  /// preference. Keep this list aligned with
+  /// [ChatComposerImageAttachmentLoader] support so paste does not select a
+  /// format that the loader must reject.
   static const _clipboardImageFormats = [
     Formats.png,
     Formats.jpeg,
-    Formats.tiff,
     Formats.gif,
     Formats.webp,
-    Formats.heic,
-    Formats.heif,
   ];
   late final TextEditingController _controller;
   late final AtomicPlaceholderTextInputFormatter _placeholderFormatter;
@@ -228,7 +224,9 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
     // Image paste — only when the contract allows image attachments.
     if (_showsLocalImageAttachmentAction) {
-      final format = _clipboardImageFormats.where(reader.canProvide).firstOrNull;
+      final format = _clipboardImageFormats
+          .where(reader.canProvide)
+          .firstOrNull;
       if (format != null) {
         final completer = Completer<Uint8List?>();
         reader.getFile(
@@ -241,8 +239,9 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
         try {
           final file = XFile.fromData(bytes);
-          final imageAttachment =
-              await _imageAttachmentLoader.loadFromXFile(file);
+          final imageAttachment = await _imageAttachmentLoader.loadFromXFile(
+            file,
+          );
           if (!mounted) return;
           _insertImageAttachment(imageAttachment);
         } on ChatComposerImageAttachmentLoadException catch (error) {
