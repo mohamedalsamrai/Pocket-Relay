@@ -445,9 +445,7 @@ void _completeWorkspaceConversationRecoveryAttempt(
       ConnectionWorkspaceRecoveryOutcome.conversationRestoreFailed,
     _ => ConnectionWorkspaceRecoveryOutcome.conversationRestored,
   };
-  if (outcome == ConnectionWorkspaceRecoveryOutcome.conversationRestored) {
-    controller._clearLiveReattachPhase(connectionId);
-  }
+  controller._clearLiveReattachPhase(connectionId);
   controller._completeRecoveryAttempt(
     connectionId,
     completedAt: completedAt,
