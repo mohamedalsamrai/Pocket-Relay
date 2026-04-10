@@ -160,7 +160,7 @@ void main() {
       'input': <Object>[
         <String, Object?>{
           'type': 'image',
-          'image_url': 'data:image/png;base64,aW1hZ2U=',
+          'url': 'data:image/png;base64,aW1hZ2U=',
         },
         <String, Object?>{
           'type': 'text',
