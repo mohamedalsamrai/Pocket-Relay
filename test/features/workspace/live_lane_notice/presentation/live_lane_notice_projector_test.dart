@@ -13,6 +13,7 @@ void main() {
     'projector prioritizes reconnecting over turn liveness while recovery is in flight',
     () {
       final contract = projector.project(
+        supportsFiniteBackgroundGrace: false,
         liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.reconnecting,
         transportRecoveryPhase: null,
         recoveryDiagnostics: null,
@@ -51,6 +52,7 @@ void main() {
     'projector marks finished-while-away as dismissible after visible dwell',
     () {
       final contract = projector.project(
+        supportsFiniteBackgroundGrace: false,
         liveReattachPhase: null,
         transportRecoveryPhase: null,
         recoveryDiagnostics: null,
@@ -90,6 +92,7 @@ void main() {
     'projector omits recovery notices while conversation recovery is active',
     () {
       final contract = projector.project(
+        supportsFiniteBackgroundGrace: false,
         liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.reconnecting,
         transportRecoveryPhase: null,
         recoveryDiagnostics: null,
@@ -112,6 +115,75 @@ void main() {
       );
 
       expect(contract, isNull);
+    },
+  );
+
+  test(
+    'projector coalesces brief finite-background foreground-resume transport loss into reconnecting progress',
+    () {
+      final contract = projector.project(
+        supportsFiniteBackgroundGrace: true,
+        liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.transportLost,
+        transportRecoveryPhase: ConnectionWorkspaceTransportRecoveryPhase.lost,
+        recoveryDiagnostics: ConnectionWorkspaceRecoveryDiagnostics(
+          lastBackgroundedAt: DateTime.utc(2026, 4, 10, 3, 0, 0),
+          lastBackgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+          lastResumedAt: DateTime.utc(2026, 4, 10, 3, 0, 4),
+          lastTransportLossAt: DateTime.utc(2026, 4, 10, 3, 0, 2),
+        ),
+        remoteRuntime: null,
+        turnLivenessAssessment: null,
+        recoveryLoadWarning: null,
+        deviceContinuityWarnings:
+            const ConnectionWorkspaceDeviceContinuityWarnings(),
+        historicalConversationRestoreState: null,
+        conversationRecoveryState: null,
+      );
+
+      expect(contract, isNotNull);
+      expect(contract!.entries, hasLength(1));
+      expect(
+        contract.entries.single,
+        const LiveLaneNoticeEntryContract(
+          key: 'transport_reconnecting',
+          title: ConnectionWorkspaceCopy.reconnectingNoticeTitle,
+          message: ConnectionWorkspaceCopy.reconnectingNoticeMessage,
+          isLoading: true,
+          tone: LiveLaneNoticeTone.informational,
+          icon: Icons.portable_wifi_off_rounded,
+        ),
+      );
+    },
+  );
+
+  test(
+    'projector keeps transport-loss warning for the same state when finite background grace is unavailable',
+    () {
+      final contract = projector.project(
+        supportsFiniteBackgroundGrace: false,
+        liveReattachPhase: ConnectionWorkspaceLiveReattachPhase.transportLost,
+        transportRecoveryPhase: ConnectionWorkspaceTransportRecoveryPhase.lost,
+        recoveryDiagnostics: ConnectionWorkspaceRecoveryDiagnostics(
+          lastBackgroundedAt: DateTime.utc(2026, 4, 10, 3, 0, 0),
+          lastBackgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+          lastResumedAt: DateTime.utc(2026, 4, 10, 3, 0, 4),
+          lastTransportLossAt: DateTime.utc(2026, 4, 10, 3, 0, 2),
+        ),
+        remoteRuntime: null,
+        turnLivenessAssessment: null,
+        recoveryLoadWarning: null,
+        deviceContinuityWarnings:
+            const ConnectionWorkspaceDeviceContinuityWarnings(),
+        historicalConversationRestoreState: null,
+        conversationRecoveryState: null,
+      );
+
+      expect(contract, isNotNull);
+      expect(contract!.entries, hasLength(1));
+      expect(contract.entries.single.key, 'transport_lost');
+      expect(contract.entries.single.tone, LiveLaneNoticeTone.warning);
     },
   );
 }

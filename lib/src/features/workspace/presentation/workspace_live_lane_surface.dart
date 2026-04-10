@@ -116,6 +116,8 @@ class _ConnectionWorkspaceLiveLaneSurfaceState
       widget.laneBinding.connectionId,
     );
     final laneNoticeContract = _liveLaneNoticeProjector.project(
+      supportsFiniteBackgroundGrace:
+          widget.platformPolicy.supportsFiniteBackgroundGrace,
       liveReattachPhase: liveReattachPhase,
       transportRecoveryPhase: transportRecoveryPhase,
       recoveryDiagnostics: recoveryDiagnostics,

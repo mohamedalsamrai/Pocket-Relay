@@ -199,6 +199,100 @@ void main() {
   );
 
   test(
+    'inactive hidden paused resumed keeps brief background reconnect in the foreground-resume path',
+    () async {
+      final repository = MemoryCodexConnectionRepository(
+        initialConnections: <SavedConnection>[
+          SavedConnection(
+            id: 'conn_primary',
+            profile: workspaceProfile('Primary Box', 'primary.local'),
+            secrets: const ConnectionSecrets(password: 'secret-1'),
+          ),
+        ],
+      );
+      final clientsByConnectionId = <String, List<FakeCodexAppServerClient>>{
+        'conn_primary': <FakeCodexAppServerClient>[],
+      };
+      final controller = ConnectionWorkspaceController(
+        connectionRepository: repository,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+        laneBindingFactory: ({required connectionId, required connection}) {
+          final appServerClient = FakeCodexAppServerClient()
+            ..threadHistoriesById['thread_123'] = savedConversationThread(
+              threadId: 'thread_123',
+            );
+          clientsByConnectionId[connectionId]!.add(appServerClient);
+          return ConnectionLaneBinding(
+            connectionId: connectionId,
+            profileStore: ConnectionScopedProfileStore(
+              connectionId: connectionId,
+              connectionRepository: repository,
+            ),
+            appServerClient: appServerClient,
+            initialSavedProfile: SavedProfile(
+              profile: connection.profile,
+              secrets: connection.secrets,
+            ),
+            ownsAppServerClient: false,
+          );
+        },
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClientLists(clientsByConnectionId);
+      });
+
+      await controller.initialize();
+      await controller.selectedLaneBinding!.sessionController
+          .selectConversationForResume('thread_123');
+      await clientsByConnectionId['conn_primary']!.first.connect(
+        profile: ConnectionProfile.defaults(),
+        secrets: const ConnectionSecrets(),
+      );
+
+      final reconnectGate = Completer<void>();
+      clientsByConnectionId['conn_primary']!.first.connectGate = reconnectGate;
+
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await controller.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      final backgroundedDiagnostics = controller.state.recoveryDiagnosticsFor(
+        'conn_primary',
+      );
+      expect(backgroundedDiagnostics, isNotNull);
+      expect(
+        backgroundedDiagnostics!.lastBackgroundedLifecycleState,
+        ConnectionWorkspaceBackgroundLifecycleState.paused,
+      );
+      expect(backgroundedDiagnostics.lastBackgroundedAt, isNotNull);
+
+      clientsByConnectionId['conn_primary']!.first.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final resumeFuture = controller.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final reconnectingDiagnostics = controller.state.recoveryDiagnosticsFor(
+        'conn_primary',
+      );
+      expect(reconnectingDiagnostics, isNotNull);
+      expect(reconnectingDiagnostics!.lastBackgroundedLifecycleState, isNull);
+      expect(reconnectingDiagnostics.lastResumedAt, isNotNull);
+      expect(
+        reconnectingDiagnostics.lastRecoveryOrigin,
+        ConnectionWorkspaceRecoveryOrigin.foregroundResume,
+      );
+
+      reconnectGate.complete();
+      await resumeFuture;
+    },
+  );
+
+  test(
     'resumed auto-reconnect replays pending user input so the lane can still submit it through the workspace path',
     () async {
       const replayedRequest = CodexAppServerRequestEvent(
