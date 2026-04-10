@@ -321,7 +321,7 @@ class _ReviewRowView extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _styleForReviewRow(row.kind, cards);
     final baseTextStyle = _changedFileCodeTextStyle(
-      color: style.foreground,
+      color: syntaxPalette.base,
       fontSize: 12.2,
       height: 1.5,
     );

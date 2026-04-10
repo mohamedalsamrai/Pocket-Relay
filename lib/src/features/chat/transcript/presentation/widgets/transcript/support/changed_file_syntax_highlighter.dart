@@ -48,6 +48,19 @@ class ChangedFileSyntaxPalette {
     required this.variable,
   });
 
+  const ChangedFileSyntaxPalette.changedFileTerminal()
+    : base = const Color(0xFFE5E7EB),
+      comment = const Color(0xFF94A3B8),
+      keyword = const Color(0xFF7DD3FC),
+      string = const Color(0xFF86EFAC),
+      number = const Color(0xFFFBBF24),
+      type = const Color(0xFFC4B5FD),
+      symbol = const Color(0xFFCBD5E1),
+      function = const Color(0xFFF9A8D4),
+      attribute = const Color(0xFF67E8F9),
+      meta = const Color(0xFFA5B4FC),
+      variable = const Color(0xFFFDE68A);
+
   final Color base;
   final Color comment;
   final Color keyword;
@@ -177,8 +190,8 @@ class ChangedFileSyntaxHighlighter {
     required ChangedFileSyntaxPalette palette,
   }) {
     final classes = className?.split(' ') ?? const <String>[];
-    var color = palette.base;
-    var fontStyle = FontStyle.normal;
+    var color = baseStyle.color ?? palette.base;
+    var fontStyle = baseStyle.fontStyle ?? FontStyle.normal;
     var fontWeight = baseStyle.fontWeight ?? FontWeight.w500;
 
     for (final tokenClass in classes) {
@@ -205,9 +218,13 @@ class ChangedFileSyntaxHighlighter {
         continue;
       }
       if (tokenClass == 'type' ||
+          tokenClass == 'class' ||
+          tokenClass == 'class_' ||
+          tokenClass == 'built_in-type' ||
           tokenClass == 'built_in' ||
           tokenClass == 'built_in-name') {
         color = palette.type;
+        fontWeight = FontWeight.w700;
         continue;
       }
       if (tokenClass == 'symbol' || tokenClass == 'link') {
@@ -223,8 +240,13 @@ class ChangedFileSyntaxHighlighter {
       }
       if (tokenClass == 'attr' ||
           tokenClass == 'attribute' ||
+          tokenClass == 'property' ||
+          tokenClass == 'tag' ||
+          tokenClass == 'name' ||
           tokenClass == 'selector-id' ||
-          tokenClass == 'selector-class') {
+          tokenClass == 'selector-class' ||
+          tokenClass == 'selector-attr' ||
+          tokenClass == 'selector-pseudo') {
         color = palette.attribute;
         continue;
       }
@@ -235,9 +257,16 @@ class ChangedFileSyntaxHighlighter {
         continue;
       }
       if (tokenClass == 'variable' ||
+          tokenClass == 'constant' ||
+          tokenClass == 'variable.constant_' ||
+          tokenClass == 'variable.language_' ||
           tokenClass == 'template-variable' ||
           tokenClass == 'params') {
         color = palette.variable;
+        continue;
+      }
+      if (tokenClass == 'operator' || tokenClass == 'punctuation') {
+        color = palette.symbol;
       }
     }
 

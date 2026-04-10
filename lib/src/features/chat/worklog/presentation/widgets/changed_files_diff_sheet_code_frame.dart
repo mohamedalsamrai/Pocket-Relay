@@ -21,25 +21,7 @@ class _DiffCodeFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final syntaxPalette = ChangedFileSyntaxPalette(
-      base: cards.terminalText,
-      comment: cards.textMuted,
-      keyword: cards.isDark ? const Color(0xFFB8D1F4) : const Color(0xFF93C5FD),
-      string: cards.isDark ? const Color(0xFFA5E4D8) : const Color(0xFF6EE7B7),
-      number: cards.isDark ? const Color(0xFFF6D28F) : const Color(0xFFFCD34D),
-      type: cards.isDark ? const Color(0xFFD5CAF8) : const Color(0xFFC4B5FD),
-      symbol: cards.textSecondary,
-      function: cards.isDark
-          ? const Color(0xFFE9D8A6)
-          : const Color(0xFFFDE68A),
-      attribute: cards.isDark
-          ? const Color(0xFFC7D2E5)
-          : const Color(0xFFBFDBFE),
-      meta: cards.textSecondary,
-      variable: cards.isDark
-          ? const Color(0xFFF3D38E)
-          : const Color(0xFFFCD34D),
-    );
+    const syntaxPalette = ChangedFileSyntaxPalette.changedFileTerminal();
     final shouldShowRawPatch = showRawPatch || review.isEmpty;
     final canToggleRawPatch = diff.lines.isNotEmpty && !review.isEmpty;
 

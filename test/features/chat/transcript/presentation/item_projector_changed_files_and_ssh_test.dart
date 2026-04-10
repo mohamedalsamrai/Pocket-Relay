@@ -139,6 +139,32 @@ void main() {
       expect(row.diff?.lines.last.kind, ChatChangedFileDiffLineKind.meta);
     });
 
+    test('maps Rhai files through the Rust highlighting path', () {
+      final block = TranscriptChangedFilesBlock(
+        id: 'changed_files_rhai_1',
+        createdAt: DateTime(2026, 3, 15, 12),
+        title: 'Changed files',
+        files: const <TranscriptChangedFile>[
+          TranscriptChangedFile(path: 'scripts/demo.rhai', additions: 1),
+        ],
+        unifiedDiff:
+            'diff --git a/scripts/demo.rhai b/scripts/demo.rhai\n'
+            '--- a/scripts/demo.rhai\n'
+            '+++ b/scripts/demo.rhai\n'
+            '@@ -1 +1 @@\n'
+            '-fn demo() { 0 }\n'
+            '+fn demo() { 1 }\n',
+      );
+
+      final item = projector.project(block) as ChatChangedFilesItemContract;
+      final row = item.rows.single;
+
+      expect(row.languageLabel, 'Rust');
+      expect(row.syntaxLanguage, 'rust');
+      expect(row.diff?.languageLabel, 'Rust');
+      expect(row.diff?.syntaxLanguage, 'rust');
+    });
+
     test('projects SSH transcript blocks into SSH item contracts', () {
       final block = TranscriptSshConnectFailedBlock(
         id: 'ssh_connect_failed_1',

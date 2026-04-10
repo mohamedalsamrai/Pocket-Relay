@@ -49,7 +49,7 @@ class _RawDiffLineView extends StatelessWidget {
     final style = _styleForDiffLine(line.kind, cards);
     final lineDisplay = _DiffLineDisplay.fromContract(line);
     final baseTextStyle = _changedFileCodeTextStyle(
-      color: style.foreground,
+      color: syntaxPalette.base,
       fontSize: 12.2,
       height: 1.45,
       fontWeight: style.fontWeight,

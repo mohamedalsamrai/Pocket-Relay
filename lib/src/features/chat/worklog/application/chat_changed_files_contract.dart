@@ -295,6 +295,10 @@ _extensionSyntaxMap = <String, _ChangedFileSyntaxDescriptor>{
     highlightLanguage: 'python',
   ),
   '.rb': _ChangedFileSyntaxDescriptor(label: 'Ruby', highlightLanguage: 'ruby'),
+  '.rhai': _ChangedFileSyntaxDescriptor(
+    label: 'Rust',
+    highlightLanguage: 'rust',
+  ),
   '.rs': _ChangedFileSyntaxDescriptor(label: 'Rust', highlightLanguage: 'rust'),
   '.scss': _ChangedFileSyntaxDescriptor(
     label: 'SCSS',
