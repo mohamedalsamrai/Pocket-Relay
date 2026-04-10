@@ -161,40 +161,37 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
   Future<void> _handleAttachImageTriggered() async {
     try {
-        final imageAttachment = await _pickImageAttachment();
-      if (!mounted || imageAttachment == null) {
-        return;
-      }
-
-      _draft = _draft.copyWith(text: _controller.text).normalized();
-      final currentSelection = _controller.selection;
-      final insertion = _draft.insertImageAttachment(
-        attachment: imageAttachment,
-        selectionStart: currentSelection.start,
-        selectionEnd: currentSelection.end,
-      );
-      _draft = insertion.draft;
-      _controller.value = _controller.value.copyWith(
-        text: _draft.text,
-        selection: TextSelection.collapsed(offset: insertion.selectionOffset),
-        composing: TextRange.empty,
-      );
-      setState(() {});
-      widget.onChanged(_draft);
+      final imageAttachment = await _pickImageAttachment();
+      if (!mounted || imageAttachment == null) return;
+      _insertImageAttachment(imageAttachment);
     } on ChatComposerImageAttachmentLoadException catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       _showTransientError(error.userFacingError);
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       _showTransientError(
         ChatComposerImageAttachmentErrors.unexpected(),
         underlyingError: error,
       );
     }
+  }
+
+  void _insertImageAttachment(ChatComposerImageAttachment imageAttachment) {
+    _draft = _draft.copyWith(text: _controller.text).normalized();
+    final currentSelection = _controller.selection;
+    final insertion = _draft.insertImageAttachment(
+      attachment: imageAttachment,
+      selectionStart: currentSelection.start,
+      selectionEnd: currentSelection.end,
+    );
+    _draft = insertion.draft;
+    _controller.value = _controller.value.copyWith(
+      text: _draft.text,
+      selection: TextSelection.collapsed(offset: insertion.selectionOffset),
+      composing: TextRange.empty,
+    );
+    setState(() {});
+    widget.onChanged(_draft);
   }
 
   void _showTransientMessage(String message) {
@@ -229,50 +226,45 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
     final reader = await clipboard.read();
 
-    final format = _clipboardImageFormats
-        .where(reader.canProvide)
-        .firstOrNull;
-    if (format == null) return;
+    // Image paste — only when the contract allows image attachments.
+    if (_showsLocalImageAttachmentAction) {
+      final format = _clipboardImageFormats.where(reader.canProvide).firstOrNull;
+      if (format != null) {
+        final completer = Completer<Uint8List?>();
+        reader.getFile(
+          format,
+          (file) async => completer.complete(await file.readAll()),
+          onError: (_) => completer.complete(null),
+        );
+        final bytes = await completer.future;
+        if (!mounted || bytes == null) return;
 
-    final completer = Completer<Uint8List?>();
-    reader.getFile(
-      format,
-      (file) async => completer.complete(await file.readAll()),
-      onError: (_) => completer.complete(null),
-    );
-    final bytes = await completer.future;
+        try {
+          final file = XFile.fromData(bytes);
+          final imageAttachment =
+              await _imageAttachmentLoader.loadFromXFile(file);
+          if (!mounted) return;
+          _insertImageAttachment(imageAttachment);
+        } on ChatComposerImageAttachmentLoadException catch (error) {
+          if (!mounted) return;
+          _showTransientError(error.userFacingError);
+        } catch (error) {
+          if (!mounted) return;
+          _showTransientError(
+            ChatComposerImageAttachmentErrors.unexpected(),
+            underlyingError: error,
+          );
+        }
+        return;
+      }
+    }
 
-    if (!mounted || bytes == null) return;
-
-    try {
-      final file = XFile.fromData(bytes);
-      final imageAttachment = await _imageAttachmentLoader.loadFromXFile(file);
-      if (!mounted) return;
-
-      _draft = _draft.copyWith(text: _controller.text).normalized();
-      final currentSelection = _controller.selection;
-      final insertion = _draft.insertImageAttachment(
-        attachment: imageAttachment,
-        selectionStart: currentSelection.start,
-        selectionEnd: currentSelection.end,
-      );
-      _draft = insertion.draft;
-      _controller.value = _controller.value.copyWith(
-        text: _draft.text,
-        selection: TextSelection.collapsed(offset: insertion.selectionOffset),
-        composing: TextRange.empty,
-      );
-      setState(() {});
-      widget.onChanged(_draft);
-    } on ChatComposerImageAttachmentLoadException catch (error) {
-      if (!mounted) return;
-      _showTransientError(error.userFacingError);
-    } catch (error) {
-      if (!mounted) return;
-      _showTransientError(
-        ChatComposerImageAttachmentErrors.unexpected(),
-        underlyingError: error,
-      );
+    // Text fallback — mirrors TextField's built-in paste behaviour.
+    if (reader.canProvide(Formats.plainText)) {
+      final text = await reader.readValue(Formats.plainText);
+      if (text != null && mounted) {
+        _insertTextAtSelection(text);
+      }
     }
   }
 
