@@ -141,3 +141,37 @@ class FakeFlutterSecureStorage extends FlutterSecureStorage {
     data.remove(key);
   }
 }
+
+final class ThrowingReadFakeFlutterSecureStorage
+    extends FakeFlutterSecureStorage {
+  ThrowingReadFakeFlutterSecureStorage(
+    super.data, {
+    required this.keyToThrowOn,
+  });
+
+  final String keyToThrowOn;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == keyToThrowOn) {
+      throw StateError('secure storage read failed');
+    }
+    return super.read(
+      key: key,
+      iOptions: iOptions,
+      aOptions: aOptions,
+      lOptions: lOptions,
+      webOptions: webOptions,
+      mOptions: mOptions,
+      wOptions: wOptions,
+    );
+  }
+}

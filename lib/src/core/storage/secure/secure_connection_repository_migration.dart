@@ -11,6 +11,55 @@ Future<void> ensureSecureCatalogsReady(SecureConnectionRepositoryState state) {
   return state.normalizedCatalogsReady ??= secureMigrateCatalogsIfNeeded(state);
 }
 
+Future<void> materializeDeferredLegacyCatalogSnapshotForWrite(
+  SecureConnectionRepositoryState state,
+) async {
+  await ensureSecureCatalogsReady(state);
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  if (deferredLegacyCatalog == null) {
+    return;
+  }
+
+  for (final systemId in deferredLegacyCatalog.systemCatalog.orderedSystemIds) {
+    final system = deferredLegacyCatalog.systemsById[systemId];
+    if (system == null) {
+      continue;
+    }
+    await persistSystemProfile(
+      state,
+      systemId: systemId,
+      profile: system.profile,
+    );
+    await persistSystemSecrets(state, system);
+  }
+  for (final workspaceId
+      in deferredLegacyCatalog.workspaceCatalog.orderedWorkspaceIds) {
+    final workspace = deferredLegacyCatalog.workspacesById[workspaceId];
+    if (workspace == null) {
+      continue;
+    }
+    await persistWorkspaceProfile(
+      state,
+      workspaceId: workspaceId,
+      profile: workspace.profile,
+    );
+  }
+  await persistOrderedIds(
+    state.preferences,
+    indexKey: workspaceCatalogIndexKey,
+    schemaVersion: workspaceCatalogSchemaVersion,
+    orderedIds: deferredLegacyCatalog.workspaceCatalog.orderedWorkspaceIds,
+  );
+  await persistOrderedIds(
+    state.preferences,
+    indexKey: systemCatalogIndexKey,
+    schemaVersion: systemCatalogSchemaVersion,
+    orderedIds: deferredLegacyCatalog.systemCatalog.orderedSystemIds,
+  );
+  _clearDeferredLegacyCatalogSnapshot(state);
+  await _clearDeferredLegacySingletonWorkspaceId(state);
+}
+
 Future<void> secureMigrateCatalogsIfNeeded(
   SecureConnectionRepositoryState state,
 ) async {
@@ -96,7 +145,7 @@ Future<void> secureMigrateCatalogsIfNeeded(
     await migrateLegacyConnectionsIntoSplitStorage(
       state,
       legacyConnections: legacySingletonConnection == null
-          ? <SavedConnection>[seededConnection.copyWith(id: seededConnectionId)]
+          ? <SavedConnection>[seededConnection]
           : legacyConnectionsResult.connections,
     );
     _clearDeferredLegacyCatalogSnapshot(state);
@@ -255,17 +304,8 @@ _loadLegacyConnectionsForMigration(
 
     if (pendingSingletonUpgrade != null &&
         summary.profile == ConnectionProfile.defaults()) {
-      final migratedConnection = pendingSingletonUpgrade.copyWith(
-        id: connectionId,
-      );
-      if (migratedConnection.profile == pendingSingletonUpgrade.profile &&
-          connectionSecretsEqual(
-            migratedConnection.secrets,
-            pendingSingletonUpgrade.secrets,
-          )) {
-        pendingSingletonUpgrade = null;
-      }
-      legacyConnections.add(migratedConnection);
+      legacyConnections.add(pendingSingletonUpgrade.copyWith(id: connectionId));
+      pendingSingletonUpgrade = null;
       continue;
     }
 

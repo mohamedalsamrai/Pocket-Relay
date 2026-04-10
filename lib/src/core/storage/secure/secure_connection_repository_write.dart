@@ -65,7 +65,7 @@ Future<void> secureSaveWorkspace(
   SecureConnectionRepositoryState state,
   SavedWorkspace workspace,
 ) async {
-  await ensureSecureCatalogsReady(state);
+  await materializeDeferredLegacyCatalogSnapshotForWrite(state);
   final normalizedWorkspace = normalizeWorkspace(workspace);
   final catalog = await secureLoadWorkspaceCatalog(state);
   final exists = catalog.workspaceForId(normalizedWorkspace.id) != null;
@@ -90,7 +90,7 @@ Future<void> secureSaveSystem(
   SecureConnectionRepositoryState state,
   SavedSystem system,
 ) async {
-  await ensureSecureCatalogsReady(state);
+  await materializeDeferredLegacyCatalogSnapshotForWrite(state);
   final normalizedSystem = normalizeSystem(system);
   final catalog = await secureLoadSystemCatalog(state);
   final exists = catalog.systemForId(normalizedSystem.id) != null;
@@ -123,7 +123,7 @@ Future<void> secureDeleteWorkspace(
   SecureConnectionRepositoryState state,
   String workspaceId,
 ) async {
-  await ensureSecureCatalogsReady(state);
+  await materializeDeferredLegacyCatalogSnapshotForWrite(state);
   final normalizedWorkspaceId = requireConnectionId(workspaceId);
   final catalog = await secureLoadWorkspaceCatalog(state);
   if (catalog.workspaceForId(normalizedWorkspaceId) == null) {
@@ -148,7 +148,7 @@ Future<void> secureDeleteSystem(
   SecureConnectionRepositoryState state,
   String systemId,
 ) async {
-  await ensureSecureCatalogsReady(state);
+  await materializeDeferredLegacyCatalogSnapshotForWrite(state);
   final normalizedSystemId = requireSystemId(systemId);
   final systemCatalog = await secureLoadSystemCatalog(state);
   if (systemCatalog.systemForId(normalizedSystemId) == null) {
@@ -189,6 +189,7 @@ Future<void> securePersistResolvedConnection(
   SecureConnectionRepositoryState state,
   SavedConnection connection,
 ) async {
+  await materializeDeferredLegacyCatalogSnapshotForWrite(state);
   final normalizedConnection = normalizeConnection(connection);
   SavedWorkspace? existingWorkspace;
   try {

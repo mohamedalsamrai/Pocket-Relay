@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/secure/secure_connection_repository_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/connection_repository_test_support.dart';
@@ -169,4 +172,83 @@ void main() {
       isNotNull,
     );
   });
+
+  test(
+    'saveConnection materializes deferred legacy entries before writing an explicit split index',
+    () async {
+      final primaryProfile = ConnectionProfile.defaults().copyWith(
+        label: 'Primary Box',
+        host: 'primary.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/primary',
+      );
+      final secondaryProfile = ConnectionProfile.defaults().copyWith(
+        label: 'Secondary Box',
+        host: 'secondary.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/secondary',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.connections.index': jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_primary', 'conn_secondary'],
+        }),
+        'pocket_relay.connection.conn_primary.profile': jsonEncode(
+          primaryProfile.toJson(),
+        ),
+        'pocket_relay.connection.conn_secondary.profile': jsonEncode(
+          secondaryProfile.toJson(),
+        ),
+      });
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{
+          passwordKeyForConnection('conn_primary'): 'primary-secret',
+          passwordKeyForConnection('conn_secondary'): 'secondary-secret',
+        },
+        keyToThrowOn: passwordKeyForConnection('conn_secondary'),
+      );
+      final preferences = SharedPreferencesAsync();
+      var nextSystemId = 0;
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+        systemIdGenerator: () =>
+            <String>['system_primary', 'system_secondary'][nextSystemId++],
+      );
+
+      final initialCatalog = await repository.loadCatalog();
+
+      await repository.saveConnection(
+        SavedConnection(
+          id: 'conn_primary',
+          profile: primaryProfile.copyWith(label: 'Primary Updated'),
+          secrets: const ConnectionSecrets(password: 'primary-secret'),
+        ),
+      );
+
+      final persistedCatalog = await repository.loadCatalog();
+      final untouchedConnection = await repository.loadConnection(
+        'conn_secondary',
+      );
+
+      expect(initialCatalog.orderedConnectionIds, <String>[
+        'conn_primary',
+        'conn_secondary',
+      ]);
+      expect(persistedCatalog.orderedConnectionIds, <String>[
+        'conn_primary',
+        'conn_secondary',
+      ]);
+      expect(untouchedConnection.profile.label, 'Secondary Box');
+      expect(
+        await preferences.getString(workspaceProfileKey('conn_secondary')),
+        isNotNull,
+      );
+      expect(
+        await preferences.getString(systemProfileKey('system_secondary')),
+        isNotNull,
+      );
+    },
+  );
 }

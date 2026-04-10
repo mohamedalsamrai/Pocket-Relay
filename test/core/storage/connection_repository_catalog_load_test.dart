@@ -609,7 +609,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{'pocket_relay.secret.password': 'secret'},
         keyToThrowOn: 'pocket_relay.secret.password',
       );
@@ -678,7 +678,7 @@ void main() {
           ConnectionProfile.defaults().toJson(),
         ),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{'pocket_relay.secret.password': 'secret'},
         keyToThrowOn: 'pocket_relay.secret.password',
       );
@@ -719,7 +719,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{'pocket_relay.secret.password': 'secret'},
         keyToThrowOn: 'pocket_relay.secret.private_key_passphrase',
       );
@@ -758,7 +758,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{'pocket_relay.secret.password': 'secret'},
         keyToThrowOn: 'pocket_relay.secret.password',
       );
@@ -801,7 +801,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{
         'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{'pocket_relay.secret.password': 'secret'},
         keyToThrowOn: 'pocket_relay.secret.password',
       );
@@ -850,7 +850,7 @@ void main() {
           legacyProfile.toJson(),
         ),
       });
-      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
         <String, String>{passwordKeyForConnection('conn_seed'): 'secret'},
         keyToThrowOn: passwordKeyForConnection('conn_seed'),
       );
@@ -941,38 +941,4 @@ void main() {
       );
     },
   );
-}
-
-final class _ThrowingReadFakeFlutterSecureStorage
-    extends FakeFlutterSecureStorage {
-  _ThrowingReadFakeFlutterSecureStorage(
-    super.data, {
-    required this.keyToThrowOn,
-  });
-
-  final String keyToThrowOn;
-
-  @override
-  Future<String?> read({
-    required String key,
-    AppleOptions? iOptions,
-    AndroidOptions? aOptions,
-    LinuxOptions? lOptions,
-    WebOptions? webOptions,
-    AppleOptions? mOptions,
-    WindowsOptions? wOptions,
-  }) async {
-    if (key == keyToThrowOn) {
-      throw StateError('secure storage read failed');
-    }
-    return super.read(
-      key: key,
-      iOptions: iOptions,
-      aOptions: aOptions,
-      lOptions: lOptions,
-      webOptions: webOptions,
-      mOptions: mOptions,
-      wOptions: wOptions,
-    );
-  }
 }
