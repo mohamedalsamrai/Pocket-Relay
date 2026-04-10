@@ -25,16 +25,12 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
         binding.sessionController.sessionState.rootThreadId ??
         binding.sessionController.historicalConversationRestoreState?.threadId,
   );
-  final isLifecyclePersistenceFlush =
-      backgroundedAt != null || backgroundedLifecycleState != null;
   final shouldRetainColdStartRecoveryThread =
       controller._state.requiresTransportReconnect(selectedConnectionId) &&
       diagnostics?.lastRecoveryOrigin ==
           ConnectionWorkspaceRecoveryOrigin.coldStart &&
       !binding.sessionController.suppressesTrackedThreadReuse &&
-      diagnostics?.lastRecoveryStartedAt != null &&
-      (diagnostics?.lastRecoveryCompletedAt == null ||
-          isLifecyclePersistenceFlush);
+      diagnostics?.lastRecoveryStartedAt != null;
   if (selectedThreadId == null &&
       shouldRetainColdStartRecoveryThread) {
     final latestRecoverySnapshot =
