@@ -197,31 +197,6 @@ final class ThrowingRemoteHostProbe implements CodexRemoteAppServerHostProbe {
   }
 }
 
-final class FakeRemoteOwnerInspector
-    implements CodexRemoteAppServerOwnerInspector {
-  const FakeRemoteOwnerInspector(this.snapshot);
-
-  final CodexRemoteAppServerOwnerSnapshot snapshot;
-
-  @override
-  Future<CodexRemoteAppServerOwnerSnapshot> inspectOwner({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-    required String ownerId,
-    required String workspaceDir,
-  }) async {
-    return snapshot;
-  }
-
-  @override
-  Future<CodexRemoteAppServerHostCapabilities> probeHostCapabilities({
-    required ConnectionProfile profile,
-    required ConnectionSecrets secrets,
-  }) async {
-    return const CodexRemoteAppServerHostCapabilities();
-  }
-}
-
 final class StaticRemoteOwnerInspector
     implements CodexRemoteAppServerOwnerInspector {
   const StaticRemoteOwnerInspector(this.snapshot);
