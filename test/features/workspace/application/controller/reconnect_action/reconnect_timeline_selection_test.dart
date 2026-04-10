@@ -113,10 +113,7 @@ void main() {
         'thread_saved',
         'thread_saved',
       ]);
-      expect(
-        controller.state.liveReattachPhaseFor('conn_primary'),
-        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
-      );
+      expect(controller.state.liveReattachPhaseFor('conn_primary'), isNull);
       expect(
         controller.state
             .recoveryDiagnosticsFor('conn_primary')!
