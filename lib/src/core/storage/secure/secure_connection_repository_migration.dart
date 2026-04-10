@@ -42,6 +42,7 @@ Future<void> secureMigrateCatalogsIfNeeded(
       (rawWorkspaceIndex?.trim().isNotEmpty ?? false) ||
       (rawSystemIndex?.trim().isNotEmpty ?? false)) {
     _clearDeferredLegacyCatalogSnapshot(state);
+    await _clearDeferredLegacySingletonWorkspaceId(state);
     await persistOrderedIds(
       state.preferences,
       indexKey: workspaceCatalogIndexKey,
@@ -77,14 +78,16 @@ Future<void> secureMigrateCatalogsIfNeeded(
     return;
   }
   if (legacyCatalog == null || legacyCatalog.isEmpty) {
-    final seededConnectionId = state.workspaceIdGenerator();
+    final seededConnectionId = legacySingletonConnection == null
+        ? state.workspaceIdGenerator()
+        : await _loadOrCreateDeferredLegacySingletonWorkspaceId(state);
     final seededConnection =
         legacySingletonConnection ??
         SavedConnection(
           id: seededConnectionId,
           profile: ConnectionProfile.defaults(),
           secrets: const ConnectionSecrets(),
-        );
+    );
     await migrateLegacyConnectionsIntoSplitStorage(
       state,
       legacyConnections: <SavedConnection>[
@@ -92,6 +95,7 @@ Future<void> secureMigrateCatalogsIfNeeded(
       ],
     );
     _clearDeferredLegacyCatalogSnapshot(state);
+    await _clearDeferredLegacySingletonWorkspaceId(state);
     if (legacySingletonConnection != null &&
         legacySingletonResult.allowCleanup) {
       await deleteLegacySingletonStorage(state);
@@ -133,6 +137,7 @@ Future<void> secureMigrateCatalogsIfNeeded(
     legacyConnections: legacyConnections,
   );
   _clearDeferredLegacyCatalogSnapshot(state);
+  await _clearDeferredLegacySingletonWorkspaceId(state);
   await deleteLegacyConnections(state, legacyCatalog.orderedConnectionIds);
   if (legacySingletonResult.allowCleanup) {
     await deleteLegacySingletonStorage(state);
@@ -250,7 +255,9 @@ Future<List<SavedConnection>> _loadLegacyConnectionsForMigration(
   required SavedConnection legacySingletonConnection,
 }) async {
   if (legacyCatalog == null || legacyCatalog.isEmpty) {
-    final workspaceId = state.workspaceIdGenerator();
+    final workspaceId = await _loadOrCreateDeferredLegacySingletonWorkspaceId(
+      state,
+    );
     return <SavedConnection>[
       legacySingletonConnection.copyWith(id: workspaceId),
     ];
@@ -285,6 +292,31 @@ Future<List<SavedConnection>> _loadLegacyConnectionsForMigration(
     legacyConnections.add(migratedConnection);
   }
   return legacyConnections;
+}
+
+Future<String> _loadOrCreateDeferredLegacySingletonWorkspaceId(
+  SecureConnectionRepositoryState state,
+) async {
+  final persistedId = await state.preferences.getString(
+    deferredLegacySingletonWorkspaceIdKey,
+  );
+  final normalizedPersistedId = persistedId?.trim();
+  if (normalizedPersistedId != null && normalizedPersistedId.isNotEmpty) {
+    return normalizedPersistedId;
+  }
+
+  final workspaceId = state.workspaceIdGenerator();
+  await state.preferences.setString(
+    deferredLegacySingletonWorkspaceIdKey,
+    workspaceId,
+  );
+  return workspaceId;
+}
+
+Future<void> _clearDeferredLegacySingletonWorkspaceId(
+  SecureConnectionRepositoryState state,
+) {
+  return state.preferences.remove(deferredLegacySingletonWorkspaceIdKey);
 }
 
 ({

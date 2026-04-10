@@ -24,6 +24,11 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
   SecureConnectionRepositoryState state,
 ) async {
   await ensureSecureCatalogsReady(state);
+  final hasExplicitWorkspaceIndex =
+      (await state.preferences.getString(workspaceCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final orderedIds = await loadOrderedIds(
     state.preferences,
     indexKey: workspaceCatalogIndexKey,
@@ -75,7 +80,8 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
   }
 
   final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
-  if (normalizedOrderedIds.isEmpty &&
+  if (!hasExplicitWorkspaceIndex &&
+      normalizedOrderedIds.isEmpty &&
       deferredLegacyCatalog?.workspaceCatalog.orderedWorkspaceIds.isNotEmpty ==
           true) {
     return deferredLegacyCatalog!.workspaceCatalog;
@@ -91,6 +97,11 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
   SecureConnectionRepositoryState state,
 ) async {
   await ensureSecureCatalogsReady(state);
+  final hasExplicitSystemIndex =
+      (await state.preferences.getString(systemCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final orderedIds = await loadOrderedIds(
     state.preferences,
     indexKey: systemCatalogIndexKey,
@@ -140,7 +151,8 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
   }
 
   final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
-  if (normalizedOrderedIds.isEmpty &&
+  if (!hasExplicitSystemIndex &&
+      normalizedOrderedIds.isEmpty &&
       deferredLegacyCatalog?.systemCatalog.orderedSystemIds.isNotEmpty ==
           true) {
     return deferredLegacyCatalog!.systemCatalog;
@@ -157,14 +169,20 @@ Future<SavedWorkspace> secureLoadWorkspace(
   String workspaceId,
 ) async {
   final normalizedWorkspaceId = requireConnectionId(workspaceId);
+  final hasExplicitWorkspaceIndex =
+      (await state.preferences.getString(workspaceCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final catalog = await secureLoadWorkspaceCatalog(state);
   final summary = catalog.workspaceForId(normalizedWorkspaceId);
   if (summary != null) {
     return SavedWorkspace(id: summary.id, profile: summary.profile);
   }
   final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
-  final deferredWorkspace =
-      deferredLegacyCatalog?.workspacesById[normalizedWorkspaceId];
+  final deferredWorkspace = hasExplicitWorkspaceIndex
+      ? null
+      : deferredLegacyCatalog?.workspacesById[normalizedWorkspaceId];
   if (deferredWorkspace != null) {
     return deferredWorkspace;
   }
@@ -176,9 +194,16 @@ Future<SavedSystem> secureLoadSystem(
   String systemId,
 ) async {
   final normalizedSystemId = requireSystemId(systemId);
+  final hasExplicitSystemIndex =
+      (await state.preferences.getString(systemCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final catalog = await secureLoadSystemCatalog(state);
   final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
-  final deferredSystem = deferredLegacyCatalog?.systemsById[normalizedSystemId];
+  final deferredSystem = hasExplicitSystemIndex
+      ? null
+      : deferredLegacyCatalog?.systemsById[normalizedSystemId];
   final summary = catalog.systemForId(normalizedSystemId);
   if (summary != null) {
     if (deferredSystem != null &&

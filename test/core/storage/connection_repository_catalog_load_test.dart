@@ -753,6 +753,92 @@ void main() {
   );
 
   test(
+    'loadCatalog does not resurrect a deferred singleton connection after delete writes an explicit empty index',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+        systemIdGenerator: () => 'system_seed',
+      );
+
+      final initialCatalog = await repository.loadCatalog();
+      await repository.deleteConnection('conn_seed');
+      final catalogAfterDelete = await repository.loadCatalog();
+
+      expect(initialCatalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(catalogAfterDelete.orderedConnectionIds, isEmpty);
+      expect(
+        repository.loadConnection('conn_seed'),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        await preferences.getString(workspaceIndexKey()),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': const <String>[],
+        }),
+      );
+    },
+  );
+
+  test(
+    'loadCatalog keeps deferred singleton workspace ids stable across launches while secret reads fail',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final firstRepository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_first',
+        systemIdGenerator: () => 'system_first',
+      );
+      final firstCatalog = await firstRepository.loadCatalog();
+      final secondRepository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_second',
+        systemIdGenerator: () => 'system_second',
+      );
+
+      final secondCatalog = await secondRepository.loadCatalog();
+      final secondConnection = await secondRepository.loadConnection(
+        firstCatalog.orderedConnectionIds.single,
+      );
+
+      expect(firstCatalog.orderedConnectionIds, <String>['conn_first']);
+      expect(secondCatalog.orderedConnectionIds, <String>['conn_first']);
+      expect(secondConnection.id, 'conn_first');
+      expect(secondConnection.profile.host, legacyProfile.host);
+      expect(secondConnection.profile.username, legacyProfile.username);
+    },
+  );
+
+  test(
     'loadCatalog rebuilds the index from namespaced profile keys when the index is missing',
     () async {
       final preferences = SharedPreferencesAsync();
