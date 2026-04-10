@@ -145,6 +145,39 @@ void main() {
   );
 
   test(
+    'secure store tolerates malformed legacy draft fields while sanitizing metadata',
+    () async {
+      final secureStorage = _FakeFlutterSecureStorage(<String, String>{});
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        'pocket_relay.workspace.recovery_state',
+        '{"connectionId":"conn_primary","selectedThreadId":"thread_saved","draftText":123,"backgroundedAt":"2026-03-22T12:00:00.000Z"}',
+      );
+      final store = SecureConnectionWorkspaceRecoveryStore(
+        secureStorage: secureStorage,
+        preferences: preferences,
+      );
+
+      final loadedState = await store.load();
+      final rawState = await preferences.getString(
+        'pocket_relay.workspace.recovery_state',
+      );
+
+      expect(loadedState, isNotNull);
+      expect(loadedState!.connectionId, 'conn_primary');
+      expect(loadedState.selectedThreadId, 'thread_saved');
+      expect(loadedState.draftText, isEmpty);
+      expect(rawState, isNotNull);
+      expect(rawState, isNot(contains('draftText')));
+      expect(
+        secureStorage
+            .data['pocket_relay.workspace.recovery_state.draft_text.conn_primary'],
+        isNull,
+      );
+    },
+  );
+
+  test(
     'secure store migrates legacy global secure drafts into a connection-scoped key on load',
     () async {
       final secureStorage = _FakeFlutterSecureStorage(<String, String>{

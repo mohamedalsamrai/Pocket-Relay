@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/persisted_json.dart';
@@ -26,6 +24,11 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
   SecureConnectionRepositoryState state,
 ) async {
   await ensureSecureCatalogsReady(state);
+  final hasExplicitWorkspaceIndex =
+      (await state.preferences.getString(workspaceCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final orderedIds = await loadOrderedIds(
     state.preferences,
     indexKey: workspaceCatalogIndexKey,
@@ -76,6 +79,14 @@ Future<WorkspaceCatalogState> secureLoadWorkspaceCatalog(
     );
   }
 
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  if (!hasExplicitWorkspaceIndex &&
+      normalizedOrderedIds.isEmpty &&
+      deferredLegacyCatalog?.workspaceCatalog.orderedWorkspaceIds.isNotEmpty ==
+          true) {
+    return deferredLegacyCatalog!.workspaceCatalog;
+  }
+
   return WorkspaceCatalogState(
     orderedWorkspaceIds: normalizedOrderedIds,
     workspacesById: workspacesById,
@@ -86,6 +97,11 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
   SecureConnectionRepositoryState state,
 ) async {
   await ensureSecureCatalogsReady(state);
+  final hasExplicitSystemIndex =
+      (await state.preferences.getString(systemCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final orderedIds = await loadOrderedIds(
     state.preferences,
     indexKey: systemCatalogIndexKey,
@@ -134,6 +150,14 @@ Future<SystemCatalogState> secureLoadSystemCatalog(
     );
   }
 
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  if (!hasExplicitSystemIndex &&
+      normalizedOrderedIds.isEmpty &&
+      deferredLegacyCatalog?.systemCatalog.orderedSystemIds.isNotEmpty ==
+          true) {
+    return deferredLegacyCatalog!.systemCatalog;
+  }
+
   return SystemCatalogState(
     orderedSystemIds: normalizedOrderedIds,
     systemsById: systemsById,
@@ -145,12 +169,24 @@ Future<SavedWorkspace> secureLoadWorkspace(
   String workspaceId,
 ) async {
   final normalizedWorkspaceId = requireConnectionId(workspaceId);
+  final hasExplicitWorkspaceIndex =
+      (await state.preferences.getString(workspaceCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final catalog = await secureLoadWorkspaceCatalog(state);
   final summary = catalog.workspaceForId(normalizedWorkspaceId);
-  if (summary == null) {
-    throw StateError('Unknown saved workspace: $normalizedWorkspaceId');
+  if (summary != null) {
+    return SavedWorkspace(id: summary.id, profile: summary.profile);
   }
-  return SavedWorkspace(id: summary.id, profile: summary.profile);
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  final deferredWorkspace = hasExplicitWorkspaceIndex
+      ? null
+      : deferredLegacyCatalog?.workspacesById[normalizedWorkspaceId];
+  if (deferredWorkspace != null) {
+    return deferredWorkspace;
+  }
+  throw StateError('Unknown saved workspace: $normalizedWorkspaceId');
 }
 
 Future<SavedSystem> secureLoadSystem(
@@ -158,16 +194,32 @@ Future<SavedSystem> secureLoadSystem(
   String systemId,
 ) async {
   final normalizedSystemId = requireSystemId(systemId);
+  final hasExplicitSystemIndex =
+      (await state.preferences.getString(systemCatalogIndexKey))
+          ?.trim()
+          .isNotEmpty ==
+      true;
   final catalog = await secureLoadSystemCatalog(state);
+  final deferredLegacyCatalog = state.deferredLegacyCatalogSnapshot;
+  final deferredSystem = hasExplicitSystemIndex
+      ? null
+      : deferredLegacyCatalog?.systemsById[normalizedSystemId];
   final summary = catalog.systemForId(normalizedSystemId);
-  if (summary == null) {
-    throw StateError('Unknown saved system: $normalizedSystemId');
+  if (summary != null) {
+    if (deferredSystem != null &&
+        identical(catalog, deferredLegacyCatalog?.systemCatalog)) {
+      return deferredSystem;
+    }
+    return SavedSystem(
+      id: summary.id,
+      profile: summary.profile,
+      secrets: await readSystemSecrets(state, normalizedSystemId),
+    );
   }
-  return SavedSystem(
-    id: summary.id,
-    profile: summary.profile,
-    secrets: await readSystemSecrets(state, normalizedSystemId),
-  );
+  if (deferredSystem != null) {
+    return deferredSystem;
+  }
+  throw StateError('Unknown saved system: $normalizedSystemId');
 }
 
 Future<SavedConnection> secureLoadConnection(

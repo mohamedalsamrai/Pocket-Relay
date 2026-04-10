@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/storage/persisted_json.dart';
@@ -82,11 +80,19 @@ Future<ConnectionSecrets> readLegacyConnectionSecrets(
 Future<SavedConnection?> readLegacySingletonConnection(
   SecureConnectionRepositoryState state,
 ) async {
+  final result = await readLegacySingletonConnectionWithStatus(state);
+  return result.connection;
+}
+
+Future<({SavedConnection? connection, bool allowCleanup})>
+readLegacySingletonConnectionWithStatus(
+  SecureConnectionRepositoryState state,
+) async {
   final rawProfile = await state.preferences.getString(
     legacySingletonProfileKey,
   );
   if (rawProfile == null || rawProfile.trim().isEmpty) {
-    return null;
+    return (connection: null, allowCleanup: false);
   }
 
   final decodedProfile = decodePersistedJsonRecord<ConnectionProfile>(
@@ -95,25 +101,34 @@ Future<SavedConnection?> readLegacySingletonConnection(
     decode: (json) => ConnectionProfile.fromJson(json),
   );
   if (decodedProfile.issue != null) {
-    return null;
+    return (connection: null, allowCleanup: false);
   }
-  return SavedConnection(
-    id: '',
-    profile: decodedProfile.value!,
-    secrets: ConnectionSecrets(
-      password: await readSecret(
-        state.secureStorage,
-        legacySingletonPasswordKey,
-      ),
-      privateKeyPem: await readSecret(
-        state.secureStorage,
-        legacySingletonPrivateKeyKey,
-      ),
-      privateKeyPassphrase: await readSecret(
-        state.secureStorage,
-        legacySingletonPrivateKeyPassphraseKey,
+  final passwordResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    legacySingletonPasswordKey,
+  );
+  final privateKeyResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    legacySingletonPrivateKeyKey,
+  );
+  final passphraseResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    legacySingletonPrivateKeyPassphraseKey,
+  );
+  return (
+    connection: SavedConnection(
+      id: '',
+      profile: decodedProfile.value!,
+      secrets: ConnectionSecrets(
+        password: passwordResult.value,
+        privateKeyPem: privateKeyResult.value,
+        privateKeyPassphrase: passphraseResult.value,
       ),
     ),
+    allowCleanup:
+        !passwordResult.readFailed &&
+        !privateKeyResult.readFailed &&
+        !passphraseResult.readFailed,
   );
 }
 
@@ -167,4 +182,15 @@ Future<String> readSecret(
   String key,
 ) async {
   return await secureStorage.read(key: key) ?? '';
+}
+
+Future<({String value, bool readFailed})> _readSecretOrEmptyOnFailure(
+  FlutterSecureStorage secureStorage,
+  String key,
+) async {
+  try {
+    return (value: await readSecret(secureStorage, key), readFailed: false);
+  } catch (_) {
+    return (value: '', readFailed: true);
+  }
 }

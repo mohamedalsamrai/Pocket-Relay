@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -597,6 +598,247 @@ void main() {
   );
 
   test(
+    'loadCatalog migrates the legacy singleton profile even when legacy secret reads fail',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(connection.id, 'conn_seed');
+      expect(connection.profile.label, legacyProfile.label);
+      expect(connection.profile.host, legacyProfile.host);
+      expect(connection.profile.port, legacyProfile.port);
+      expect(connection.profile.username, legacyProfile.username);
+      expect(connection.profile.workspaceDir, legacyProfile.workspaceDir);
+      expect(connection.profile.agentAdapter, legacyProfile.agentAdapter);
+      expect(connection.profile.agentCommand, legacyProfile.agentCommand);
+      expect(connection.profile.authMode, legacyProfile.authMode);
+      expect(
+        connection.profile.hostFingerprint,
+        legacyProfile.hostFingerprint,
+      );
+      expect(
+        connection.profile.dangerouslyBypassSandbox,
+        legacyProfile.dangerouslyBypassSandbox,
+      );
+      expect(
+        connection.profile.ephemeralSession,
+        legacyProfile.ephemeralSession,
+      );
+      expect(connection.profile.model, legacyProfile.model);
+      expect(connection.profile.reasoningEffort, legacyProfile.reasoningEffort);
+      expect(
+        connection.profile.connectionMode,
+        legacyProfile.connectionMode,
+      );
+      expect(connection.secrets, const ConnectionSecrets());
+      expect(
+        await preferences.getString('pocket_relay.profile'),
+        jsonEncode(legacyProfile.toJson()),
+      );
+      expect(await preferences.getString(workspaceIndexKey()), isNull);
+      expect(
+        await preferences.getString(workspaceProfileKey('conn_seed')),
+        isNull,
+      );
+      expect(await preferences.getString(systemIndexKey()), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+    },
+  );
+
+  test(
+    'loadCatalog upgrades a deferred default legacy catalog entry with singleton profile data',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+        'pocket_relay.connections.index': jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_seed'],
+        }),
+        'pocket_relay.connection.conn_seed.profile': jsonEncode(
+          ConnectionProfile.defaults().toJson(),
+        ),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+        systemIdGenerator: () => 'system_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: legacyProfile,
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(await preferences.getString(workspaceIndexKey()), isNull);
+      expect(await preferences.getString(systemIndexKey()), isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+    },
+  );
+
+  test(
+    'loadConnection preserves recovered deferred singleton secrets until split migration succeeds',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.private_key_passphrase',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+        systemIdGenerator: () => 'system_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final systemCatalog = await repository.loadSystemCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+      final system = await repository.loadSystem('system_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(systemCatalog.orderedSystemIds, <String>['system_seed']);
+      expect(connection.secrets.password, 'secret');
+      expect(system.secrets.password, 'secret');
+      expect(await preferences.getString(workspaceIndexKey()), isNull);
+      expect(await preferences.getString(systemIndexKey()), isNull);
+      expect(secureStorage.data[systemPasswordKey('system_seed')], isNull);
+      expect(secureStorage.data['pocket_relay.secret.password'], 'secret');
+    },
+  );
+
+  test(
+    'loadCatalog does not resurrect a deferred singleton connection after delete writes an explicit empty index',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_seed',
+        systemIdGenerator: () => 'system_seed',
+      );
+
+      final initialCatalog = await repository.loadCatalog();
+      await repository.deleteConnection('conn_seed');
+      final catalogAfterDelete = await repository.loadCatalog();
+
+      expect(initialCatalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(catalogAfterDelete.orderedConnectionIds, isEmpty);
+      expect(
+        repository.loadConnection('conn_seed'),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        await preferences.getString(workspaceIndexKey()),
+        jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedIds': const <String>[],
+        }),
+      );
+    },
+  );
+
+  test(
+    'loadCatalog keeps deferred singleton workspace ids stable across launches while secret reads fail',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.profile': jsonEncode(legacyProfile.toJson()),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{'pocket_relay.secret.password': 'secret'},
+        keyToThrowOn: 'pocket_relay.secret.password',
+      );
+      final preferences = SharedPreferencesAsync();
+      final firstRepository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_first',
+        systemIdGenerator: () => 'system_first',
+      );
+      final firstCatalog = await firstRepository.loadCatalog();
+      final secondRepository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_second',
+        systemIdGenerator: () => 'system_second',
+      );
+
+      final secondCatalog = await secondRepository.loadCatalog();
+      final secondConnection = await secondRepository.loadConnection(
+        firstCatalog.orderedConnectionIds.single,
+      );
+
+      expect(firstCatalog.orderedConnectionIds, <String>['conn_first']);
+      expect(secondCatalog.orderedConnectionIds, <String>['conn_first']);
+      expect(secondConnection.id, 'conn_first');
+      expect(secondConnection.profile.host, legacyProfile.host);
+      expect(secondConnection.profile.username, legacyProfile.username);
+    },
+  );
+
+  test(
     'loadCatalog rebuilds the index from namespaced profile keys when the index is missing',
     () async {
       final preferences = SharedPreferencesAsync();
@@ -642,4 +884,38 @@ void main() {
       );
     },
   );
+}
+
+final class _ThrowingReadFakeFlutterSecureStorage
+    extends FakeFlutterSecureStorage {
+  _ThrowingReadFakeFlutterSecureStorage(
+    super.data, {
+    required this.keyToThrowOn,
+  });
+
+  final String keyToThrowOn;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == keyToThrowOn) {
+      throw StateError('secure storage read failed');
+    }
+    return super.read(
+      key: key,
+      iOptions: iOptions,
+      aOptions: aOptions,
+      lOptions: lOptions,
+      webOptions: webOptions,
+      mOptions: mOptions,
+      wOptions: wOptions,
+    );
+  }
 }

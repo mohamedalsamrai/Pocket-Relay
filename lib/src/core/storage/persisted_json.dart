@@ -63,8 +63,31 @@ PersistedJsonReadResult<Map<String, Object?>> decodePersistedJsonObject(
     );
   }
   return PersistedJsonReadResult<Map<String, Object?>>.success(
-    Map<String, Object?>.from(decoded),
+    decoded.cast<String, Object?>(),
   );
+}
+
+PersistedJsonReadResult<T> decodePersistedJsonRecordObject<T>(
+  Map<String, Object?> json, {
+  required String subject,
+  required T Function(Map<String, Object?> json) decode,
+  PersistedJsonRecordValidator<T>? validate,
+  String invalidRecordDetail = 'is not a valid record.',
+}) {
+  try {
+    final value = decode(json);
+    final validationIssue = validate?.call(value);
+    if (validationIssue != null) {
+      return PersistedJsonReadResult<T>.failure(
+        PersistedJsonIssue.invalidRecord(subject, detail: validationIssue),
+      );
+    }
+    return PersistedJsonReadResult<T>.success(value);
+  } catch (_) {
+    return PersistedJsonReadResult<T>.failure(
+      PersistedJsonIssue.invalidRecord(subject, detail: invalidRecordDetail),
+    );
+  }
 }
 
 PersistedJsonReadResult<T> decodePersistedJsonRecord<T>(
@@ -79,18 +102,11 @@ PersistedJsonReadResult<T> decodePersistedJsonRecord<T>(
     return PersistedJsonReadResult<T>.failure(issue);
   }
 
-  try {
-    final value = decode(objectResult.value!);
-    final validationIssue = validate?.call(value);
-    if (validationIssue != null) {
-      return PersistedJsonReadResult<T>.failure(
-        PersistedJsonIssue.invalidRecord(subject, detail: validationIssue),
-      );
-    }
-    return PersistedJsonReadResult<T>.success(value);
-  } catch (_) {
-    return PersistedJsonReadResult<T>.failure(
-      PersistedJsonIssue.invalidRecord(subject, detail: invalidRecordDetail),
-    );
-  }
+  return decodePersistedJsonRecordObject(
+    objectResult.value!,
+    subject: subject,
+    decode: decode,
+    validate: validate,
+    invalidRecordDetail: invalidRecordDetail,
+  );
 }
