@@ -54,45 +54,6 @@ BoxDecoration noticeDecorationFor(WidgetTester tester, String title) {
   return noticeDecoratedBox.decoration as BoxDecoration;
 }
 
-ConnectionWorkspaceController buildSingleConnectionWorkspaceController({
-  required FakeCodexAppServerClient client,
-  CodexRemoteAppServerHostProbe remoteAppServerHostProbe =
-      const FakeRemoteHostProbe(CodexRemoteAppServerHostCapabilities()),
-  Duration? recoveryPersistenceDebounceDuration,
-}) {
-  final repository = MemoryCodexConnectionRepository(
-    initialConnections: <SavedConnection>[
-      SavedConnection(
-        id: 'conn_primary',
-        profile: workspaceProfile('Primary Box', 'primary.local'),
-        secrets: const ConnectionSecrets(password: 'secret-1'),
-      ),
-    ],
-  );
-  return ConnectionWorkspaceController(
-    connectionRepository: repository,
-    recoveryPersistenceDebounceDuration:
-        recoveryPersistenceDebounceDuration ??
-        const Duration(milliseconds: 250),
-    remoteAppServerHostProbe: remoteAppServerHostProbe,
-    laneBindingFactory: ({required connectionId, required connection}) {
-      return ConnectionLaneBinding(
-        connectionId: connectionId,
-        profileStore: ConnectionScopedProfileStore(
-          connectionId: connectionId,
-          connectionRepository: repository,
-        ),
-        appServerClient: client,
-        initialSavedProfile: SavedProfile(
-          profile: connection.profile,
-          secrets: connection.secrets,
-        ),
-        ownsAppServerClient: false,
-      );
-    },
-  );
-}
-
 Future<void> pumpRemoteRuntimeNoticesSurface(
   WidgetTester tester,
   ConnectionWorkspaceController controller,
@@ -139,16 +100,6 @@ Future<void> selectConversationAndLoseTransport(
   await controller.selectedLaneBinding!.sessionController
       .selectConversationForResume(threadId);
   await connectAndLoseTransport(client);
-}
-
-CodexAppServerThreadHistory savedConversationThread({
-  required String threadId,
-}) {
-  return conversationThreadWithStatus(
-    threadId: threadId,
-    turnId: 'turn_saved',
-    status: 'completed',
-  );
 }
 
 CodexAppServerThreadHistory inconclusiveConversationThread({

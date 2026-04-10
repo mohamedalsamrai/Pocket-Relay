@@ -12,7 +12,7 @@ void main() {
         remoteAppServerHostProbe: const FakeRemoteHostProbe(
           CodexRemoteAppServerHostCapabilities(),
         ),
-        remoteAppServerOwnerInspector: const FakeRemoteOwnerInspector(
+        remoteAppServerOwnerInspector: const StaticRemoteOwnerInspector(
           CodexRemoteAppServerOwnerSnapshot(
             ownerId: 'conn_primary',
             workspaceDir: '/workspace',
