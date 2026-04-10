@@ -14,6 +14,7 @@ import 'package:pocket_relay/src/features/chat/lane/application/chat_session_err
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_guardrail_errors.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_command_audit_snapshot.dart';
 import 'package:pocket_relay/src/features/chat/runtime/application/agent_adapter_runtime_event_bridge.dart';
 import 'package:pocket_relay/src/features/chat/runtime/application/host_adapter_runtime_event_mapper.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_support.dart';

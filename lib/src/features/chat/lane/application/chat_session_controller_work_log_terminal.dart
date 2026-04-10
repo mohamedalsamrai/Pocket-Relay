@@ -12,6 +12,12 @@ Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   if ((itemId?.isEmpty ?? true) || (threadId?.isEmpty ?? true)) {
     return terminal;
   }
+  if (!terminal.isRunning &&
+      !terminal.isWaiting &&
+      (terminal.hasTerminalOutput ||
+          terminal.outputState != ChatWorkLogTerminalOutputState.unknown)) {
+    return terminal;
+  }
 
   final timelineActiveTurn = controller._sessionState
       .timelineForThread(threadId!)
@@ -71,12 +77,15 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
 ) {
   final snapshot = item.snapshot;
   final terminalInput =
-      _nonBlankTerminalStringPreservingWhitespace(snapshot?['stdin']) ??
+      _nonEmptyTerminalStringPreservingWhitespace(snapshot?['stdin']) ??
       terminal.terminalInput;
   final terminalOutput =
       _terminalOutputFromSnapshot(snapshot) ??
       _activeTerminalOutput(item.body, terminalInput) ??
       terminal.terminalOutput;
+  final outputState = terminalOutput == null
+      ? _terminalOutputStateFromSnapshot(snapshot)
+      : ChatWorkLogTerminalOutputState.unknown;
   final activitySummary = terminalOutput != null
       ? null
       : _terminalActivitySummaryFromActiveItem(
@@ -93,6 +102,9 @@ ChatWorkLogTerminalContract _terminalFromActiveItem(
     processId: _terminalProcessId(snapshot) ?? terminal.processId,
     terminalInput: terminalInput,
     terminalOutput: terminalOutput,
+    outputState: outputState == ChatWorkLogTerminalOutputState.unknown
+        ? terminal.outputState
+        : outputState,
     activitySummary: activitySummary,
   );
 }
@@ -125,6 +137,9 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
   final result = _terminalObject(raw['result']);
   final terminalOutput =
       _terminalOutputFromSnapshot(raw) ?? terminal.terminalOutput;
+  final outputState = terminalOutput == null
+      ? _terminalOutputStateFromSnapshot(raw)
+      : ChatWorkLogTerminalOutputState.unknown;
   final activitySummary = terminalOutput != null
       ? null
       : _terminalActivitySummaryFromSnapshot(
@@ -144,9 +159,12 @@ ChatWorkLogTerminalContract _terminalFromHistoryItem(
     exitCode: exitCode,
     processId: _terminalProcessId(raw) ?? terminal.processId,
     terminalInput:
-        _nonBlankTerminalStringPreservingWhitespace(raw['stdin']) ??
+        _nonEmptyTerminalStringPreservingWhitespace(raw['stdin']) ??
         terminal.terminalInput,
     terminalOutput: terminalOutput,
+    outputState: outputState == ChatWorkLogTerminalOutputState.unknown
+        ? terminal.outputState
+        : outputState,
     activitySummary: activitySummary,
   );
 }
@@ -193,42 +211,40 @@ String? _nonBlankTerminalStringPreservingWhitespace(Object? value) {
   return value;
 }
 
-String? _terminalOutputFromSnapshot(Map<String, dynamic>? value) {
-  final result = _terminalObject(value?['result']);
-  final aggregatedOutput = _nonBlankTerminalStringPreservingWhitespace(
-    value?['aggregatedOutput'] ??
-        value?['aggregated_output'] ??
-        result?['output'],
-  );
-  if (aggregatedOutput != null) {
-    return aggregatedOutput;
-  }
-
-  return _combinedTerminalStreamOutput(
-    stdout: value?['stdout'] ?? result?['stdout'],
-    stderr: value?['stderr'] ?? result?['stderr'],
-  );
-}
-
-String? _combinedTerminalStreamOutput({
-  required Object? stdout,
-  required Object? stderr,
-}) {
-  final stdoutText = _nonBlankTerminalStringPreservingWhitespace(stdout);
-  final stderrText = _nonBlankTerminalStringPreservingWhitespace(stderr);
-  if (stdoutText == null && stderrText == null) {
+String? _nonEmptyTerminalStringPreservingWhitespace(Object? value) {
+  if (value is! String || value.isEmpty) {
     return null;
   }
-  if (stdoutText == null) {
-    return stderrText;
+  return value;
+}
+
+String? _terminalOutputFromSnapshot(Map<String, dynamic>? value) {
+  final retainedOutput = TranscriptCommandAuditSnapshot.explicitOutputPayload(
+    value,
+  );
+  if (retainedOutput == null || retainedOutput.value.isEmpty) {
+    return null;
   }
-  if (stderrText == null) {
-    return stdoutText;
+  return retainedOutput.value;
+}
+
+ChatWorkLogTerminalOutputState _terminalOutputStateFromSnapshot(
+  Map<String, dynamic>? value,
+) {
+  final retainedState = chatWorkLogTerminalOutputStateFromSnapshotValue(
+    TranscriptCommandAuditSnapshot.explicitOutputState(value),
+  );
+  if (retainedState != ChatWorkLogTerminalOutputState.unknown) {
+    return retainedState;
   }
 
-  return stdoutText.endsWith('\n') || stderrText.startsWith('\n')
-      ? '$stdoutText$stderrText'
-      : '$stdoutText\n$stderrText';
+  final retainedOutput = TranscriptCommandAuditSnapshot.explicitOutputPayload(
+    value,
+  );
+  if (retainedOutput != null && retainedOutput.value.isEmpty) {
+    return ChatWorkLogTerminalOutputState.empty;
+  }
+  return ChatWorkLogTerminalOutputState.unknown;
 }
 
 String? _terminalActivitySummaryFromSnapshot(
@@ -334,7 +350,7 @@ bool _isTerminalFailureStatus(String? status) {
 }
 
 String? _activeTerminalOutput(String body, String? terminalInput) {
-  final value = _nonBlankTerminalStringPreservingWhitespace(body);
+  final value = _nonEmptyTerminalStringPreservingWhitespace(body);
   if (value == null) {
     return null;
   }

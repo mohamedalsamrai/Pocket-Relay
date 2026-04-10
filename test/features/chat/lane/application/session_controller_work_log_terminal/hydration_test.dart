@@ -130,6 +130,33 @@ void main() {
   );
 
   test(
+    'hydrateWorkLogTerminal trusts retained command output without rereading history',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      final controller = buildWorkLogTerminalSessionController(
+        appServerClient: appServerClient,
+      );
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_saved',
+          activityLabel: 'Ran command',
+          commandText: 'pwd',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_saved',
+          threadId: 'thread_saved',
+          turnId: 'turn_saved',
+          terminalOutput: '/repo\n',
+        ),
+      );
+
+      expect(hydrated.terminalOutput, '/repo\n');
+      expect(appServerClient.readThreadCalls, isEmpty);
+    },
+  );
+
+  test(
     'hydrateWorkLogTerminal ignores active items from a different turn id',
     () async {
       final appServerClient = FakeCodexAppServerClient()

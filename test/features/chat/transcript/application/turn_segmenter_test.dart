@@ -43,6 +43,7 @@ void main() {
     required String itemId,
     required String body,
     bool isRunning = false,
+    Map<String, dynamic>? snapshot,
   }) {
     return TranscriptSessionActiveItem(
       itemId: itemId,
@@ -55,7 +56,12 @@ void main() {
       title: 'pwd',
       body: body,
       isRunning: isRunning,
-      snapshot: const <String, Object?>{'processId': 'proc-1'},
+      snapshot:
+          snapshot ??
+          const <String, Object?>{
+            'processId': 'proc-1',
+            'aggregatedOutput': '/workspace\n',
+          },
     );
   }
 
@@ -117,23 +123,28 @@ $diffLines
     },
   );
 
-  test('does not persist full command output inside work-log artifacts', () {
-    final turn = builder.upsertItem(
-      initialTurn(),
-      commandItem(
-        itemId: 'command-1',
-        entryId: 'entry-1',
-        body: '/workspace\n',
-      ),
-    );
-    final artifact = turn.artifacts.single as TranscriptTurnWorkArtifact;
-    final entry = artifact.entries.single;
+  test(
+    'retains command audit output in the snapshot without duplicating full body',
+    () {
+      final turn = builder.upsertItem(
+        initialTurn(),
+        commandItem(
+          itemId: 'command-1',
+          entryId: 'entry-1',
+          body: '/workspace\n',
+        ),
+      );
+      final artifact = turn.artifacts.single as TranscriptTurnWorkArtifact;
+      final entry = artifact.entries.single;
 
-    expect(entry.itemId, 'command-1');
-    expect(entry.threadId, 'thread-1');
-    expect(entry.preview, '/workspace');
-    expect(entry.body, isNull);
-  });
+      expect(entry.itemId, 'command-1');
+      expect(entry.threadId, 'thread-1');
+      expect(entry.preview, '/workspace');
+      expect(entry.body, isNull);
+      expect(entry.snapshot?['processId'], 'proc-1');
+      expect(entry.snapshot?['aggregatedOutput'], '/workspace\n');
+    },
+  );
 
   test('caps retained changed-file diffs in the segmenter', () {
     final largeDiff = List<String>.generate(
