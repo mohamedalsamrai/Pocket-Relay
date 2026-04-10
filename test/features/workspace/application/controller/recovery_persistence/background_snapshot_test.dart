@@ -49,7 +49,7 @@ void main() {
       );
       expect(diagnostics, isNotNull);
       expect(diagnostics!.lastResumedAt, snapshotTime);
-      expect(diagnostics.lastBackgroundedAt, isNull);
+      expect(diagnostics.lastBackgroundedAt, snapshotTime);
     },
   );
 

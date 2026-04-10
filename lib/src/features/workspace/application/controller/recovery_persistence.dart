@@ -19,6 +19,12 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
   final diagnostics = controller._state.recoveryDiagnosticsFor(
     selectedConnectionId,
   );
+  final backgroundedLifecycleStateFromDiagnostics =
+      diagnostics?.lastBackgroundedLifecycleState;
+  final backgroundedAtFromDiagnostics =
+      backgroundedLifecycleStateFromDiagnostics == null
+      ? null
+      : diagnostics?.lastBackgroundedAt;
 
   var selectedThreadId = _normalizedWorkspaceThreadId(
     binding.sessionController.sessionState.currentThreadId ??
@@ -31,8 +37,7 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
           ConnectionWorkspaceRecoveryOrigin.coldStart &&
       !binding.sessionController.suppressesTrackedThreadReuse &&
       diagnostics?.lastRecoveryStartedAt != null;
-  if (selectedThreadId == null &&
-      shouldRetainColdStartRecoveryThread) {
+  if (selectedThreadId == null && shouldRetainColdStartRecoveryThread) {
     final latestRecoverySnapshot =
         controller._recoveryPersistenceController.latestSnapshot;
     selectedThreadId = _normalizedWorkspaceThreadId(
@@ -46,9 +51,8 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
     connectionId: selectedConnectionId,
     selectedThreadId: selectedThreadId,
     draftText: binding.composerDraftHost.draft.text,
-    backgroundedAt: backgroundedAt ?? diagnostics?.lastBackgroundedAt,
+    backgroundedAt: backgroundedAt ?? backgroundedAtFromDiagnostics,
     backgroundedLifecycleState:
-        backgroundedLifecycleState ??
-        diagnostics?.lastBackgroundedLifecycleState,
+        backgroundedLifecycleState ?? backgroundedLifecycleStateFromDiagnostics,
   );
 }

@@ -15,8 +15,12 @@ class LiveLaneNoticeProjector {
   static const Duration finishedWhileAwayVisibilityDuration = Duration(
     seconds: 6,
   );
+  static const Duration briefBackgroundInterruptionThreshold = Duration(
+    seconds: 10,
+  );
 
   LiveLaneNoticeContract? project({
+    bool supportsFiniteBackgroundGrace = false,
     required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
     required ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhase,
     required ConnectionWorkspaceRecoveryDiagnostics? recoveryDiagnostics,
@@ -31,6 +35,7 @@ class LiveLaneNoticeProjector {
   }) {
     final entries = <LiveLaneNoticeEntryContract>[];
     final LiveLaneNoticeEntryContract? primaryEntry = _primaryEntryFor(
+      supportsFiniteBackgroundGrace: supportsFiniteBackgroundGrace,
       liveReattachPhase: liveReattachPhase,
       transportRecoveryPhase: transportRecoveryPhase,
       recoveryDiagnostics: recoveryDiagnostics,
@@ -72,6 +77,7 @@ class LiveLaneNoticeProjector {
   }
 
   LiveLaneNoticeEntryContract? _primaryEntryFor({
+    required bool supportsFiniteBackgroundGrace,
     required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
     required ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhase,
     required ConnectionWorkspaceRecoveryDiagnostics? recoveryDiagnostics,
@@ -139,6 +145,17 @@ class LiveLaneNoticeProjector {
       );
     }
 
+    final shouldCoalesceBriefBackgroundReconnect =
+        _shouldCoalesceBriefBackgroundReconnect(
+          supportsFiniteBackgroundGrace: supportsFiniteBackgroundGrace,
+          liveReattachPhase: liveReattachPhase,
+          transportRecoveryPhase: transportRecoveryPhase,
+          recoveryDiagnostics: recoveryDiagnostics,
+        );
+    if (shouldCoalesceBriefBackgroundReconnect) {
+      return _reconnectingEntry();
+    }
+
     final transportLostError = ConnectionLifecycleErrors.transportLostNotice();
     final unavailableError =
         ConnectionLifecycleErrors.transportUnavailableNotice(
@@ -160,14 +177,7 @@ class LiveLaneNoticeProjector {
         ),
       ConnectionWorkspaceLiveReattachPhase.reconnecting ||
       ConnectionWorkspaceTransportRecoveryPhase.reconnecting =>
-        LiveLaneNoticeEntryContract(
-          key: 'transport_reconnecting',
-          title: ConnectionWorkspaceCopy.reconnectingNoticeTitle,
-          message: ConnectionWorkspaceCopy.reconnectingNoticeMessage,
-          isLoading: true,
-          tone: LiveLaneNoticeTone.informational,
-          icon: Icons.portable_wifi_off_rounded,
-        ),
+        _reconnectingEntry(),
       ConnectionWorkspaceLiveReattachPhase.ownerMissing ||
       ConnectionWorkspaceLiveReattachPhase.ownerUnhealthy ||
       ConnectionWorkspaceTransportRecoveryPhase.unavailable =>
@@ -184,6 +194,53 @@ class LiveLaneNoticeProjector {
         ),
       _ => null,
     };
+  }
+
+  bool _shouldCoalesceBriefBackgroundReconnect({
+    required bool supportsFiniteBackgroundGrace,
+    required ConnectionWorkspaceLiveReattachPhase? liveReattachPhase,
+    required ConnectionWorkspaceTransportRecoveryPhase? transportRecoveryPhase,
+    required ConnectionWorkspaceRecoveryDiagnostics? recoveryDiagnostics,
+  }) {
+    final isTransportRecoveryNotice = switch (liveReattachPhase ??
+        transportRecoveryPhase) {
+      ConnectionWorkspaceLiveReattachPhase.transportLost ||
+      ConnectionWorkspaceLiveReattachPhase.reconnecting ||
+      ConnectionWorkspaceTransportRecoveryPhase.lost ||
+      ConnectionWorkspaceTransportRecoveryPhase.reconnecting => true,
+      _ => false,
+    };
+    if (!supportsFiniteBackgroundGrace ||
+        !isTransportRecoveryNotice ||
+        recoveryDiagnostics == null) {
+      return false;
+    }
+
+    final backgroundedAt = recoveryDiagnostics.lastBackgroundedAt;
+    final resumedAt = recoveryDiagnostics.lastResumedAt;
+    final transportLossAt = recoveryDiagnostics.lastTransportLossAt;
+    if (backgroundedAt == null ||
+        resumedAt == null ||
+        transportLossAt == null) {
+      return false;
+    }
+
+    return !transportLossAt.isBefore(backgroundedAt) &&
+        !transportLossAt.isAfter(resumedAt) &&
+        !resumedAt.isBefore(backgroundedAt) &&
+        resumedAt.difference(backgroundedAt) <=
+            briefBackgroundInterruptionThreshold;
+  }
+
+  LiveLaneNoticeEntryContract _reconnectingEntry() {
+    return const LiveLaneNoticeEntryContract(
+      key: 'transport_reconnecting',
+      title: ConnectionWorkspaceCopy.reconnectingNoticeTitle,
+      message: ConnectionWorkspaceCopy.reconnectingNoticeMessage,
+      isLoading: true,
+      tone: LiveLaneNoticeTone.informational,
+      icon: Icons.portable_wifi_off_rounded,
+    );
   }
 
   LiveLaneNoticeEntryContract _turnLivenessEntry(

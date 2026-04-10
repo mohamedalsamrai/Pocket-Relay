@@ -331,7 +331,6 @@ void _recordWorkspaceLifecycleResume(
     connectionId,
     (current) => current.copyWith(
       lastResumedAt: occurredAt,
-      clearLastBackgroundedAt: true,
       clearLastBackgroundedLifecycleState: true,
     ),
     enqueueRecoveryPersistence: true,
