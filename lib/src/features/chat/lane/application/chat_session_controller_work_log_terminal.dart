@@ -1,6 +1,7 @@
 part of 'chat_session_controller.dart';
 
 const _terminalItemSupport = TranscriptItemSupport();
+const _truncatedTerminalOutputSuffix = ' [truncated]';
 
 Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   ChatSessionController controller,
@@ -12,10 +13,7 @@ Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   if ((itemId?.isEmpty ?? true) || (threadId?.isEmpty ?? true)) {
     return terminal;
   }
-  if (!terminal.isRunning &&
-      !terminal.isWaiting &&
-      (terminal.hasTerminalOutput ||
-          terminal.outputState == ChatWorkLogTerminalOutputState.empty)) {
+  if (_canTrustRetainedTerminalSnapshot(terminal)) {
     return terminal;
   }
 
@@ -48,6 +46,18 @@ Future<ChatWorkLogTerminalContract> _hydrateChatWorkLogTerminal(
   } catch (_) {
     return terminal;
   }
+}
+
+bool _canTrustRetainedTerminalSnapshot(ChatWorkLogTerminalContract terminal) {
+  if (terminal.isRunning || terminal.isWaiting) {
+    return false;
+  }
+  if (terminal.outputState == ChatWorkLogTerminalOutputState.empty) {
+    return true;
+  }
+  final terminalOutput = terminal.terminalOutput;
+  return terminalOutput != null &&
+      !terminalOutput.endsWith(_truncatedTerminalOutputSuffix);
 }
 
 TranscriptSessionActiveItem? _matchingActiveTerminalItem(

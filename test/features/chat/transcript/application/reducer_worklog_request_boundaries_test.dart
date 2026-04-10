@@ -171,61 +171,64 @@ void main() {
     },
   );
 
-  test('command lifecycle updates replace stale terminal snapshot fields', () {
-    final reducer = TranscriptReducer();
-    final now = DateTime(2026, 3, 14, 12);
-    var state = reducer.reduceRuntimeEvent(
-      TranscriptSessionState.initial(),
-      TranscriptRuntimeItemStartedEvent(
-        createdAt: now,
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        snapshot: const <String, Object?>{'command': 'git status'},
-      ),
-    );
+  test(
+    'command lifecycle updates preserve retained terminal input snapshot fields',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        TranscriptSessionState.initial(),
+        TranscriptRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{'command': 'git status'},
+        ),
+      );
 
-    state = reducer.reduceRuntimeEvent(
-      state,
-      TranscriptRuntimeItemUpdatedEvent(
-        createdAt: now.add(const Duration(milliseconds: 10)),
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        rawMethod: 'item/commandExecution/terminalInteraction',
-        snapshot: const <String, Object?>{
-          'processId': 'proc_1',
-          'stdin': 'y\n',
-        },
-      ),
-    );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 10)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          rawMethod: 'item/commandExecution/terminalInteraction',
+          snapshot: const <String, Object?>{
+            'processId': 'proc_1',
+            'stdin': 'y\n',
+          },
+        ),
+      );
 
-    state = reducer.reduceRuntimeEvent(
-      state,
-      TranscriptRuntimeItemUpdatedEvent(
-        createdAt: now.add(const Duration(milliseconds: 20)),
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        snapshot: const <String, Object?>{
-          'command': 'git status',
-          'processId': 'proc_1',
-        },
-      ),
-    );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 20)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{
+            'command': 'git status',
+            'processId': 'proc_1',
+          },
+        ),
+      );
 
-    final activeItem = state.activeTurn?.itemsById['command_snapshot_1'];
-    expect(activeItem, isNotNull);
-    expect(activeItem?.snapshot?['stdin'], isNull);
-    expect(activeItem?.snapshot?['processId'], 'proc_1');
-    expect(activeItem?.snapshot?['command'], 'git status');
-  });
+      final activeItem = state.activeTurn?.itemsById['command_snapshot_1'];
+      expect(activeItem, isNotNull);
+      expect(activeItem?.snapshot?['stdin'], 'y\n');
+      expect(activeItem?.snapshot?['processId'], 'proc_1');
+      expect(activeItem?.snapshot?['command'], 'git status');
+    },
+  );
 
   test(
     'retains live command output and terminal input in the command work-log snapshot after completion',
