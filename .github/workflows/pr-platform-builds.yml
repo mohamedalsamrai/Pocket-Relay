@@ -46,6 +46,10 @@ jobs:
                 per_page: 100,
               },
             );
+            const changedFilesCount = context.payload.pull_request.changed_files;
+            const hasCompleteFileList =
+              Number.isInteger(changedFilesCount) &&
+              files.length === changedFilesCount;
 
             const isDocsPath = (name) => {
               const lowered = name.toLowerCase();
@@ -53,6 +57,7 @@ jobs:
             };
 
             const docsOnly =
+              hasCompleteFileList &&
               files.length > 0 &&
               files.every((file) =>
                 [file.filename, file.previous_filename]
@@ -63,6 +68,12 @@ jobs:
             core.info(
               `Changed files (${files.length}): ${files.map((file) => file.filename).join(', ')}`,
             );
+            core.info(`pull_request.changed_files=${changedFilesCount}`);
+            if (!hasCompleteFileList) {
+              core.warning(
+                'Changed-file listing may be incomplete; keeping full verification enabled.',
+              );
+            }
             core.info(`docs_only=${docsOnly}`);
             core.setOutput('docs_only', docsOnly ? 'true' : 'false');
 
