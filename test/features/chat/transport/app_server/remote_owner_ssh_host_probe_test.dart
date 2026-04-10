@@ -127,4 +127,40 @@ void main() {
       );
     },
   );
+
+  test(
+    'probeHostCapabilities rejects shell-snippet agent commands before SSH launch',
+    () async {
+      var launchCalls = 0;
+      final probe = CodexSshRemoteAppServerHostProbe(
+        sshBootstrap:
+            ({
+              required profile,
+              required secrets,
+              required verifyHostKey,
+            }) async {
+              return ScriptedSshBootstrapClient(
+                onLaunch: (command) async {
+                  launchCalls += 1;
+                  return FakeCodexAppServerProcess();
+                },
+              );
+            },
+      );
+
+      final capabilities = await probe.probeHostCapabilities(
+        profile: sshProfile().copyWith(
+          codexPath: 'source /etc/profile && codex',
+        ),
+        secrets: const ConnectionSecrets(password: 'secret'),
+      );
+
+      expect(launchCalls, 0);
+      expect(capabilities.supportsContinuity, isFalse);
+      expect(capabilities.issues, <ConnectionRemoteHostCapabilityIssue>{
+        ConnectionRemoteHostCapabilityIssue.agentCommandMissing,
+      });
+      expect(capabilities.detail, contains('Shell operators'));
+    },
+  );
 }

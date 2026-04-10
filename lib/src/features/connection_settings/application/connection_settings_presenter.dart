@@ -2,6 +2,7 @@ import 'package:pocket_relay/src/agent_adapters/agent_adapter_capabilities.dart'
 import 'package:pocket_relay/src/agent_adapters/agent_adapter_registry.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/utils/trusted_agent_command.dart';
 import 'package:pocket_relay/src/features/connection_settings/application/connection_settings_system_templates.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_contract.dart';
 import 'package:pocket_relay/src/features/connection_settings/domain/connection_settings_draft.dart';

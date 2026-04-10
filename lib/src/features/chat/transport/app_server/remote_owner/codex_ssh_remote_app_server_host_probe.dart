@@ -13,6 +13,17 @@ class CodexSshRemoteAppServerHostProbe
     required ConnectionProfile profile,
     required ConnectionSecrets secrets,
   }) async {
+    try {
+      parseTrustedAgentCommand(profile.codexPath);
+    } on FormatException catch (error) {
+      return CodexRemoteAppServerHostCapabilities(
+        issues: const <ConnectionRemoteHostCapabilityIssue>{
+          ConnectionRemoteHostCapabilityIssue.agentCommandMissing,
+        },
+        detail: error.message,
+      );
+    }
+
     final result = await _runRemoteProbeCommand(
       profile: profile,
       secrets: secrets,

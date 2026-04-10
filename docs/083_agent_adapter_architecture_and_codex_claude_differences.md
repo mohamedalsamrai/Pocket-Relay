@@ -190,7 +190,7 @@ Current shared consumers of capability metadata include:
 Connection settings now treat the adapter as a first-class concept:
 
 - section title: `Agent adapter`
-- field label: `Agent command`
+- field label: `Trusted agent command`
 
 Relevant files:
 

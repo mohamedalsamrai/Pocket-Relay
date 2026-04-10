@@ -4,9 +4,10 @@ part of '../codex_app_server_remote_owner_ssh.dart';
 String buildSshRemoteHostCapabilityProbeCommand({
   required ConnectionProfile profile,
 }) {
+  final requestedCodex = parseTrustedAgentCommand(profile.codexPath);
   final command =
       '''
-${_buildRequestedCodexShellFunctions(requestedCodex: profile.codexPath)}
+${_buildRequestedCodexShellFunctions(requestedCodex: requestedCodex)}
 tmux_status=1
 if command -v tmux >/dev/null 2>&1; then
   tmux_status=0
@@ -128,29 +129,56 @@ int _fnv1a32(String value) {
   return hash & 0x7FFFFFFF;
 }
 
-String _buildRequestedCodexShellFunctions({required String requestedCodex}) {
-  final normalizedRequestedCodex = requestedCodex.trim();
+String _buildRequestedCodexShellFunctions({
+  required TrustedAgentCommand requestedCodex,
+}) {
   return '''
 ${_buildRemoteBinaryPathPrelude()}
-requested_codex=${shellEscape(normalizedRequestedCodex)}
+requested_codex_executable=${shellEscape(requestedCodex.executable)}
+${_buildRequestedCodexArgumentArray(requestedCodex.arguments)}
 
-requested_codex_requires_eval() {
-  [[ "\$requested_codex" == *[[:space:]]* || "\$requested_codex" == */* ]]
+expand_requested_codex_executable() {
+  candidate="\$1"
+  case "\$candidate" in
+    '~')
+      if [ -n "\${HOME-}" ]; then
+        printf '%s' "\$HOME"
+        return 0
+      fi
+      return 1
+      ;;
+    '~/'*)
+      if [ -n "\${HOME-}" ]; then
+        printf '%s/%s' "\$HOME" "\${candidate#~/}"
+        return 0
+      fi
+      return 1
+      ;;
+    *)
+      printf '%s' "\$candidate"
+      return 0
+      ;;
+  esac
 }
 
 resolve_requested_codex() {
-  if [ -z "\$requested_codex" ]; then
+  if [ -z "\$requested_codex_executable" ]; then
     return 1
   fi
 
-  if requested_codex_requires_eval; then
-    printf '%s' "\$requested_codex"
-    return 0
-  fi
+  requested_codex=\$(expand_requested_codex_executable "\$requested_codex_executable") || return 1
 
   if command -v "\$requested_codex" >/dev/null 2>&1; then
     command -v "\$requested_codex"
     return 0
+  fi
+
+  if [[ "\$requested_codex" == */* ]]; then
+    if [ -x "\$requested_codex" ]; then
+      printf '%s' "\$requested_codex"
+      return 0
+    fi
+    return 1
   fi
 
   for candidate in "\$HOME/.local/bin/\$requested_codex" "\$HOME/bin/\$requested_codex" "/usr/local/bin/\$requested_codex" "/opt/homebrew/bin/\$requested_codex" "/usr/bin/\$requested_codex" "/bin/\$requested_codex"; do
@@ -165,16 +193,23 @@ resolve_requested_codex() {
 
 run_requested_codex() {
   resolved_codex=\$(resolve_requested_codex) || return 127
-  if requested_codex_requires_eval; then
-    quoted_args=
-    for arg in "\$@"; do
-      printf -v quoted_args '%s %q' "\$quoted_args" "\$arg"
-    done
-    eval "\$resolved_codex\$quoted_args"
-    return \$?
-  fi
-  "\$resolved_codex" "\$@"
+  "\$resolved_codex" "\${requested_codex_args[@]}" "\$@"
 }
+''';
+}
+
+String _buildRequestedCodexArgumentArray(List<String> arguments) {
+  if (arguments.isEmpty) {
+    return 'requested_codex_args=()';
+  }
+
+  final escapedArguments = arguments
+      .map((argument) => '  ${shellEscape(argument)}')
+      .join('\n');
+  return '''
+requested_codex_args=(
+$escapedArguments
+)
 ''';
 }
 
@@ -335,9 +370,10 @@ String buildSshRemoteOwnerStartCommand({
   required String codexPath,
   required int port,
 }) {
+  final requestedCodex = parseTrustedAgentCommand(codexPath);
   final tmuxCommand =
       '''
-${_buildRequestedCodexShellFunctions(requestedCodex: codexPath)}
+${_buildRequestedCodexShellFunctions(requestedCodex: requestedCodex)}
 ${_buildPocketRelayRemoteOwnerLogShellFunctions()}
 ensure_pocket_relay_log_dir
 log_file=\$(resolve_pocket_relay_log_file ${shellEscape(sessionName)})

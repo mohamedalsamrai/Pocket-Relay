@@ -8,6 +8,7 @@ ConnectionSettingsTextFieldContract settingsField(
   final fields = switch (section) {
     ConnectionSettingsSectionContract(:final fields) => fields,
     ConnectionSettingsAuthenticationSectionContract(:final fields) => fields,
+    ConnectionSettingsAgentAdapterSectionContract(:final fields) => fields,
     _ => throw ArgumentError.value(section, 'section'),
   };
 

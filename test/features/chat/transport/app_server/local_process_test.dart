@@ -7,30 +7,50 @@ import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_se
 import 'package:pocket_relay/src/features/chat/transport/app_server/codex_app_server_local_process.dart';
 
 void main() {
-  test('builds a local macOS command for a plain codex binary', () {
+  test('builds a direct local invocation for a plain codex binary', () {
     final invocation = buildLocalCodexAppServerInvocation(
       profile: _profile(),
       platform: TargetPlatform.macOS,
     );
 
-    expect(invocation.executable, 'bash');
+    expect(invocation.executable, 'codex');
     expect(invocation.arguments, <String>[
-      '-lc',
-      'codex app-server --listen stdio://',
+      'app-server',
+      '--listen',
+      'stdio://',
     ]);
   });
 
-  test('builds a local Windows command for a plain codex binary', () {
+  test('preserves fixed arguments in the configured agent command', () {
     final invocation = buildLocalCodexAppServerInvocation(
-      profile: _profile(),
-      platform: TargetPlatform.windows,
+      profile: _profile(codexPath: '"./tools/codex wrapper" --profile turbo'),
+      platform: TargetPlatform.macOS,
     );
 
-    expect(invocation.executable, 'cmd.exe');
+    expect(invocation.executable, './tools/codex wrapper');
     expect(invocation.arguments, <String>[
-      '/C',
-      'codex app-server --listen stdio://',
+      '--profile',
+      'turbo',
+      'app-server',
+      '--listen',
+      'stdio://',
     ]);
+  });
+
+  test('rejects shell snippets in the configured agent command', () {
+    expect(
+      () => buildLocalCodexAppServerInvocation(
+        profile: _profile(codexPath: 'source /etc/profile && codex'),
+        platform: TargetPlatform.macOS,
+      ),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('Shell operators'),
+        ),
+      ),
+    );
   });
 
   test('emits a diagnostic event when local process startup fails', () async {
@@ -68,10 +88,10 @@ void main() {
   });
 }
 
-ConnectionProfile _profile() {
+ConnectionProfile _profile({String codexPath = 'codex'}) {
   return ConnectionProfile.defaults().copyWith(
     connectionMode: ConnectionMode.local,
     workspaceDir: '/workspace',
-    codexPath: 'codex',
+    codexPath: codexPath,
   );
 }

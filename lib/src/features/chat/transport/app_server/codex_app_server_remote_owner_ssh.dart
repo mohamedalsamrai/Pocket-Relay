@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
+import 'package:pocket_relay/src/core/utils/trusted_agent_command.dart';
 
 import 'codex_app_server_models.dart';
 import 'codex_app_server_remote_owner.dart';

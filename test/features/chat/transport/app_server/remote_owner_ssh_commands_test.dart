@@ -68,14 +68,22 @@ exit 1
   );
 
   test(
-    'builds a capability probe command for a launch command with spaces',
+    'builds a capability probe command for a quoted executable with fixed arguments',
     () {
       final command = buildSshRemoteHostCapabilityProbeCommand(
-        profile: sshProfile().copyWith(codexPath: 'just codex-mcp'),
+        profile: sshProfile().copyWith(
+          codexPath: '"~/Applications/Codex App/codex" --profile turbo',
+        ),
       );
 
-      expect(command, contains('just codex-mcp'));
+      expect(command, contains('requested_codex_executable='));
+      expect(command, contains('~/Applications/Codex App/codex'));
+      expect(command, contains("requested_codex_args=("));
+      expect(command, contains('--profile'));
+      expect(command, contains('turbo'));
+      expect(command, contains('expand_requested_codex_executable()'));
       expect(command, contains('run_requested_codex app-server --help'));
+      expect(command, isNot(contains('eval ')));
     },
   );
 
@@ -153,7 +161,8 @@ exit 1
     expect(command, contains('chmod 700'));
     expect(command, contains('umask "\$previous_umask"'));
     expect(command, contains('resolve_pocket_relay_log_file'));
-    expect(command, contains('requested_codex='));
+    expect(command, contains('requested_codex_executable='));
+    expect(command, contains('requested_codex_args=()'));
     expect(command, contains('resolve_requested_codex()'));
     expect(command, contains('run_requested_codex app-server --listen'));
     expect(command, contains('codex app-server exited with status'));
@@ -162,20 +171,27 @@ exit 1
     expect(command, contains('exec bash -lc'));
     expect(command, contains('tmux new-session -d -P -F'));
     expect(command, contains('#{pane_id}'));
+    expect(command, isNot(contains('eval ')));
   });
 
   test(
-    'buildSshRemoteOwnerStartCommand preserves shell-wrapped launch commands',
+    'buildSshRemoteOwnerStartCommand rejects shell-wrapped launch commands',
     () {
-      final command = buildSshRemoteOwnerStartCommand(
-        sessionName: 'pocket-relay-remote-1',
-        workspaceDir: '/workspace',
-        codexPath: 'source /etc/profile && codex',
-        port: 45123,
+      expect(
+        () => buildSshRemoteOwnerStartCommand(
+          sessionName: 'pocket-relay-remote-1',
+          workspaceDir: '/workspace',
+          codexPath: 'source /etc/profile && codex',
+          port: 45123,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            contains('Shell operators'),
+          ),
+        ),
       );
-
-      expect(command, contains('source /etc/profile && codex'));
-      expect(command, contains('run_requested_codex app-server --listen'));
     },
   );
 

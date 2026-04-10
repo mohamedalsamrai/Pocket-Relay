@@ -81,8 +81,6 @@ class _ConnectionSettingsPresentationState {
         isRemote && draft.hostFingerprint.trim().isEmpty;
     final hasWorkspaceDirError =
         !isSystemSettings && draft.workspaceDir.trim().isEmpty;
-    final hasHostCommandError =
-        !isSystemSettings && draft.agentCommand.trim().isEmpty;
     final hasPasswordError =
         isRemote &&
         draft.authMode == AuthMode.password &&
@@ -116,11 +114,11 @@ class _ConnectionSettingsPresentationState {
       message: 'Workspace directory is required',
       show: shouldShowValidationErrors && !isSystemSettings,
     );
-    final hostCommandError = _requiredError(
+    final hostCommandError = _agentCommandError(
       value: draft.agentCommand,
-      message: 'Agent command is required',
       show: shouldShowValidationErrors && !isSystemSettings,
     );
+    final hasHostCommandError = hostCommandError != null;
     final passwordError = shouldShowValidationErrors && hasPasswordError
         ? 'Password is required'
         : null;
@@ -271,6 +269,24 @@ String? _requiredError({
   }
 
   return message;
+}
+
+String? _agentCommandError({required String value, required bool show}) {
+  if (!show) {
+    return null;
+  }
+
+  final normalized = value.trim();
+  if (normalized.isEmpty) {
+    return 'Agent command is required';
+  }
+
+  try {
+    parseTrustedAgentCommand(normalized);
+    return null;
+  } on FormatException catch (error) {
+    return error.message.toString();
+  }
 }
 
 String? _portError({required String value, required bool show}) {

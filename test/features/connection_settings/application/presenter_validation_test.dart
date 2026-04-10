@@ -104,6 +104,45 @@ void main() {
     );
   });
 
+  test('rejects shell snippets in the trusted agent command field', () {
+    final initialProfile = configuredConnectionProfile();
+    const initialSecrets = ConnectionSecrets(password: 'secret');
+    final formState =
+        ConnectionSettingsFormState.initial(
+          profile: initialProfile,
+          secrets: initialSecrets,
+        ).copyWith(
+          draft: ConnectionSettingsDraft.fromConnection(
+            profile: initialProfile,
+            secrets: initialSecrets,
+          ).copyWith(agentCommand: 'source /etc/profile && codex'),
+          showValidationErrors: true,
+        );
+
+    final contract = presenter.present(
+      initialProfile: initialProfile,
+      initialSecrets: initialSecrets,
+      formState: formState,
+    );
+
+    expect(
+      settingsField(
+        contract.agentAdapterSection,
+        ConnectionSettingsFieldId.hostCommand,
+      ).label,
+      'Trusted agent command',
+    );
+    expect(
+      settingsField(
+        contract.agentAdapterSection,
+        ConnectionSettingsFieldId.hostCommand,
+      ).errorText,
+      contains('Shell operators'),
+    );
+    expect(contract.saveAction.canSubmit, isFalse);
+    expect(contract.saveAction.submitPayload, isNull);
+  });
+
   test('derives dirty state and normalized save payload in the presenter', () {
     final initialProfile = configuredConnectionProfile();
     const initialSecrets = ConnectionSecrets(password: 'secret');

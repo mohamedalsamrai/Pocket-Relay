@@ -42,12 +42,12 @@ ConnectionSettingsAgentAdapterSectionContract _buildAgentAdapterSection(
     fields: <ConnectionSettingsTextFieldContract>[
       ConnectionSettingsTextFieldContract(
         id: ConnectionSettingsFieldId.hostCommand,
-        label: 'Agent command',
+        label: 'Trusted agent command',
         value: draft.agentCommand,
         hintText: defaultCommandForAgentAdapter(draft.agentAdapter),
         helperText: state.isRemote
-            ? 'Command used to launch $adapterLabel on the remote system inside this workspace before Pocket Relay appends runtime arguments.'
-            : 'Command used to launch $adapterLabel on this device inside this workspace before Pocket Relay appends runtime arguments.',
+            ? 'Trusted executable plus fixed arguments used to launch $adapterLabel on the remote system inside this workspace. Shell snippets are not supported; use a wrapper script if setup is needed.'
+            : 'Trusted executable plus fixed arguments used to launch $adapterLabel on this device inside this workspace. Shell snippets are not supported; use a wrapper script if setup is needed.',
         errorText: state.hostCommandError,
       ),
     ],

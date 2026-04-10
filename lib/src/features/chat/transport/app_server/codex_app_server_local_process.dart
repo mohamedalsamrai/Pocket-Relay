@@ -3,11 +3,12 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/utils/trusted_agent_command.dart';
 
 import 'codex_app_server_models.dart';
 
-class CodexLocalShellInvocation {
-  const CodexLocalShellInvocation({
+class CodexLocalProcessInvocation {
+  const CodexLocalProcessInvocation({
     required this.executable,
     required this.arguments,
   });
@@ -50,21 +51,23 @@ Future<CodexAppServerProcess> openLocalCodexAppServerProcess({
   }
 }
 
-CodexLocalShellInvocation buildLocalCodexAppServerInvocation({
+CodexLocalProcessInvocation buildLocalCodexAppServerInvocation({
   required ConnectionProfile profile,
   TargetPlatform? platform,
 }) {
-  final command = '${profile.codexPath.trim()} app-server --listen stdio://';
-  return switch (platform ?? defaultTargetPlatform) {
-    TargetPlatform.windows => CodexLocalShellInvocation(
-      executable: 'cmd.exe',
-      arguments: <String>['/C', command],
+  final configuredCommand = parseTrustedAgentCommand(profile.codexPath);
+  return CodexLocalProcessInvocation(
+    executable: _localExecutableForCommand(
+      configuredCommand.executable,
+      platform: platform ?? defaultTargetPlatform,
     ),
-    _ => CodexLocalShellInvocation(
-      executable: 'bash',
-      arguments: <String>['-lc', command],
-    ),
-  };
+    arguments: <String>[
+      ...configuredCommand.arguments,
+      'app-server',
+      '--listen',
+      'stdio://',
+    ],
+  );
 }
 
 Future<Process> _startLocalProcess({
@@ -77,6 +80,56 @@ Future<Process> _startLocalProcess({
     arguments,
     workingDirectory: workingDirectory,
   );
+}
+
+String _localExecutableForCommand(
+  String executable, {
+  required TargetPlatform platform,
+}) {
+  final homeDirectory = switch (platform) {
+    TargetPlatform.windows =>
+      Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'],
+    _ => Platform.environment['HOME'],
+  };
+  if (homeDirectory == null || homeDirectory.isEmpty) {
+    return executable;
+  }
+  if (executable == '~') {
+    return homeDirectory;
+  }
+  if (executable.startsWith('~/')) {
+    return _joinHomePath(
+      homeDirectory: homeDirectory,
+      suffix: executable.substring(2),
+      separator: '/',
+    );
+  }
+  if (executable.startsWith('~\\')) {
+    return _joinHomePath(
+      homeDirectory: homeDirectory,
+      suffix: executable.substring(2),
+      separator: '\\',
+    );
+  }
+  return executable;
+}
+
+String _joinHomePath({
+  required String homeDirectory,
+  required String suffix,
+  required String separator,
+}) {
+  if (suffix.isEmpty) {
+    return homeDirectory;
+  }
+  final needsSeparator =
+      !homeDirectory.endsWith(separator) &&
+      !homeDirectory.endsWith('/') &&
+      !homeDirectory.endsWith('\\');
+  final normalizedHome = needsSeparator
+      ? '$homeDirectory$separator'
+      : homeDirectory;
+  return '$normalizedHome$suffix';
 }
 
 class _LocalCodexAppServerProcess implements CodexAppServerProcess {
