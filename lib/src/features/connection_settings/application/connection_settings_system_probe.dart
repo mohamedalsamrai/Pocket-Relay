@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartssh2/dartssh2.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
@@ -16,8 +18,7 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
   required ConnectionProfile profile,
   required ConnectionSecrets secrets,
 }) async {
-  String? observedKeyType;
-  String? observedFingerprint;
+  final observedHostKey = Completer<ConnectionSettingsSystemTestResult>();
   final socket = await SSHSocket.connect(
     profile.host.trim(),
     profile.port,
@@ -27,8 +28,14 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
     socket,
     username: profile.username.trim(),
     onVerifyHostKey: (type, fingerprint) {
-      observedKeyType = type;
-      observedFingerprint = formatFingerprint(fingerprint);
+      if (!observedHostKey.isCompleted) {
+        observedHostKey.complete(
+          ConnectionSettingsSystemTestResult(
+            keyType: type,
+            fingerprint: formatFingerprint(fingerprint),
+          ),
+        );
+      }
       return true;
     },
     identities: _connectionSettingsSystemProbeIdentities(profile, secrets),
@@ -38,16 +45,17 @@ Future<ConnectionSettingsSystemTestResult> testConnectionSettingsRemoteSystem({
   );
 
   try {
+    final result = await Future.any<ConnectionSettingsSystemTestResult>([
+      observedHostKey.future,
+      client.authenticated.then<ConnectionSettingsSystemTestResult>((_) {
+        throw StateError('Could not read the SSH host fingerprint.');
+      }),
+    ]).timeout(const Duration(seconds: 10));
     await client.authenticated;
-    final fingerprint = observedFingerprint;
-    final keyType = observedKeyType;
-    if (fingerprint == null || fingerprint.isEmpty || keyType == null) {
+    if (result.fingerprint.isEmpty || result.keyType.isEmpty) {
       throw StateError('Could not read the SSH host fingerprint.');
     }
-    return ConnectionSettingsSystemTestResult(
-      keyType: keyType,
-      fingerprint: fingerprint,
-    );
+    return result;
   } finally {
     client.close();
   }
