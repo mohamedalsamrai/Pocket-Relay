@@ -295,6 +295,12 @@ Repo rules for future agents.
 - Protected branches are `master` and `main`.
 - New feature work must happen on a feature branch and land through a PR.
 - PRs should be opened ready-for-review by default.
+- Unless the operator explicitly asks for CI babysitting, review babysitting,
+  or post-PR follow-up, agent work should stop once the branch is pushed, the
+  relevant local verification is done, and a ready-for-review PR is open.
+- Do not block the foreground on waiting for remote CI, waiting for reviewers,
+  or waiting for idle background merge gates when another issue can be worked
+  in parallel.
 - A draft PR requires explicit operator instruction in the current turn.
 - Do not switch a PR between draft and ready-for-review without explicit
   operator instruction in the current turn.
