@@ -120,6 +120,83 @@ void main() {
     },
   );
 
+  testWidgets(
+    'clears the submitted draft immediately and prevents duplicate resend while the send is in flight',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.sentMessages, <String>['Hello Codex']);
+      expect(overlayDelegate.transientFeedbackMessages, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'keeps newly typed text when an earlier in-flight send later fails',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      expect(tester.widget<TextField>(composerField).controller?.text, isEmpty);
+
+      await tester.enterText(composerField, 'Follow-up text');
+      await tester.pump();
+
+      appServerClient.sendUserMessageError = StateError('transport broke');
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(appServerClient.sentMessages, isEmpty);
+      expect(
+        tester.widget<TextField>(composerField).controller?.text,
+        'Follow-up text',
+      );
+      expect(overlayDelegate.transientFeedbackMessages, hasLength(1));
+    },
+  );
+
   testWidgets('renders the material first-launch empty state on iOS', (
     tester,
   ) async {

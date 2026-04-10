@@ -83,17 +83,28 @@ Future<void> _sendChatPrompt(_ChatRootAdapterState state) async {
   final laneBinding = state.widget.laneBinding;
   final controller = laneBinding.sessionController;
   final draft = laneBinding.composerDraftHost.draft.normalized();
+  if (draft.isEmpty) {
+    return;
+  }
+
+  laneBinding.composerDraftHost.clear();
   final sent = draft.hasStructuredDraft
       ? await controller.sendDraft(draft)
       : await controller.sendPrompt(draft.text);
-  if (!state.mounted || laneBinding != state.widget.laneBinding || !sent) {
+  if (!state.mounted || laneBinding != state.widget.laneBinding) {
+    return;
+  }
+
+  if (!sent) {
+    if (laneBinding.composerDraftHost.draft.isEmpty) {
+      laneBinding.composerDraftHost.updateDraft(draft);
+    }
     return;
   }
 
   laneBinding.transcriptFollowHost.requestFollow(
     source: ChatTranscriptFollowRequestSource.sendPrompt,
   );
-  laneBinding.composerDraftHost.clear();
 }
 
 Future<void> _continueChatFromUserMessage(
