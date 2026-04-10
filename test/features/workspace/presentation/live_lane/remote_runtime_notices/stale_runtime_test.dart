@@ -46,7 +46,7 @@ void main() {
       );
       expect(
         controller.state.liveReattachPhaseFor('conn_primary'),
-        ConnectionWorkspaceLiveReattachPhase.fallbackRestore,
+        isNull,
       );
       expect(find.text('Restored answer'), findsOneWidget);
 
