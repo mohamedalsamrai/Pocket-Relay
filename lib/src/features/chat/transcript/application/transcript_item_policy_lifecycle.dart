@@ -98,13 +98,24 @@ Map<String, dynamic>? _nextLifecycleSnapshot(
 ) {
   final eventSnapshot = event.snapshot;
   if (eventSnapshot == null) {
-    return existingSnapshot;
+    if (event.itemType != TranscriptCanonicalItemType.commandExecution) {
+      return existingSnapshot;
+    }
+    return TranscriptCommandAuditSnapshot.mergeLifecycleSnapshot(
+      eventSnapshot,
+      existingSnapshot,
+      rawMethod: event.rawMethod ?? '',
+      status: event.status,
+    );
   }
 
-  if (event.itemType == TranscriptCanonicalItemType.commandExecution &&
-      existingSnapshot != null &&
-      event.rawMethod == 'item/commandExecution/terminalInteraction') {
-    return <String, dynamic>{...existingSnapshot, ...eventSnapshot};
+  if (event.itemType == TranscriptCanonicalItemType.commandExecution) {
+    return TranscriptCommandAuditSnapshot.mergeLifecycleSnapshot(
+      eventSnapshot,
+      existingSnapshot,
+      rawMethod: event.rawMethod ?? '',
+      status: event.status,
+    );
   }
 
   return eventSnapshot;

@@ -318,3 +318,26 @@ Repo rules for future agents.
   in the current turn.
 - Do not bypass the protected-branch commit guard unless the operator has
   explicitly authorized that exact exception.
+
+## 16A. Solo-Maintainer Review Policy
+
+- Pocket Relay is currently a solo-maintainer repository. There is no standing
+  second human reviewer.
+- While that remains true, GitHub protected branches must not require
+  approving reviews before merge. Keep
+  `required_approving_review_count = 0`.
+- Do not create, reopen, or preserve admin work whose intended outcome is
+  "require 1 approval on protected branches" unless the operator explicitly
+  says the reviewer pool has changed.
+- CI changes, branch-protection cleanup, and auto-merge work are not permission
+  to reintroduce a human-approval gate.
+- Preserve the solo-maintainer baseline during repo-admin work:
+  PRs may still be required, status checks may still be required, conversation
+  resolution may still be required, and merge commits may still be the only
+  allowed merge method, but human approval requirements must stay disabled.
+- AI reviews, owner comments, and post-merge comments do not count as an
+  independent human reviewer and must not be used to justify re-enabling
+  approval requirements.
+- If independent reviewer availability changes in the future, stop and ask
+  before changing branch protection instead of inferring a new policy from old
+  issues, old comments, or prior admin passes.

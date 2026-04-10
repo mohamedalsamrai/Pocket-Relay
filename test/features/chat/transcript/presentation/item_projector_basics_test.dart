@@ -115,6 +115,62 @@ void main() {
         expect(entry.activityLabel, 'Running command');
       },
     );
+
+    test(
+      'projects retained command snapshots into durable terminal payloads',
+      () {
+        final groupBlock = TranscriptWorkLogGroupBlock(
+          id: 'worklog_command_retained',
+          createdAt: DateTime(2026, 3, 15, 12),
+          entries: <TranscriptWorkLogEntry>[
+            TranscriptWorkLogEntry(
+              id: 'entry_command_retained',
+              createdAt: DateTime(2026, 3, 15, 12),
+              entryKind: TranscriptWorkLogEntryKind.commandExecution,
+              title: 'python demo.py',
+              preview: 'ready',
+              snapshot: const <String, Object?>{
+                'processId': 'proc_7',
+                'stdin': '\n',
+                'aggregatedOutput': 'ready\n',
+              },
+            ),
+          ],
+        );
+
+        final item =
+            projector.project(groupBlock) as ChatExecCommandItemContract;
+        final entry = item.entry;
+
+        expect(entry.processId, 'proc_7');
+        expect(entry.terminalInput, '\n');
+        expect(entry.terminalOutput, 'ready\n');
+        expect(entry.outputState, ChatWorkLogTerminalOutputState.unknown);
+      },
+    );
+
+    test('projects explicit empty command output state distinctly', () {
+      final groupBlock = TranscriptWorkLogGroupBlock(
+        id: 'worklog_command_empty',
+        createdAt: DateTime(2026, 3, 15, 12),
+        entries: <TranscriptWorkLogEntry>[
+          TranscriptWorkLogEntry(
+            id: 'entry_command_empty',
+            createdAt: DateTime(2026, 3, 15, 12),
+            entryKind: TranscriptWorkLogEntryKind.commandExecution,
+            title: 'true',
+            snapshot: const <String, Object?>{
+              'retainedOutputState': 'empty',
+              'aggregatedOutput': '',
+            },
+          ),
+        ],
+      );
+
+      final item = projector.project(groupBlock) as ChatExecCommandItemContract;
+      expect(item.entry.terminalOutput, isNull);
+      expect(item.entry.outputState, ChatWorkLogTerminalOutputState.empty);
+    });
     test(
       'projects empty-stdin terminal interactions into command wait entries',
       () {

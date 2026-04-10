@@ -1,4 +1,5 @@
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_ui_block.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_command_audit_snapshot.dart';
 import 'package:pocket_relay/src/features/chat/transcript/presentation/chat_transcript_item_contract.dart';
 import 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart';
 
@@ -93,6 +94,7 @@ class ChatWorkLogItemProjector {
       processId: shellFields.processId,
       terminalInput: shellFields.terminalInput,
       terminalOutput: shellFields.terminalOutput,
+      outputState: shellFields.outputState,
       turnId: entry.turnId,
       isRunning: entry.isRunning,
       exitCode: entry.exitCode,
@@ -121,6 +123,7 @@ class ChatWorkLogItemProjector {
       processId: shellFields.processId,
       terminalInput: shellFields.terminalInput,
       terminalOutput: shellFields.terminalOutput,
+      outputState: shellFields.outputState,
       turnId: entry.turnId,
       isRunning: entry.isRunning,
       exitCode: entry.exitCode,

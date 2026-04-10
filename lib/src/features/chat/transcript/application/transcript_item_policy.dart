@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_command_audit_snapshot.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_block_factory.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_item_support.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_policy_support.dart';
