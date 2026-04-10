@@ -11,7 +11,7 @@ build on each supported platform surface that the repo owns today?
 
 | Check | Runner | Verification level | Command |
 | --- | --- | --- | --- |
-| Regression tests | `ubuntu-latest` | Full Flutter regression suite for app-owned tests, split into three parallel shards behind one required check | `flutter test --no-pub --total-shards 3 --shard-index <0..2>` |
+| Regression tests | `ubuntu-latest` | Full Flutter regression suite for app-owned tests, split into three parallel shards behind one required check | `flutter test --no-pub --total-shards 3 --shard-index [0-2]` |
 
 ## Verification levels
 
