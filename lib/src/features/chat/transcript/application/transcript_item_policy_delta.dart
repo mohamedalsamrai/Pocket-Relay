@@ -83,15 +83,14 @@ Map<String, dynamic>? _nextContentDeltaSnapshot(
   TranscriptRuntimeContentDeltaEvent event,
   Map<String, dynamic>? existingSnapshot,
 ) {
-  if (event.streamKind != TranscriptRuntimeContentStreamKind.commandOutput ||
-      existingSnapshot == null ||
-      !_isBackgroundTerminalWaitSnapshot(existingSnapshot)) {
+  if (event.streamKind != TranscriptRuntimeContentStreamKind.commandOutput) {
     return existingSnapshot;
   }
 
-  final nextSnapshot = Map<String, dynamic>.from(existingSnapshot)
-    ..remove('stdin');
-  return nextSnapshot.isEmpty ? null : nextSnapshot;
+  return TranscriptCommandAuditSnapshot.mergeContentDeltaSnapshot(
+    existingSnapshot,
+    event.delta,
+  );
 }
 
 bool _isBackgroundTerminalWaitSnapshot(Map<String, dynamic> snapshot) {

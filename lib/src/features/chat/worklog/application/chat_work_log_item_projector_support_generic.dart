@@ -65,15 +65,15 @@ String? _processIdFromSnapshot(Map<String, dynamic>? snapshot) {
   ]);
 }
 
-String? _nonBlankTextPreservingWhitespace(Object? value) {
-  if (value is! String || value.trim().isEmpty) {
+String? _nonEmptyTextPreservingWhitespace(Object? value) {
+  if (value is! String || value.isEmpty) {
     return null;
   }
   return value;
 }
 
 String? _terminalInputText(Map<String, dynamic>? snapshot) {
-  return _nonBlankTextPreservingWhitespace(snapshot?['stdin']);
+  return _nonEmptyTextPreservingWhitespace(snapshot?['stdin']);
 }
 
 String? _terminalOutputText(
@@ -81,7 +81,14 @@ String? _terminalOutputText(
   required String commandText,
   String? terminalInput,
 }) {
-  final body = _nonBlankTextPreservingWhitespace(entry.body);
+  final retainedOutput = TranscriptCommandAuditSnapshot.explicitOutputPayload(
+    entry.snapshot,
+  );
+  if (retainedOutput != null) {
+    return retainedOutput.value.isEmpty ? null : retainedOutput.value;
+  }
+
+  final body = _nonEmptyTextPreservingWhitespace(entry.body);
   if (body == null) {
     return null;
   }
@@ -91,7 +98,35 @@ String? _terminalOutputText(
   return body;
 }
 
-({String? processId, String? terminalInput, String? terminalOutput})
+ChatWorkLogTerminalOutputState _terminalOutputState(
+  TranscriptWorkLogEntry entry, {
+  required String? terminalOutput,
+}) {
+  final retainedState = chatWorkLogTerminalOutputStateFromSnapshotValue(
+    TranscriptCommandAuditSnapshot.explicitOutputState(entry.snapshot),
+  );
+  if (retainedState != ChatWorkLogTerminalOutputState.unknown) {
+    return retainedState;
+  }
+
+  final retainedOutput = TranscriptCommandAuditSnapshot.explicitOutputPayload(
+    entry.snapshot,
+  );
+  if (retainedOutput != null && retainedOutput.value.isEmpty) {
+    return ChatWorkLogTerminalOutputState.empty;
+  }
+  if (terminalOutput != null) {
+    return ChatWorkLogTerminalOutputState.unknown;
+  }
+  return ChatWorkLogTerminalOutputState.unknown;
+}
+
+({
+  String? processId,
+  String? terminalInput,
+  String? terminalOutput,
+  ChatWorkLogTerminalOutputState outputState,
+})
 _shellTerminalFields(
   TranscriptWorkLogEntry entry, {
   required String commandText,
@@ -103,10 +138,15 @@ _shellTerminalFields(
     commandText: commandText,
     terminalInput: terminalInput,
   );
+  final outputState = _terminalOutputState(
+    entry,
+    terminalOutput: terminalOutput,
+  );
   return (
     processId: processId,
     terminalInput: terminalInput,
     terminalOutput: terminalOutput,
+    outputState: outputState,
   );
 }
 
