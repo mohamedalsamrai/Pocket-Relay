@@ -17,6 +17,7 @@ void main() {
     originalAsyncPlatform = SharedPreferencesAsyncPlatform.instance;
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
   tearDown(() {
