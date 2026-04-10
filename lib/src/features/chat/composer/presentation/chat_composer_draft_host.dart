@@ -4,9 +4,11 @@ import 'package:pocket_relay/src/features/chat/composer/presentation/chat_compos
 class ChatComposerDraftHost extends ChangeNotifier {
   ChatComposerDraft _draft = const ChatComposerDraft();
   int _revision = 0;
+  bool _isDisposed = false;
 
   ChatComposerDraft get draft => _draft;
   int get revision => _revision;
+  bool get isDisposed => _isDisposed;
 
   void updateDraft(ChatComposerDraft draft) {
     if (_draft == draft) {
@@ -28,5 +30,14 @@ class ChatComposerDraftHost extends ChangeNotifier {
 
   void reset() {
     clear();
+  }
+
+  @override
+  void dispose() {
+    if (_isDisposed) {
+      return;
+    }
+    _isDisposed = true;
+    super.dispose();
   }
 }

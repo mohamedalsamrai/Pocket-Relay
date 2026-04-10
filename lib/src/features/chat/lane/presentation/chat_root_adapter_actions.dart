@@ -99,7 +99,8 @@ Future<void> _sendChatPrompt(_ChatRootAdapterState state) async {
   }
 
   if (!sent) {
-    if (laneBinding.composerDraftHost.revision == handoffRevision &&
+    if (!laneBinding.composerDraftHost.isDisposed &&
+        laneBinding.composerDraftHost.revision == handoffRevision &&
         laneBinding.composerDraftHost.draft.isEmpty) {
       laneBinding.composerDraftHost.updateDraft(draft);
     }

@@ -293,6 +293,46 @@ void main() {
     },
   );
 
+  testWidgets(
+    'does not restore into a disposed lane binding when an in-flight send later fails',
+    (tester) async {
+      final sendGate = Completer<void>();
+      final appServerClient = FakeCodexAppServerClient()
+        ..sendUserMessageGate = sendGate;
+      final overlayDelegate = FakeChatRootOverlayDelegate();
+      final laneBinding = buildLaneBinding(
+        appServerClient: appServerClient,
+        savedProfile: testSavedProfile(),
+      );
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildAdapterApp(
+          laneBinding: laneBinding,
+          appServerClient: appServerClient,
+          overlayDelegate: overlayDelegate,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final composerField = find.byKey(const ValueKey('composer_input'));
+      await tester.enterText(composerField, 'Hello Codex');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send')));
+      await tester.pump();
+
+      await tester.pumpWidget(const SizedBox());
+      laneBinding.dispose();
+
+      appServerClient.sendUserMessageError = StateError('transport broke');
+      sendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(laneBinding.composerDraftHost.isDisposed, isTrue);
+    },
+  );
+
   testWidgets('renders the material first-launch empty state on iOS', (
     tester,
   ) async {
