@@ -138,6 +138,7 @@ class ChatSessionController extends ChangeNotifier {
   ChatHistoricalConversationRestoreState?
   get historicalConversationRestoreState => _historicalConversationRestoreState;
   bool get isLoading => _isLoading;
+  bool get suppressesTrackedThreadReuse => _suppressTrackedThreadReuse;
   bool get currentModelSupportsImageInput => _currentModelSupportsImageInput();
   List<TranscriptUiBlock> get transcriptBlocks =>
       _sessionState.transcriptBlocks;

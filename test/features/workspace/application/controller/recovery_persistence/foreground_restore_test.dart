@@ -184,4 +184,51 @@ void main() {
       );
     },
   );
+
+  test(
+    'clearing the transcript during transport reconnect clears the persisted selected thread',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_primary']!.threadHistoriesById['thread_saved'] =
+          savedConversationThread(threadId: 'thread_saved');
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore();
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      await controller.initialize();
+      final binding = controller.bindingForConnectionId('conn_primary')!;
+      await binding.sessionController.selectConversationForResume(
+        'thread_saved',
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
+
+      clientsById['conn_primary']!.emit(
+        const CodexAppServerDisconnectedEvent(exitCode: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.requiresTransportReconnect('conn_primary'),
+        isTrue,
+      );
+
+      binding.sessionController.clearTranscript();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.debugLatestUnsavedRecoveryState?.selectedThreadId,
+        isNull,
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, isNull);
+    },
+  );
 }

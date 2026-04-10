@@ -318,7 +318,7 @@ void _recordWorkspaceLifecycleBackgroundSnapshot(
       lastBackgroundedAt: occurredAt,
       lastBackgroundedLifecycleState: lifecycleState,
     ),
-    enqueueRecoveryPersistence: true,
+    enqueueRecoveryPersistence: false,
   );
 }
 

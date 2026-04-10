@@ -17,7 +17,7 @@ Future<void> _initializeWorkspaceController(
     recoveryState,
   );
   if (catalog.isEmpty) {
-    controller._applyState(
+    controller._applyStateWithoutRecoveryPersistence(
       const ConnectionWorkspaceState(
         isLoading: false,
         catalog: ConnectionCatalogState.empty(),
@@ -61,7 +61,7 @@ Future<void> _initializeWorkspaceController(
 
   controller._laneRoster.putBinding(firstConnectionId, firstBinding);
   controller._registerLiveBinding(firstConnectionId, firstBinding);
-  controller._applyState(
+  controller._applyStateWithoutRecoveryPersistence(
     ConnectionWorkspaceState(
       isLoading: false,
       catalog: catalog,
