@@ -47,12 +47,18 @@ jobs:
               },
             );
 
+            const isDocsPath = (name) => {
+              const lowered = name.toLowerCase();
+              return lowered === 'agents.md' || lowered.endsWith('.md');
+            };
+
             const docsOnly =
               files.length > 0 &&
-              files.every((file) => {
-                const name = file.filename.toLowerCase();
-                return name === 'agents.md' || name.endsWith('.md');
-              });
+              files.every((file) =>
+                [file.filename, file.previous_filename]
+                  .filter(Boolean)
+                  .every(isDocsPath),
+              );
 
             core.info(
               `Changed files (${files.length}): ${files.map((file) => file.filename).join(', ')}`,
