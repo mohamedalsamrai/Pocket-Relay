@@ -313,8 +313,8 @@ Repo rules for future agents.
   approving reviews before merge. Keep
   `required_approving_review_count = 0`.
 - Do not create, reopen, or preserve admin work whose intended outcome is
-  "require 1 approval on `master`" unless the operator explicitly says the
-  reviewer pool has changed.
+  "require 1 approval on protected branches" unless the operator explicitly
+  says the reviewer pool has changed.
 - CI changes, branch-protection cleanup, and auto-merge work are not permission
   to reintroduce a human-approval gate.
 - Preserve the solo-maintainer baseline during repo-admin work:
