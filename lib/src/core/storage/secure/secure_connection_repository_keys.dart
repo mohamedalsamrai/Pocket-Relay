@@ -9,6 +9,8 @@ const legacySingletonPrivateKeyPassphraseKey =
     'pocket_relay.secret.private_key_passphrase';
 const deferredLegacySingletonWorkspaceIdKey =
     'pocket_relay.deferred_legacy_singleton_workspace_id';
+const systemLegacySecretFallbacksKey =
+    'pocket_relay.systems.legacy_secret_fallbacks';
 const legacyProfileKeyPrefix = 'pocket_relay.connection.';
 const legacyProfileKeySuffix = '.profile';
 const legacySecretKeyPrefix = 'pocket_relay.connection.';

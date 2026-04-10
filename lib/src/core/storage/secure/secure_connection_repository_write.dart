@@ -104,6 +104,7 @@ Future<void> secureSaveSystem(
     profile: normalizedSystem.profile,
   );
   await persistSystemSecrets(state, normalizedSystem);
+  await clearSystemLegacySecretFallback(state, normalizedSystem.id);
   await persistOrderedIds(
     state.preferences,
     indexKey: systemCatalogIndexKey,
@@ -169,6 +170,7 @@ Future<void> secureDeleteSystem(
       .toList(growable: false);
   await state.preferences.remove(systemProfileKeyForSystem(normalizedSystemId));
   await deleteSystemSecrets(state, normalizedSystemId);
+  await clearSystemLegacySecretFallback(state, normalizedSystemId);
   await persistOrderedIds(
     state.preferences,
     indexKey: systemCatalogIndexKey,

@@ -6,12 +6,20 @@ import '../codex_connection_catalog_recovery.dart';
 import '../repository/connection_repository_contract.dart';
 import 'secure_connection_repository_keys.dart';
 
+enum LegacySystemSecretFallbackSourceKind { connection, singleton }
+
+typedef LegacySystemSecretFallbackSource = ({
+  LegacySystemSecretFallbackSourceKind kind,
+  String? connectionId,
+});
+
 typedef DeferredLegacyCatalogSnapshot = ({
   WorkspaceCatalogState workspaceCatalog,
   SystemCatalogState systemCatalog,
   Map<String, SavedWorkspace> workspacesById,
   Map<String, SavedSystem> systemsById,
   Map<String, SavedConnection> connectionsById,
+  Map<String, LegacySystemSecretFallbackSource> systemSecretFallbacksById,
 });
 
 final class SecureConnectionRepositoryState {

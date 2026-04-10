@@ -200,13 +200,11 @@ void main() {
           secondaryProfile.toJson(),
         ),
       });
-      final secureStorage = ThrowingReadFakeFlutterSecureStorage(
-        <String, String>{
-          passwordKeyForConnection('conn_primary'): 'primary-secret',
-          passwordKeyForConnection('conn_secondary'): 'secondary-secret',
-        },
-        keyToThrowOn: passwordKeyForConnection('conn_secondary'),
-      );
+      final secureStorage =
+          ThrowingReadFakeFlutterSecureStorage(<String, String>{
+            passwordKeyForConnection('conn_primary'): 'primary-secret',
+            passwordKeyForConnection('conn_secondary'): 'secondary-secret',
+          }, keyToThrowOn: passwordKeyForConnection('conn_secondary'));
       final preferences = SharedPreferencesAsync();
       var nextSystemId = 0;
       final repository = buildSecureConnectionRepository(
@@ -248,6 +246,30 @@ void main() {
       expect(
         await preferences.getString(systemProfileKey('system_secondary')),
         isNotNull,
+      );
+      expect(
+        await preferences.getString(systemLegacySecretFallbacksKey),
+        isNotNull,
+      );
+
+      final reopenedRepository = buildSecureConnectionRepository(
+        secureStorage: FakeFlutterSecureStorage(secureStorage.data),
+        preferences: SharedPreferencesAsync(),
+        connectionIdGenerator: () => 'conn_unused',
+        systemIdGenerator: () => 'system_unused',
+      );
+      final recoveredConnection = await reopenedRepository.loadConnection(
+        'conn_secondary',
+      );
+
+      expect(recoveredConnection.secrets.password, 'secondary-secret');
+      expect(
+        secureStorage.data[systemPasswordKey('system_secondary')],
+        'secondary-secret',
+      );
+      expect(
+        await preferences.getString(systemLegacySecretFallbacksKey),
+        isNull,
       );
     },
   );

@@ -7,6 +7,11 @@ import 'secure_connection_repository_profiles.dart';
 import 'secure_connection_repository_secrets.dart';
 import 'secure_connection_repository_state.dart';
 
+typedef _LegacyMigrationConnection = ({
+  SavedConnection connection,
+  LegacySystemSecretFallbackSource? secretFallbackSource,
+});
+
 Future<void> ensureSecureCatalogsReady(SecureConnectionRepositoryState state) {
   return state.normalizedCatalogsReady ??= secureMigrateCatalogsIfNeeded(state);
 }
@@ -32,6 +37,10 @@ Future<void> materializeDeferredLegacyCatalogSnapshotForWrite(
     );
     await persistSystemSecrets(state, system);
   }
+  await persistSystemLegacySecretFallbacks(
+    state,
+    deferredLegacyCatalog.systemSecretFallbacksById,
+  );
   for (final workspaceId
       in deferredLegacyCatalog.workspaceCatalog.orderedWorkspaceIds) {
     final workspace = deferredLegacyCatalog.workspacesById[workspaceId];
@@ -146,7 +155,9 @@ Future<void> secureMigrateCatalogsIfNeeded(
       state,
       legacyConnections: legacySingletonConnection == null
           ? <SavedConnection>[seededConnection]
-          : legacyConnectionsResult.connections,
+          : legacyConnectionsResult.connections
+                .map((entry) => entry.connection)
+                .toList(growable: false),
     );
     _clearDeferredLegacyCatalogSnapshot(state);
     await _clearDeferredLegacySingletonWorkspaceId(state);
@@ -159,7 +170,9 @@ Future<void> secureMigrateCatalogsIfNeeded(
 
   await migrateLegacyConnectionsIntoSplitStorage(
     state,
-    legacyConnections: legacyConnectionsResult.connections,
+    legacyConnections: legacyConnectionsResult.connections
+        .map((entry) => entry.connection)
+        .toList(growable: false),
   );
   _clearDeferredLegacyCatalogSnapshot(state);
   await _clearDeferredLegacySingletonWorkspaceId(state);
@@ -175,7 +188,11 @@ Future<void> migrateLegacyConnectionsIntoSplitStorage(
 }) async {
   final splitCatalogs = _buildSplitCatalogsFromLegacyConnections(
     state,
-    legacyConnections: legacyConnections,
+    legacyConnections: legacyConnections
+        .map<_LegacyMigrationConnection>(
+          (connection) => (connection: connection, secretFallbackSource: null),
+        )
+        .toList(growable: false),
   );
 
   for (final systemId in splitCatalogs.orderedSystemIds) {
@@ -223,7 +240,7 @@ void _clearDeferredLegacyCatalogSnapshot(
 
 Future<DeferredLegacyCatalogSnapshot> _buildDeferredLegacyCatalogSnapshot(
   SecureConnectionRepositoryState state, {
-  required List<SavedConnection> legacyConnections,
+  required List<_LegacyMigrationConnection> legacyConnections,
 }) async {
   final splitCatalogs = _buildSplitCatalogsFromLegacyConnections(
     state,
@@ -265,10 +282,11 @@ Future<DeferredLegacyCatalogSnapshot> _buildDeferredLegacyCatalogSnapshot(
                     .systemId!],
         ),
     },
+    systemSecretFallbacksById: splitCatalogs.systemSecretFallbacksById,
   );
 }
 
-Future<({List<SavedConnection> connections, bool allowCleanup})>
+Future<({List<_LegacyMigrationConnection> connections, bool allowCleanup})>
 _loadLegacyConnectionsForMigration(
   SecureConnectionRepositoryState state, {
   required ConnectionCatalogState? legacyCatalog,
@@ -277,21 +295,32 @@ _loadLegacyConnectionsForMigration(
 }) async {
   if (legacyCatalog == null || legacyCatalog.isEmpty) {
     if (legacySingletonConnection == null) {
-      return (connections: const <SavedConnection>[], allowCleanup: true);
+      return (
+        connections: const <_LegacyMigrationConnection>[],
+        allowCleanup: true,
+      );
     }
 
     final workspaceId = await _loadOrCreateDeferredLegacySingletonWorkspaceId(
       state,
     );
     return (
-      connections: <SavedConnection>[
-        legacySingletonConnection.copyWith(id: workspaceId),
+      connections: <_LegacyMigrationConnection>[
+        (
+          connection: legacySingletonConnection.copyWith(id: workspaceId),
+          secretFallbackSource: legacySingletonAllowCleanup
+              ? null
+              : (
+                  kind: LegacySystemSecretFallbackSourceKind.singleton,
+                  connectionId: null,
+                ),
+        ),
       ],
       allowCleanup: legacySingletonAllowCleanup,
     );
   }
 
-  final legacyConnections = <SavedConnection>[];
+  final legacyConnections = <_LegacyMigrationConnection>[];
   var allowCleanup = legacySingletonConnection == null
       ? true
       : legacySingletonAllowCleanup;
@@ -304,7 +333,15 @@ _loadLegacyConnectionsForMigration(
 
     if (pendingSingletonUpgrade != null &&
         summary.profile == ConnectionProfile.defaults()) {
-      legacyConnections.add(pendingSingletonUpgrade.copyWith(id: connectionId));
+      legacyConnections.add((
+        connection: pendingSingletonUpgrade.copyWith(id: connectionId),
+        secretFallbackSource: legacySingletonAllowCleanup
+            ? null
+            : (
+                kind: LegacySystemSecretFallbackSourceKind.singleton,
+                connectionId: null,
+              ),
+      ));
       pendingSingletonUpgrade = null;
       continue;
     }
@@ -314,13 +351,19 @@ _loadLegacyConnectionsForMigration(
       connectionId,
     );
     allowCleanup = allowCleanup && secretsResult.allowCleanup;
-    legacyConnections.add(
-      SavedConnection(
+    legacyConnections.add((
+      connection: SavedConnection(
         id: connectionId,
         profile: summary.profile,
         secrets: secretsResult.secrets,
       ),
-    );
+      secretFallbackSource: secretsResult.allowCleanup
+          ? null
+          : (
+              kind: LegacySystemSecretFallbackSourceKind.connection,
+              connectionId: connectionId,
+            ),
+    ));
   }
   return (connections: legacyConnections, allowCleanup: allowCleanup);
 }
@@ -355,17 +398,22 @@ Future<void> _clearDeferredLegacySingletonWorkspaceId(
   Map<String, SavedWorkspace> workspacesById,
   List<String> orderedSystemIds,
   List<String> orderedWorkspaceIds,
+  Map<String, LegacySystemSecretFallbackSource> systemSecretFallbacksById,
 })
 _buildSplitCatalogsFromLegacyConnections(
   SecureConnectionRepositoryState state, {
-  required List<SavedConnection> legacyConnections,
+  required List<_LegacyMigrationConnection> legacyConnections,
 }) {
   final systemsById = <String, SavedSystem>{};
   final workspacesById = <String, SavedWorkspace>{};
   final orderedSystemIds = <String>[];
   final orderedWorkspaceIds = <String>[];
+  final systemSecretFallbacksById =
+      <String, LegacySystemSecretFallbackSource>{};
   for (final legacyConnection in legacyConnections) {
-    final normalizedConnection = normalizeConnection(legacyConnection);
+    final normalizedConnection = normalizeConnection(
+      legacyConnection.connection,
+    );
     String? systemId;
     final resolvedSystemProfile = normalizeSystemFingerprintFromHostIdentity(
       systemProfileFromConnectionProfile(normalizedConnection.profile),
@@ -403,6 +451,9 @@ _buildSplitCatalogsFromLegacyConnections(
         systemsById[systemId] = savedSystem;
         orderedSystemIds.add(systemId);
       }
+      if (legacyConnection.secretFallbackSource case final fallbackSource?) {
+        systemSecretFallbacksById[systemId] ??= fallbackSource;
+      }
       final fingerprintToShare = resolvedSystemProfile.hostFingerprint.trim();
       if (fingerprintToShare.isNotEmpty) {
         for (final entry in systemsById.entries.toList()) {
@@ -439,5 +490,6 @@ _buildSplitCatalogsFromLegacyConnections(
     workspacesById: workspacesById,
     orderedSystemIds: orderedSystemIds,
     orderedWorkspaceIds: orderedWorkspaceIds,
+    systemSecretFallbacksById: systemSecretFallbacksById,
   );
 }
