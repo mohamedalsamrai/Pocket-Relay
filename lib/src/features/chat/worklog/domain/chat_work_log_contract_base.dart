@@ -1,5 +1,17 @@
 part of 'chat_work_log_contract.dart';
 
+enum ChatWorkLogTerminalOutputState { unknown, empty, uncaptured }
+
+ChatWorkLogTerminalOutputState chatWorkLogTerminalOutputStateFromSnapshotValue(
+  String? value,
+) {
+  return switch (value) {
+    'empty' => ChatWorkLogTerminalOutputState.empty,
+    'uncaptured' => ChatWorkLogTerminalOutputState.uncaptured,
+    _ => ChatWorkLogTerminalOutputState.unknown,
+  };
+}
+
 sealed class ChatWorkLogEntryContract {
   const ChatWorkLogEntryContract({
     required this.id,
@@ -25,6 +37,7 @@ sealed class ChatShellWorkLogEntryContract extends ChatWorkLogEntryContract {
     this.processId,
     this.terminalInput,
     this.terminalOutput,
+    this.outputState = ChatWorkLogTerminalOutputState.unknown,
     super.turnId,
     required super.isRunning,
     super.exitCode,
@@ -36,6 +49,7 @@ sealed class ChatShellWorkLogEntryContract extends ChatWorkLogEntryContract {
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
+  final ChatWorkLogTerminalOutputState outputState;
 }
 
 final class ChatGenericWorkLogEntryContract extends ChatWorkLogEntryContract {
@@ -64,6 +78,7 @@ final class ChatCommandExecutionWorkLogEntryContract
     super.processId,
     super.terminalInput,
     super.terminalOutput,
+    super.outputState,
     super.turnId,
     super.isRunning = false,
     super.exitCode,
@@ -85,6 +100,7 @@ final class ChatCommandWaitWorkLogEntryContract
     super.processId,
     super.terminalInput,
     super.terminalOutput,
+    super.outputState,
     super.turnId,
     super.isRunning = true,
     super.exitCode,

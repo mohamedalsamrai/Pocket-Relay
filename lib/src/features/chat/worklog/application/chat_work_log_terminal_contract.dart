@@ -1,4 +1,8 @@
 import 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart';
+export 'package:pocket_relay/src/features/chat/worklog/domain/chat_work_log_contract.dart'
+    show
+        ChatWorkLogTerminalOutputState,
+        chatWorkLogTerminalOutputStateFromSnapshotValue;
 
 const _chatWorkLogTerminalKeepValue = Object();
 
@@ -17,6 +21,7 @@ class ChatWorkLogTerminalContract {
     this.processId,
     this.terminalInput,
     this.terminalOutput,
+    this.outputState = ChatWorkLogTerminalOutputState.unknown,
     this.activitySummary,
   });
 
@@ -46,6 +51,7 @@ class ChatWorkLogTerminalContract {
       processId: entry.processId,
       terminalInput: entry.terminalInput,
       terminalOutput: entry.terminalOutput,
+      outputState: entry.outputState,
       activitySummary: switch (entry) {
         ChatCommandExecutionWorkLogEntryContract(:final outputPreview) =>
           outputPreview,
@@ -69,6 +75,7 @@ class ChatWorkLogTerminalContract {
   final String? processId;
   final String? terminalInput;
   final String? terminalOutput;
+  final ChatWorkLogTerminalOutputState outputState;
   final String? activitySummary;
 
   ChatWorkLogTerminalContract copyWith({
@@ -84,6 +91,7 @@ class ChatWorkLogTerminalContract {
     String? processId,
     String? terminalInput,
     String? terminalOutput,
+    ChatWorkLogTerminalOutputState? outputState,
     Object? activitySummary = _chatWorkLogTerminalKeepValue,
   }) {
     return ChatWorkLogTerminalContract(
@@ -100,6 +108,7 @@ class ChatWorkLogTerminalContract {
       processId: processId ?? this.processId,
       terminalInput: terminalInput ?? this.terminalInput,
       terminalOutput: terminalOutput ?? this.terminalOutput,
+      outputState: outputState ?? this.outputState,
       activitySummary: identical(activitySummary, _chatWorkLogTerminalKeepValue)
           ? this.activitySummary
           : activitySummary as String?,

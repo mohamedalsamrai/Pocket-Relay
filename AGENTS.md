@@ -295,6 +295,20 @@ Repo rules for future agents.
 - Protected branches are `master` and `main`.
 - New feature work must happen on a feature branch and land through a PR.
 - PRs should be opened ready-for-review by default.
+- Unless the operator explicitly asks for CI babysitting, review babysitting,
+  or post-PR follow-up, agent work should stop once the branch is pushed, the
+  relevant local verification is done, and a ready-for-review PR is open.
+- Do not block the foreground waiting for remote CI, reviewers, or idle
+  background merge gates when another issue can be worked in parallel.
+- Machine issue reservations such as `computer:<host>` are queue ownership for
+  that computer, not a synonym for "currently being worked on".
+- "Work on one issue at a time" changes only the active implementation target.
+  It does not authorize clearing the other issues already reserved to that
+  computer.
+- Do not silently unassign, unlabel, or otherwise unreserve queued issues when
+  switching focus. Clear a machine reservation only when the issue is done,
+  explicitly reassigned, or the operator explicitly asks to reshuffle the
+  queue.
 - A draft PR requires explicit operator instruction in the current turn.
 - Do not switch a PR between draft and ready-for-review without explicit
   operator instruction in the current turn.
@@ -304,3 +318,26 @@ Repo rules for future agents.
   in the current turn.
 - Do not bypass the protected-branch commit guard unless the operator has
   explicitly authorized that exact exception.
+
+## 16A. Solo-Maintainer Review Policy
+
+- Pocket Relay is currently a solo-maintainer repository. There is no standing
+  second human reviewer.
+- While that remains true, GitHub protected branches must not require
+  approving reviews before merge. Keep
+  `required_approving_review_count = 0`.
+- Do not create, reopen, or preserve admin work whose intended outcome is
+  "require 1 approval on protected branches" unless the operator explicitly
+  says the reviewer pool has changed.
+- CI changes, branch-protection cleanup, and auto-merge work are not permission
+  to reintroduce a human-approval gate.
+- Preserve the solo-maintainer baseline during repo-admin work:
+  PRs may still be required, status checks may still be required, conversation
+  resolution may still be required, and merge commits may still be the only
+  allowed merge method, but human approval requirements must stay disabled.
+- AI reviews, owner comments, and post-merge comments do not count as an
+  independent human reviewer and must not be used to justify re-enabling
+  approval requirements.
+- If independent reviewer availability changes in the future, stop and ask
+  before changing branch protection instead of inferring a new policy from old
+  issues, old comments, or prior admin passes.
