@@ -130,6 +130,146 @@ void main() {
   );
 
   test(
+    'hydrateWorkLogTerminal trusts retained command output without rereading history',
+    () async {
+      final appServerClient = FakeCodexAppServerClient();
+      final controller = buildWorkLogTerminalSessionController(
+        appServerClient: appServerClient,
+      );
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_saved',
+          activityLabel: 'Ran command',
+          commandText: 'pwd',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_saved',
+          threadId: 'thread_saved',
+          turnId: 'turn_saved',
+          terminalOutput: '/repo\n',
+        ),
+      );
+
+      expect(hydrated.terminalOutput, '/repo\n');
+      expect(appServerClient.readThreadCalls, isEmpty);
+    },
+  );
+
+  test(
+    'hydrateWorkLogTerminal rereads history when terminal output is marked uncaptured',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_uncaptured'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_uncaptured',
+              turns: <CodexAppServerHistoryTurn>[
+                CodexAppServerHistoryTurn(
+                  id: 'turn_uncaptured',
+                  status: 'completed',
+                  items: <CodexAppServerHistoryItem>[
+                    CodexAppServerHistoryItem(
+                      id: 'command_uncaptured',
+                      type: 'commandExecution',
+                      status: 'completed',
+                      raw: <String, dynamic>{
+                        'id': 'command_uncaptured',
+                        'type': 'commandExecution',
+                        'status': 'completed',
+                        'command': 'pwd',
+                        'aggregatedOutput': '/repo\n',
+                        'exitCode': 0,
+                      },
+                    ),
+                  ],
+                  raw: <String, dynamic>{
+                    'id': 'turn_uncaptured',
+                    'status': 'completed',
+                  },
+                ),
+              ],
+            );
+      final controller = buildWorkLogTerminalSessionController(
+        appServerClient: appServerClient,
+      );
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_uncaptured',
+          activityLabel: 'Ran command',
+          commandText: 'pwd',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_uncaptured',
+          threadId: 'thread_uncaptured',
+          turnId: 'turn_uncaptured',
+          outputState: ChatWorkLogTerminalOutputState.uncaptured,
+        ),
+      );
+
+      expect(appServerClient.readThreadCalls, <String>['thread_uncaptured']);
+      expect(hydrated.terminalOutput, '/repo\n');
+    },
+  );
+
+  test(
+    'hydrateWorkLogTerminal rereads history when retained terminal output is truncated',
+    () async {
+      final appServerClient = FakeCodexAppServerClient()
+        ..threadHistoriesById['thread_truncated'] =
+            const CodexAppServerThreadHistory(
+              id: 'thread_truncated',
+              turns: <CodexAppServerHistoryTurn>[
+                CodexAppServerHistoryTurn(
+                  id: 'turn_truncated',
+                  status: 'completed',
+                  items: <CodexAppServerHistoryItem>[
+                    CodexAppServerHistoryItem(
+                      id: 'command_truncated',
+                      type: 'commandExecution',
+                      status: 'completed',
+                      raw: <String, dynamic>{
+                        'id': 'command_truncated',
+                        'type': 'commandExecution',
+                        'status': 'completed',
+                        'command': 'cat big.log',
+                        'aggregatedOutput':
+                            'line 1\\nline 2\\nline 3\\nline 4\\n',
+                        'exitCode': 0,
+                      },
+                    ),
+                  ],
+                  raw: <String, dynamic>{
+                    'id': 'turn_truncated',
+                    'status': 'completed',
+                  },
+                ),
+              ],
+            );
+      final controller = buildWorkLogTerminalSessionController(
+        appServerClient: appServerClient,
+      );
+
+      final hydrated = await controller.hydrateWorkLogTerminal(
+        const ChatWorkLogTerminalContract(
+          id: 'item_command_truncated',
+          activityLabel: 'Ran command',
+          commandText: 'cat big.log',
+          isRunning: false,
+          isWaiting: false,
+          itemId: 'command_truncated',
+          threadId: 'thread_truncated',
+          turnId: 'turn_truncated',
+          terminalOutput: 'line 1\\nline 2\\n [truncated]',
+        ),
+      );
+
+      expect(appServerClient.readThreadCalls, <String>['thread_truncated']);
+      expect(hydrated.terminalOutput, 'line 1\\nline 2\\nline 3\\nline 4\\n');
+    },
+  );
+
+  test(
     'hydrateWorkLogTerminal ignores active items from a different turn id',
     () async {
       final appServerClient = FakeCodexAppServerClient()

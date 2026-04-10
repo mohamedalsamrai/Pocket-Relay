@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_command_audit_snapshot.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/transcript_memory_budget.dart';
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_runtime_event.dart';
 
@@ -36,6 +37,24 @@ void main() {
       endsWith('[truncated]'),
     );
     expect(snapshot?.containsKey('aggregatedOutput'), isFalse);
+  });
+
+  test('retains bounded command audit output for command work logs', () {
+    final snapshot = budget.retainWorkLogSnapshot(
+      TranscriptCanonicalItemType.commandExecution,
+      <String, dynamic>{
+        'command': 'flutter test',
+        'processId': 'proc_1',
+        TranscriptCommandAuditSnapshot.aggregatedOutputKey: 'x' * 3000,
+      },
+    );
+
+    expect(snapshot?['command'], 'flutter test');
+    expect(snapshot?['processId'], 'proc_1');
+    expect(
+      snapshot?[TranscriptCommandAuditSnapshot.aggregatedOutputKey],
+      endsWith('[truncated]'),
+    );
   });
 
   test('caps retained unified diff size', () {
