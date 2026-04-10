@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: pr-platform-builds-${{ github.event.pull_request.number || github.ref }}
@@ -20,8 +21,68 @@ env:
   ANDROID_TARGET_PLATFORM: android-arm64
 
 jobs:
+  changes:
+    name: Detect verification scope
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+
+    steps:
+      - name: Detect markdown-only PRs
+        id: scope
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('docs_only', 'false');
+              core.info('Non-PR run: full verification remains enabled.');
+              return;
+            }
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                per_page: 100,
+              },
+            );
+            const changedFilesCount = context.payload.pull_request.changed_files;
+            const hasCompleteFileList =
+              Number.isInteger(changedFilesCount) &&
+              files.length === changedFilesCount;
+
+            const isDocsPath = (name) => {
+              const lowered = name.toLowerCase();
+              return lowered === 'agents.md' || lowered.endsWith('.md');
+            };
+
+            const docsOnly =
+              hasCompleteFileList &&
+              files.length > 0 &&
+              files.every((file) =>
+                [file.filename, file.previous_filename]
+                  .filter(Boolean)
+                  .every(isDocsPath),
+              );
+
+            core.info(
+              `Changed files (${files.length}): ${files.map((file) => file.filename).join(', ')}`,
+            );
+            core.info(`pull_request.changed_files=${changedFilesCount}`);
+            if (!hasCompleteFileList) {
+              core.warning(
+                'Changed-file listing may be incomplete; keeping full verification enabled.',
+              );
+            }
+            core.info(`docs_only=${docsOnly}`);
+            core.setOutput('docs_only', docsOnly ? 'true' : 'false');
+
   regression_shards:
     name: Regression shard ${{ matrix.shard_label }}
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -57,23 +118,40 @@ jobs:
 
   regression:
     name: Regression tests
+    needs:
+      - changes
+      - regression_shards
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: regression_shards
     if: ${{ always() }}
 
     steps:
+      - name: Skip regression shards for markdown-only PRs
+        if: ${{ needs.changes.result == 'success' && needs.changes.outputs.docs_only == 'true' }}
+        run: |
+          echo "Markdown-only PR: regression shards intentionally skipped."
+
+      - name: Fail when verification scope detection fails
+        if: ${{ needs.changes.result != 'success' }}
+        run: |
+          echo "Verification-scope detection failed."
+          exit 1
+
       - name: Fail when any regression shard fails
-        if: ${{ needs.regression_shards.result != 'success' }}
+        if: ${{ needs.changes.outputs.docs_only != 'true' && needs.regression_shards.result != 'success' }}
         run: |
           echo "At least one regression shard failed."
           exit 1
 
       - name: Confirm all regression shards passed
-        run: echo "All regression shards passed."
+        if: ${{ needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.regression_shards.result == 'success' }}
+        run: |
+          echo "All regression shards passed."
 
   android:
     name: Android debug APK (app flavor)
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -109,6 +187,8 @@ jobs:
 
   ios:
     name: iOS simulator debug build
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: macos-latest
     timeout-minutes: 45
 
@@ -133,6 +213,8 @@ jobs:
 
   linux:
     name: Linux debug bundle
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -159,6 +241,8 @@ jobs:
 
   macos:
     name: macOS debug app
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.docs_only != 'true') }}
     runs-on: macos-latest
     timeout-minutes: 45
 

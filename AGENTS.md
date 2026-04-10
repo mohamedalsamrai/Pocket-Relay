@@ -295,6 +295,20 @@ Repo rules for future agents.
 - Protected branches are `master` and `main`.
 - New feature work must happen on a feature branch and land through a PR.
 - PRs should be opened ready-for-review by default.
+- Unless the operator explicitly asks for CI babysitting, review babysitting,
+  or post-PR follow-up, agent work should stop once the branch is pushed, the
+  relevant local verification is done, and a ready-for-review PR is open.
+- Do not block the foreground waiting for remote CI, reviewers, or idle
+  background merge gates when another issue can be worked in parallel.
+- Machine issue reservations such as `computer:<host>` are queue ownership for
+  that computer, not a synonym for "currently being worked on".
+- "Work on one issue at a time" changes only the active implementation target.
+  It does not authorize clearing the other issues already reserved to that
+  computer.
+- Do not silently unassign, unlabel, or otherwise unreserve queued issues when
+  switching focus. Clear a machine reservation only when the issue is done,
+  explicitly reassigned, or the operator explicitly asks to reshuffle the
+  queue.
 - A draft PR requires explicit operator instruction in the current turn.
 - Do not switch a PR between draft and ready-for-review without explicit
   operator instruction in the current turn.
