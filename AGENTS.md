@@ -298,9 +298,8 @@ Repo rules for future agents.
 - Unless the operator explicitly asks for CI babysitting, review babysitting,
   or post-PR follow-up, agent work should stop once the branch is pushed, the
   relevant local verification is done, and a ready-for-review PR is open.
-- Do not block the foreground on waiting for remote CI, waiting for reviewers,
-  or waiting for idle background merge gates when another issue can be worked
-  in parallel.
+- Do not block the foreground waiting for remote CI, reviewers, or idle
+  background merge gates when another issue can be worked in parallel.
 - Machine issue reservations such as `computer:<host>` are queue ownership for
   that computer, not a synonym for "currently being worked on".
 - "Work on one issue at a time" changes only the active implementation target.
