@@ -5,8 +5,15 @@ extension _ConnectionSettingsSheetSections on ConnectionSettingsSheetSurface {
     BuildContext context,
     ConnectionSettingsContract contract,
   ) {
+    final usesCompactMobileSystemEditor = this._usesCompactMobileSystemEditor(
+      context,
+    );
     return surfaceMode == ConnectionSettingsSurfaceMode.system
-        ? this._buildSystemScrollableContent(context, contract)
+        ? this._buildSystemScrollableContent(
+            context,
+            contract,
+            usesCompactMobileSystemEditor: usesCompactMobileSystemEditor,
+          )
         : this._buildWorkspaceScrollableContent(context, contract);
   }
 
@@ -48,8 +55,29 @@ extension _ConnectionSettingsSheetSections on ConnectionSettingsSheetSurface {
 
   Widget _buildSystemScrollableContent(
     BuildContext context,
-    ConnectionSettingsContract contract,
-  ) {
+    ConnectionSettingsContract contract, {
+    required bool usesCompactMobileSystemEditor,
+  }) {
+    if (usesCompactMobileSystemEditor) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (contract.profileSection.fields.isNotEmpty) ...[
+            this._buildFieldColumn(context, contract.profileSection.fields),
+            if (contract.remoteConnectionSection != null)
+              const SizedBox(height: 20),
+          ],
+          if (contract.remoteConnectionSection case final remoteSection?)
+            this._buildRemoteAccessSection(
+              context,
+              contract,
+              remoteSection,
+              showSystemPicker: false,
+            ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

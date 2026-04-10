@@ -5,10 +5,12 @@ extension _ConnectionSettingsSheetHeader on ConnectionSettingsSheetSurface {
     BuildContext context,
     ConnectionSettingsContract contract, {
     required bool isDesktop,
+    bool usesCompactMobileSystemEditor = false,
   }) {
     final theme = Theme.of(context);
     final summary = this._summaryTextFor(contract);
     final badges = this._buildHeaderBadges(context, contract);
+    final showCompactHeaderDetails = !usesCompactMobileSystemEditor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -22,7 +24,7 @@ extension _ConnectionSettingsSheetHeader on ConnectionSettingsSheetSurface {
             fontSize: isDesktop ? 30 : 24,
           ),
         ),
-        if (summary.isNotEmpty) ...[
+        if (showCompactHeaderDetails && summary.isNotEmpty) ...[
           const SizedBox(height: 10),
           Text(
             summary,
@@ -31,7 +33,7 @@ extension _ConnectionSettingsSheetHeader on ConnectionSettingsSheetSurface {
             ),
           ),
         ],
-        if (badges.isNotEmpty) ...[
+        if (showCompactHeaderDetails && badges.isNotEmpty) ...[
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: badges),
         ],

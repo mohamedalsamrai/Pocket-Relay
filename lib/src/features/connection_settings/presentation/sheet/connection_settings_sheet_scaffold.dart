@@ -1,21 +1,42 @@
 part of 'package:pocket_relay/src/features/connection_settings/presentation/connection_settings_sheet_surface.dart';
 
 extension _ConnectionSettingsSheetScaffold on ConnectionSettingsSheetSurface {
+  bool _usesCompactMobileSystemEditor(BuildContext context) {
+    return !isDesktopPresentation &&
+        surfaceMode == ConnectionSettingsSurfaceMode.system &&
+        MediaQuery.viewInsetsOf(context).bottom > 0;
+  }
+
   Widget _buildMaterialSurface(
     BuildContext context,
     ConnectionSettingsContract contract,
   ) {
+    final usesCompactMobileSystemEditor = this._usesCompactMobileSystemEditor(
+      context,
+    );
     return ModalSheetScaffold(
-      headerPadding: const EdgeInsets.fromLTRB(
+      headerPadding: EdgeInsets.fromLTRB(
         _mobileHorizontalPadding,
-        _mobileHeaderTopPadding,
+        usesCompactMobileSystemEditor ? 0 : _mobileHeaderTopPadding,
         _mobileHorizontalPadding,
-        _mobileHeaderBottomPadding,
+        usesCompactMobileSystemEditor ? 0 : _mobileHeaderBottomPadding,
       ),
+      showDivider: !usesCompactMobileSystemEditor,
       bodyPadding: EdgeInsets.zero,
       bodyIsScrollable: false,
-      header: this._buildMobileHeader(context, contract),
-      body: this._buildSurfaceBody(context, contract, isDesktop: false),
+      header: usesCompactMobileSystemEditor
+          ? const SizedBox.shrink()
+          : this._buildMobileHeader(
+              context,
+              contract,
+              usesCompactMobileSystemEditor: false,
+            ),
+      body: this._buildSurfaceBody(
+        context,
+        contract,
+        isDesktop: false,
+        usesCompactMobileSystemEditor: usesCompactMobileSystemEditor,
+      ),
     );
   }
 
@@ -90,14 +111,20 @@ extension _ConnectionSettingsSheetScaffold on ConnectionSettingsSheetSurface {
 
   Widget _buildMobileHeader(
     BuildContext context,
-    ConnectionSettingsContract contract,
-  ) {
+    ConnectionSettingsContract contract, {
+    required bool usesCompactMobileSystemEditor,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const ModalSheetDragHandle(),
-        const SizedBox(height: 18),
-        this._buildHeaderContent(context, contract, isDesktop: false),
+        SizedBox(height: usesCompactMobileSystemEditor ? 10 : 18),
+        this._buildHeaderContent(
+          context,
+          contract,
+          isDesktop: false,
+          usesCompactMobileSystemEditor: usesCompactMobileSystemEditor,
+        ),
       ],
     );
   }
@@ -106,7 +133,32 @@ extension _ConnectionSettingsSheetScaffold on ConnectionSettingsSheetSurface {
     BuildContext context,
     ConnectionSettingsContract contract, {
     required bool isDesktop,
+    required bool usesCompactMobileSystemEditor,
   }) {
+    if (usesCompactMobileSystemEditor) {
+      return SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          _mobileHorizontalPadding,
+          12,
+          _mobileHorizontalPadding,
+          _mobileFooterBottomPadding + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            this._buildScrollableContent(context, contract),
+            const SizedBox(height: 20),
+            this._buildFooterActionBar(
+              context,
+              contract,
+              isDesktop: false,
+              isInline: true,
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
         Expanded(
@@ -130,18 +182,23 @@ extension _ConnectionSettingsSheetScaffold on ConnectionSettingsSheetSurface {
     BuildContext context,
     ConnectionSettingsContract contract, {
     required bool isDesktop,
+    bool isInline = false,
   }) {
-    final bottomPadding = isDesktop
+    final double bottomPadding = isDesktop
         ? _desktopSurfacePadding
+        : isInline
+        ? 0
         : _mobileFooterBottomPadding + MediaQuery.viewInsetsOf(context).bottom;
-    final horizontalPadding = isDesktop
+    final double horizontalPadding = isDesktop
         ? _desktopSurfacePadding
+        : isInline
+        ? 0
         : _mobileHorizontalPadding;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
         horizontalPadding,
-        14,
+        isInline ? 0 : 14,
         horizontalPadding,
         bottomPadding,
       ),
