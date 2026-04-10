@@ -10,8 +10,12 @@ import 'package:pocket_relay/src/core/utils/platform_capabilities.dart';
 import 'package:pocket_relay/src/core/utils/shell_utils.dart';
 import 'package:pocket_relay/src/features/chat/composer/domain/chat_composer_draft.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_conversation_recovery_policy.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_effect_coordinator.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_errors.dart';
 import 'package:pocket_relay/src/features/chat/lane/application/chat_session_guardrail_errors.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_recovery_coordinator.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_request_coordinator.dart';
+import 'package:pocket_relay/src/features/chat/lane/application/chat_session_send_coordinator.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/chat_historical_conversation_restorer.dart';
 import 'package:pocket_relay/src/features/chat/transcript/application/codex_historical_conversation_normalizer.dart';
 import 'package:pocket_relay/src/features/chat/runtime/application/agent_adapter_runtime_event_bridge.dart';
@@ -27,11 +31,9 @@ import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_ada
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/agent_adapter_models.dart';
 import 'package:pocket_relay/src/features/chat/worklog/application/chat_work_log_terminal_contract.dart';
 
-part 'chat_session_controller_events.dart';
 part 'chat_session_controller_history.dart';
 part 'chat_session_controller_init.dart';
 part 'chat_session_controller_model_capabilities.dart';
-part 'chat_session_controller_prompt_flow.dart';
 part 'chat_session_controller_recovery.dart';
 part 'chat_session_controller_support.dart';
 part 'chat_session_controller_thread_metadata.dart';
@@ -72,6 +74,18 @@ class ChatSessionController extends ChangeNotifier {
        _supportsLocalConnectionMode =
            supportsLocalConnectionMode ??
            supportsLocalAgentAdapterConnection() {
+    _requestCoordinator = DefaultChatSessionRequestCoordinator(
+      context: _ChatSessionRequestCoordinatorContextAdapter(this),
+    );
+    _effectCoordinator = DefaultChatSessionEffectCoordinator(
+      context: _ChatSessionEffectCoordinatorContextAdapter(this),
+    );
+    _sendCoordinator = DefaultChatSessionSendCoordinator(
+      context: _ChatSessionSendCoordinatorContextAdapter(this),
+    );
+    _recoveryCoordinator = DefaultChatSessionRecoveryCoordinator(
+      context: _ChatSessionRecoveryCoordinatorContextAdapter(this),
+    );
     final initial = initialSavedProfile;
     if (initial != null) {
       _profile = initial.profile;
@@ -96,6 +110,12 @@ class ChatSessionController extends ChangeNotifier {
   final ChatConversationRecoveryPolicy _conversationRecoveryPolicy =
       const ChatConversationRecoveryPolicy();
   final bool _supportsLocalConnectionMode;
+  late final ChatSessionRequestCoordinator _requestCoordinator;
+  late final ChatSessionEffectCoordinator _effectCoordinator;
+  late final ChatSessionSendCoordinator _sendCoordinator;
+  late final ChatSessionRecoveryCoordinator _recoveryCoordinator;
+
+  // Send/recovery shared connection identity and persisted credentials.
   final _snackBarMessagesController = StreamController<String>.broadcast();
   final _turnCompletedEventsController =
       StreamController<ChatSessionTurnCompletedEvent>.broadcast();
@@ -107,21 +127,28 @@ class ChatSessionController extends ChangeNotifier {
   ChatHistoricalConversationRestoreState? _historicalConversationRestoreState;
   List<AgentAdapterModel>? _modelCatalog;
 
+  // Controller lifecycle owner.
   bool _isLoading = true;
   bool _isDisposed = false;
+
+  // Effect coordinator owner.
   bool _isTrackingSshBootstrapFailures = false;
   bool _sawTrackedSshBootstrapFailure = false;
   bool _sawTrackedUnpinnedHostKeyFailure = false;
-  bool _suppressTrackedThreadReuse = false;
   bool _isBufferingRuntimeEvents = false;
-  bool _didAttemptModelCatalogHydration = false;
-  int _historicalConversationRestoreGeneration = 0;
-  final Set<String> _threadMetadataHydrationAttempts = <String>{};
   final List<TranscriptRuntimeEvent> _bufferedRuntimeEvents =
       <TranscriptRuntimeEvent>[];
+
+  // Recovery/history owner.
+  bool _suppressTrackedThreadReuse = false;
+  int _historicalConversationRestoreGeneration = 0;
+
+  // Model/capability hydration owner.
+  bool _didAttemptModelCatalogHydration = false;
   StreamSubscription<AgentAdapterEvent>? _appServerEventSubscription;
   Future<void>? _initializationFuture;
   Future<void>? _modelCatalogHydrationFuture;
+  final Set<String> _threadMetadataHydrationAttempts = <String>{};
 
   Stream<String> get snackBarMessages => _snackBarMessagesController.stream;
   Stream<ChatSessionTurnCompletedEvent> get turnCompletedEvents =>
@@ -152,35 +179,31 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   Future<void> saveObservedHostFingerprint(String blockId) {
-    return _ChatSessionControllerPromptFlow(
-      this,
-    ).saveObservedHostFingerprint(blockId);
+    return _sendCoordinator.saveObservedHostFingerprint(blockId);
   }
 
   Future<bool> sendPrompt(String prompt) {
-    return _ChatSessionControllerPromptFlow(this).sendPrompt(prompt);
+    return _sendCoordinator.sendPrompt(prompt);
   }
 
   Future<bool> sendDraft(ChatComposerDraft draft) {
-    return _ChatSessionControllerPromptFlow(this).sendDraft(draft);
+    return _sendCoordinator.sendDraft(draft);
   }
 
   Future<void> stopActiveTurn() {
-    return _ChatSessionControllerPromptFlow(this).stopActiveTurn();
+    return _sendCoordinator.stopActiveTurn();
   }
 
   void startFreshConversation() {
-    _ChatSessionControllerRecovery(this).startFreshConversation();
+    _recoveryCoordinator.startFreshConversation();
   }
 
   void clearTranscript() {
-    _ChatSessionControllerRecovery(this).clearTranscript();
+    _recoveryCoordinator.clearTranscript();
   }
 
   void openConversationRecoveryAlternateSession() {
-    _ChatSessionControllerRecovery(
-      this,
-    ).openConversationRecoveryAlternateSession();
+    _recoveryCoordinator.openConversationRecoveryAlternateSession();
   }
 
   void selectTimeline(String threadId) {
@@ -210,25 +233,19 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   Future<void> selectConversationForResume(String threadId) {
-    return _ChatSessionControllerRecovery(
-      this,
-    ).selectConversationForResume(threadId);
+    return _recoveryCoordinator.selectConversationForResume(threadId);
   }
 
   Future<void> reattachConversation(String threadId) {
-    return _ChatSessionControllerRecovery(this).reattachConversation(threadId);
+    return _recoveryCoordinator.reattachConversation(threadId);
   }
 
   Future<void> retryHistoricalConversationRestore() {
-    return _ChatSessionControllerRecovery(
-      this,
-    ).retryHistoricalConversationRestore();
+    return _recoveryCoordinator.retryHistoricalConversationRestore();
   }
 
   Future<ChatComposerDraft?> continueFromUserMessage(String blockId) {
-    return _ChatSessionControllerRecovery(
-      this,
-    ).continueFromUserMessage(blockId);
+    return _recoveryCoordinator.continueFromUserMessage(blockId);
   }
 
   Future<ChatWorkLogTerminalContract> hydrateWorkLogTerminal(
@@ -238,24 +255,22 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   Future<bool> branchSelectedConversation() {
-    return _ChatSessionControllerRecovery(this).branchSelectedConversation();
+    return _recoveryCoordinator.branchSelectedConversation();
   }
 
   Future<void> approveRequest(String requestId) {
-    return _resolveApproval(requestId, approved: true);
+    return _requestCoordinator.approveRequest(requestId);
   }
 
   Future<void> denyRequest(String requestId) {
-    return _resolveApproval(requestId, approved: false);
+    return _requestCoordinator.denyRequest(requestId);
   }
 
   Future<void> submitUserInput(
     String requestId,
     Map<String, List<String>> answers,
   ) {
-    return _ChatSessionControllerPromptFlow(
-      this,
-    ).submitUserInput(requestId, answers);
+    return _requestCoordinator.submitUserInput(requestId, answers);
   }
 
   @override
@@ -287,7 +302,7 @@ class ChatSessionController extends ChangeNotifier {
   }
 
   void _handleAppServerEvent(AgentAdapterEvent event) {
-    _handleChatSessionAppServerEvent(this, event);
+    _effectCoordinator.handleAgentAdapterEvent(event);
   }
 
   bool _isUnsupportedHostRequest(String method) {
@@ -333,11 +348,22 @@ class ChatSessionController extends ChangeNotifier {
     await _stopChatSessionAppServerTurn(this);
   }
 
-  Future<void> _resolveApproval(
-    String requestId, {
-    required bool approved,
-  }) async {
-    await _resolveChatSessionApproval(this, requestId, approved: approved);
+  void _applyRuntimeEvent(TranscriptRuntimeEvent event) {
+    _effectCoordinator.applyRuntimeEvent(event);
+  }
+
+  void _reportAppServerFailure({
+    required PocketUserFacingError userFacingError,
+    String? runtimeErrorMessage,
+    bool suppressRuntimeError = false,
+    bool suppressSnackBar = false,
+  }) {
+    _effectCoordinator.reportAppServerFailure(
+      userFacingError: userFacingError,
+      runtimeErrorMessage: runtimeErrorMessage,
+      suppressRuntimeError: suppressRuntimeError,
+      suppressSnackBar: suppressSnackBar,
+    );
   }
 
   void _notifyListenersIfMounted() {
@@ -362,5 +388,485 @@ class ChatSessionController extends ChangeNotifier {
 
   bool _isCurrentHistoricalConversationRestore(int generation) {
     return _historicalConversationRestoreGeneration == generation;
+  }
+}
+
+final class _ChatSessionSendCoordinatorContextAdapter
+    implements ChatSessionSendCoordinatorContext {
+  _ChatSessionSendCoordinatorContextAdapter(this._controller);
+
+  final ChatSessionController _controller;
+
+  @override
+  ConnectionProfile get profile => _controller._profile;
+
+  @override
+  ConnectionSecrets get secrets => _controller._secrets;
+
+  @override
+  TranscriptSessionState get sessionState => _controller._sessionState;
+
+  @override
+  ChatConversationRecoveryState? get conversationRecoveryState =>
+      _controller._conversationRecoveryState;
+
+  @override
+  ChatHistoricalConversationRestoreState?
+  get historicalConversationRestoreState =>
+      _controller._historicalConversationRestoreState;
+
+  @override
+  ChatConversationRecoveryPolicy get conversationRecoveryPolicy =>
+      _controller._conversationRecoveryPolicy;
+
+  @override
+  AgentAdapterClient get agentAdapterClient => _controller.agentAdapterClient;
+
+  @override
+  bool get supportsLocalConnectionMode =>
+      _controller._supportsLocalConnectionMode;
+
+  @override
+  TranscriptSshUnpinnedHostKeyBlock? findUnpinnedHostKeyBlock(String blockId) {
+    return _controller._findUnpinnedHostKeyBlock(blockId);
+  }
+
+  @override
+  Future<void> persistProfile(ConnectionProfile profile) {
+    return _controller.profileStore.save(profile, _controller._secrets);
+  }
+
+  @override
+  void updateProfile(ConnectionProfile profile) {
+    if (_controller._isDisposed) {
+      return;
+    }
+    _controller._profile = profile;
+  }
+
+  @override
+  void emitUserFacingError(PocketUserFacingError error) {
+    _controller._emitUserFacingError(error);
+  }
+
+  @override
+  void applySessionState(TranscriptSessionState nextState) {
+    _controller._applySessionState(nextState);
+  }
+
+  @override
+  TranscriptSessionState markUnpinnedHostKeySaved(String blockId) {
+    return _controller._sessionReducer.markUnpinnedHostKeySaved(
+      _controller._sessionState,
+      blockId: blockId,
+    );
+  }
+
+  @override
+  TranscriptSessionState addUserMessage({
+    required String text,
+    ChatComposerDraft? draft,
+  }) {
+    return _controller._sessionReducer.addUserMessage(
+      _controller._sessionState,
+      text: text,
+      draft: draft,
+    );
+  }
+
+  @override
+  void selectTimeline(String threadId) {
+    _controller.selectTimeline(threadId);
+  }
+
+  @override
+  String? activeConversationThreadId() {
+    if (_controller._profile.ephemeralSession) {
+      return null;
+    }
+    return _normalizedThreadId(_controller._sessionState.rootThreadId);
+  }
+
+  @override
+  String? trackedThreadReuseCandidate() {
+    if (_controller._profile.ephemeralSession ||
+        _controller._suppressTrackedThreadReuse ||
+        _controller._sessionState.hasMultipleTimelines) {
+      return null;
+    }
+
+    return _normalizedThreadId(_controller.agentAdapterClient.threadId);
+  }
+
+  @override
+  void setConversationRecovery(ChatConversationRecoveryState nextState) {
+    final currentState = _controller._conversationRecoveryState;
+    if (currentState?.reason == nextState.reason &&
+        currentState?.alternateThreadId == nextState.alternateThreadId &&
+        currentState?.expectedThreadId == nextState.expectedThreadId &&
+        currentState?.actualThreadId == nextState.actualThreadId) {
+      return;
+    }
+
+    _controller._conversationRecoveryState = nextState;
+    _controller._notifyListenersIfMounted();
+  }
+
+  @override
+  bool canSendAdditionalInputToCurrentTurn() {
+    if (_activeTurnIdForSteering() == null ||
+        _controller.agentAdapterCapabilities.supportsLiveTurnSteering) {
+      return true;
+    }
+
+    _controller._emitUserFacingError(
+      ChatSessionGuardrailErrors.liveTurnSteeringUnsupported(),
+    );
+    return false;
+  }
+
+  @override
+  Future<bool> ensureImageInputsSupportedForDraft(ChatComposerDraft draft) {
+    return _controller._ensureImageInputsSupportedForDraft(draft);
+  }
+
+  @override
+  Future<bool> sendPromptWithAppServer(String prompt) {
+    return _controller._sendPromptWithAppServer(prompt);
+  }
+
+  @override
+  Future<bool> sendDraftWithAppServer(ChatComposerDraft draft) {
+    return _controller._sendDraftWithAppServer(draft);
+  }
+
+  @override
+  Future<void> stopAppServerTurn() {
+    return _controller._stopAppServerTurn();
+  }
+
+  String? _normalizedThreadId(String? value) {
+    final normalizedValue = value?.trim();
+    if (normalizedValue == null || normalizedValue.isEmpty) {
+      return null;
+    }
+    return normalizedValue;
+  }
+
+  String? _activeTurnIdForSteering() {
+    final transportTurnId = _normalizedTurnId(
+      _controller.agentAdapterClient.activeTurnId,
+    );
+    if (transportTurnId != null) {
+      return transportTurnId;
+    }
+
+    if (_controller.agentAdapterClient.isConnected) {
+      return null;
+    }
+
+    return _normalizedTurnId(_controller._sessionState.activeTurn?.turnId);
+  }
+
+  String? _normalizedTurnId(String? value) {
+    final normalizedValue = value?.trim();
+    if (normalizedValue == null || normalizedValue.isEmpty) {
+      return null;
+    }
+    return normalizedValue;
+  }
+}
+
+final class _ChatSessionRecoveryCoordinatorContextAdapter
+    implements ChatSessionRecoveryCoordinatorContext {
+  _ChatSessionRecoveryCoordinatorContextAdapter(this._controller);
+
+  final ChatSessionController _controller;
+
+  @override
+  TranscriptSessionState get sessionState => _controller._sessionState;
+
+  @override
+  ChatConversationRecoveryState? get conversationRecoveryState =>
+      _controller._conversationRecoveryState;
+
+  @override
+  ChatHistoricalConversationRestoreState?
+  get historicalConversationRestoreState =>
+      _controller._historicalConversationRestoreState;
+
+  @override
+  AgentAdapterClient get agentAdapterClient => _controller.agentAdapterClient;
+
+  @override
+  void emitUserFacingError(PocketUserFacingError error) {
+    _controller._emitUserFacingError(error);
+  }
+
+  @override
+  void applySessionState(TranscriptSessionState nextState) {
+    _controller._applySessionState(nextState);
+  }
+
+  @override
+  TranscriptSessionState startFreshThread({String? message}) {
+    return _controller._sessionReducer.startFreshThread(
+      _controller._sessionState,
+      message: message,
+    );
+  }
+
+  @override
+  TranscriptSessionState clearTranscriptState() {
+    return _controller._sessionReducer.clearTranscript(
+      _controller._sessionState,
+    );
+  }
+
+  @override
+  void invalidateHistoricalConversationRestore() {
+    _controller._invalidateHistoricalConversationRestore();
+  }
+
+  @override
+  void clearConversationRecovery() {
+    if (_controller._conversationRecoveryState == null) {
+      return;
+    }
+    _controller._conversationRecoveryState = null;
+    _controller._notifyListenersIfMounted();
+  }
+
+  @override
+  void clearHistoricalConversationRestoreState() {
+    if (_controller._historicalConversationRestoreState == null) {
+      return;
+    }
+    _controller._historicalConversationRestoreState = null;
+    _controller._notifyListenersIfMounted();
+  }
+
+  @override
+  void setSuppressTrackedThreadReuse(bool value) {
+    _controller._suppressTrackedThreadReuse = value;
+  }
+
+  @override
+  String? normalizeThreadId(String value) {
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  @override
+  String? activeConversationThreadId() {
+    if (_controller._profile.ephemeralSession) {
+      return null;
+    }
+    return _normalizeNullable(_controller._sessionState.rootThreadId);
+  }
+
+  @override
+  String? selectedConversationThreadId() {
+    if (_controller._profile.ephemeralSession) {
+      return null;
+    }
+    return _normalizeNullable(
+      _controller._sessionState.currentThreadId ??
+          _controller._sessionState.rootThreadId,
+    );
+  }
+
+  @override
+  bool hasVisibleConversationState([TranscriptSessionState? state]) {
+    final effectiveState = state ?? _controller._sessionState;
+    return effectiveState.activeTurn != null ||
+        effectiveState.pendingApprovalRequests.isNotEmpty ||
+        effectiveState.pendingUserInputRequests.isNotEmpty ||
+        effectiveState.transcriptBlocks.isNotEmpty;
+  }
+
+  @override
+  Future<void> restoreConversationTranscript(String threadId) {
+    return _controller._restoreConversationTranscript(threadId);
+  }
+
+  @override
+  Future<void> resumeConversationThread(String threadId) {
+    return _controller._resumeConversationThread(threadId);
+  }
+
+  @override
+  Future<void> reattachConversationWithHistoryBaseline(String threadId) {
+    return _controller._reattachConversationWithHistoryBaseline(threadId);
+  }
+
+  @override
+  Future<TranscriptSessionState?> performHistoryRestoringThreadTransition({
+    required Future<AgentAdapterThreadHistory> Function() operation,
+    required PocketUserFacingError userFacingError,
+    ChatHistoricalConversationRestoreState? loadingRestoreState,
+    ChatHistoricalConversationRestoreState? emptyHistoryRestoreState,
+    ChatHistoricalConversationRestoreState? failureRestoreState,
+  }) {
+    return _controller._performHistoryRestoringThreadTransition(
+      operation: operation,
+      userFacingError: userFacingError,
+      loadingRestoreState: loadingRestoreState,
+      emptyHistoryRestoreState: emptyHistoryRestoreState,
+      failureRestoreState: failureRestoreState,
+    );
+  }
+
+  String? _normalizeNullable(String? value) {
+    final normalizedValue = value?.trim();
+    if (normalizedValue == null || normalizedValue.isEmpty) {
+      return null;
+    }
+    return normalizedValue;
+  }
+}
+
+final class _ChatSessionRequestCoordinatorContextAdapter
+    implements ChatSessionRequestCoordinatorContext {
+  _ChatSessionRequestCoordinatorContextAdapter(this._controller);
+
+  final ChatSessionController _controller;
+
+  @override
+  AgentAdapterClient get agentAdapterClient => _controller.agentAdapterClient;
+
+  @override
+  TranscriptSessionPendingRequest? findPendingApprovalRequest(
+    String requestId,
+  ) {
+    return _controller._findPendingApprovalRequest(requestId);
+  }
+
+  @override
+  TranscriptSessionPendingUserInputRequest? findPendingUserInputRequest(
+    String requestId,
+  ) {
+    return _controller._findPendingUserInputRequest(requestId);
+  }
+
+  @override
+  void emitUserFacingError(PocketUserFacingError error) {
+    _controller._emitUserFacingError(error);
+  }
+
+  @override
+  void reportAppServerFailure({
+    required PocketUserFacingError userFacingError,
+    String? runtimeErrorMessage,
+    bool suppressRuntimeError = false,
+    bool suppressSnackBar = false,
+  }) {
+    _controller._reportAppServerFailure(
+      userFacingError: userFacingError,
+      runtimeErrorMessage: runtimeErrorMessage,
+      suppressRuntimeError: suppressRuntimeError,
+      suppressSnackBar: suppressSnackBar,
+    );
+  }
+
+  @override
+  void applyRuntimeEvent(TranscriptRuntimeEvent event) {
+    _controller._applyRuntimeEvent(event);
+  }
+}
+
+final class _ChatSessionEffectCoordinatorContextAdapter
+    implements ChatSessionEffectCoordinatorContext {
+  _ChatSessionEffectCoordinatorContextAdapter(this._controller);
+
+  final ChatSessionController _controller;
+
+  @override
+  AgentAdapterRuntimeEventMapper get runtimeEventMapper =>
+      _controller._runtimeEventMapper;
+
+  @override
+  TranscriptReducer get sessionReducer => _controller._sessionReducer;
+
+  @override
+  TranscriptSessionState get sessionState => _controller._sessionState;
+
+  @override
+  bool get isTrackingSshBootstrapFailures =>
+      _controller._isTrackingSshBootstrapFailures;
+
+  @override
+  set isTrackingSshBootstrapFailures(bool value) {
+    _controller._isTrackingSshBootstrapFailures = value;
+  }
+
+  @override
+  bool get sawTrackedSshBootstrapFailure =>
+      _controller._sawTrackedSshBootstrapFailure;
+
+  @override
+  set sawTrackedSshBootstrapFailure(bool value) {
+    _controller._sawTrackedSshBootstrapFailure = value;
+  }
+
+  @override
+  bool get sawTrackedUnpinnedHostKeyFailure =>
+      _controller._sawTrackedUnpinnedHostKeyFailure;
+
+  @override
+  set sawTrackedUnpinnedHostKeyFailure(bool value) {
+    _controller._sawTrackedUnpinnedHostKeyFailure = value;
+  }
+
+  @override
+  bool get isBufferingRuntimeEvents => _controller._isBufferingRuntimeEvents;
+
+  @override
+  void resetModelCatalogHydration() {
+    _controller._resetModelCatalogHydration();
+  }
+
+  @override
+  bool isUnsupportedHostRequest(String method) {
+    return _controller._isUnsupportedHostRequest(method);
+  }
+
+  @override
+  Future<void> handleUnsupportedHostRequest(AgentAdapterRequestEvent event) {
+    return _controller._requestCoordinator.handleUnsupportedHostRequest(event);
+  }
+
+  @override
+  bool isSshBootstrapFailureRuntimeEvent(TranscriptRuntimeEvent event) {
+    return _controller._isSshBootstrapFailureRuntimeEvent(event);
+  }
+
+  @override
+  void bufferRuntimeEvent(TranscriptRuntimeEvent event) {
+    _controller._bufferedRuntimeEvents.add(event);
+  }
+
+  @override
+  void applySessionState(TranscriptSessionState nextState) {
+    _controller._applySessionState(nextState);
+  }
+
+  @override
+  void emitTurnCompleted({required String turnId, String? threadId}) {
+    _controller._turnCompletedEventsController.add(
+      ChatSessionTurnCompletedEvent(turnId: turnId, threadId: threadId),
+    );
+  }
+
+  @override
+  void hydrateThreadMetadataIfNeeded(
+    TranscriptRuntimeThreadStartedEvent event,
+  ) {
+    unawaited(_hydrateChatSessionThreadMetadataIfNeeded(_controller, event));
+  }
+
+  @override
+  void emitSnackBar(String message) {
+    _controller._emitSnackBar(message);
   }
 }

@@ -155,14 +155,7 @@ extension on ChatSessionController {
     PocketUserFacingError warning, {
     required String rawMethod,
   }) {
-    _applyChatSessionRuntimeEvent(
-      this,
-      TranscriptRuntimeWarningEvent(
-        createdAt: DateTime.now(),
-        rawMethod: rawMethod,
-        summary: warning.bodyWithCode,
-      ),
-    );
+    _effectCoordinator.emitDiagnosticWarning(warning, rawMethod: rawMethod);
   }
 
   String _sessionLabel() {

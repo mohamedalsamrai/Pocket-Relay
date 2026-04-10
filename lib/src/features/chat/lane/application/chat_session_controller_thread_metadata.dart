@@ -18,8 +18,7 @@ Future<void> _hydrateChatSessionThreadMetadataIfNeeded(
       return;
     }
 
-    _applyChatSessionRuntimeEvent(
-      controller,
+    controller._applyRuntimeEvent(
       TranscriptRuntimeThreadStartedEvent(
         createdAt: DateTime.now(),
         threadId: thread.id,

@@ -1,102 +1,6 @@
 part of 'chat_session_controller.dart';
 
 extension _ChatSessionControllerRecovery on ChatSessionController {
-  void startFreshConversation() {
-    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.freshConversationBlockedByActiveTurn(),
-      );
-      return;
-    }
-    _resetConversationState(
-      nextState: _sessionReducer.startFreshThread(
-        _sessionState,
-        message: 'The next prompt will start a fresh Codex thread.',
-      ),
-    );
-  }
-
-  void clearTranscript() {
-    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.clearTranscriptBlockedByActiveTurn(),
-      );
-      return;
-    }
-    _resetConversationState(
-      nextState: _sessionReducer.clearTranscript(_sessionState),
-    );
-  }
-
-  void openConversationRecoveryAlternateSession() {
-    final alternateThreadId = _conversationRecoveryState?.alternateThreadId
-        ?.trim();
-    if (alternateThreadId == null || alternateThreadId.isEmpty) {
-      return;
-    }
-
-    final timeline = _sessionState.timelineForThread(alternateThreadId);
-    if (timeline == null) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.alternateSessionUnavailable(),
-      );
-      return;
-    }
-
-    final nextRegistry = <String, TranscriptThreadRegistryEntry>{
-      for (final entry in _sessionState.threadRegistry.entries)
-        entry.key: entry.value.copyWith(
-          isPrimary: entry.key == alternateThreadId,
-        ),
-    };
-
-    _invalidateHistoricalConversationRestore();
-    _suppressTrackedThreadReuse = false;
-    _clearConversationRecovery();
-    _clearHistoricalConversationRestoreState();
-    _applySessionState(
-      _sessionState.copyWith(
-        rootThreadId: alternateThreadId,
-        selectedThreadId: alternateThreadId,
-        threadRegistry: nextRegistry,
-      ),
-    );
-  }
-
-  Future<void> selectConversationForResume(String threadId) async {
-    final normalizedThreadId = _normalizedThreadId(threadId);
-    if (normalizedThreadId == null) {
-      throw ArgumentError.value(
-        threadId,
-        'threadId',
-        'Thread id must not be empty.',
-      );
-    }
-
-    _suppressTrackedThreadReuse = false;
-    await _restoreConversationTranscript(normalizedThreadId);
-  }
-
-  Future<void> reattachConversation(String threadId) async {
-    final normalizedThreadId = _normalizedThreadId(threadId);
-    if (normalizedThreadId == null) {
-      throw ArgumentError.value(
-        threadId,
-        'threadId',
-        'Thread id must not be empty.',
-      );
-    }
-
-    _invalidateHistoricalConversationRestore();
-    _clearHistoricalConversationRestoreState();
-    if (!_hasVisibleConversationState()) {
-      await _reattachConversationWithHistoryBaseline(normalizedThreadId);
-      return;
-    }
-
-    await _resumeConversationThread(normalizedThreadId);
-  }
-
   Future<void> _resumeConversationThread(String threadId) async {
     await _ensureChatSessionAppServerConnected(this);
     final session = await agentAdapterClient.resumeThread(
@@ -107,8 +11,7 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
     _clearConversationRecovery();
     _suppressTrackedThreadReuse = false;
     _rememberChatSessionHeaderMetadata(this, session);
-    _applyChatSessionRuntimeEvent(
-      this,
+    _applyRuntimeEvent(
       TranscriptRuntimeThreadStartedEvent(
         createdAt: DateTime.now(),
         threadId: session.threadId,
@@ -154,7 +57,7 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
         );
       }
       for (final bufferedEvent in bufferedEvents) {
-        _applyChatSessionRuntimeEvent(this, bufferedEvent);
+        _applyRuntimeEvent(bufferedEvent);
       }
     }
 
@@ -168,122 +71,6 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
         historyRestoreStackTrace!,
       );
     }
-  }
-
-  Future<void> retryHistoricalConversationRestore() async {
-    final threadId = _historicalConversationRestoreState?.threadId.trim();
-    if (threadId == null || threadId.isEmpty) {
-      return;
-    }
-
-    await _restoreConversationTranscript(threadId);
-  }
-
-  Future<ChatComposerDraft?> continueFromUserMessage(String blockId) async {
-    final normalizedBlockId = blockId.trim();
-    if (normalizedBlockId.isEmpty) {
-      return null;
-    }
-    if (_historicalConversationRestoreState != null) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.continueBlockedByTranscriptRestore(),
-      );
-      return null;
-    }
-    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.continueBlockedByActiveTurn(),
-      );
-      return null;
-    }
-
-    final targetThreadId = _activeConversationThreadId();
-    if (targetThreadId == null) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.continueTargetUnavailable(),
-      );
-      return null;
-    }
-
-    final timeline = _sessionState.timelineForThread(targetThreadId);
-    final transcriptBlocks =
-        timeline?.transcriptBlocks ?? _sessionState.transcriptBlocks;
-    final userMessages = transcriptBlocks
-        .whereType<TranscriptUserMessageBlock>()
-        .toList(growable: false);
-    final targetIndex = userMessages.indexWhere(
-      (block) => block.id == normalizedBlockId,
-    );
-    if (targetIndex < 0) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.continuePromptUnavailable(),
-      );
-      return null;
-    }
-
-    final targetBlock = userMessages[targetIndex];
-    final numTurns = userMessages.length - targetIndex;
-    if (numTurns < 1) {
-      return null;
-    }
-
-    final nextState = await _performHistoryRestoringThreadTransition(
-      operation: () => agentAdapterClient.rollbackThread(
-        threadId: targetThreadId,
-        numTurns: numTurns,
-      ),
-      userFacingError: ChatSessionErrors.continueFromPromptFailed(),
-      loadingRestoreState: ChatHistoricalConversationRestoreState(
-        threadId: targetThreadId,
-        phase: ChatHistoricalConversationRestorePhase.loading,
-      ),
-    );
-    if (nextState == null) {
-      return null;
-    }
-
-    return targetBlock.draft;
-  }
-
-  Future<bool> branchSelectedConversation() async {
-    if (_historicalConversationRestoreState != null) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.branchBlockedByTranscriptRestore(),
-      );
-      return false;
-    }
-    if (_sessionState.activeTurn != null || _sessionState.isBusy) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.branchBlockedByActiveTurn(),
-      );
-      return false;
-    }
-
-    final targetThreadId = _selectedConversationThreadId();
-    if (targetThreadId == null) {
-      _emitUserFacingError(
-        ChatSessionGuardrailErrors.branchTargetUnavailable(),
-      );
-      return false;
-    }
-
-    final nextState = await _performHistoryRestoringThreadTransition(
-      operation: () async {
-        final forkedSession = await agentAdapterClient.forkThread(
-          threadId: targetThreadId,
-          persistExtendedHistory: true,
-        );
-        return agentAdapterClient.readThreadWithTurns(
-          threadId: forkedSession.threadId,
-        );
-      },
-      userFacingError: ChatSessionErrors.branchConversationFailed(),
-      loadingRestoreState: ChatHistoricalConversationRestoreState(
-        threadId: targetThreadId,
-        phase: ChatHistoricalConversationRestorePhase.loading,
-      ),
-    );
-    return nextState != null;
   }
 
   void _setConversationRecovery(ChatConversationRecoveryState nextState) {
@@ -336,14 +123,6 @@ extension _ChatSessionControllerRecovery on ChatSessionController {
     if (!_isDisposed) {
       _notifyListenersIfMounted();
     }
-  }
-
-  void _resetConversationState({required TranscriptSessionState nextState}) {
-    _invalidateHistoricalConversationRestore();
-    _clearConversationRecovery();
-    _clearHistoricalConversationRestoreState();
-    _suppressTrackedThreadReuse = true;
-    _applySessionState(nextState);
   }
 
   String? _activeConversationThreadId() {

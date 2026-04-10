@@ -65,8 +65,7 @@ _performHistoryRestoringThreadTransitionForController(
     } else {
       controller._clearHistoricalConversationRestoreState();
     }
-    _reportChatSessionAppServerFailure(
-      controller,
+    controller._reportAppServerFailure(
       userFacingError: userFacingError,
       runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
         userFacingError,
@@ -156,8 +155,7 @@ Future<bool> _sendTurnInputWithAppServerForController(
           );
     controller._suppressTrackedThreadReuse = false;
     if (activeTurnId == null) {
-      _applyChatSessionRuntimeEvent(
-        controller,
+      controller._applyRuntimeEvent(
         TranscriptRuntimeTurnStartedEvent(
           createdAt: DateTime.now(),
           threadId: turn.threadId,
@@ -187,8 +185,7 @@ Future<bool> _sendTurnInputWithAppServerForController(
       );
     }
     await Future<void>.microtask(() {});
-    _reportChatSessionAppServerFailure(
-      controller,
+    controller._reportAppServerFailure(
       userFacingError: recoveryAssessment.presentation.userFacingError,
       runtimeErrorMessage: recoveryAssessment.presentation.runtimeErrorMessage,
       suppressRuntimeError: controller._sawTrackedSshBootstrapFailure,
@@ -225,8 +222,7 @@ Future<String> _ensureChatSessionAppServerThread(
   );
   controller._suppressTrackedThreadReuse = false;
   _rememberChatSessionHeaderMetadata(controller, session);
-  _applyChatSessionRuntimeEvent(
-    controller,
+  controller._applyRuntimeEvent(
     TranscriptRuntimeThreadStartedEvent(
       createdAt: DateTime.now(),
       threadId: session.threadId,
@@ -303,8 +299,7 @@ Future<void> _stopChatSessionAppServerTurn(
       threadId: threadId,
       turnId: turnId,
     );
-    _applyChatSessionRuntimeEvent(
-      controller,
+    controller._applyRuntimeEvent(
       TranscriptRuntimeTurnAbortedEvent(
         createdAt: DateTime.now(),
         threadId: threadId,
@@ -314,8 +309,7 @@ Future<void> _stopChatSessionAppServerTurn(
     );
   } catch (error) {
     final userFacingError = ChatSessionErrors.stopTurnFailed();
-    _reportChatSessionAppServerFailure(
-      controller,
+    controller._reportAppServerFailure(
       userFacingError: userFacingError,
       runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
         userFacingError,
@@ -347,46 +341,12 @@ Future<void> _resolveChatSessionApproval(
     final userFacingError = approved
         ? ChatSessionErrors.approveRequestFailed()
         : ChatSessionErrors.denyRequestFailed();
-    _reportChatSessionAppServerFailure(
-      controller,
+    controller._reportAppServerFailure(
       userFacingError: userFacingError,
       runtimeErrorMessage: ChatSessionErrors.runtimeMessage(
         userFacingError,
         error: error,
       ),
     );
-  }
-}
-
-void _reportChatSessionAppServerFailure(
-  ChatSessionController controller, {
-  required PocketUserFacingError userFacingError,
-  String? runtimeErrorMessage,
-  bool suppressRuntimeError = false,
-  bool suppressSnackBar = false,
-}) {
-  final now = DateTime.now();
-  _applyChatSessionRuntimeEvent(
-    controller,
-    TranscriptRuntimeSessionStateChangedEvent(
-      createdAt: now,
-      state: TranscriptRuntimeSessionState.ready,
-      reason: userFacingError.message,
-      rawMethod: 'app-server/failure',
-    ),
-  );
-  if (!suppressRuntimeError) {
-    _applyChatSessionRuntimeEvent(
-      controller,
-      TranscriptRuntimeErrorEvent(
-        createdAt: now,
-        message: runtimeErrorMessage ?? userFacingError.inlineMessage,
-        errorClass: TranscriptRuntimeErrorClass.transportError,
-        rawMethod: 'app-server/failure',
-      ),
-    );
-  }
-  if (!suppressSnackBar) {
-    controller._emitSnackBar(userFacingError.inlineMessage);
   }
 }
