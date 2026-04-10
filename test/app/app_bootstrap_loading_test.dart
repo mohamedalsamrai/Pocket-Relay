@@ -1,10 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
+import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/secure/secure_connection_repository_keys.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/widgets/flutter_chat_screen_renderer.dart';
 import 'package:pocket_relay/src/features/chat/transport/agent_adapter/testing/fake_agent_adapter_client.dart';
+import 'package:pocket_relay/src/features/workspace/presentation/workspace_desktop_shell.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/builders/app_test_harness.dart';
+import '../core/storage/support/connection_repository_test_support.dart';
 
 void main() {
   registerAppTestStorageLifecycle();
@@ -79,4 +87,93 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
+
+  testWidgets(
+    'boots the macOS workspace shell when legacy secure secret reads fail during migration',
+    (tester) async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.connections.index': jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_seed'],
+        }),
+        'pocket_relay.connection.conn_seed.profile': jsonEncode(
+          legacyProfile.toJson(),
+        ),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{passwordKeyForConnection('conn_seed'): 'secret'},
+        keyToThrowOn: passwordKeyForConnection('conn_seed'),
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+        systemIdGenerator: () => 'system_seed',
+      );
+      final appServerClient = FakeAgentAdapterClient();
+      addTearDown(appServerClient.close);
+
+      await tester.pumpWidget(
+        buildCatalogApp(
+          connectionRepository: repository,
+          agentAdapterClient: appServerClient,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          '[${PocketErrorCatalog.appBootstrapWorkspaceInitializationFailed.code}]',
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('retry_workspace_bootstrap')),
+        findsNothing,
+      );
+      expect(find.byType(ConnectionWorkspaceDesktopShell), findsOneWidget);
+      expect(find.byType(FlutterChatScreenRenderer), findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+}
+
+final class _ThrowingReadFakeFlutterSecureStorage
+    extends FakeFlutterSecureStorage {
+  _ThrowingReadFakeFlutterSecureStorage(
+    super.data, {
+    required this.keyToThrowOn,
+  });
+
+  final String keyToThrowOn;
+
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == keyToThrowOn) {
+      throw StateError('secure storage read failed');
+    }
+    return super.read(
+      key: key,
+      iOptions: iOptions,
+      aOptions: aOptions,
+      lOptions: lOptions,
+      webOptions: webOptions,
+      mOptions: mOptions,
+      wOptions: wOptions,
+    );
+  }
 }

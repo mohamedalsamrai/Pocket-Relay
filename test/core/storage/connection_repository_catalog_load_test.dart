@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_relay/src/core/models/connection_models.dart';
+import 'package:pocket_relay/src/core/storage/secure/secure_connection_repository_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/connection_repository_test_support.dart';
@@ -632,10 +633,7 @@ void main() {
       expect(connection.profile.agentAdapter, legacyProfile.agentAdapter);
       expect(connection.profile.agentCommand, legacyProfile.agentCommand);
       expect(connection.profile.authMode, legacyProfile.authMode);
-      expect(
-        connection.profile.hostFingerprint,
-        legacyProfile.hostFingerprint,
-      );
+      expect(connection.profile.hostFingerprint, legacyProfile.hostFingerprint);
       expect(
         connection.profile.dangerouslyBypassSandbox,
         legacyProfile.dangerouslyBypassSandbox,
@@ -646,10 +644,7 @@ void main() {
       );
       expect(connection.profile.model, legacyProfile.model);
       expect(connection.profile.reasoningEffort, legacyProfile.reasoningEffort);
-      expect(
-        connection.profile.connectionMode,
-        legacyProfile.connectionMode,
-      );
+      expect(connection.profile.connectionMode, legacyProfile.connectionMode);
       expect(connection.secrets, const ConnectionSecrets());
       expect(
         await preferences.getString('pocket_relay.profile'),
@@ -835,6 +830,68 @@ void main() {
       expect(secondConnection.id, 'conn_first');
       expect(secondConnection.profile.host, legacyProfile.host);
       expect(secondConnection.profile.username, legacyProfile.username);
+    },
+  );
+
+  test(
+    'loadCatalog defers legacy indexed connection migration when secure secret reads fail',
+    () async {
+      final legacyProfile = ConnectionProfile.defaults().copyWith(
+        host: 'relay.example.com',
+        username: 'vince',
+        workspaceDir: '/workspace/app',
+      );
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'pocket_relay.connections.index': jsonEncode(<String, Object?>{
+          'schemaVersion': 1,
+          'orderedConnectionIds': <String>['conn_seed'],
+        }),
+        'pocket_relay.connection.conn_seed.profile': jsonEncode(
+          legacyProfile.toJson(),
+        ),
+      });
+      final secureStorage = _ThrowingReadFakeFlutterSecureStorage(
+        <String, String>{passwordKeyForConnection('conn_seed'): 'secret'},
+        keyToThrowOn: passwordKeyForConnection('conn_seed'),
+      );
+      final preferences = SharedPreferencesAsync();
+      final repository = buildSecureConnectionRepository(
+        secureStorage: secureStorage,
+        preferences: preferences,
+        connectionIdGenerator: () => 'conn_unused',
+        systemIdGenerator: () => 'system_seed',
+      );
+
+      final catalog = await repository.loadCatalog();
+      final systemCatalog = await repository.loadSystemCatalog();
+      final connection = await repository.loadConnection('conn_seed');
+      final system = await repository.loadSystem('system_seed');
+
+      expect(catalog.orderedConnectionIds, <String>['conn_seed']);
+      expect(systemCatalog.orderedSystemIds, <String>['system_seed']);
+      expect(
+        connection,
+        SavedConnection(
+          id: 'conn_seed',
+          profile: legacyProfile,
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(
+        system,
+        SavedSystem(
+          id: 'system_seed',
+          profile: systemProfileFromConnectionProfile(legacyProfile),
+          secrets: const ConnectionSecrets(),
+        ),
+      );
+      expect(await preferences.getString(workspaceIndexKey()), isNull);
+      expect(await preferences.getString(systemIndexKey()), isNull);
+      expect(
+        secureStorage.data[passwordKeyForConnection('conn_seed')],
+        'secret',
+      );
+      expect(secureStorage.data[systemPasswordKey('system_seed')], isNull);
     },
   );
 

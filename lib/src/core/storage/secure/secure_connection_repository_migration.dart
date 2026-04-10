@@ -67,13 +67,18 @@ Future<void> secureMigrateCatalogsIfNeeded(
   }
 
   final legacyCatalog = await state.catalogRecovery.loadCatalog();
-  if (legacySingletonConnection != null &&
-      !legacySingletonResult.allowCleanup) {
+  final legacyConnectionsResult = await _loadLegacyConnectionsForMigration(
+    state,
+    legacyCatalog: legacyCatalog,
+    legacySingletonConnection: legacySingletonConnection,
+    legacySingletonAllowCleanup: legacySingletonResult.allowCleanup,
+  );
+  if (!legacyConnectionsResult.allowCleanup &&
+      legacyConnectionsResult.connections.isNotEmpty) {
     state.deferredLegacyCatalogSnapshot =
         await _buildDeferredLegacyCatalogSnapshot(
           state,
-          legacyCatalog: legacyCatalog,
-          legacySingletonConnection: legacySingletonConnection,
+          legacyConnections: legacyConnectionsResult.connections,
         );
     return;
   }
@@ -87,12 +92,12 @@ Future<void> secureMigrateCatalogsIfNeeded(
           id: seededConnectionId,
           profile: ConnectionProfile.defaults(),
           secrets: const ConnectionSecrets(),
-    );
+        );
     await migrateLegacyConnectionsIntoSplitStorage(
       state,
-      legacyConnections: <SavedConnection>[
-        seededConnection.copyWith(id: seededConnectionId),
-      ],
+      legacyConnections: legacySingletonConnection == null
+          ? <SavedConnection>[seededConnection.copyWith(id: seededConnectionId)]
+          : legacyConnectionsResult.connections,
     );
     _clearDeferredLegacyCatalogSnapshot(state);
     await _clearDeferredLegacySingletonWorkspaceId(state);
@@ -103,38 +108,9 @@ Future<void> secureMigrateCatalogsIfNeeded(
     return;
   }
 
-  final legacyConnections = <SavedConnection>[];
-  var pendingSingletonUpgrade = legacySingletonConnection;
-  for (final connectionId in legacyCatalog.orderedConnectionIds) {
-    final summary = legacyCatalog.connectionForId(connectionId);
-    if (summary == null) {
-      continue;
-    }
-
-    final migratedConnection =
-        pendingSingletonUpgrade != null &&
-            summary.profile == ConnectionProfile.defaults()
-        ? pendingSingletonUpgrade.copyWith(id: connectionId)
-        : SavedConnection(
-            id: connectionId,
-            profile: summary.profile,
-            secrets: await readLegacyConnectionSecrets(state, connectionId),
-          );
-    if (pendingSingletonUpgrade != null &&
-        migratedConnection.id == connectionId &&
-        migratedConnection.profile == pendingSingletonUpgrade.profile &&
-        connectionSecretsEqual(
-          migratedConnection.secrets,
-          pendingSingletonUpgrade.secrets,
-        )) {
-      pendingSingletonUpgrade = null;
-    }
-    legacyConnections.add(migratedConnection);
-  }
-
   await migrateLegacyConnectionsIntoSplitStorage(
     state,
-    legacyConnections: legacyConnections,
+    legacyConnections: legacyConnectionsResult.connections,
   );
   _clearDeferredLegacyCatalogSnapshot(state);
   await _clearDeferredLegacySingletonWorkspaceId(state);
@@ -198,14 +174,8 @@ void _clearDeferredLegacyCatalogSnapshot(
 
 Future<DeferredLegacyCatalogSnapshot> _buildDeferredLegacyCatalogSnapshot(
   SecureConnectionRepositoryState state, {
-  required ConnectionCatalogState? legacyCatalog,
-  required SavedConnection legacySingletonConnection,
+  required List<SavedConnection> legacyConnections,
 }) async {
-  final legacyConnections = await _loadLegacyConnectionsForMigration(
-    state,
-    legacyCatalog: legacyCatalog,
-    legacySingletonConnection: legacySingletonConnection,
-  );
   final splitCatalogs = _buildSplitCatalogsFromLegacyConnections(
     state,
     legacyConnections: legacyConnections,
@@ -249,21 +219,33 @@ Future<DeferredLegacyCatalogSnapshot> _buildDeferredLegacyCatalogSnapshot(
   );
 }
 
-Future<List<SavedConnection>> _loadLegacyConnectionsForMigration(
+Future<({List<SavedConnection> connections, bool allowCleanup})>
+_loadLegacyConnectionsForMigration(
   SecureConnectionRepositoryState state, {
   required ConnectionCatalogState? legacyCatalog,
-  required SavedConnection legacySingletonConnection,
+  required SavedConnection? legacySingletonConnection,
+  required bool legacySingletonAllowCleanup,
 }) async {
   if (legacyCatalog == null || legacyCatalog.isEmpty) {
+    if (legacySingletonConnection == null) {
+      return (connections: const <SavedConnection>[], allowCleanup: true);
+    }
+
     final workspaceId = await _loadOrCreateDeferredLegacySingletonWorkspaceId(
       state,
     );
-    return <SavedConnection>[
-      legacySingletonConnection.copyWith(id: workspaceId),
-    ];
+    return (
+      connections: <SavedConnection>[
+        legacySingletonConnection.copyWith(id: workspaceId),
+      ],
+      allowCleanup: legacySingletonAllowCleanup,
+    );
   }
 
   final legacyConnections = <SavedConnection>[];
+  var allowCleanup = legacySingletonConnection == null
+      ? true
+      : legacySingletonAllowCleanup;
   SavedConnection? pendingSingletonUpgrade = legacySingletonConnection;
   for (final connectionId in legacyCatalog.orderedConnectionIds) {
     final summary = legacyCatalog.connectionForId(connectionId);
@@ -271,27 +253,36 @@ Future<List<SavedConnection>> _loadLegacyConnectionsForMigration(
       continue;
     }
 
-    final migratedConnection =
-        pendingSingletonUpgrade != null &&
-            summary.profile == ConnectionProfile.defaults()
-        ? pendingSingletonUpgrade.copyWith(id: connectionId)
-        : SavedConnection(
-            id: connectionId,
-            profile: summary.profile,
-            secrets: await readLegacyConnectionSecrets(state, connectionId),
-          );
     if (pendingSingletonUpgrade != null &&
-        migratedConnection.id == connectionId &&
-        migratedConnection.profile == pendingSingletonUpgrade.profile &&
-        connectionSecretsEqual(
-          migratedConnection.secrets,
-          pendingSingletonUpgrade.secrets,
-        )) {
-      pendingSingletonUpgrade = null;
+        summary.profile == ConnectionProfile.defaults()) {
+      final migratedConnection = pendingSingletonUpgrade.copyWith(
+        id: connectionId,
+      );
+      if (migratedConnection.profile == pendingSingletonUpgrade.profile &&
+          connectionSecretsEqual(
+            migratedConnection.secrets,
+            pendingSingletonUpgrade.secrets,
+          )) {
+        pendingSingletonUpgrade = null;
+      }
+      legacyConnections.add(migratedConnection);
+      continue;
     }
-    legacyConnections.add(migratedConnection);
+
+    final secretsResult = await readLegacyConnectionSecretsWithStatus(
+      state,
+      connectionId,
+    );
+    allowCleanup = allowCleanup && secretsResult.allowCleanup;
+    legacyConnections.add(
+      SavedConnection(
+        id: connectionId,
+        profile: summary.profile,
+        secrets: secretsResult.secrets,
+      ),
+    );
   }
-  return legacyConnections;
+  return (connections: legacyConnections, allowCleanup: allowCleanup);
 }
 
 Future<String> _loadOrCreateDeferredLegacySingletonWorkspaceId(

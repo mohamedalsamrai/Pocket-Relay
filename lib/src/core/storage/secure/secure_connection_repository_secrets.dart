@@ -77,6 +77,36 @@ Future<ConnectionSecrets> readLegacyConnectionSecrets(
   );
 }
 
+Future<({ConnectionSecrets secrets, bool allowCleanup})>
+readLegacyConnectionSecretsWithStatus(
+  SecureConnectionRepositoryState state,
+  String connectionId,
+) async {
+  final passwordResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    passwordKeyForConnection(connectionId),
+  );
+  final privateKeyResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    privateKeyKeyForConnection(connectionId),
+  );
+  final passphraseResult = await _readSecretOrEmptyOnFailure(
+    state.secureStorage,
+    privateKeyPassphraseKeyForConnection(connectionId),
+  );
+  return (
+    secrets: ConnectionSecrets(
+      password: passwordResult.value,
+      privateKeyPem: privateKeyResult.value,
+      privateKeyPassphrase: passphraseResult.value,
+    ),
+    allowCleanup:
+        !passwordResult.readFailed &&
+        !privateKeyResult.readFailed &&
+        !passphraseResult.readFailed,
+  );
+}
+
 Future<SavedConnection?> readLegacySingletonConnection(
   SecureConnectionRepositoryState state,
 ) async {
