@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pocket_relay/src/core/errors/pocket_error.dart';
@@ -12,6 +13,7 @@ import 'package:pocket_relay/src/features/chat/composer/presentation/surface/cha
 import 'package:pocket_relay/src/features/chat/composer/presentation/surface/chat_composer_surface_input.dart';
 import 'package:pocket_relay/src/features/chat/composer/presentation/surface/chat_composer_surface_layout.dart';
 import 'package:pocket_relay/src/features/chat/lane/presentation/chat_screen_contract.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 class ChatComposerSurface extends StatefulWidget {
   const ChatComposerSurface({
@@ -36,6 +38,21 @@ class ChatComposerSurface extends StatefulWidget {
 class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
   static const _imageAttachmentLoader = ChatComposerImageAttachmentLoader();
   static const _imageAttachmentPicker = ChatComposerImageAttachmentPicker();
+
+  /// Image formats to probe when reading from the clipboard, ordered by
+  /// preference. PNG is first because it is universally supported and is
+  /// synthesised automatically on macOS (from TIFF) and Windows (from DIB).
+  /// TIFF is listed early because it is the native macOS pasteboard format.
+  /// Web only supports PNG via the Async Clipboard API.
+  static const _clipboardImageFormats = [
+    Formats.png,
+    Formats.jpeg,
+    Formats.tiff,
+    Formats.gif,
+    Formats.webp,
+    Formats.heic,
+    Formats.heif,
+  ];
   late final TextEditingController _controller;
   late final AtomicPlaceholderTextInputFormatter _placeholderFormatter;
   late ChatComposerDraft _draft;
@@ -112,6 +129,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
       onInsertNewlineFromKeyboard: () {
         _insertTextAtSelection('\n');
       },
+      onPaste: _handlePaste,
     );
   }
 
@@ -143,7 +161,7 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
 
   Future<void> _handleAttachImageTriggered() async {
     try {
-      final imageAttachment = await _pickImageAttachment();
+        final imageAttachment = await _pickImageAttachment();
       if (!mounted || imageAttachment == null) {
         return;
       }
@@ -203,6 +221,59 @@ class _ChatComposerSurfaceState extends State<ChatComposerSurface> {
     }
 
     return _imageAttachmentLoader.loadFromXFile(file);
+  }
+
+  Future<void> _handlePaste() async {
+    final clipboard = SystemClipboard.instance;
+    if (clipboard == null) return;
+
+    final reader = await clipboard.read();
+
+    final format = _clipboardImageFormats
+        .where(reader.canProvide)
+        .firstOrNull;
+    if (format == null) return;
+
+    final completer = Completer<Uint8List?>();
+    reader.getFile(
+      format,
+      (file) async => completer.complete(await file.readAll()),
+      onError: (_) => completer.complete(null),
+    );
+    final bytes = await completer.future;
+
+    if (!mounted || bytes == null) return;
+
+    try {
+      final file = XFile.fromData(bytes);
+      final imageAttachment = await _imageAttachmentLoader.loadFromXFile(file);
+      if (!mounted) return;
+
+      _draft = _draft.copyWith(text: _controller.text).normalized();
+      final currentSelection = _controller.selection;
+      final insertion = _draft.insertImageAttachment(
+        attachment: imageAttachment,
+        selectionStart: currentSelection.start,
+        selectionEnd: currentSelection.end,
+      );
+      _draft = insertion.draft;
+      _controller.value = _controller.value.copyWith(
+        text: _draft.text,
+        selection: TextSelection.collapsed(offset: insertion.selectionOffset),
+        composing: TextRange.empty,
+      );
+      setState(() {});
+      widget.onChanged(_draft);
+    } on ChatComposerImageAttachmentLoadException catch (error) {
+      if (!mounted) return;
+      _showTransientError(error.userFacingError);
+    } catch (error) {
+      if (!mounted) return;
+      _showTransientError(
+        ChatComposerImageAttachmentErrors.unexpected(),
+        underlyingError: error,
+      );
+    }
   }
 
   void _dismissKeyboard() {

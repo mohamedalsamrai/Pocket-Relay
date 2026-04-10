@@ -18,6 +18,7 @@ class ChatComposerSurfaceInput extends StatelessWidget {
     required this.canSubmitFromKeyboard,
     required this.onSubmitFromKeyboard,
     required this.onInsertNewlineFromKeyboard,
+    required this.onPaste,
   });
 
   final TextEditingController controller;
@@ -30,6 +31,8 @@ class ChatComposerSurfaceInput extends StatelessWidget {
   final bool Function() canSubmitFromKeyboard;
   final VoidCallback onSubmitFromKeyboard;
   final VoidCallback onInsertNewlineFromKeyboard;
+  final VoidCallback onPaste;
+
 
   @override
   Widget build(BuildContext context) {
@@ -37,23 +40,38 @@ class ChatComposerSurfaceInput extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextField(
-          key: const ValueKey('composer_input'),
-          controller: controller,
-          minLines: 1,
-          maxLines: 6,
-          textInputAction: TextInputAction.newline,
-          onTapOutside: (_) => onTapOutside(),
-          inputFormatters: <TextInputFormatter>[inputFormatter],
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            hintText: placeholder,
-            isCollapsed: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 4),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: false,
+        Focus(
+          onKeyEvent: (node, event) {
+            final isPaste =
+                event is KeyDownEvent &&
+                (HardwareKeyboard.instance.isControlPressed ||
+                    HardwareKeyboard.instance.isMetaPressed) &&
+                event.logicalKey == LogicalKeyboardKey.keyV;
+
+            if (isPaste) {
+              onPaste();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: TextField(
+            key: const ValueKey('composer_input'),
+            controller: controller,
+            minLines: 1,
+            maxLines: 6,
+            textInputAction: TextInputAction.newline,
+            onTapOutside: (_) => onTapOutside(),
+            inputFormatters: <TextInputFormatter>[inputFormatter],
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              hintText: placeholder,
+              isCollapsed: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+            ),
           ),
         ),
         if (attachmentSummaries.isNotEmpty) ...[
