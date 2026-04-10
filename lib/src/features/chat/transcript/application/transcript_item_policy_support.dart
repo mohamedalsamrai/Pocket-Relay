@@ -1,8 +1,7 @@
 part of 'transcript_item_policy.dart';
 
 int? _extractExitCode(Map<String, dynamic>? snapshot) {
-  final value = snapshot?['exitCode'] ?? snapshot?['exit_code'];
-  return value is num ? value.toInt() : null;
+  return TranscriptCommandAuditSnapshot.exitCodeValue(snapshot);
 }
 
 bool _shouldForkVisibleArtifact(

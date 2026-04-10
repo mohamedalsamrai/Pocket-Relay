@@ -171,61 +171,136 @@ void main() {
     },
   );
 
-  test('command lifecycle updates replace stale terminal snapshot fields', () {
-    final reducer = TranscriptReducer();
-    final now = DateTime(2026, 3, 14, 12);
-    var state = reducer.reduceRuntimeEvent(
-      TranscriptSessionState.initial(),
-      TranscriptRuntimeItemStartedEvent(
-        createdAt: now,
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        snapshot: const <String, Object?>{'command': 'git status'},
-      ),
-    );
+  test(
+    'command lifecycle updates preserve retained terminal input snapshot fields',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        TranscriptSessionState.initial(),
+        TranscriptRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{'command': 'git status'},
+        ),
+      );
 
-    state = reducer.reduceRuntimeEvent(
-      state,
-      TranscriptRuntimeItemUpdatedEvent(
-        createdAt: now.add(const Duration(milliseconds: 10)),
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        rawMethod: 'item/commandExecution/terminalInteraction',
-        snapshot: const <String, Object?>{
-          'processId': 'proc_1',
-          'stdin': 'y\n',
-        },
-      ),
-    );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 10)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          rawMethod: 'item/commandExecution/terminalInteraction',
+          snapshot: const <String, Object?>{
+            'processId': 'proc_1',
+            'stdin': 'y\n',
+          },
+        ),
+      );
 
-    state = reducer.reduceRuntimeEvent(
-      state,
-      TranscriptRuntimeItemUpdatedEvent(
-        createdAt: now.add(const Duration(milliseconds: 20)),
-        itemType: TranscriptCanonicalItemType.commandExecution,
-        threadId: 'thread_123',
-        turnId: 'turn_123',
-        itemId: 'command_snapshot_1',
-        status: TranscriptRuntimeItemStatus.inProgress,
-        snapshot: const <String, Object?>{
-          'command': 'git status',
-          'processId': 'proc_1',
-        },
-      ),
-    );
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 20)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_snapshot_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{
+            'command': 'git status',
+            'processId': 'proc_1',
+          },
+        ),
+      );
 
-    final activeItem = state.activeTurn?.itemsById['command_snapshot_1'];
-    expect(activeItem, isNotNull);
-    expect(activeItem?.snapshot?['stdin'], isNull);
-    expect(activeItem?.snapshot?['processId'], 'proc_1');
-    expect(activeItem?.snapshot?['command'], 'git status');
-  });
+      final activeItem = state.activeTurn?.itemsById['command_snapshot_1'];
+      expect(activeItem, isNotNull);
+      expect(activeItem?.snapshot?['stdin'], 'y\n');
+      expect(activeItem?.snapshot?['processId'], 'proc_1');
+      expect(activeItem?.snapshot?['command'], 'git status');
+    },
+  );
+
+  test(
+    'retains live command output and terminal input in the command work-log snapshot after completion',
+    () {
+      final reducer = TranscriptReducer();
+      final now = DateTime(2026, 3, 14, 12);
+      var state = reducer.reduceRuntimeEvent(
+        TranscriptSessionState.initial(),
+        TranscriptRuntimeItemStartedEvent(
+          createdAt: now,
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_retained_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          snapshot: const <String, Object?>{'command': 'python demo.py'},
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemUpdatedEvent(
+          createdAt: now.add(const Duration(milliseconds: 10)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_retained_1',
+          status: TranscriptRuntimeItemStatus.inProgress,
+          rawMethod: 'item/commandExecution/terminalInteraction',
+          snapshot: const <String, Object?>{
+            'processId': 'proc_1',
+            'stdin': '\n',
+          },
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeContentDeltaEvent(
+          createdAt: now.add(const Duration(milliseconds: 20)),
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_retained_1',
+          streamKind: TranscriptRuntimeContentStreamKind.commandOutput,
+          delta: 'ready\n',
+        ),
+      );
+
+      state = reducer.reduceRuntimeEvent(
+        state,
+        TranscriptRuntimeItemCompletedEvent(
+          createdAt: now.add(const Duration(milliseconds: 30)),
+          itemType: TranscriptCanonicalItemType.commandExecution,
+          threadId: 'thread_123',
+          turnId: 'turn_123',
+          itemId: 'command_retained_1',
+          status: TranscriptRuntimeItemStatus.completed,
+          snapshot: const <String, Object?>{'exitCode': 0},
+        ),
+      );
+
+      final workBlock =
+          state.transcriptBlocks.single as TranscriptWorkLogGroupBlock;
+      final entry = workBlock.entries.single;
+
+      expect(entry.exitCode, 0);
+      expect(entry.snapshot?['command'], 'python demo.py');
+      expect(entry.snapshot?['processId'], 'proc_1');
+      expect(entry.snapshot?['stdin'], '\n');
+      expect(entry.snapshot?['aggregatedOutput'], 'ready\n');
+    },
+  );
 
   test(
     'command titles upgrade when later lifecycle events include the command',

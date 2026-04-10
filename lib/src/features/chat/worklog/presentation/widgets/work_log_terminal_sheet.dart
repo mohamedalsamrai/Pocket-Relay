@@ -40,7 +40,10 @@ const String _terminalCloseTooltip = 'Close';
 const String _terminalCommandPrefix = r'$ ';
 const String _terminalInputPrefix = '> ';
 const String _waitingForOutputMessage = 'Waiting for terminal output...';
-const String _emptyOutputMessage = 'No terminal output captured.';
+const String _emptyOutputMessage = 'Command completed without terminal output.';
+const String _uncapturedOutputMessage =
+    'Terminal output was not retained for this command.';
+const String _unknownOutputMessage = 'No terminal output captured.';
 const String _activityWithoutTranscriptMessage =
     'Runtime activity was recorded, but no terminal transcript was available.';
 const String _latestActivityPrefix = 'Latest activity: ';
@@ -229,23 +232,44 @@ String _terminalTranscriptText(ChatWorkLogTerminalContract terminal) {
   } else if (terminal.activitySummary case final activitySummary?) {
     buffer
       ..writeln()
-      ..write(
-        terminal.isWaiting
-            ? _waitingForOutputMessage
-            : _activityWithoutTranscriptMessage,
-      )
+      ..write(_terminalEmptyStateMessage(terminal, withActivitySummary: true))
       ..writeln()
       ..writeln()
       ..write('$_latestActivityPrefix$activitySummary');
+  } else if (terminal.outputState == ChatWorkLogTerminalOutputState.empty) {
+    buffer
+      ..writeln()
+      ..write(_emptyOutputMessage);
+  } else if (terminal.outputState ==
+      ChatWorkLogTerminalOutputState.uncaptured) {
+    buffer
+      ..writeln()
+      ..write(_uncapturedOutputMessage);
   } else if (!terminal.hasTerminalInput) {
     buffer
       ..writeln()
       ..write(
-        terminal.isWaiting ? _waitingForOutputMessage : _emptyOutputMessage,
+        terminal.isWaiting ? _waitingForOutputMessage : _unknownOutputMessage,
       );
   }
 
   return buffer.toString();
+}
+
+String _terminalEmptyStateMessage(
+  ChatWorkLogTerminalContract terminal, {
+  required bool withActivitySummary,
+}) {
+  if (terminal.isWaiting) {
+    return _waitingForOutputMessage;
+  }
+  return switch (terminal.outputState) {
+    ChatWorkLogTerminalOutputState.empty => _emptyOutputMessage,
+    ChatWorkLogTerminalOutputState.uncaptured => _uncapturedOutputMessage,
+    ChatWorkLogTerminalOutputState.unknown when withActivitySummary =>
+      _activityWithoutTranscriptMessage,
+    ChatWorkLogTerminalOutputState.unknown => _unknownOutputMessage,
+  };
 }
 
 void _writePrefixedBlock(

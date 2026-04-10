@@ -1,4 +1,5 @@
 import 'package:pocket_relay/src/features/chat/transcript/domain/transcript_runtime_event.dart';
+import 'package:pocket_relay/src/features/chat/transcript/application/transcript_command_audit_snapshot.dart';
 
 class TranscriptMemoryBudget {
   const TranscriptMemoryBudget();
@@ -19,17 +20,17 @@ class TranscriptMemoryBudget {
     }
 
     final scopedSnapshot = switch (itemType) {
-      TranscriptCanonicalItemType.commandExecution => _pickKeys(
-        snapshot,
-        const {
+      TranscriptCanonicalItemType.commandExecution =>
+        _pickKeys(snapshot, const {
           'command',
           'processId',
           'process_id',
           'stdin',
           'exitCode',
           'exit_code',
-        },
-      ),
+          TranscriptCommandAuditSnapshot.aggregatedOutputKey,
+          retainedOutputStateKey,
+        }),
       TranscriptCanonicalItemType.mcpToolCall => _pickKeys(snapshot, const {
         'server',
         'serverName',

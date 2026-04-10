@@ -45,6 +45,7 @@ void main() {
                 commandText: 'deploy.sh',
                 isRunning: false,
                 isWaiting: false,
+                outputState: ChatWorkLogTerminalOutputState.uncaptured,
                 activitySummary: 'Waiting on remote deployment slot',
               ),
             ),
@@ -55,9 +56,7 @@ void main() {
       final text = tester.widget<SelectableText>(find.byType(SelectableText));
       expect(
         text.data,
-        contains(
-          'Runtime activity was recorded, but no terminal transcript was available.',
-        ),
+        contains('Terminal output was not retained for this command.'),
       );
       expect(
         text.data,
@@ -91,6 +90,38 @@ void main() {
     final text = tester.widget<SelectableText>(find.byType(SelectableText));
     expect(text.data, contains('Waiting for terminal output...'));
     expect(text.data, contains('Latest activity: still running'));
-    expect(text.data, isNot(contains('No terminal output captured.')));
+    expect(
+      text.data,
+      isNot(contains('Command completed without terminal output.')),
+    );
+  });
+
+  testWidgets('shows explicit empty output distinctly from uncaptured output', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildPocketTheme(Brightness.light),
+        home: const Scaffold(
+          body: WorkLogTerminalSheet(
+            terminal: ChatWorkLogTerminalContract(
+              id: 'terminal_4',
+              activityLabel: 'Ran command',
+              commandText: 'true',
+              isRunning: false,
+              isWaiting: false,
+              outputState: ChatWorkLogTerminalOutputState.empty,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final text = tester.widget<SelectableText>(find.byType(SelectableText));
+    expect(text.data, contains('Command completed without terminal output.'));
+    expect(
+      text.data,
+      isNot(contains('Terminal output was not retained for this command.')),
+    );
   });
 }
