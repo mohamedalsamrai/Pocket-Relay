@@ -232,6 +232,56 @@ void main() {
   );
 
   test(
+    'clearing the transcript during in-flight cold-start recovery clears the persisted selected thread',
+    () async {
+      final clientsById = buildClientsById('conn_primary', 'conn_secondary');
+      clientsById['conn_secondary']!.connectGate = Completer<void>();
+      final recoveryStore = MemoryConnectionWorkspaceRecoveryStore(
+        initialState: const ConnectionWorkspaceRecoveryState(
+          connectionId: 'conn_secondary',
+          selectedThreadId: 'thread_saved',
+          draftText: 'Restore my draft',
+          backgroundedLifecycleState:
+              ConnectionWorkspaceBackgroundLifecycleState.paused,
+        ),
+      );
+      final controller = buildWorkspaceController(
+        clientsById: clientsById,
+        recoveryStore: recoveryStore,
+        recoveryPersistenceDebounceDuration: Duration.zero,
+      );
+      addTearDown(() async {
+        if (!clientsById['conn_secondary']!.connectGate!.isCompleted) {
+          clientsById['conn_secondary']!.connectGate!.complete();
+        }
+        controller.dispose();
+        await closeClients(clientsById);
+      });
+
+      final initialization = controller.initialize();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.transportRecoveryPhaseFor('conn_secondary'),
+        ConnectionWorkspaceTransportRecoveryPhase.reconnecting,
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, 'thread_saved');
+
+      controller.selectedLaneBinding!.sessionController.clearTranscript();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.debugLatestUnsavedRecoveryState?.selectedThreadId,
+        isNull,
+      );
+      expect((await recoveryStore.load())?.selectedThreadId, isNull);
+
+      clientsById['conn_secondary']!.connectGate!.complete();
+      await initialization;
+    },
+  );
+
+  test(
     'lifecycle persistence after failed cold-start recovery keeps the selected thread for the next launch retry',
     () async {
       const initialRecoveryState = ConnectionWorkspaceRecoveryState(

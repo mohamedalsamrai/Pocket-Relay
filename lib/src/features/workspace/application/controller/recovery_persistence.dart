@@ -31,6 +31,7 @@ ConnectionWorkspaceRecoveryState? _selectedWorkspaceRecoveryStateSnapshot(
       controller._state.requiresTransportReconnect(selectedConnectionId) &&
       diagnostics?.lastRecoveryOrigin ==
           ConnectionWorkspaceRecoveryOrigin.coldStart &&
+      !binding.sessionController.suppressesTrackedThreadReuse &&
       diagnostics?.lastRecoveryStartedAt != null &&
       (diagnostics?.lastRecoveryCompletedAt == null ||
           isLifecyclePersistenceFlush);
